@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import appConfig from '../utils/app-config';
 
-// IMPORTANT: Directly hardcoding Supabase credentials to avoid environment variable issues
-// In a production environment, these should be managed through environment variables
-const supabaseUrl = 'https://cpeyavpxqcloupolbvyh.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwZXlhdnB4cWNsb3Vwb2xidnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0OTY4OTYsImV4cCI6MjA2MTA3Mjg5Nn0.5rxsiRuLHCpeJZ5TqoIA5X4UwoAAuxIpNu_reafwwbQ';
+// Using environment variables for Supabase credentials
+const supabaseUrl = appConfig.supabase.url;
+const supabaseAnonKey = appConfig.supabase.anonKey;
 
-console.log('Services - Supabase URL (hardcoded):', supabaseUrl);
+console.log('Services - Supabase URL:', supabaseUrl);
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
