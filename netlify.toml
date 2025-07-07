@@ -1,0 +1,26 @@
+[build]
+  publish = "build"
+  command = "npm run build"
+
+# Redirect rule to support client-side routing for the SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Cache control for static assets
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment settings for production
+[context.production.environment]
+  REACT_APP_API_URL = "https://api.trashdrop.com"
+  # Note: Sensitive environment variables should be set in the Netlify dashboard
+
+# Enable PWA features and offline capabilities
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
