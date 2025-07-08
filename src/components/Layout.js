@@ -27,7 +27,7 @@ const Layout = () => {
   }, [location.pathname]);
   
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-800">
       <NavBar />
       <OfflineIndicator />
       {/* Add extra bottom padding for pages with maps on mobile */}

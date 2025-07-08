@@ -11,6 +11,20 @@ const appConfig = {
   supabase: {
     url: process.env.REACT_APP_SUPABASE_URL,
     anonKey: process.env.REACT_APP_SUPABASE_ANON_KEY,
+    // Log env variable status without exposing actual values
+    validateConfig: () => {
+      if (!process.env.REACT_APP_SUPABASE_URL) {
+        console.error('REACT_APP_SUPABASE_URL is missing');
+      } else {
+        console.log('REACT_APP_SUPABASE_URL is set');
+      }
+      
+      if (!process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        console.error('REACT_APP_SUPABASE_ANON_KEY is missing');
+      } else {
+        console.log('REACT_APP_SUPABASE_ANON_KEY is set');
+      }
+    },
   },
   maps: {
     defaultCenter: {

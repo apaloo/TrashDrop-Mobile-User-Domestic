@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../utils/supabaseClient';
+import { authService, supabase } from '../utils/supabaseClient';
 import appConfig from '../utils/app-config';
 import idbUtils from '../utils/indexedDB';
 
@@ -19,6 +19,42 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [authRetries, setAuthRetries] = useState(0);
+  const [authFallbackNeeded, setAuthFallbackNeeded] = useState(false);
+  
+  // Function to clear all auth-related storage
+  const clearAuthData = () => {
+    // Clear Supabase auth data from localStorage
+    if (typeof localStorage !== 'undefined') {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-') || 
+                   key === appConfig.storage.userKey || 
+                   key === appConfig.storage.tokenKey)) {
+          keysToRemove.push(key);
+        }
+      }
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
+      console.log('Cleared authentication data from localStorage');
+    }
+  };
+  
+  // Reset auth state function
+  const resetAuthState = async () => {
+    setUser(null);
+    setIsAuthenticated(false);
+    clearAuthData();
+    await supabase.auth.signOut();
+    setAuthRetries(0);
+    setAuthFallbackNeeded(true);
+    setError('Authentication error occurred. Please sign in again.');
+  };
+  
   useEffect(() => {
     // Try to load user from localStorage first for immediate UI update
     const storedUser = localStorage.getItem(appConfig.storage.userKey);
@@ -28,6 +64,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
       } catch (e) {
         console.error('Failed to parse stored user data', e);
+        clearAuthData();
       }
     }
     
@@ -37,27 +74,68 @@ export const AuthProvider = ({ children }) => {
       try {
         const { session, error } = await authService.getSession();
         
-        if (error) throw error;
+        if (error) {
+          if (error.message && (error.message.includes('invalid JWT') || 
+                              error.message.includes('malformed'))) {
+            console.warn('JWT token error detected, clearing auth data');
+            await resetAuthState();
+            return;
+          }
+          throw error;
+        }
         
         if (session) {
-          const { user: currentUser } = await authService.getCurrentUser();
-          setUser(currentUser);
-          setIsAuthenticated(true);
-          // Update localStorage with latest user data
-          localStorage.setItem(appConfig.storage.userKey, JSON.stringify(currentUser));
+          try {
+            const { user: currentUser, error: userError } = await authService.getCurrentUser();
+            
+            if (userError) {
+              if (userError.message && (userError.message.includes('invalid JWT') || 
+                                       userError.message.includes('malformed'))) {
+                console.warn('JWT token error when getting user, clearing auth data');
+                await resetAuthState();
+                return;
+              }
+              throw userError;
+            }
+            
+            if (currentUser) {
+              setUser(currentUser);
+              setIsAuthenticated(true);
+              setAuthFallbackNeeded(false);
+              // Update localStorage with latest user data
+              localStorage.setItem(appConfig.storage.userKey, JSON.stringify(currentUser));
+              setError(null);
+            } else {
+              // No user found despite valid session
+              console.warn('No user found despite valid session');
+              await resetAuthState();
+            }
+          } catch (userErr) {
+            console.error('Error getting current user:', userErr);
+            // Increment retry counter
+            if (authRetries < 2) {
+              setAuthRetries(prev => prev + 1);
+            } else {
+              await resetAuthState();
+            }
+          }
         } else {
           setUser(null);
           setIsAuthenticated(false);
+          setAuthFallbackNeeded(true);
           // Clear stored user data if no valid session
-          localStorage.removeItem(appConfig.storage.userKey);
-          localStorage.removeItem(appConfig.storage.tokenKey);
+          clearAuthData();
         }
-        setError(null);
       } catch (err) {
         console.error('Auth check error:', err);
         setError(err.message);
-        setUser(null);
-        setIsAuthenticated(false);
+        
+        // If we've tried multiple times and still have errors, reset auth
+        if (authRetries >= 2) {
+          await resetAuthState();
+        } else {
+          setAuthRetries(prev => prev + 1);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -66,14 +144,23 @@ export const AuthProvider = ({ children }) => {
     checkSession();
     
     // Set up auth state change listener
-    const { data: authListener } = authService.getSession();
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event);
+      if (event === 'SIGNED_IN' && session) {
+        checkSession();
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsAuthenticated(false);
+        clearAuthData();
+      }
+    });
     
     return () => {
-      if (authListener && authListener.subscription) {
-        authListener.subscription.unsubscribe();
+      if (authListener && authListener.unsubscribe) {
+        authListener.unsubscribe();
       }
     };
-  }, []);
+  }, [authRetries]);
 
   const signIn = async (email, password) => {
     setIsLoading(true);

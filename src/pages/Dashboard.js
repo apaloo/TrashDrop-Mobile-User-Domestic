@@ -28,40 +28,49 @@ const Dashboard = () => {
       setIsLoading(true);
       
       try {
-        // In a real app, these would be API calls
-        // Mock data for development
-        setTimeout(() => {
-          setStats({
-            points: 250,
-            pickups: 5,
-            reports: 3,
-          });
-          
-          setRecentActivity([
-            { id: 1, type: 'pickup', status: 'completed', date: '2025-07-01', points: 50 },
-            { id: 2, type: 'report', status: 'verified', date: '2025-06-28', points: 30 },
-            { id: 3, type: 'pickup', status: 'scheduled', date: '2025-07-10', points: 0 },
-          ]);
-          
-          // Create mock active pickup request matching the screenshot
-          setActivePickup({
-            id: 'pickup-123',
-            status: 'waiting_for_collector',
-            collector_id: 'collector-456',
-            collector_name: 'John (Demo)',
-            location: [37.7749, -122.4194], // NYC coordinates from the screenshot
-            address: '123 Main St, New York, NY',
-            waste_type: 'Mixed Recyclables',
-            number_of_bags: '2',
-            points: 0,
-            eta_minutes: null,
-            distance: null,
-            // Coordinates will be slightly offset for the collector
-            collector_location: [37.7649, -122.4294] 
-          });
-          
+        if (!user || !user.id) {
           setIsLoading(false);
-        }, 1000);
+          return;
+        }
+        
+        // Fetch user stats from Supabase
+        const { data: statsData, error: statsError } = await supabase
+          .from('user_stats')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (statsError) throw statsError;
+        
+        if (statsData) {
+          setStats({
+            points: statsData.total_points || 0,
+            pickups: statsData.total_pickups || 0,
+            reports: statsData.total_reports || 0,
+          });
+        }
+        
+        // Fetch recent activity from Supabase
+        const { data: activityData, error: activityError } = await supabase
+          .from('user_activity')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+          
+        if (activityError) throw activityError;
+        
+        if (activityData && activityData.length > 0) {
+          setRecentActivity(activityData.map(activity => ({
+            id: activity.id,
+            type: activity.activity_type,
+            status: activity.status,
+            date: activity.created_at,
+            points: activity.points || 0
+          })));
+        }
+        
+        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setIsLoading(false);
@@ -70,12 +79,15 @@ const Dashboard = () => {
     
     fetchUserData();
     
-    // In a real application, we would fetch active pickup from supabase
+    // Fetch active pickup from supabase
     const fetchActivePickup = async () => {
       if (user && user.id) {
         try {
-          // This is commented out since we're using mock data for now
-          /* 
+          // Check session storage first for cached active pickup status
+          const sessionActivePickup = sessionStorage.getItem(`activePickup_${user.id}`);
+          const cachedPickup = sessionActivePickup ? JSON.parse(sessionActivePickup) : null;
+          
+          // Always fetch from Supabase to ensure data is fresh
           const { data, error } = await supabase
             .from('pickups')
             .select('*')
@@ -85,33 +97,80 @@ const Dashboard = () => {
             .limit(1)
             .single();
             
-          if (error) throw error;
+          if (error && error.code !== 'PGRST116') { // PGRST116 is the error for no rows returned
+            throw error;
+          }
           
           if (data) {
             // Format pickup data for the card
-            setActivePickup({
+            const formattedPickup = {
               id: data.id,
               status: data.status,
               collector_id: data.collector_id,
-              collector_name: data.collector_name || 'John (Demo)',
+              collector_name: data.collector_name || 'Assigned Collector',
               location: data.location,
               address: data.address,
               waste_type: data.waste_type,
               number_of_bags: data.number_of_bags,
               points: data.points || 0,
               eta_minutes: data.eta_minutes,
-              distance: data.distance
-            });
+              distance: data.distance,
+              created_at: data.created_at,
+              updated_at: data.updated_at
+            };
+            
+            setActivePickup(formattedPickup);
+            
+            // Save to session storage for persistence across page reloads
+            sessionStorage.setItem(`activePickup_${user.id}`, JSON.stringify(formattedPickup));
+          } else {
+            // No active pickup found in database
+            setActivePickup(null);
+            // Clear from session storage
+            sessionStorage.removeItem(`activePickup_${user.id}`);
           }
-          */
         } catch (error) {
           console.error('Error fetching active pickup:', error);
+          setActivePickup(null);
         }
       }
     };
     
-    // Uncomment this for real implementation
-    // fetchActivePickup();
+    // Call the function to fetch active pickup
+    fetchActivePickup();
+    
+    // Set up real-time subscription for pickup status changes
+    const setupPickupSubscription = async () => {
+      if (user && user.id) {
+        // Subscribe to changes in the pickups table for this user
+        const pickupSubscription = supabase
+          .channel('pickup-changes')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'pickups', filter: `user_id=eq.${user.id}` },
+            (payload) => {
+              console.log('Pickup update received:', payload);
+              
+              // If the pickup status was changed to completed or cancelled, remove from active pickup
+              if (payload.new && (payload.new.status === 'completed' || payload.new.status === 'cancelled')) {
+                setActivePickup(null);
+                sessionStorage.removeItem(`activePickup_${user.id}`);
+              } else if (payload.new) {
+                // Update the active pickup with new data
+                fetchActivePickup();
+              }
+            }
+          )
+          .subscribe();
+          
+        return () => {
+          pickupSubscription.unsubscribe();
+        };
+      }
+    };
+    
+    // Setup the subscription
+    const unsubscribe = setupPickupSubscription();
     
   }, [user]);
   
@@ -299,26 +358,62 @@ const Dashboard = () => {
           onCancel={(pickupId) => {
             // Handle cancel pickup
             console.log('Cancelling pickup:', pickupId);
-            setActivePickup(null);
-            // In a real app, we'd call supabase to update the status
-            /*
+            
+            // Update the status in Supabase
             supabase
               .from('pickups')
-              .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+              .update({ 
+                status: 'cancelled', 
+                updated_at: new Date().toISOString() 
+              })
               .eq('id', pickupId)
               .then(({ error }) => {
                 if (error) {
                   console.error('Error cancelling pickup:', error);
                 } else {
+                  // Set to null immediately to remove from UI
                   setActivePickup(null);
                 }
               });
-            */
           }}
           onRefresh={() => {
             // Handle refresh pickup data
             console.log('Refreshing pickup data');
-            // In a real app, we'd fetch updated data from supabase
+            
+            // Re-fetch updated data from Supabase
+            if (user && user.id) {
+              supabase
+                .from('pickups')
+                .select('*')
+                .eq('user_id', user.id)
+                .in('status', ['waiting_for_collector', 'collector_assigned', 'en_route', 'arrived'])
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+                .then(({ data, error }) => {
+                  if (error && error.code !== 'PGRST116') {
+                    console.error('Error refreshing pickup data:', error);
+                  }
+                  
+                  if (data) {
+                    setActivePickup({
+                      id: data.id,
+                      status: data.status,
+                      collector_id: data.collector_id,
+                      collector_name: data.collector_name || 'Assigned Collector',
+                      location: data.location,
+                      address: data.address,
+                      waste_type: data.waste_type,
+                      number_of_bags: data.number_of_bags,
+                      points: data.points || 0,
+                      eta_minutes: data.eta_minutes,
+                      distance: data.distance
+                    });
+                  } else {
+                    setActivePickup(null);
+                  }
+                });
+            }
           }}
         />
       )}

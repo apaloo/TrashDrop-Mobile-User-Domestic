@@ -1,10 +1,12 @@
 import { Routes, Route } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { Suspense, lazy, useEffect } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
+import InstallPrompt from './components/InstallPrompt';
+import AuthFallback from './components/AuthFallback';
 
 // Import pages
 import Login from './pages/Login';
@@ -20,18 +22,35 @@ import Activity from './pages/Activity';
 import Profile from './pages/Profile';
 
 /**
- * Main application component with routing and context providers
+ * Application content with auth state handling
  */
-function App() {
+const AppContent = () => {
+  const { isLoading, authFallbackNeeded } = useAuth();
+  
+  // Show loading spinner during initial load
+  if (isLoading && !authFallbackNeeded) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+  
+  // Show auth fallback when authentication fails
+  if (authFallbackNeeded) {
+    return <AuthFallback />;
+  }
+  
+  // Render normal app routes when authenticated
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <Suspense fallback={
-          <div className="flex justify-center items-center h-screen">
-            <LoadingSpinner size="lg" />
-          </div>
-        }>
-          <Routes>
+    <Suspense fallback={
+      <div className="flex justify-center items-center h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    }>
+      <InstallPrompt />
+      <Routes>
+
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -101,6 +120,17 @@ function App() {
             } />
           </Routes>
         </Suspense>
+  );
+};
+
+/**
+ * Main application component with routing and context providers
+ */
+function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
       </AuthProvider>
     </ThemeProvider>
   );

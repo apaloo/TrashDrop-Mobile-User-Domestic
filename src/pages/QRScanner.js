@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { supabase } from '../utils/supabaseClient';
 
 /**
  * QR Scanner component for scanning trash bin QR codes
@@ -40,6 +41,34 @@ const QRScanner = () => {
   // Stream reference to store the camera stream for cleanup
   const streamRef = React.useRef(null);
   
+  // Function to validate TrashDrops QR codes
+  const validateQRCode = (qrData) => {
+    try {
+      // TrashDrops QR codes should have a specific format like:
+      // TRASHDROP:{binId}:{timestamp}:{signature}
+      if (!qrData.startsWith('TRASHDROP:')) {
+        return { isValid: false, message: 'This is not a valid TrashDrops QR code. Please scan codes from authorized trash bags only.' };
+      }
+      
+      const parts = qrData.split(':');
+      if (parts.length !== 4) {
+        return { isValid: false, message: 'Invalid QR code format. Please use authorized trash bags.' };
+      }
+      
+      // In a real app, we would verify the signature against our server
+      // For now, we'll simply validate the format
+      return { 
+        isValid: true,
+        binId: parts[1],
+        timestamp: parts[2],
+        signature: parts[3]
+      };
+    } catch (error) {
+      console.error('QR code validation error:', error);
+      return { isValid: false, message: 'Error validating QR code.' };
+    }
+  };
+
   // Function to actually scan QR code using device camera
   const startScanning = () => {
     setScanning(true);
@@ -70,38 +99,56 @@ const QRScanner = () => {
         }
         
         // In a real app, we would use a QR code scanning library here
-        // For now, we'll still simulate the scanning after a delay
+        // For now, we'll simulate the scanning after a delay
         setTimeout(() => {
           // Simulate successful scan 80% of the time
           const success = Math.random() > 0.2;
           
           if (success) {
-            // Generate a random bin ID and location
+            // Generate a simulated QR code data
+            const timestamp = Date.now().toString();
             const binId = `BIN-${Math.floor(1000 + Math.random() * 9000)}`;
-            const location = 'City Center, Main St';
-            const earnedPoints = Math.floor(10 + Math.random() * 30);
+            const signature = `SIG-${Math.random().toString(36).substring(2, 15)}`;
             
-            // Set scan result
-            setScanResult({
-              binId,
-              location,
-              timestamp: new Date().toISOString(),
-              points: earnedPoints
-            });
+            // 70% chance of valid TrashDrops QR code, 30% chance of invalid QR code
+            const isTrashDropQR = Math.random() > 0.3;
+            const qrData = isTrashDropQR ? 
+              `TRASHDROP:${binId}:${timestamp}:${signature}` : 
+              `https://example.com/some-other-qr-code`;
             
-            // Update points
-            setPoints(earnedPoints);
+            // Validate the QR code
+            const validationResult = validateQRCode(qrData);
             
-            // Save scan to "database" (in a real app, this would be an API call)
-            saveScan({
-              binId,
-              location,
-              timestamp: new Date().toISOString(),
-              userId: user?.id,
-              points: earnedPoints
-            });
+            if (validationResult.isValid) {
+              // Get location
+              const location = 'City Center, Main St';
+              const earnedPoints = Math.floor(10 + Math.random() * 30);
+              
+              // Set scan result
+              setScanResult({
+                binId: validationResult.binId,
+                location,
+                timestamp: new Date().toISOString(),
+                points: earnedPoints
+              });
+              
+              // Update points
+              setPoints(earnedPoints);
+              
+              // Save scan to Supabase
+              saveScan({
+                binId: validationResult.binId,
+                location,
+                timestamp: new Date().toISOString(),
+                userId: user?.id,
+                points: earnedPoints
+              });
+            } else {
+              // Invalid QR code
+              setError(validationResult.message);
+            }
           } else {
-            // Simulate error
+            // Simulate scan error
             setError('Could not recognize QR code. Please try again.');
           }
           
@@ -117,25 +164,53 @@ const QRScanner = () => {
       });
   };
 
-  // Function to save scan result (in a real app, this would be an API call)
+  // Function to save scan result to Supabase
   const saveScan = async (scanData) => {
     setLoading(true);
     
     try {
-      // Simulate API call
-      console.log('Saving scan data:', scanData);
+      if (!user || !user.id) {
+        throw new Error('User not authenticated');
+      }
       
-      // In a real app, this would store data in IndexedDB when offline
-      // and sync when back online using the service worker
+      // Store in Supabase
+      const { data, error } = await supabase
+        .from('scans')
+        .insert([
+          {
+            user_id: user.id,
+            bin_id: scanData.binId,
+            location: scanData.location,
+            scan_time: scanData.timestamp,
+            points: scanData.points
+          }
+        ]);
       
-      // Simulate successful save
-      setTimeout(() => {
-        setLoading(false);
-      }, 1000);
+      if (error) throw error;
+      
+      console.log('QR scan saved to database:', data);
+      
+      // Update user stats with the new points
+      await supabase.rpc('increment_user_points', { 
+        user_id_param: user.id, 
+        points_to_add: scanData.points 
+      });
+      
+      setLoading(false);
     } catch (err) {
       console.error('Error saving scan:', err);
-      setError('Failed to save scan result.');
+      setError('Failed to save scan result to database.');
       setLoading(false);
+      
+      // Store locally for offline mode
+      try {
+        const offlineScans = JSON.parse(localStorage.getItem('offlineScans') || '[]');
+        offlineScans.push({...scanData, syncPending: true});
+        localStorage.setItem('offlineScans', JSON.stringify(offlineScans));
+        console.log('Scan saved offline for later sync');
+      } catch (localError) {
+        console.error('Error saving scan offline:', localError);
+      }
     }
   };
 

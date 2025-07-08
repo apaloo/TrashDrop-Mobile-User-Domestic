@@ -5,6 +5,7 @@ import * as Yup from 'yup';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabaseClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import appConfig from '../utils/app-config';
 
@@ -57,14 +58,51 @@ const PickupRequest = () => {
   const [error, setError] = useState('');
   const [savedLocations, setSavedLocations] = useState([]);
   
-  // Load saved locations from localStorage when component mounts
+  // Load saved locations from Supabase when component mounts
   useEffect(() => {
-    const loadSavedLocations = () => {
+    const loadSavedLocations = async () => {
+      if (!user) return;
+      
+      // Clear any existing saved locations first
+      setSavedLocations([]);
+      
       try {
-        const savedLocationsJson = localStorage.getItem('trashdrop_locations');
-        if (savedLocationsJson) {
-          const userSavedLocations = JSON.parse(savedLocationsJson);
-          setSavedLocations(userSavedLocations);
+        // Clear localStorage to completely remove any potential hardcoded/mock locations
+        localStorage.removeItem('trashdrop_locations');
+        
+        // Make sure we start with an empty array
+        setSavedLocations([]);
+        
+        // Fetch only locations specifically added by the user in Profile & Settings
+        const { data, error } = await supabase
+          .from('saved_locations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('source', 'user_profile') // Only fetch locations added via Profile & Settings
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Format locations to match component's expected structure
+          const formattedLocations = data.map(location => ({
+            id: location.id,
+            name: location.name,
+            address: location.address,
+          }));
+          
+          console.log('Loaded saved locations from profile:', formattedLocations);
+          setSavedLocations(formattedLocations);
+          
+          // Only save to localStorage if we have actual locations from Supabase
+          if (formattedLocations && formattedLocations.length > 0) {
+            localStorage.setItem('trashdrop_locations', JSON.stringify(formattedLocations));
+          } else {
+            // Ensure we remove any old data
+            localStorage.removeItem('trashdrop_locations');
+          }
+        } else {
+          console.log('No saved locations found for user in Profile & Settings');
         }
       } catch (error) {
         console.error('Error loading saved locations:', error);
@@ -72,6 +110,22 @@ const PickupRequest = () => {
     };
     
     loadSavedLocations();
+    
+    // Setup real-time subscription for saved locations
+    const subscription = supabase
+      .channel('saved_locations_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'saved_locations', filter: `user_id=eq.${user?.id}` },
+        () => {
+          loadSavedLocations();
+        }
+      )
+      .subscribe();
+    
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
     
     // Add event listener to refresh locations when localStorage changes
     // This helps synchronize data between tabs/windows
@@ -139,6 +193,8 @@ const PickupRequest = () => {
     try {
       // Get location details if using saved location
       let locationDetails = {};
+      let coordinates = {};
+      
       if (values.savedLocationId) {
         const selectedLocation = savedLocations.find(loc => loc.id === values.savedLocationId);
         if (selectedLocation) {
@@ -146,20 +202,79 @@ const PickupRequest = () => {
             address: selectedLocation.address,
             name: selectedLocation.name,
           };
+          // If the saved location has coordinates, use them
+          if (selectedLocation.coordinates) {
+            coordinates = selectedLocation.coordinates;
+          }
         }
+      } else {
+        // Use the map-selected coordinates
+        coordinates = values.location;
       }
       
-      // In a real app, this would be an API call
-      console.log('Submitting pickup request:', {
-        ...values,
-        ...locationDetails,
-        userId: user?.id,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
+      // Prepare data for Supabase insertion
+      const pickupData = {
+        user_id: user.id,
+        number_of_bags: parseInt(values.numberOfBags, 10),
+        waste_type: values.wasteType,
+        priority: values.priority,
+        notes: values.notes || '',
+        location: [coordinates.lat, coordinates.lng], // Store as array for PostGIS compatibility
+        address: locationDetails.address || 'Custom Location',
+        status: 'waiting_for_collector',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Default points awarded for pickup request
+        points: values.wasteType === 'recycling' ? 15 : 10,
+      };
+      
+      console.log('Submitting pickup request to Supabase:', pickupData);
+      
+      // Insert into Supabase pickups table
+      const { data, error } = await supabase
+        .from('pickups')
+        .insert(pickupData)
+        .select();
+      
+      if (error) throw error;
+      
+      console.log('Pickup request submitted successfully:', data);
+      
+      // Also record this activity in user_activity table
+      const activityData = {
+        user_id: user.id,
+        activity_type: 'pickup_request',
+        status: 'waiting_for_collector',
+        points: pickupData.points,
+        details: {
+          pickup_id: data[0].id,
+          waste_type: values.wasteType,
+          number_of_bags: parseInt(values.numberOfBags, 10)
+        },
+        created_at: new Date().toISOString(),
+      };
+      
+      // Insert into user_activity table
+      const { error: activityError } = await supabase
+        .from('user_activity')
+        .insert(activityData);
+      
+      if (activityError) {
+        console.error('Error recording activity:', activityError);
+        // Continue anyway as this is non-critical
+      }
+      
+      // Update user_stats table to add points
+      const { error: statsError } = await supabase.rpc('increment_user_stats', {
+        user_id: user.id,
+        pickup_count: 1,
+        point_count: pickupData.points
       });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (statsError) {
+        console.error('Error updating user stats:', statsError);
+        // Continue anyway as this is non-critical
+      }
       
       // Show success message
       setSuccess(true);

@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import appConfig from '../utils/app-config';
+import { supabase } from '../utils/supabaseClient';
 
 // Component to update map view when position changes
 const MapUpdater = ({ position }) => {
@@ -295,7 +297,7 @@ const DumpingReport = () => {
     if (isAutomatedTest) {
       // Use default mock location for testing
       console.log('Detected automated test environment, using mock location');
-      const mockPosition = [37.7749, -122.4194]; // Example: San Francisco
+      const mockPosition = [5.6037, -0.1870]; // Accra, Ghana - better default for this application
       // Force new array to trigger state update
       const newPosition = [...mockPosition];
       setPosition(newPosition);
@@ -308,38 +310,97 @@ const DumpingReport = () => {
     
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser');
+      // Fall back to a default location if geolocation is not available
+      const defaultPosition = [5.6037, -0.1870]; // Accra, Ghana
+      setPosition([...defaultPosition]);
+      setFieldValue('location', { lat: defaultPosition[0], lng: defaultPosition[1] });
+      setLocationAutoDetected(false);
       return;
     }
 
     setIsLocating(true);
+    
+    // Try to get cached location from localStorage first for immediate display
+    const cachedLocation = localStorage.getItem('userLastLocation');
+    if (cachedLocation) {
+      try {
+        const parsedLocation = JSON.parse(cachedLocation);
+        if (parsedLocation && Array.isArray(parsedLocation) && parsedLocation.length === 2) {
+          // Use cached location temporarily while waiting for fresh location
+          setPosition([...parsedLocation]);
+          setFieldValue('location', { lat: parsedLocation[0], lng: parsedLocation[1] });
+        }
+      } catch (e) {
+        console.error('Error parsing cached location:', e);
+      }
+    }
+    
+    // Get fresh location
     navigator.geolocation.getCurrentPosition(
       (position) => {
         // Force new array to ensure state update is detected
         const newPosition = [position.coords.latitude, position.coords.longitude];
         console.log('Got geolocation:', newPosition);
+        
+        // Store accuracy and timestamp for quality tracking
+        const locationDetails = {
+          coords: newPosition,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp
+        };
+        
+        // Update state
         setPosition([...newPosition]);
-        setFieldValue('location', { lat: newPosition[0], lng: newPosition[1] });
+        setFieldValue('location', { 
+          lat: newPosition[0], 
+          lng: newPosition[1],
+          accuracy: position.coords.accuracy 
+        });
+        
+        // Cache location for future use
+        localStorage.setItem('userLastLocation', JSON.stringify(newPosition));
+        
         setLocationAutoDetected(true);
         setIsLocating(false);
       },
       (error) => {
         setIsLocating(false);
+        
+        // Try to get cached location as fallback if we have an error
+        const cachedLocation = localStorage.getItem('userLastLocation');
+        if (cachedLocation) {
+          try {
+            const parsedLocation = JSON.parse(cachedLocation);
+            if (parsedLocation && Array.isArray(parsedLocation) && parsedLocation.length === 2) {
+              setPosition([...parsedLocation]);
+              setFieldValue('location', { lat: parsedLocation[0], lng: parsedLocation[1] });
+              setLocationAutoDetected(false); // Mark as not auto-detected since it's from cache
+            }
+          } catch (e) {
+            console.error('Error parsing cached location:', e);
+          }
+        }
+        
         switch(error.code) {
           case error.PERMISSION_DENIED:
-            setError('Location permission denied. Please enable location services.');
+            setError('Location permission denied. Please enable location services in your browser settings.');
             break;
           case error.POSITION_UNAVAILABLE:
-            setError('Location information is unavailable.');
+            setError('Location information is unavailable. Please try again.');
             break;
           case error.TIMEOUT:
-            setError('The request to get user location timed out.');
+            setError('The request to get user location timed out. Please try again.');
             break;
           default:
             setError('An unknown error occurred when trying to get your location.');
             break;
         }
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 10000,  // Increased timeout for more reliable results
+        maximumAge: 60000 // Allow cached positions up to 1 minute old
+      }
     );
   };
 
@@ -356,20 +417,70 @@ const DumpingReport = () => {
     setError('');
     
     try {
-      // In a real app, this would be an API call
-      console.log('Submitting dumping report:', {
-        ...values,
-        userId: user?.id,
+      // Prepare data for Supabase insertion
+      const reportData = {
+        user_id: user.id,
+        waste_type: values.wasteType,
+        size: values.wasteSize,
+        hazardous: values.hazardous === 'yes',
+        description: values.description,
+        location: position ? [position[0], position[1]] : null, // Store as array for PostGIS compatibility
+        address: values.address || 'Location from map',
         status: 'submitted',
-        createdAt: new Date().toISOString(),
-        location: position ? {
-          lat: position[0],
-          lng: position[1],
-        } : null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        image_urls: values.photos || [], // Array of photo URLs if available
+        // Points awarded for reporting illegal dumping
+        points: 30,
+      };
+      
+      console.log('Submitting dumping report to Supabase:', reportData);
+      
+      // Insert into Supabase reports table
+      const { data, error } = await supabase
+        .from('dumping_reports')
+        .insert(reportData)
+        .select();
+      
+      if (error) throw error;
+      
+      console.log('Dumping report submitted successfully:', data);
+      
+      // Also record this activity in user_activity table
+      const activityData = {
+        user_id: user.id,
+        activity_type: 'dumping_report',
+        status: 'submitted',
+        points: reportData.points,
+        details: {
+          report_id: data[0].id,
+          waste_type: values.wasteType,
+          hazardous: values.hazardous === 'yes'
+        },
+        created_at: new Date().toISOString(),
+      };
+      
+      // Insert into user_activity table
+      const { error: activityError } = await supabase
+        .from('user_activity')
+        .insert(activityData);
+      
+      if (activityError) {
+        console.error('Error recording activity:', activityError);
+        // Continue anyway as this is non-critical
+      }
+      
+      // Update user_stats table to add points and increment report count
+      const { error: statsError } = await supabase.rpc('increment_user_stats', {
+        user_id: user.id,
+        report_count: 1,
+        point_count: reportData.points
       });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (statsError) {
+        console.error('Error updating user stats:', statsError);
+        // Continue anyway as this is non-critical
+      }
       
       // Show success message
       setFormSubmitted(true);

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
 // Fix for default marker icon in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -34,6 +36,7 @@ const DraggableMarker = ({ position, setPosition }) => {
 };
 
 const LocationStep = ({ formData, updateFormData, nextStep }) => {
+  const { user } = useAuth();
   const [position, setPosition] = useState(
     formData.latitude && formData.longitude 
       ? [formData.latitude, formData.longitude] 
@@ -42,15 +45,52 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const [savedLocations, setSavedLocations] = useState([]);
   const [addressInput, setAddressInput] = useState(formData.address || '');
   const [addressError, setAddressError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load saved locations (in a real app, this would come from an API or localStorage)
+  // Load saved locations from Supabase
   useEffect(() => {
-    // Mock data for saved locations
-    setSavedLocations([
-      { id: '1', name: 'Home', address: '123 Main St, New York, NY', latitude: 40.7128, longitude: -74.0060 },
-      { id: '2', name: 'Office', address: '456 Park Ave, New York, NY', latitude: 40.7580, longitude: -73.9855 }
-    ]);
-  }, []);
+    const fetchSavedLocations = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      
+      try {
+        // Fetch only locations added through user profile
+        const { data, error } = await supabase
+          .from('saved_locations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('source', 'user_profile')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Format locations to match component's expected structure
+          const formattedLocations = data.map(location => ({
+            id: location.id,
+            name: location.name,
+            address: location.address,
+            latitude: location.coordinates?.lat || 40.7128,
+            longitude: location.coordinates?.lng || -74.0060
+          }));
+          
+          console.log('Loaded saved locations for LocationStep:', formattedLocations);
+          setSavedLocations(formattedLocations);
+        } else {
+          console.log('No saved locations found for user in LocationStep');
+          setSavedLocations([]);
+        }
+      } catch (error) {
+        console.error('Error loading saved locations in LocationStep:', error);
+        setSavedLocations([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchSavedLocations();
+  }, [user]);
 
   // Handler for setting position from map
   const handlePositionChange = (newPosition) => {

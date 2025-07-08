@@ -216,15 +216,15 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
   const renderStatusBadge = (status) => {
     switch (status) {
       case 'waiting_for_collector':
-        return <span className="px-3 py-1 bg-yellow-400 dark:bg-yellow-500 text-yellow-800 dark:text-yellow-100 rounded-full font-medium">Waiting for collector</span>;
+        return <span className="px-3 py-1 bg-yellow-400 dark:bg-yellow-500 text-yellow-800 dark:text-yellow-100 rounded-full font-medium flex items-center justify-center text-center">Waiting for collector</span>;
       case 'collector_assigned':
-        return <span className="px-3 py-1 bg-blue-400 dark:bg-blue-500 text-blue-800 dark:text-blue-100 rounded-full font-medium">Collector assigned</span>;
+        return <span className="px-3 py-1 bg-blue-400 dark:bg-blue-500 text-blue-800 dark:text-blue-100 rounded-full font-medium flex items-center justify-center text-center">Collector assigned</span>;
       case 'en_route':
-        return <span className="px-3 py-1 bg-blue-400 dark:bg-blue-500 text-blue-800 dark:text-blue-100 rounded-full font-medium">En route</span>;
+        return <span className="px-3 py-1 bg-blue-400 dark:bg-blue-500 text-blue-800 dark:text-blue-100 rounded-full font-medium flex items-center justify-center text-center">En route</span>;
       case 'arrived':
-        return <span className="px-3 py-1 bg-green-400 dark:bg-green-500 text-green-800 dark:text-green-100 rounded-full font-medium">Collector arrived</span>;
+        return <span className="px-3 py-1 bg-green-400 dark:bg-green-500 text-green-800 dark:text-green-100 rounded-full font-medium flex items-center justify-center text-center">Collector arrived</span>;
       default:
-        return <span className="px-3 py-1 bg-gray-400 dark:bg-gray-500 text-gray-800 dark:text-gray-100 rounded-full font-medium">{status}</span>;
+        return <span className="px-3 py-1 bg-gray-400 dark:bg-gray-500 text-gray-800 dark:text-gray-100 rounded-full font-medium flex items-center justify-center text-center">{status}</span>;
     }
   };
 

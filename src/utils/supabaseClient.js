@@ -7,6 +7,31 @@ const supabaseAnonKey = appConfig.supabase.anonKey;
 
 console.log('Supabase URL:', supabaseUrl);
 
+// Check if we have valid credentials before creating client
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase credentials. Please check your environment variables.');
+}
+
+// Function to clear potentially corrupted auth data
+const clearAuthData = () => {
+  if (typeof localStorage !== 'undefined') {
+    // Clear only Supabase auth related items
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('sb-'))) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    console.log('Cleared potentially corrupted authentication data');
+  }
+};
+
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -21,6 +46,30 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   localStorage: typeof localStorage !== 'undefined' ? localStorage : null
 });
+
+// Add event listener for auth state changes to detect problems
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event);
+  if (event === 'SIGNED_OUT') {
+    // Clear any potentially corrupted data on sign out
+    clearAuthData();
+  }
+});
+
+// Check for corrupted token on load and clear if needed
+try {
+  const hasSession = localStorage.getItem('supabase.auth.token');
+  if (hasSession) {
+    supabase.auth.getSession().catch(error => {
+      if (error.message && (error.message.includes('invalid JWT') || error.message.includes('malformed'))) {
+        console.warn('Detected corrupted authentication token, clearing...');
+        clearAuthData();
+      }
+    });
+  }
+} catch (e) {
+  console.error('Error checking auth state:', e);
+}
 
 /**
  * Authentication services using Supabase

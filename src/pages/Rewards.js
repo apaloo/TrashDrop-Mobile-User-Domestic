@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { supabase } from '../utils/supabaseClient';
 
 /**
  * Rewards page component for viewing and redeeming rewards
@@ -15,77 +16,68 @@ const Rewards = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    // Simulate fetching user points and available rewards
+    // Fetch user points and available rewards from Supabase
     const fetchRewardsData = async () => {
+      if (!user) return;
+      
       setIsLoading(true);
+      setErrorMessage('');
       
       try {
-        // In a real app, these would be API calls
-        // Mock data for development
-        setTimeout(() => {
-          setUserPoints(250);
+        // Fetch user stats to get current points
+        const { data: userStats, error: userStatsError } = await supabase
+          .from('user_stats')
+          .select('points')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (userStatsError) throw userStatsError;
+        
+        if (userStats) {
+          setUserPoints(userStats.points || 0);
+        }
+        
+        // Fetch available rewards from Supabase
+        const { data: rewardsData, error: rewardsError } = await supabase
+          .from('rewards')
+          .select('*')
+          .eq('is_active', true)
+          .order('points_cost', { ascending: true });
+        
+        if (rewardsError) throw rewardsError;
+        
+        if (rewardsData) {
+          // Format rewards data to match our component's expected structure
+          const formattedRewards = rewardsData.map(reward => ({
+            id: reward.id,
+            name: reward.name,
+            description: reward.description,
+            pointsCost: reward.points_cost,
+            image: reward.image_url || `https://source.unsplash.com/random/300x200/?${reward.name.toLowerCase().replace(/\s/g, '')}`,
+            expiresAt: reward.expires_at,
+            partnerId: reward.partner_id
+          }));
           
-          setRewards([
-            { 
-              id: 1, 
-              name: 'Coffee Voucher', 
-              description: 'Free coffee at participating local cafés',
-              pointsCost: 100,
-              image: 'https://source.unsplash.com/random/300x200/?coffee',
-              expiresAt: '2025-12-31',
-              partnerId: 'cafe-partner'
-            },
-            { 
-              id: 2, 
-              name: 'Movie Ticket', 
-              description: 'One free movie ticket at City Cinema',
-              pointsCost: 200,
-              image: 'https://source.unsplash.com/random/300x200/?movie',
-              expiresAt: '2025-12-31',
-              partnerId: 'cinema-partner'
-            },
-            { 
-              id: 3, 
-              name: 'Public Transit Pass', 
-              description: 'One-day unlimited rides on public transportation',
-              pointsCost: 150,
-              image: 'https://source.unsplash.com/random/300x200/?bus',
-              expiresAt: '2025-12-31',
-              partnerId: 'transit-partner'
-            },
-            { 
-              id: 4, 
-              name: 'Plant a Tree', 
-              description: 'We\'ll plant a tree in your name in the city park',
-              pointsCost: 75,
-              image: 'https://source.unsplash.com/random/300x200/?tree',
-              expiresAt: '2025-12-31',
-              partnerId: 'environmental-partner'
-            },
-            { 
-              id: 5, 
-              name: '$10 Grocery Voucher', 
-              description: '$10 off your next purchase at Local Market',
-              pointsCost: 300,
-              image: 'https://source.unsplash.com/random/300x200/?grocery',
-              expiresAt: '2025-12-31',
-              partnerId: 'grocery-partner'
-            },
-          ]);
-          
-          setIsLoading(false);
-        }, 1000);
+          setRewards(formattedRewards);
+        }
       } catch (error) {
         console.error('Error fetching rewards data:', error);
         setErrorMessage('Failed to load rewards. Please try again later.');
+      } finally {
         setIsLoading(false);
       }
     };
     
     fetchRewardsData();
-  }, []);
+  }, [user]);
 
   const handleRedeemReward = async (reward) => {
+    if (!user) {
+      setErrorMessage('You must be logged in to redeem rewards');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    
     if (userPoints < reward.pointsCost) {
       setErrorMessage('Not enough points to redeem this reward');
       setTimeout(() => setErrorMessage(''), 3000);
@@ -97,20 +89,58 @@ const Rewards = () => {
     setErrorMessage('');
     
     try {
-      // In a real app, this would be an API call
-      console.log('Redeeming reward:', reward);
+      // Generate a unique redemption code
+      const redemptionCode = `REWARD-${reward.id}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Insert redemption record in Supabase
+      const { data: redemptionData, error: redemptionError } = await supabase
+        .from('redemptions')
+        .insert([
+          {
+            user_id: user.id,
+            reward_id: reward.id,
+            points_cost: reward.pointsCost,
+            redemption_code: redemptionCode,
+            status: 'redeemed',
+            redeemed_at: new Date().toISOString()
+          }
+        ])
+        .select();
       
-      // Update user points (deduct cost)
+      if (redemptionError) throw redemptionError;
+      
+      // Update user points in the database (deduct cost)
+      const { error: pointsError } = await supabase.rpc('decrement_user_points', { 
+        user_id_param: user.id, 
+        points_to_subtract: reward.pointsCost 
+      });
+      
+      if (pointsError) throw pointsError;
+      
+      // Record activity
+      await supabase.from('user_activity').insert([
+        {
+          user_id: user.id,
+          activity_type: 'reward_redemption',
+          status: 'completed',
+          points: -reward.pointsCost, // negative as points are spent
+          details: {
+            reward_id: reward.id,
+            reward_name: reward.name,
+            redemption_code: redemptionCode
+          },
+          created_at: new Date().toISOString()
+        }
+      ]);
+      
+      // Update local state
       setUserPoints(prev => prev - reward.pointsCost);
       
       // Show success message
       setRedeemSuccess({
         id: reward.id,
         message: `Successfully redeemed ${reward.name}!`,
-        code: `REWARD-${reward.id}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+        code: redemptionCode,
       });
     } catch (error) {
       console.error('Error redeeming reward:', error);
