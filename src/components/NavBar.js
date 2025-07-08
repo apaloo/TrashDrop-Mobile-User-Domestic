@@ -194,7 +194,7 @@ const NavBar = () => {
       {/* Mobile Bottom Navigation */}
       {isAuthenticated && (
         <div className="mobile-bottom-nav-container">
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg z-10">
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg z-50">
             <div className="flex justify-between items-center px-4 py-2">
               <NavLink 
                 to="/dashboard" 

@@ -35,49 +35,86 @@ const QRScanner = () => {
     checkPermission();
   }, []);
 
-  // Function to simulate scanning a QR code
+  // Video element reference to display camera feed
+  const videoRef = React.useRef(null);
+  // Stream reference to store the camera stream for cleanup
+  const streamRef = React.useRef(null);
+  
+  // Function to actually scan QR code using device camera
   const startScanning = () => {
     setScanning(true);
     setScanResult(null);
     setError('');
     
-    // Simulate scanning process
-    setTimeout(() => {
-      // Simulate successful scan 80% of the time
-      const success = Math.random() > 0.2;
-      
-      if (success) {
-        // Generate a random bin ID and location
-        const binId = `BIN-${Math.floor(1000 + Math.random() * 9000)}`;
-        const location = 'City Center, Main St';
-        const earnedPoints = Math.floor(10 + Math.random() * 30);
-        
-        // Set scan result
-        setScanResult({
-          binId,
-          location,
-          timestamp: new Date().toISOString(),
-          points: earnedPoints
-        });
-        
-        // Update points
-        setPoints(earnedPoints);
-        
-        // Save scan to "database" (in a real app, this would be an API call)
-        saveScan({
-          binId,
-          location,
-          timestamp: new Date().toISOString(),
-          userId: user?.id,
-          points: earnedPoints
-        });
-      } else {
-        // Simulate error
-        setError('Could not recognize QR code. Please try again.');
-      }
-      
+    if (!permission) {
+      setError('Camera permission is required to scan QR codes');
       setScanning(false);
-    }, 2000);
+      return;
+    }
+    
+    // Access the device camera
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        // Store stream for cleanup
+        streamRef.current = stream;
+        
+        // Display the camera feed
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play()
+            .catch(err => {
+              console.error('Error playing video:', err);
+              setError('Could not start video stream');
+              setScanning(false);
+            });
+        }
+        
+        // In a real app, we would use a QR code scanning library here
+        // For now, we'll still simulate the scanning after a delay
+        setTimeout(() => {
+          // Simulate successful scan 80% of the time
+          const success = Math.random() > 0.2;
+          
+          if (success) {
+            // Generate a random bin ID and location
+            const binId = `BIN-${Math.floor(1000 + Math.random() * 9000)}`;
+            const location = 'City Center, Main St';
+            const earnedPoints = Math.floor(10 + Math.random() * 30);
+            
+            // Set scan result
+            setScanResult({
+              binId,
+              location,
+              timestamp: new Date().toISOString(),
+              points: earnedPoints
+            });
+            
+            // Update points
+            setPoints(earnedPoints);
+            
+            // Save scan to "database" (in a real app, this would be an API call)
+            saveScan({
+              binId,
+              location,
+              timestamp: new Date().toISOString(),
+              userId: user?.id,
+              points: earnedPoints
+            });
+          } else {
+            // Simulate error
+            setError('Could not recognize QR code. Please try again.');
+          }
+          
+          // Stop the camera when done scanning
+          stopCamera();
+          setScanning(false);
+        }, 2000);
+      })
+      .catch(err => {
+        console.error('Error accessing camera:', err);
+        setError('Could not access camera. Please check your permissions.');
+        setScanning(false);
+      });
   };
 
   // Function to save scan result (in a real app, this would be an API call)
@@ -102,6 +139,23 @@ const QRScanner = () => {
     }
   };
 
+  // Function to stop the camera feed
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  };
+
+  // Clean up camera on component unmount
+  useEffect(() => {
+    return () => stopCamera();
+  }, []);
+  
   // Function to handle requesting pickup for the scanned bin
   const handleRequestPickup = () => {
     if (scanResult) {
@@ -127,8 +181,16 @@ const QRScanner = () => {
         
         {/* Camera preview area */}
         <div className="bg-black aspect-square w-full relative rounded-lg overflow-hidden mb-4">
+          {/* Video element to show camera feed */}
+          <video 
+            ref={videoRef}
+            className={`w-full h-full object-cover ${scanning ? 'block' : 'hidden'}`}
+            playsInline
+            muted
+          />
+          
           {scanning ? (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
               <LoadingSpinner size="lg" color="white" />
               <span className="text-white ml-3">Scanning...</span>
             </div>
@@ -230,10 +292,11 @@ const QRScanner = () => {
         <div className="mt-6">
           <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">How to Use</h3>
           <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-300">
-            <li>Find a TrashDrop QR code on any participating bin</li>
-            <li>Click "Start Scanning" and aim your camera at the code</li>
-            <li>Hold steady until the code is recognized</li>
-            <li>Earn points for each unique scan</li>
+            <li>Find the TrashDrop Batch QR code for wrapped on the the bags</li>
+            <li>Click "Start Scanning" and aim your camera at the QR code</li>
+            <li>Hold steady until the code is recognised and validated</li>
+            <li>Earn points for each sorting and recycling trash</li>
+            <li>Properly tie the flaps when the trash bag is full and ready for pickup</li>
           </ol>
         </div>
       </div>

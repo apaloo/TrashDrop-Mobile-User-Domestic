@@ -217,7 +217,7 @@ const PickupRequest = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-0">
       <div className="p-6">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
           Request Pickup

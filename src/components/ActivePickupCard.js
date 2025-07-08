@@ -73,7 +73,7 @@ const PickupMap = ({ userLocation, collectorLocation }) => {
     <MapContainer 
       center={userLocation || [37.7749, -122.4194]}
       zoom={13}
-      style={{ height: '200px', width: '100%', borderRadius: '0.5rem' }}
+      style={{ height: '100%', width: '100%', borderRadius: '0.5rem', zIndex: 1 }}
       whenCreated={setMap}
     >
       <TileLayer
@@ -229,15 +229,15 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-6">
       <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-900/30 p-6">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white">Active Pickup Request</h2>
         {renderStatusBadge(activePickup.status)}
       </div>
 
       <div className="p-6">
-        {/* Grid of pickup details - 2 rows with 3 items each with gamification elements */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        {/* Grid of pickup details - 3 rows with 2 items each with gamification elements */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
           {/* Row 1: Collector, Distance, ETA */}
           {/* Collector information with gamification */}
           <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden">
@@ -373,12 +373,15 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
         </div>
 
         {/* Map with collector's location and route */}
-        <div className="h-72 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="h-64 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-0 relative z-0">
           <PickupMap 
             userLocation={activePickup.location} 
             collectorLocation={collectorLocation}
           />
         </div>
+        
+        {/* Extra space to prevent bottom nav overlap on mobile */}
+        <div className="md:hidden h-16 mt-4"></div>
       </div>
 
       {/* Cancel button */}

@@ -139,12 +139,13 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+    <div className="space-y-6 pb-28 md:pb-6">
+      {/* User Stats Card */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
         
-        {/* User stats with gamification elements */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden">
+        {/* User stats with gamification elements - horizontal scrollable */}
+        <div className="flex overflow-x-auto pb-2 -mx-6 px-6 space-x-4 mb-6">
+          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden min-w-[200px] flex-shrink-0">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-blue-700 dark:text-blue-300">Points Earned</h3>
               <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.points / 100) + 1}</span>
@@ -173,7 +174,7 @@ const Dashboard = () => {
             )}
           </div>
           
-          <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg relative overflow-hidden min-w-[200px] flex-shrink-0">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-green-700 dark:text-green-300">Pickups</h3>
               <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.pickups / 5) + 1}</span>
@@ -201,7 +202,7 @@ const Dashboard = () => {
             )}
           </div>
           
-          <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg relative overflow-hidden min-w-[200px] flex-shrink-0">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-yellow-700 dark:text-yellow-300">Reports</h3>
               <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.reports / 3) + 1}</span>
@@ -234,21 +235,14 @@ const Dashboard = () => {
         <div className="flex flex-wrap gap-2 mb-4">
           <Link 
             to="/schedule-pickup" 
-            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors"
+            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors flex-1 text-center"
           >
             Schedule Pickup
           </Link>
           
           <Link 
-            to="/report" 
-            className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors"
-          >
-            Report Dumping
-          </Link>
-          
-          <Link 
             to="/rewards" 
-            className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors"
+            className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors flex-1 text-center"
           >
             View Rewards
           </Link>
@@ -256,7 +250,7 @@ const Dashboard = () => {
       </div>
       
       {/* Recent activity */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Recent Activity</h2>
         
         {recentActivity.length > 0 ? (

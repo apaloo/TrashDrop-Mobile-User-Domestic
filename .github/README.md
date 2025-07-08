@@ -1,5 +1,8 @@
 # TrashDrop CI/CD Workflows
 
+[![CI/CD](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/ci-cd.yml)
+[![Database Migrations](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/supabase-migrations.yml/badge.svg)](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/supabase-migrations.yml)
+
 This directory contains GitHub Actions workflow files that automate the testing, building, and deployment processes for the TrashDrop mobile app.
 
 ## Available Workflows

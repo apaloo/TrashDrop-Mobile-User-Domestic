@@ -1,8 +1,28 @@
-# Getting Started with Create React App
+# TrashDrop Mobile App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+[![CI/CD](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/ci-cd.yml)
+[![Database Migrations](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/supabase-migrations.yml/badge.svg)](https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/actions/workflows/supabase-migrations.yml)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/9f7ad4f6-5c98-4a73-9c87-a2e0ef50fef8/deploy-status)](https://trashdrop-mobile.windsurf.build)
 
-## Available Scripts
+This repository contains the TrashDrop mobile application, a progressive web app (PWA) for waste pickup scheduling and management.
+
+## Features
+
+- **PWA Support**: Works offline and can be installed on mobile devices
+- **Responsive Navigation**:
+  - Mobile: Top navbar with logo and profile dropdown + bottom navigation bar
+  - Desktop: Traditional horizontal navbar
+- **Waste Management**:
+  - Schedule pickups
+  - Report illegal dumping
+  - Scan QR codes at collection points
+  - Track activity and rewards
+
+## Live Demo
+
+The production application is deployed at: [https://trashdrop-mobile.windsurf.build](https://trashdrop-mobile.windsurf.build)
+
+## Development
 
 In the project directory, you can run:
 
