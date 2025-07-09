@@ -8,10 +8,11 @@
 import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
-import { registerRoute } from 'workbox-routing';
-import { StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
+import { registerRoute, NavigationRoute } from 'workbox-routing';
+import { StaleWhileRevalidate, CacheFirst, NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { BackgroundSyncPlugin } from 'workbox-background-sync';
+import { setDefaultHandler, setCatchHandler } from 'workbox-routing';
 
 clientsClaim();
 
@@ -117,18 +118,131 @@ registerRoute(
   })
 );
 
-// Setup background sync for pickup requests and reports
-const bgSyncPlugin = new BackgroundSyncPlugin('offlineQueue', {
+// Setup background sync for pickup requests and reports with a more comprehensive queue
+const reportsSyncPlugin = new BackgroundSyncPlugin('offlineReportsQueue', {
   maxRetentionTime: 24 * 60, // Retry for up to 24 Hours (specified in minutes)
 });
 
+const pickupSyncPlugin = new BackgroundSyncPlugin('offlinePickupsQueue', {
+  maxRetentionTime: 24 * 60, // Retry for up to 24 Hours (specified in minutes)
+});
+
+const locationsSyncPlugin = new BackgroundSyncPlugin('offlineLocationsQueue', {
+  maxRetentionTime: 24 * 60, // Retry for up to 24 Hours (specified in minutes)
+});
+
+// Handle submission of illegal dumping reports
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/submit-pickup') || url.pathname.startsWith('/api/submit-report'),
+  ({ url }) => url.pathname.startsWith('/api/submit-report'),
   new StaleWhileRevalidate({
-    cacheName: 'submission-requests',
-    plugins: [bgSyncPlugin],
+    cacheName: 'report-requests',
+    plugins: [reportsSyncPlugin],
   }),
   'POST'
+);
+
+// Handle submission of pickup requests
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/submit-pickup'),
+  new StaleWhileRevalidate({
+    cacheName: 'pickup-requests',
+    plugins: [pickupSyncPlugin],
+  }),
+  'POST'
+);
+
+// Handle saving locations
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/locations'),
+  new StaleWhileRevalidate({
+    cacheName: 'location-requests',
+    plugins: [locationsSyncPlugin],
+  }),
+  'POST'
+);
+
+// Add offline fallback for critical app pages
+registerRoute(
+  ({ request }) => 
+    request.mode === 'navigate' && 
+    (request.url.includes('/report') || 
+     request.url.includes('/pickup') || 
+     request.url.includes('/profile')),
+  async ({ event }) => {
+    try {
+      // Try network first
+      return await networkFirstStrategy.handle(event);
+    } catch (error) {
+      // If network fails, return the cached offline page
+      const cache = await caches.open('workbox-offline-fallbacks');
+      return await cache.match('/offline.html') || Response.error();
+    }
+  }
+);
+
+// Define a networkFirst strategy for dynamic API content
+const networkFirstStrategy = new NetworkFirst({
+  cacheName: 'dynamic-content',
+  plugins: [
+    new ExpirationPlugin({
+      maxEntries: 50,
+      maxAgeSeconds: 24 * 60 * 60, // 24 hours
+    }),
+  ],
+});
+
+// Set default handler for all fetch requests
+setDefaultHandler(new NetworkOnly());
+
+// Define an offlineFallback strategy
+const offlineFallback = async ({ event }) => {
+  // Return cached shell for navigation requests
+  if (event.request.mode === 'navigate') {
+    const cache = await caches.open('workbox-offline-fallbacks');
+    const cachedResponse = await cache.match('/offline.html');
+    return cachedResponse;
+  }
+  // Return a placeholder image for image requests
+  if (event.request.destination === 'image') {
+    const cache = await caches.open('workbox-offline-fallbacks');
+    const cachedResponse = await cache.match('/offline-image.png');
+    return cachedResponse || Response.error();
+  }
+  // Return an empty response for other requests
+  return Response.error();
+};
+
+// Set catch handler for offline fallbacks
+setCatchHandler(offlineFallback);
+
+// Cache the offline fallback page
+self.addEventListener('install', (event) => {
+  const files = ['/offline.html'];
+  
+  // Add a placeholder image for offline use
+  if (self.location.pathname.includes('/trashdrop/')) {
+    files.push('/trashdrop/offline-image.png');
+  } else {
+    files.push('/offline-image.png');
+  }
+  
+  event.waitUntil(
+    caches.open('workbox-offline-fallbacks').then((cache) => cache.addAll(files))
+  );
+});
+
+// Add specific route handlers for critical app routes
+registerRoute(
+  ({ url }) => url.pathname === '/profile' || url.pathname === '/profile/',
+  new NetworkFirst({
+    cacheName: 'profile-page',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 5,
+        maxAgeSeconds: 60 * 60, // 1 hour
+      }),
+    ],
+  })
 );
 
 // This allows the web app to trigger skipWaiting via
@@ -164,4 +278,18 @@ self.addEventListener('notificationclick', (event) => {
       self.clients.openWindow(event.notification.data.url)
     );
   }
+});
+
+// Track and respond to version changes
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames
+          .filter(cacheName => cacheName.startsWith('trashdrop-'))
+          .filter(cacheName => cacheName !== 'trashdrop-v1')
+          .map(cacheName => caches.delete(cacheName))
+      );
+    })
+  );
 });

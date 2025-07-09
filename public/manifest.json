@@ -1,6 +1,7 @@
 {
   "short_name": "TrashDrop",
   "name": "TrashDrop - Waste Management App",
+  "description": "Report illegal dumping and schedule trash pickups in your community",
   "icons": [
     {
       "src": "logo_icon.png",
@@ -10,18 +11,58 @@
     {
       "src": "logo_icon.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo_icon.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
   "theme_color": "#0073e6",
   "background_color": "#ffffff",
   "orientation": "portrait",
-  "categories": ["utilities", "lifestyle", "environment"]
+  "categories": ["utilities", "lifestyle", "environment"],
+  "screenshots": [
+    {
+      "src": "screenshots/home.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    },
+    {
+      "src": "screenshots/profile.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Report Dumping",
+      "short_name": "Report",
+      "description": "Report illegal dumping",
+      "url": "/report",
+      "icons": [{ "src": "report_icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Request Pickup",
+      "short_name": "Pickup",
+      "description": "Request trash pickup",
+      "url": "/pickup",
+      "icons": [{ "src": "pickup_icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Locations",
+      "short_name": "Locations",
+      "description": "View saved locations",
+      "url": "/profile",
+      "icons": [{ "src": "locations_icon.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

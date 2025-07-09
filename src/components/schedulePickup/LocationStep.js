@@ -47,7 +47,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const [addressError, setAddressError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load saved locations from Supabase
+  // Load saved locations from localStorage and Supabase
   useEffect(() => {
     const fetchSavedLocations = async () => {
       if (!user) return;
@@ -55,12 +55,19 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       setIsLoading(true);
       
       try {
-        // Fetch only locations added through user profile
+        // First check localStorage for immediate display
+        const cachedLocations = localStorage.getItem('trashdrop_locations');
+        if (cachedLocations) {
+          const parsedLocations = JSON.parse(cachedLocations);
+          console.log('Loaded locations from local storage in LocationStep:', parsedLocations);
+          setSavedLocations(parsedLocations);
+        }
+        
+        // Then fetch from Supabase to ensure we have the latest
         const { data, error } = await supabase
-          .from('saved_locations')
+          .from('user_locations') // Use the correct table name
           .select('*')
           .eq('user_id', user.id)
-          .eq('source', 'user_profile')
           .order('created_at', { ascending: false });
         
         if (error) throw error;
@@ -70,20 +77,43 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           const formattedLocations = data.map(location => ({
             id: location.id,
             name: location.name,
-            address: location.address,
-            latitude: location.coordinates?.lat || 40.7128,
-            longitude: location.coordinates?.lng || -74.0060
+            address: location.address || '',
+            city: location.city || '',
+            latitude: location.latitude,
+            longitude: location.longitude,
+            synced: true
           }));
           
-          console.log('Loaded saved locations for LocationStep:', formattedLocations);
-          setSavedLocations(formattedLocations);
+          console.log('Loaded user locations from Supabase in LocationStep:', formattedLocations);
+          
+          // Merge with local storage data for any offline-saved locations
+          const cachedLocations = localStorage.getItem('trashdrop_locations');
+          const localLocations = cachedLocations ? JSON.parse(cachedLocations) : [];
+          
+          // Identify any local-only locations (ones not synced to server yet)
+          const localOnlyLocations = localLocations.filter(
+            local => local.id.toString().startsWith('local_') && 
+                     !formattedLocations.some(server => 
+                        server.name === local.name && server.address === local.address)
+          );
+          
+          // Combine server locations with any local-only locations
+          const mergedLocations = [...formattedLocations, ...localOnlyLocations];
+          
+          // Update state with all locations
+          setSavedLocations(mergedLocations);
+          
+          // Keep localStorage in sync
+          localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
         } else {
-          console.log('No saved locations found for user in LocationStep');
-          setSavedLocations([]);
+          // Check if we already have locations in localStorage
+          const cachedLocations = localStorage.getItem('trashdrop_locations');
+          if (!cachedLocations) {
+            console.log('No saved locations found for user in LocationStep');
+          }
         }
       } catch (error) {
         console.error('Error loading saved locations in LocationStep:', error);
-        setSavedLocations([]);
       } finally {
         setIsLoading(false);
       }

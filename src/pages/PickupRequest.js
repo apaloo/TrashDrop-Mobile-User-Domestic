@@ -68,22 +68,23 @@ const PickupRequest = () => {
     const loadSavedLocations = async () => {
       if (!user) return;
       
-      // Clear any existing saved locations first
+      // Clear any existing saved locations in state (not localStorage)
       setSavedLocations([]);
       
       try {
-        // Clear localStorage to completely remove any potential hardcoded/mock locations
-        localStorage.removeItem('trashdrop_locations');
+        // First check localStorage for immediate display
+        const cachedLocations = localStorage.getItem('trashdrop_locations');
+        if (cachedLocations) {
+          const parsedLocations = JSON.parse(cachedLocations);
+          console.log('Loaded locations from local storage:', parsedLocations);
+          setSavedLocations(parsedLocations);
+        }
         
-        // Make sure we start with an empty array
-        setSavedLocations([]);
-        
-        // Fetch only locations specifically added by the user in Profile & Settings
+        // Then fetch from Supabase to ensure we have the latest
         const { data, error } = await supabase
-          .from('saved_locations')
+          .from('user_locations') // Use the correct table name
           .select('*')
           .eq('user_id', user.id)
-          .eq('source', 'user_profile') // Only fetch locations added via Profile & Settings
           .order('created_at', { ascending: false });
         
         if (error) throw error;
@@ -93,21 +94,40 @@ const PickupRequest = () => {
           const formattedLocations = data.map(location => ({
             id: location.id,
             name: location.name,
-            address: location.address,
+            address: location.address || '',
+            city: location.city || '',
+            latitude: location.latitude,
+            longitude: location.longitude,
+            synced: true
           }));
           
-          console.log('Loaded saved locations from profile:', formattedLocations);
-          setSavedLocations(formattedLocations);
+          console.log('Loaded user locations from Supabase:', formattedLocations);
           
-          // Only save to localStorage if we have actual locations from Supabase
-          if (formattedLocations && formattedLocations.length > 0) {
-            localStorage.setItem('trashdrop_locations', JSON.stringify(formattedLocations));
-          } else {
-            // Ensure we remove any old data
-            localStorage.removeItem('trashdrop_locations');
-          }
+          // Merge with local storage data for any offline-saved locations
+          const cachedLocations = localStorage.getItem('trashdrop_locations');
+          const localLocations = cachedLocations ? JSON.parse(cachedLocations) : [];
+          
+          // Identify any local-only locations (ones not synced to server yet)
+          const localOnlyLocations = localLocations.filter(
+            local => local.id.toString().startsWith('local_') && 
+                     !formattedLocations.some(server => 
+                        server.name === local.name && server.address === local.address)
+          );
+          
+          // Combine server locations with any local-only locations
+          const mergedLocations = [...formattedLocations, ...localOnlyLocations];
+          
+          // Update state with all locations
+          setSavedLocations(mergedLocations);
+          
+          // Keep localStorage in sync
+          localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
         } else {
-          console.log('No saved locations found for user in Profile & Settings');
+          // Check if we already have locations in localStorage
+          const cachedLocations = localStorage.getItem('trashdrop_locations');
+          if (!cachedLocations) {
+            console.log('No saved locations found for user');
+          }
         }
       } catch (error) {
         console.error('Error loading saved locations:', error);
@@ -446,25 +466,43 @@ const PickupRequest = () => {
                 <div className="p-4">
                   <h2 className="text-xl font-medium text-gray-800 dark:text-white mb-4">Pickup Details</h2>
                   
-                  {/* Number of Bags */}
+                  {/* Number of Bags - Dynamic based on available bags */}
                   <div className="mb-4">
                     <label htmlFor="numberOfBags" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Number of Bags <span className="text-red-600">*</span>
+                      {userStats.totalBags > 0 && (
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          (You have {userStats.totalBags} bag{userStats.totalBags !== 1 ? 's' : ''} available)
+                        </span>
+                      )}
                     </label>
                     <Field
                       as="select"
                       id="numberOfBags"
                       name="numberOfBags"
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
+                      disabled={userStats.totalBags <= 0}
                     >
-                      <option value="1">1 Bag</option>
-                      <option value="2">2 Bags</option>
-                      <option value="3">3 Bags</option>
-                      <option value="4">4 Bags</option>
-                      <option value="5">5 Bags</option>
+                      {/* Dynamically generate options based on available bags, up to 10 maximum */}
+                      {[...Array(Math.min(userStats.totalBags, 10))].map((_, index) => {
+                        const bagNumber = index + 1;
+                        return (
+                          <option key={bagNumber} value={String(bagNumber)}>
+                            {bagNumber} Bag{bagNumber !== 1 ? 's' : ''}
+                          </option>
+                        );
+                      })}
+                      {userStats.totalBags <= 0 && (
+                        <option value="1">No bags available</option>
+                      )}
                     </Field>
                     {touched.numberOfBags && errors.numberOfBags && (
                       <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.numberOfBags}</div>
+                    )}
+                    {userStats.totalBags <= 0 && (
+                      <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
+                        You don't have any bags available. Please collect more bags or purchase bags to continue.
+                      </div>
                     )}
                   </div>
                   

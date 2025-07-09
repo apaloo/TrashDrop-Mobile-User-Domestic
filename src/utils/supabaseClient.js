@@ -116,6 +116,12 @@ export const authService = {
       
       if (error) throw error;
       
+      // Store token in local storage if appConfig is available
+      if (appConfig && appConfig.storage) {
+        localStorage.setItem(appConfig.storage.tokenKey, data.session.access_token);
+        localStorage.setItem(appConfig.storage.userKey, JSON.stringify(data.user));
+      }
+      
       return { data, error: null };
     } catch (error) {
       console.error('Error signing in:', error.message);
@@ -130,6 +136,15 @@ export const authService = {
   async signOut() {
     try {
       const { error } = await supabase.auth.signOut();
+      
+      // Clear local storage tokens if appConfig is available
+      if (appConfig && appConfig.storage) {
+        localStorage.removeItem(appConfig.storage.tokenKey);
+        localStorage.removeItem(appConfig.storage.userKey);
+      }
+      
+      // Also run clearAuthData to ensure all Supabase tokens are removed
+      clearAuthData();
       
       if (error) throw error;
       

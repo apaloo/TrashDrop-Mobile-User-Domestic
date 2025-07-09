@@ -216,28 +216,67 @@ class SyncService {
    */
   async syncReport(operation) {
     try {
+      // Try to refresh the session before syncing reports
+      try {
+        await supabase.auth.refreshSession();
+      } catch (refreshError) {
+        console.warn('Failed to refresh auth session during sync:', refreshError);
+        // Continue anyway - the operation might still work
+      }
+      
       switch (operation.operation) {
         case 'add': {
-          // Format data for API
+          // Format data for API - ensure all required fields are included
           const apiData = {
-            user_id: operation.data.userId,
-            waste_type: operation.data.wasteType,
-            severity: operation.data.severity,
+            user_id: operation.data.userId || operation.data.user_id,
+            waste_type: operation.data.wasteType || operation.data.waste_type,
+            severity: operation.data.severity || operation.data.size,
             description: operation.data.description,
             location: operation.data.location,
-            images: operation.data.images || [],
-            status: operation.data.status
+            images: operation.data.images || operation.data.image_urls || [],
+            status: operation.data.status,
+            created_at: operation.data.created_at || new Date().toISOString(),
+            hazardous: operation.data.hazardous || false
           };
           
-          // Call API
-          const { data, error } = await supabase
-            .from('reports')
+          // Call API with timeout protection
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Supabase sync request timeout')), 15000));
+            
+          const supabasePromise = supabase
+            .from('dumping_reports') // Make sure we're using the correct table name
             .insert(apiData)
             .select('id')
             .single();
             
-          if (error) throw error;
+          // Race between timeout and actual request
+          const { data, error } = await Promise.race([supabasePromise, timeoutPromise])
+            .catch(err => {
+              console.error('Report sync failed:', err);
+              throw new Error(`Sync timeout: ${err.message}`);
+            });
+            
+          if (error) {
+            // If authentication error, mark for retry with refreshed token
+            if (error.message && (error.message.includes('JWT') || 
+                error.message.includes('auth') || 
+                error.message.includes('Authorization') ||
+                error.message.includes('token'))) {
+              console.log('Auth error during sync, will retry after auth refresh');
+              // Increment retry count in operation data
+              operation.retryCount = (operation.retryCount || 0) + 1;
+              if (operation.retryCount < 3) { // Max 3 retries
+                // We'll skip removing this operation so it will be retried next sync
+                return { success: false, error: 'auth_error', retry: true };
+              } else {
+                console.error('Max retries reached for auth errors');
+                throw error;
+              }
+            }
+            throw error;
+          }
           
+          console.log('Report successfully synced with server ID:', data.id);
           return { success: true, serverId: data.id };
         }
         

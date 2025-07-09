@@ -25,23 +25,96 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Fetch user stats, activities and active pickup
+    // Enhanced session refresh function with validation
+    const refreshAndValidateSession = async () => {
+      try {
+        console.log('Attempting to refresh session for dashboard data');
+        const { data, error } = await supabase.auth.refreshSession();
+        
+        if (error) {
+          console.warn('Session refresh failed in Dashboard component:', error.message);
+          return { success: false, error };
+        }
+        
+        if (!data?.session) {
+          console.warn('Session refresh did not return a valid session in Dashboard component');
+          return { success: false };
+        }
+        
+        console.log('Session refreshed successfully in Dashboard component');
+        return { success: true };
+      } catch (err) {
+        console.error('Error during session refresh in Dashboard component:', err);
+        return { success: false, error: err };
+      }
+    };
+    
+    // Retry operation with timeout and exponential backoff
+    const retryOperation = async (operation, maxRetries = 2, initialDelay = 500) => {
+      let retries = 0;
+      let lastError = null;
+      
+      while (retries <= maxRetries) {
+        try {
+          // Add a timeout wrapper around the operation
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Dashboard operation timeout')), 10000));
+          
+          const result = await Promise.race([
+            operation(),
+            timeoutPromise
+          ]);
+          
+          return result;
+        } catch (err) {
+          console.warn(`Dashboard operation failed (attempt ${retries + 1}/${maxRetries + 1}):`, err);
+          lastError = err;
+          
+          // If this is the last retry, don't delay, just throw
+          if (retries === maxRetries) {
+            throw lastError;
+          }
+          
+          // If this is a token error, try refreshing immediately
+          if (err.message && (
+            err.message.includes('JWT') || 
+            err.message.includes('auth') ||
+            err.message.includes('token')
+          )) {
+            await refreshAndValidateSession();
+          }
+          
+          // Add delay with exponential backoff
+          const delay = initialDelay * Math.pow(2, retries);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          retries++;
+        }
+      }
+    };
+
+    // Fetch user data including stats and recent activity with enhanced error handling
     const fetchUserData = async () => {
       setIsLoading(true);
       
+      if (!user) {
+        console.log('No user found, cannot fetch user data');
+        setIsLoading(false);
+        return;
+      }
+      
       try {
-        if (!user || !user.id) {
-          setIsLoading(false);
-          return;
-        }
+        // Always refresh session first
+        await refreshAndValidateSession();
         
         // Fetch user stats from Supabase
-        const { data: statsData, error: statsError } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-          
+        const { data: statsData, error: statsError } = await retryOperation(async () => {
+          return await supabase
+            .from('user_stats')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+        });
+        
         if (statsError) throw statsError;
         
         if (statsData) {
@@ -55,13 +128,15 @@ const Dashboard = () => {
         }
         
         // Fetch recent activity from Supabase
-        const { data: activityData, error: activityError } = await supabase
-          .from('user_activity')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(3);
-          
+        const { data: activityData, error: activityError } = await retryOperation(async () => {
+          return await supabase
+            .from('user_activity')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(3);
+        });
+        
         if (activityError) throw activityError;
         
         if (activityData && activityData.length > 0) {

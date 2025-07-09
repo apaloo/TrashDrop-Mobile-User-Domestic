@@ -18,10 +18,34 @@ const Activity = () => {
     itemsPerPage: 10
   });
 
+  // Enhanced session refresh function with validation
+  const refreshAndValidateSession = async () => {
+    try {
+      console.log('Attempting to refresh session for activity fetch');
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.warn('Session refresh failed in Activity component:', error.message);
+        return { success: false, error };
+      }
+      
+      if (!data?.session) {
+        console.warn('Session refresh did not return a valid session in Activity component');
+        return { success: false };
+      }
+      
+      console.log('Session refreshed successfully in Activity component');
+      return { success: true };
+    } catch (err) {
+      console.error('Error during session refresh in Activity component:', err);
+      return { success: false, error: err };
+    }
+  };
+  
   // Create fetchActivities as a memoized function with useCallback
   const fetchActivities = useCallback(async (retryCount = 0) => {
-    const MAX_RETRIES = 2; // Maximum number of retries
-    const RETRY_DELAY = 1000; // Delay between retries in ms
+    const MAX_RETRIES = 3; // Increased maximum number of retries
+    const RETRY_DELAY = 1500; // Increased delay between retries in ms
     
     if (!user) {
       console.log('No user found, cannot fetch activities');
@@ -43,10 +67,69 @@ const Activity = () => {
     
     try {
       console.log(`Attempting to fetch activities (attempt ${retryCount + 1} of ${MAX_RETRIES + 1})`);
+      
+      // Always try to refresh the session first
+      if (retryCount > 0) {
+        const refreshResult = await refreshAndValidateSession();
+        if (!refreshResult.success) {
+          console.warn('Session refresh failed before fetching activities');
+          // We'll continue anyway and let the query itself handle any auth errors
+        }
+      }
+      
       // Calculate pagination offset
       const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
       
-      // Build query based on filter
+      // Build query based on filter with timeout safety
+      const fetchWithTimeout = async (operation) => {
+        const timeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Activity fetch timeout')), 15000));
+        return Promise.race([operation(), timeout]);
+      };
+      
+      // Fetch the count first with its own error handling
+      let filteredCount = 0;
+      try {
+        // Get base count first
+        const countResult = await fetchWithTimeout(async () => {
+          let countQuery = supabase
+            .from('user_activity')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+            
+          // Apply filter if needed
+          if (filter !== 'all') {
+            countQuery = countQuery.eq('activity_type', filter);
+          }
+          
+          return await countQuery;
+        });
+        
+        if (countResult.error) {
+          console.error('Error getting activity count:', countResult.error);
+          
+          // If this is a JWT error, try refreshing and retry immediately
+          if (countResult.error.message && countResult.error.message.includes('JWT')) {
+            await refreshAndValidateSession();
+            throw new Error('Authentication error, retrying after refresh');
+          }
+          
+          throw countResult.error;
+        }
+        
+        filteredCount = countResult.count || 0;
+        console.log(`Found ${filteredCount} activities matching current filter`);
+        
+      } catch (countErr) {
+        console.error('Failed to get activity count:', countErr);
+        // Continue anyway, we'll use a default count
+        filteredCount = 0;
+      }
+      
+      // Now fetch the actual activities
+      console.log('Executing activity query for user:', user.id, 'filter:', filter, 'page:', pagination.currentPage);
+      
+      // Prepare the query
       let query = supabase
         .from('user_activity')
         .select('*')
@@ -59,43 +142,20 @@ const Activity = () => {
       }
       
       // Apply pagination
-      query = query
-        .range(offset, offset + pagination.itemsPerPage - 1);
+      query = query.range(offset, offset + pagination.itemsPerPage - 1);
       
-      // Get total count for pagination
-      const { count, error: countError } = await supabase
-        .from('user_activity')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-        
-      if (countError) {
-        console.error('Error getting activity count:', countError);
-        throw countError;
-      }
-      
-      // If filter is applied, get filtered count
-      let filteredCount = count || 0;
-      if (filter !== 'all') {
-        const { count: filterCount, error: filterCountError } = await supabase
-          .from('user_activity')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('activity_type', filter);
-          
-        if (filterCountError) {
-          console.error('Error getting filtered activity count:', filterCountError);
-          throw filterCountError;
-        }
-        
-        filteredCount = filterCount || 0;
-      }
-      
-      // Execute the main query with additional debug logging
-      console.log('Executing activity query for user:', user.id, 'filter:', filter, 'page:', pagination.currentPage);
-      const { data, error: activitiesError } = await query;
+      // Execute with timeout
+      const { data, error: activitiesError } = await fetchWithTimeout(async () => query);
       
       if (activitiesError) {
         console.error('Error fetching activities data:', activitiesError);
+        
+        // If this is a JWT error, try refreshing and retry
+        if (activitiesError.message && activitiesError.message.includes('JWT')) {
+          await refreshAndValidateSession();
+          throw new Error('Authentication error, retrying after refresh');
+        }
+        
         throw activitiesError;
       }
       
@@ -111,7 +171,7 @@ const Activity = () => {
         let formattedActivity = {
           id: activity.id,
           type: activity.activity_type,
-          status: activity.status,
+          status: activity.status || 'submitted',
           date: new Date(activity.created_at).toLocaleDateString(),
           points: activity.points || 0,
           description: '',
@@ -154,25 +214,28 @@ const Activity = () => {
       }));
       
       setActivities(formattedActivities);
+      setError(''); // Clear any previous errors on success
+      
     } catch (error) {
       console.error('Error fetching activity history:', error);
       
       // Check if we should retry
       if (retryCount < MAX_RETRIES) {
-        console.log(`Will retry in ${RETRY_DELAY}ms...`);
+        const delay = RETRY_DELAY * Math.pow(1.5, retryCount); // Exponential backoff
+        console.log(`Will retry in ${delay}ms (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
         setTimeout(() => {
           fetchActivities(retryCount + 1);
-        }, RETRY_DELAY);
+        }, delay);
         return;
       }
       
       // No more retries, show error to user
       // More descriptive error message based on the error type
-      if (error?.message?.includes('JWT')) {
-        setError('Authentication error. Please log out and log back in.');
+      if (error?.message?.includes('JWT') || error?.message?.includes('token') || error?.message?.includes('auth')) {
+        setError('Authentication error. Your session may have expired. Please try refreshing the page or sign out and log back in.');
       } else if (error?.code === 'PGRST301') {
         setError('Permission denied. You do not have access to this data.');
-      } else if (error?.code?.includes('network')) {
+      } else if (error?.code?.includes('network') || error?.message?.includes('timeout')) {
         setError('Network error. Please check your connection and try again.');
       } else {
         setError('Unable to load activity history. Please try again later.');

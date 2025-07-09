@@ -412,12 +412,93 @@ const DumpingReport = () => {
     }
   }, []);
 
-  // Handle form submission
+  // Import the offline storage utility
+  const { saveOfflineReport, isOnline } = require('../utils/offlineStorage');
+  
+  // Enhanced session refresh function with validation
+  const refreshAndValidateSession = async () => {
+    try {
+      // First try to refresh the session
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.warn('Session refresh failed:', error.message);
+        
+        // If refresh failed with JWT error, try a more aggressive approach
+        if (error.message && (
+          error.message.includes('invalid JWT') || 
+          error.message.includes('malformed') ||
+          error.message.includes('token expired')
+        )) {
+          console.warn('JWT validation error during refresh, attempting session recovery...');
+          
+          // Try to get current session without refresh
+          const { data: sessionData } = await supabase.auth.getSession();
+          
+          if (!sessionData?.session) {
+            throw new Error('No valid session available');
+          }
+          
+          return { success: false, tokenError: true };
+        }
+        
+        return { success: false, tokenError: false, error };
+      }
+      
+      if (!data?.session) {
+        console.warn('Session refresh did not return a valid session');
+        return { success: false, tokenError: true };
+      }
+      
+      return { success: true };
+    } catch (err) {
+      console.error('Error during session refresh and validation:', err);
+      return { success: false, tokenError: true, error: err };
+    }
+  };
+  
+  // Retry operation with exponential backoff
+  const retryOperation = async (operation, maxRetries = 3, initialDelay = 500) => {
+    let retries = 0;
+    let lastError = null;
+    
+    while (retries < maxRetries) {
+      try {
+        // Try to refresh session before each retry
+        if (retries > 0) {
+          await refreshAndValidateSession();
+          // Add a small delay with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, initialDelay * Math.pow(2, retries - 1)));
+        }
+        
+        return await operation();
+      } catch (err) {
+        console.warn(`Operation failed (attempt ${retries + 1}/${maxRetries}):`, err);
+        lastError = err;
+        retries++;
+        
+        // If this is a token error, try an immediate refresh
+        if (err.message && (
+          err.message.includes('JWT') || 
+          err.message.includes('auth') ||
+          err.message.includes('token')
+        )) {
+          await refreshAndValidateSession();
+        }
+      }
+    }
+    
+    // If we get here, all retries failed
+    throw lastError || new Error('Operation failed after multiple retries');
+  };
+
+  // Handle form submission with enhanced error handling and retry logic
   const handleSubmit = async (values, { setSubmitting }) => {
     setError('');
+    let reportId = null;
     
     try {
-      // Prepare data for Supabase insertion
+      // Prepare data for submission
       const reportData = {
         user_id: user.id,
         waste_type: values.wasteType,
@@ -432,66 +513,218 @@ const DumpingReport = () => {
         image_urls: values.photos || [], // Array of photo URLs if available
         // Points awarded for reporting illegal dumping
         points: 30,
+        // Add device ID or session ID for better tracking
+        device_id: localStorage.getItem('device_id') || `device_${Math.random().toString(36).substring(2, 15)}`,
       };
       
-      console.log('Submitting dumping report to Supabase:', reportData);
+      // Store device ID if not already stored
+      if (!localStorage.getItem('device_id')) {
+        localStorage.setItem('device_id', reportData.device_id);
+      }
       
-      // Insert into Supabase reports table
-      const { data, error } = await supabase
-        .from('dumping_reports')
-        .insert(reportData)
-        .select();
-      
-      if (error) throw error;
-      
-      console.log('Dumping report submitted successfully:', data);
-      
-      // Also record this activity in user_activity table
-      const activityData = {
-        user_id: user.id,
-        activity_type: 'dumping_report',
-        status: 'submitted',
-        points: reportData.points,
-        details: {
-          report_id: data[0].id,
-          waste_type: values.wasteType,
-          hazardous: values.hazardous === 'yes'
-        },
-        created_at: new Date().toISOString(),
+      // Check online status with a more reliable approach
+      const checkOnlineStatus = async () => {
+        if (!navigator.onLine) return false;
+        
+        try {
+          // Try a tiny HEAD request to a reliable endpoint
+          const response = await fetch('/api/health-check', { 
+            method: 'HEAD',
+            mode: 'no-cors',
+            cache: 'no-cache',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          return true;
+        } catch (e) {
+          console.log('Network check failed, considering app offline');
+          return false;
+        }
       };
       
-      // Insert into user_activity table
-      const { error: activityError } = await supabase
-        .from('user_activity')
-        .insert(activityData);
+      const isNetworkAvailable = await checkOnlineStatus();
       
-      if (activityError) {
-        console.error('Error recording activity:', activityError);
-        // Continue anyway as this is non-critical
+      if (isNetworkAvailable) {
+        console.log('Online: Preparing to submit dumping report to Supabase');
+        
+        // Always refresh session before starting critical operations
+        const sessionStatus = await refreshAndValidateSession();
+        
+        if (!sessionStatus.success && sessionStatus.tokenError) {
+          console.warn('Authentication token issues detected, saving report offline');
+          await saveOfflineReport({
+            ...reportData,
+            offline_reason: 'auth_token_error'
+          });
+          sessionStorage.setItem('pendingReports', 'true');
+          setFormSubmitted(true);
+          setTimeout(() => navigate('/dashboard'), 3000);
+          return;
+        }
+        
+        // Step 1: Submit the report with retry logic
+        try {
+          const { data, error } = await retryOperation(async () => {
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Supabase request timeout')), 12000));
+              
+            const supabasePromise = supabase
+              .from('dumping_reports')
+              .insert(reportData)
+              .select();
+              
+            return await Promise.race([supabasePromise, timeoutPromise]);
+          });
+          
+          if (error) throw error;
+          
+          console.log('Dumping report submitted successfully:', data);
+          reportId = data[0].id;
+          
+          // Step 2: Record activity with its own retry logic
+          const activityData = {
+            user_id: user.id,
+            activity_type: 'dumping_report',
+            status: 'submitted',
+            points: reportData.points,
+            details: {
+              report_id: reportId,
+              waste_type: values.wasteType,
+              hazardous: values.hazardous === 'yes',
+              address: values.address || 'Location from map'
+            },
+            created_at: new Date().toISOString(),
+          };
+          
+          // Independent try-catch for activity recording
+          try {
+            await retryOperation(async () => {
+              // Refresh session before activity insert
+              await refreshAndValidateSession();
+              
+              const { error: activityError } = await supabase
+                .from('user_activity')
+                .insert(activityData);
+                
+              if (activityError) throw activityError;
+              return { success: true };
+            });
+            
+            console.log('Activity record created successfully');
+            
+          } catch (activityErr) {
+            console.error('Failed to record activity after retries:', activityErr);
+            // Store activity for later sync instead of failing the whole operation
+            try {
+              localStorage.setItem(
+                `pending_activity_${Date.now()}`, 
+                JSON.stringify(activityData)
+              );
+              console.log('Activity data stored offline for later sync');
+            } catch (storageErr) {
+              console.error('Failed to store activity offline:', storageErr);
+            }
+          }
+          
+          // Step 3: Update user stats with its own retry logic
+          try {
+            await retryOperation(async () => {
+              // Refresh session before stats update
+              await refreshAndValidateSession();
+              
+              const { error: statsError } = await supabase.rpc('increment_user_stats', {
+                user_id: user.id,
+                report_count: 1,
+                point_count: reportData.points
+              });
+              
+              if (statsError) throw statsError;
+              return { success: true };
+            });
+            
+            console.log('User stats updated successfully');
+            
+          } catch (statsErr) {
+            console.error('Failed to update user stats after retries:', statsErr);
+            // Store stats update for later sync
+            try {
+              localStorage.setItem(
+                `pending_stats_update_${Date.now()}`, 
+                JSON.stringify({
+                  user_id: user.id,
+                  report_count: 1,
+                  point_count: reportData.points,
+                  operation: 'increment_user_stats'
+                })
+              );
+              console.log('Stats update stored offline for later sync');
+            } catch (storageErr) {
+              console.error('Failed to store stats update offline:', storageErr);
+            }
+          }
+          
+        } catch (err) {
+          console.error('Error in report submission process:', err);
+          
+          // Handle offline storage as fallback
+          console.log('Online submission failed, saving to offline storage');
+          await saveOfflineReport({
+            ...reportData,
+            offline_reason: err.message || 'Unknown error'
+          });
+          sessionStorage.setItem('pendingReports', 'true');
+        }
+        
+      } else {
+        // We're offline, save report to local storage for later syncing
+        console.log('Offline: Saving dumping report to local storage for later sync');
+        await saveOfflineReport(reportData);
+        
+        // Set a flag in sessionStorage to show a message when user comes back online
+        sessionStorage.setItem('pendingReports', 'true');
+        localStorage.setItem('offlineReportsCount', 
+          (parseInt(localStorage.getItem('offlineReportsCount') || '0') + 1).toString());
       }
       
-      // Update user_stats table to add points and increment report count
-      const { error: statsError } = await supabase.rpc('increment_user_stats', {
-        user_id: user.id,
-        report_count: 1,
-        point_count: reportData.points
-      });
-      
-      if (statsError) {
-        console.error('Error updating user stats:', statsError);
-        // Continue anyway as this is non-critical
-      }
-      
-      // Show success message
+      // Show success message in both online and offline cases
       setFormSubmitted(true);
       
       // Navigate to dashboard after 3 seconds
       setTimeout(() => {
         navigate('/dashboard');
       }, 3000);
+      
     } catch (err) {
-      console.error('Error submitting report:', err);
-      setError('Failed to submit report. Please try again later.');
+      console.error('Unhandled error in report submission:', err);
+      
+      // Final fallback - try offline storage
+      try {
+        console.log('Attempting final fallback to offline storage');
+        const fallbackData = {
+          user_id: user.id,
+          waste_type: values.wasteType,
+          size: values.wasteSize,
+          hazardous: values.hazardous === 'yes',
+          description: values.description,
+          location: position ? [position[0], position[1]] : null,
+          address: values.address || 'Location from map',
+          status: 'submitted',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          image_urls: values.photos || [],
+          points: 30,
+          error_reason: err.message || 'Unknown error'
+        };
+        
+        await saveOfflineReport(fallbackData);
+        sessionStorage.setItem('pendingReports', 'true');
+        setFormSubmitted(true);
+        setTimeout(() => navigate('/dashboard'), 3000);
+        
+      } catch (offlineErr) {
+        console.error('Final fallback to offline storage also failed:', offlineErr);
+        setError('Failed to submit report. Please try again later.');
+      }
+      
     } finally {
       setSubmitting(false);
     }
