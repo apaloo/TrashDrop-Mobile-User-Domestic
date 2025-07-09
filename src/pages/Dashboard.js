@@ -16,6 +16,8 @@ const Dashboard = () => {
     points: 0,
     pickups: 0,
     reports: 0,
+    batches: 0,
+    totalBags: 0,
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [dropPoints, setDropPoints] = useState([]);
@@ -47,6 +49,8 @@ const Dashboard = () => {
             points: statsData.total_points || 0,
             pickups: statsData.total_pickups || 0,
             reports: statsData.total_reports || 0,
+            batches: statsData.total_batches || 0,
+            totalBags: statsData.total_bags || 0,
           });
         }
         
@@ -202,9 +206,67 @@ const Dashboard = () => {
       {/* User Stats Card */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
         
-        {/* User stats with gamification elements - horizontal scrollable */}
-        <div className="flex overflow-x-auto pb-2 -mx-6 px-6 space-x-4 mb-6">
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden min-w-[200px] flex-shrink-0">
+        {/* Stats cards - horizontal scroll on mobile, grid on desktop */}
+        <div className="flex md:grid md:grid-cols-4 gap-4 mb-6 overflow-x-auto pb-4 snap-x snap-mandatory scroll-pl-6 touch-pan-x">
+          <div className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm md:text-lg font-semibold text-purple-700 dark:text-purple-300">Batches & Bags</h3>
+              <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.batches / 2) + 1}</span>
+            </div>
+            <div className="flex items-end gap-2">
+              <div>
+                <p className="text-xs text-purple-700 dark:text-purple-300">Batches</p>
+                <p className="text-2xl md:text-3xl font-bold text-purple-800 dark:text-purple-200">{stats.batches}</p>
+              </div>
+              <div className="ml-4">
+                <p className="text-xs text-indigo-700 dark:text-indigo-300">Available Bags</p>
+                <p className="text-2xl md:text-3xl font-bold text-indigo-800 dark:text-indigo-200">{stats.totalBags}</p>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full h-2 bg-purple-200 dark:bg-purple-700 rounded-full mt-2">
+              <div 
+                className="h-2 bg-purple-600 dark:bg-purple-400 rounded-full" 
+                style={{ width: `${(stats.batches % 2) * 50}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs mt-1">
+              <p className="text-purple-600 dark:text-purple-300">{2 - (stats.batches % 2)} more to level up</p>
+              <p className="text-indigo-600 dark:text-indigo-300">
+                {stats.totalBags > 0 ? `${stats.totalBags} bags available` : "No bags available"}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm md:text-lg font-semibold text-green-700 dark:text-green-300">Pickups</h3>
+              <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.pickups / 5) + 1}</span>
+            </div>
+            <p className="text-2xl md:text-3xl font-bold text-green-800 dark:text-green-200">{stats.pickups}</p>
+            {/* Progress bar */}
+            <div className="w-full h-2 bg-green-200 dark:bg-green-700 rounded-full mt-2">
+              <div 
+                className="h-2 bg-green-600 dark:bg-green-400 rounded-full" 
+                style={{ width: `${(stats.pickups % 5) * 20}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-green-600 dark:text-green-300 mt-1">{5 - (stats.pickups % 5)} more to level up</p>
+            {/* Achievement badge */}
+            {stats.pickups >= 5 && (
+              <div className="absolute -top-1 -right-1">
+                <span className="flex h-6 w-6">
+                  <span className="relative rounded-full h-6 w-6 bg-green-500 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                    </svg>
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-blue-700 dark:text-blue-300">Points Earned</h3>
               <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.points / 100) + 1}</span>
@@ -233,35 +295,7 @@ const Dashboard = () => {
             )}
           </div>
           
-          <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg relative overflow-hidden min-w-[200px] flex-shrink-0">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm md:text-lg font-semibold text-green-700 dark:text-green-300">Pickups</h3>
-              <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.pickups / 5) + 1}</span>
-            </div>
-            <p className="text-2xl md:text-3xl font-bold text-green-800 dark:text-green-200">{stats.pickups}</p>
-            {/* Progress bar */}
-            <div className="w-full h-2 bg-green-200 dark:bg-green-700 rounded-full mt-2">
-              <div 
-                className="h-2 bg-green-600 dark:bg-green-400 rounded-full" 
-                style={{ width: `${(stats.pickups % 5) * 20}%` }}
-              ></div>
-            </div>
-            <p className="text-xs text-green-600 dark:text-green-300 mt-1">{5 - (stats.pickups % 5)} more to level up</p>
-            {/* Achievement badge */}
-            {stats.pickups >= 5 && (
-              <div className="absolute -top-1 -right-1">
-                <span className="flex h-6 w-6">
-                  <span className="relative rounded-full h-6 w-6 bg-green-500 flex items-center justify-center">
-                    <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                    </svg>
-                  </span>
-                </span>
-              </div>
-            )}
-          </div>
-          
-          <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg relative overflow-hidden min-w-[200px] flex-shrink-0">
+          <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-yellow-700 dark:text-yellow-300">Reports</h3>
               <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.reports / 3) + 1}</span>
@@ -291,19 +325,19 @@ const Dashboard = () => {
         </div>
         
         {/* Action buttons */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <Link 
             to="/schedule-pickup" 
-            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors flex-1 text-center"
+            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors flex items-center justify-center"
           >
-            Schedule Pickup
+            <span className="inline-flex items-center justify-center">Schedule Pickup</span>
           </Link>
           
           <Link 
             to="/rewards" 
-            className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors flex-1 text-center"
+            className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors flex items-center justify-center"
           >
-            View Rewards
+            <span className="inline-flex items-center justify-center">View Rewards</span>
           </Link>
         </div>
       </div>

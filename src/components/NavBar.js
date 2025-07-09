@@ -140,7 +140,7 @@ const NavBar = () => {
                 </NavLink>
                 <button
                   onClick={handleSignOut}
-                  className="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-primary-dark/50 transition-colors"
+                  className="px-3 py-2 rounded-md text-sm font-medium text-white bg-primary hover:bg-primary-dark transition-colors"
                 >
                   Sign Out
                 </button>
@@ -171,7 +171,7 @@ const NavBar = () => {
             {/* Theme Toggle */}
             <button 
               onClick={toggleTheme} 
-              className="p-2 rounded-md text-white hover:bg-primary-dark/50 transition-colors"
+              className="p-2 rounded-md text-white bg-primary hover:bg-primary-dark transition-colors"
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
             >
               {theme === 'light' ? (

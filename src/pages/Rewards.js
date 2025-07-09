@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { supabase } from '../utils/supabaseClient';
+import { Link } from 'react-router-dom';
 
 /**
  * Rewards page component for viewing and redeeming rewards
@@ -10,10 +11,48 @@ const Rewards = () => {
   const { user } = useAuth();
   const [userPoints, setUserPoints] = useState(0);
   const [rewards, setRewards] = useState([]);
+  const [pointsHistory, setPointsHistory] = useState([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const fetchPointsHistory = async (limit = 3) => {
+    if (!user) return;
+    
+    setIsHistoryLoading(true);
+    try {
+      // Fetch user activity with points changes from Supabase
+      const { data, error } = await supabase
+        .from('user_activity')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('points', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (error) throw error;
+      
+      if (data) {
+        // Format activity data for display
+        const formattedHistory = data.map(activity => ({
+          id: activity.id,
+          activity: activity.activity_type.replace(/_/g, ' '),
+          date: new Date(activity.created_at).toLocaleDateString(),
+          points: activity.points,
+          details: activity.details
+        }));
+        
+        setPointsHistory(formattedHistory);
+      }
+    } catch (error) {
+      console.error('Error fetching points history:', error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Fetch user points and available rewards from Supabase
@@ -27,14 +66,14 @@ const Rewards = () => {
         // Fetch user stats to get current points
         const { data: userStats, error: userStatsError } = await supabase
           .from('user_stats')
-          .select('points')
+          .select('total_points')
           .eq('user_id', user.id)
           .single();
         
         if (userStatsError) throw userStatsError;
         
         if (userStats) {
-          setUserPoints(userStats.points || 0);
+          setUserPoints(userStats.total_points || 0);
         }
         
         // Fetch available rewards from Supabase
@@ -60,6 +99,9 @@ const Rewards = () => {
           
           setRewards(formattedRewards);
         }
+        
+        // Fetch initial points history (limited to 3 entries)
+        await fetchPointsHistory();
       } catch (error) {
         console.error('Error fetching rewards data:', error);
         setErrorMessage('Failed to load rewards. Please try again later.');
@@ -282,62 +324,67 @@ const Rewards = () => {
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">Points History</h2>
-          <span className="text-sm text-primary dark:text-primary-light hover:underline cursor-pointer">
-            View All
-          </span>
+          <button 
+            className="text-sm text-primary dark:text-primary-light hover:underline focus:outline-none"
+            onClick={() => {
+              if (showAllHistory) {
+                // If already showing all, revert to just 3
+                fetchPointsHistory();
+              } else {
+                // Show all history (limit set to 50, can be adjusted)
+                fetchPointsHistory(50);
+              }
+              setShowAllHistory(!showAllHistory);
+            }}
+          >
+            {showAllHistory ? "Show Less" : "View All"}
+          </button>
         </div>
         
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Activity
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Date
-                </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Points
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
-                  Reported Illegal Dumping
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                  2025-07-01
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 dark:text-green-400 font-medium">
-                  +30
-                </td>
-              </tr>
-              <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
-                  QR Code Scan
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                  2025-06-29
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 dark:text-green-400 font-medium">
-                  +15
-                </td>
-              </tr>
-              <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
-                  Scheduled Pickup
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                  2025-06-25
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 dark:text-green-400 font-medium">
-                  +50
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {isHistoryLoading ? (
+            <div className="py-8 text-center">
+              <LoadingSpinner size="md" />
+            </div>
+          ) : pointsHistory.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Activity
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Points
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {pointsHistory.map(item => (
+                  <tr key={item.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                      {item.activity.replace(/_/g, ' ').split(' ').map(word => 
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                      ).join(' ')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      {item.date}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${item.points >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {item.points > 0 ? `+${item.points}` : item.points}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">No points history found.</p>
+              <p className="text-gray-500 dark:text-gray-400 mt-1">Earn points by requesting pickups, reporting illegal dumping, and scanning QR codes.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -57,6 +57,11 @@ const PickupRequest = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [savedLocations, setSavedLocations] = useState([]);
+  const [userStats, setUserStats] = useState({
+    totalBags: 0,
+    batches: 0
+  });
+  const [insufficientBags, setInsufficientBags] = useState(false);
   
   // Load saved locations from Supabase when component mounts
   useEffect(() => {
@@ -159,13 +164,51 @@ const PickupRequest = () => {
     }
   }, [formData.location, formData.savedLocationId, savedLocations]);
 
+  // Fetch user stats to check available bags
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (user && user.id) {
+        try {
+          const { data: statsData, error: statsError } = await supabase
+            .from('user_stats')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+            
+          if (statsError) throw statsError;
+          
+          if (statsData) {
+            setUserStats({
+              totalBags: statsData.total_bags || 0,
+              batches: statsData.total_batches || 0
+            });
+            
+            // Check if the user has enough bags
+            if (statsData.total_bags <= 0) {
+              setInsufficientBags(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user stats:', error);
+        }
+      }
+    };
+    
+    fetchUserStats();
+  }, [user]);
+
   // Schema for form validation
   const validationSchema = Yup.object().shape({
-    savedLocationId: Yup.string().required('Please select a saved location'),
-    numberOfBags: Yup.string().required('Please select number of bags'),
-    priority: Yup.string().required('Please select priority'),
-    wasteType: Yup.string().required('Please select waste type'),
-    notes: Yup.string().max(200, 'Notes must be less than 200 characters'),
+    savedLocationId: Yup.string(),
+    numberOfBags: Yup.number()
+      .typeError('Please enter a valid number')
+      .min(1, 'Minimum 1 bag required')
+      .max(10, 'Maximum 10 bags allowed')
+      .max(userStats.totalBags, `You only have ${userStats.totalBags} bag(s) available`)
+      .required('Number of bags is required'),
+    priority: Yup.string().required('Priority is required'),
+    wasteType: Yup.string().required('Waste type is required'),
+    notes: Yup.string().max(300, 'Notes cannot exceed 300 characters'),
     location: Yup.object().shape({
       lat: Yup.number().required('Latitude is required'),
       lng: Yup.number().required('Longitude is required'),
@@ -186,112 +229,73 @@ const PickupRequest = () => {
   };
 
   // Handle form submission
-  const handleSubmit = async (values) => {
+  const handleSubmit = async (values, { setSubmitting, resetForm }) => {
     setIsSubmitting(true);
     setError('');
     
     try {
-      // Get location details if using saved location
-      let locationDetails = {};
-      let coordinates = {};
-      
-      if (values.savedLocationId) {
-        const selectedLocation = savedLocations.find(loc => loc.id === values.savedLocationId);
-        if (selectedLocation) {
-          locationDetails = {
-            address: selectedLocation.address,
-            name: selectedLocation.name,
-          };
-          // If the saved location has coordinates, use them
-          if (selectedLocation.coordinates) {
-            coordinates = selectedLocation.coordinates;
-          }
-        }
-      } else {
-        // Use the map-selected coordinates
-        coordinates = values.location;
+      if (!user || !user.id) {
+        throw new Error('You must be logged in to request a pickup');
       }
       
-      // Prepare data for Supabase insertion
+      // Check if the user has enough bags for this request
+      if (userStats.totalBags < Number(values.numberOfBags)) {
+        throw new Error(`You don't have enough bags. You have ${userStats.totalBags} bag(s), but requested ${values.numberOfBags}.`);
+      }
+      
+      // Format the pickup data
       const pickupData = {
         user_id: user.id,
-        number_of_bags: parseInt(values.numberOfBags, 10),
+        status: 'waiting_for_collector',
+        number_of_bags: Number(values.numberOfBags),
         waste_type: values.wasteType,
         priority: values.priority,
-        notes: values.notes || '',
-        location: [coordinates.lat, coordinates.lng], // Store as array for PostGIS compatibility
-        address: locationDetails.address || 'Custom Location',
-        status: 'waiting_for_collector',
+        notes: values.notes,
+        location: `POINT(${values.location.lng} ${values.location.lat})`,
+        address: values.address || 'Custom location',
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        // Default points awarded for pickup request
-        points: values.wasteType === 'recycling' ? 15 : 10,
       };
       
-      console.log('Submitting pickup request to Supabase:', pickupData);
-      
-      // Insert into Supabase pickups table
+      // Add to pickups table in Supabase
       const { data, error } = await supabase
         .from('pickups')
-        .insert(pickupData)
-        .select();
-      
+        .insert([pickupData]);
+        
       if (error) throw error;
       
-      console.log('Pickup request submitted successfully:', data);
-      
-      // Also record this activity in user_activity table
-      const activityData = {
-        user_id: user.id,
-        activity_type: 'pickup_request',
-        status: 'waiting_for_collector',
-        points: pickupData.points,
-        details: {
-          pickup_id: data[0].id,
-          waste_type: values.wasteType,
-          number_of_bags: parseInt(values.numberOfBags, 10)
-        },
-        created_at: new Date().toISOString(),
-      };
-      
-      // Insert into user_activity table
-      const { error: activityError } = await supabase
-        .from('user_activity')
-        .insert(activityData);
-      
-      if (activityError) {
-        console.error('Error recording activity:', activityError);
-        // Continue anyway as this is non-critical
-      }
-      
-      // Update user_stats table to add points
-      const { error: statsError } = await supabase.rpc('increment_user_stats', {
-        user_id: user.id,
-        pickup_count: 1,
-        point_count: pickupData.points
+      // Update the user's bag count in the stats table
+      const { error: statsError } = await supabase.rpc('decrement_user_bags', {
+        user_id_param: user.id,
+        bags_to_remove: Number(values.numberOfBags)
       });
       
       if (statsError) {
-        console.error('Error updating user stats:', statsError);
-        // Continue anyway as this is non-critical
+        console.error('Error updating bag count:', statsError);
+        // Continue with success even if the stats update fails - this should be handled by a background job
+      } else {
+        // Update the local state to reflect the new bag count
+        setUserStats(prev => ({
+          ...prev,
+          totalBags: prev.totalBags - Number(values.numberOfBags)
+        }));
       }
       
-      // Show success message
+      // Success - show confirmation and clear form
       setSuccess(true);
+      resetForm();
       
-      // Navigate to dashboard after 3 seconds
+      // Automatically redirect after 3 seconds
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/');
       }, 3000);
-    } catch (err) {
-      console.error('Error submitting pickup request:', err);
-      setError('Failed to submit pickup request. Please try again later.');
+    } catch (error) {
+      console.error('Error submitting pickup request:', error);
+      setError(error.message || 'Failed to submit pickup request. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
-
-
 
   // If submission was successful, show success message
   if (success) {
@@ -338,23 +342,45 @@ const PickupRequest = () => {
           Request Pickup
         </h1>
         
-        <div className="mb-6">
-          <span className="flex items-center text-red-600 dark:text-red-400 text-sm mb-2">
-            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-            </svg>
-            Fields marked with * are required
-          </span>
+        {/* Display bag availability information */}
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            You have <span className="font-bold">{userStats.totalBags}</span> bag(s) available for pickup.
+          </p>
         </div>
         
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center text-blue-600">
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-            </svg>
-            Request a one-time pickup for your trash
+        {insufficientBags && (
+          <div className="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-md text-yellow-700 dark:text-yellow-200 mb-4">
+            <p>No bags available in your account. Please topup your bags now or use the Schedule Pickup option.</p>
+            <div className="mt-3">
+              <button 
+                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
+                onClick={() => navigate('/schedule-pickup')}
+              >
+                Go to Schedule Pickup
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+        
+        {success ? (
+          <div className="bg-green-100 dark:bg-green-900 p-4 rounded-md text-green-700 dark:text-green-200 mb-4">
+            <p>Your pickup request has been submitted successfully! A collector will be assigned shortly.</p>
+            <p className="mt-2">Redirecting to dashboard...</p>
+          </div>
+        ) : insufficientBags ? null : (
+          <div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center text-blue-600">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+                </svg>
+                <span className="font-medium">Important:</span>
+              </div>
+              <p className="ml-7 text-blue-700">Select your pickup location by clicking on the map or choosing from your saved locations.</p>
+            </div>
+          </div>
+        )}
         
         {error && (
           <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded relative mb-4" role="alert">

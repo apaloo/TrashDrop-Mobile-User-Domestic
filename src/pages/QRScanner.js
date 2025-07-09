@@ -45,24 +45,51 @@ const QRScanner = () => {
   const validateQRCode = (qrData) => {
     try {
       // TrashDrops QR codes should have a specific format like:
-      // TRASHDROP:{binId}:{timestamp}:{signature}
+      // For batch codes: TRASHDROP:BATCH:{batchId}:{bagCount}:{timestamp}:{signature}
+      // For bag codes: TRASHDROP:BAG:{bagId}:{batchId}:{timestamp}:{signature}
       if (!qrData.startsWith('TRASHDROP:')) {
         return { isValid: false, message: 'This is not a valid TrashDrops QR code. Please scan codes from authorized trash bags only.' };
       }
       
       const parts = qrData.split(':');
-      if (parts.length !== 4) {
+      
+      // Validate based on code type
+      if (parts[1] === 'BATCH' && parts.length === 6) {
+        // This is a batch code
+        return { 
+          isValid: true,
+          codeType: 'BATCH',
+          batchId: parts[2],
+          bagCount: parseInt(parts[3], 10),
+          timestamp: parts[4],
+          signature: parts[5]
+        };
+      } 
+      else if (parts[1] === 'BAG' && parts.length === 6) {
+        // This is a bag code
+        return { 
+          isValid: true,
+          codeType: 'BAG',
+          bagId: parts[2],
+          batchId: parts[3],
+          timestamp: parts[4],
+          signature: parts[5]
+        };
+      } 
+      else if (parts.length === 4) {
+        // Legacy format for backward compatibility
+        return { 
+          isValid: true,
+          codeType: 'LEGACY',
+          binId: parts[1],
+          timestamp: parts[2],
+          signature: parts[3]
+        };
+      }
+      else {
+        // Invalid format
         return { isValid: false, message: 'Invalid QR code format. Please use authorized trash bags.' };
       }
-      
-      // In a real app, we would verify the signature against our server
-      // For now, we'll simply validate the format
-      return { 
-        isValid: true,
-        binId: parts[1],
-        timestamp: parts[2],
-        signature: parts[3]
-      };
     } catch (error) {
       console.error('QR code validation error:', error);
       return { isValid: false, message: 'Error validating QR code.' };
@@ -107,14 +134,26 @@ const QRScanner = () => {
           if (success) {
             // Generate a simulated QR code data
             const timestamp = Date.now().toString();
-            const binId = `BIN-${Math.floor(1000 + Math.random() * 9000)}`;
             const signature = `SIG-${Math.random().toString(36).substring(2, 15)}`;
             
-            // 70% chance of valid TrashDrops QR code, 30% chance of invalid QR code
-            const isTrashDropQR = Math.random() > 0.3;
-            const qrData = isTrashDropQR ? 
-              `TRASHDROP:${binId}:${timestamp}:${signature}` : 
-              `https://example.com/some-other-qr-code`;
+            // 80% chance of valid TrashDrops QR code, 20% chance of invalid QR code
+            const randomValue = Math.random();
+            let qrData;
+            
+            if (randomValue > 0.8) {
+              // Invalid QR code
+              qrData = `https://example.com/some-other-qr-code`;
+            } else if (randomValue > 0.4) {
+              // Generate batch code
+              const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
+              const bagCount = Math.floor(1 + Math.random() * 10); // 1 to 10 bags
+              qrData = `TRASHDROP:BATCH:${batchId}:${bagCount}:${timestamp}:${signature}`;
+            } else {
+              // Generate bag code
+              const bagId = `BAG-${Math.floor(1000 + Math.random() * 9000)}`;
+              const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
+              qrData = `TRASHDROP:BAG:${bagId}:${batchId}:${timestamp}:${signature}`;
+            }
             
             // Validate the QR code
             const validationResult = validateQRCode(qrData);
@@ -124,25 +163,51 @@ const QRScanner = () => {
               const location = 'City Center, Main St';
               const earnedPoints = Math.floor(10 + Math.random() * 30);
               
-              // Set scan result
-              setScanResult({
-                binId: validationResult.binId,
+              // Set scan result based on code type
+              const scanResultData = {
+                codeType: validationResult.codeType,
                 location,
                 timestamp: new Date().toISOString(),
                 points: earnedPoints
-              });
+              };
+              
+              if (validationResult.codeType === 'BATCH') {
+                scanResultData.batchId = validationResult.batchId;
+                scanResultData.bagCount = validationResult.bagCount;
+              } else if (validationResult.codeType === 'BAG') {
+                scanResultData.bagId = validationResult.bagId;
+                scanResultData.batchId = validationResult.batchId;
+              } else {
+                // Legacy code
+                scanResultData.binId = validationResult.binId;
+              }
+              
+              setScanResult(scanResultData);
               
               // Update points
               setPoints(earnedPoints);
               
-              // Save scan to Supabase
-              saveScan({
-                binId: validationResult.binId,
+              // Save scan to Supabase with appropriate data structure
+              const scanData = {
                 location,
                 timestamp: new Date().toISOString(),
                 userId: user?.id,
-                points: earnedPoints
-              });
+                points: earnedPoints,
+                codeType: validationResult.codeType
+              };
+              
+              if (validationResult.codeType === 'BATCH') {
+                scanData.batchId = validationResult.batchId;
+                scanData.bagCount = validationResult.bagCount;
+              } else if (validationResult.codeType === 'BAG') {
+                scanData.bagId = validationResult.bagId;
+                scanData.batchId = validationResult.batchId;
+              } else {
+                // Legacy code
+                scanData.binId = validationResult.binId;
+              }
+              
+              saveScan(scanData);
             } else {
               // Invalid QR code
               setError(validationResult.message);
@@ -173,28 +238,55 @@ const QRScanner = () => {
         throw new Error('User not authenticated');
       }
       
+      const scanRecord = {
+        user_id: user.id,
+        location: scanData.location,
+        scan_time: scanData.timestamp,
+        points: scanData.points,
+        code_type: scanData.codeType
+      };
+      
+      // Add appropriate fields based on code type
+      if (scanData.codeType === 'BATCH') {
+        scanRecord.batch_id = scanData.batchId;
+        scanRecord.bag_count = scanData.bagCount;
+      } else if (scanData.codeType === 'BAG') {
+        scanRecord.bag_id = scanData.bagId;
+        scanRecord.batch_id = scanData.batchId;
+      } else {
+        scanRecord.bin_id = scanData.binId;
+      }
+      
       // Store in Supabase
       const { data, error } = await supabase
         .from('scans')
-        .insert([
-          {
-            user_id: user.id,
-            bin_id: scanData.binId,
-            location: scanData.location,
-            scan_time: scanData.timestamp,
-            points: scanData.points
-          }
-        ]);
+        .insert([scanRecord]);
       
       if (error) throw error;
       
       console.log('QR scan saved to database:', data);
       
-      // Update user stats with the new points
-      await supabase.rpc('increment_user_points', { 
-        user_id_param: user.id, 
-        points_to_add: scanData.points 
-      });
+      // Update user stats depending on the scan type
+      if (scanData.codeType === 'BATCH') {
+        // For batch codes, increment batch count and bag count
+        await supabase.rpc('update_user_batch_scan', { 
+          user_id_param: user.id, 
+          points_to_add: scanData.points,
+          bags_to_add: scanData.bagCount
+        });
+      } else if (scanData.codeType === 'BAG') {
+        // For bag codes, we don't update bag counts as they are included in batches
+        await supabase.rpc('increment_user_points', { 
+          user_id_param: user.id, 
+          points_to_add: scanData.points 
+        });
+      } else {
+        // Legacy code handling
+        await supabase.rpc('increment_user_points', { 
+          user_id_param: user.id, 
+          points_to_add: scanData.points 
+        });
+      }
       
       setLoading(false);
     } catch (err) {
@@ -231,12 +323,15 @@ const QRScanner = () => {
     return () => stopCamera();
   }, []);
   
-  // Function to handle requesting pickup for the scanned bin
+  // Function to handle requesting pickup for the scanned bin or bag
   const handleRequestPickup = () => {
     if (scanResult) {
       navigate('/pickup-request', { 
         state: { 
-          binId: scanResult.binId,
+          codeType: scanResult.codeType,
+          ...(scanResult.codeType === 'BATCH' ? { batchId: scanResult.batchId, bagCount: scanResult.bagCount } : {}),
+          ...(scanResult.codeType === 'BAG' ? { bagId: scanResult.bagId, batchId: scanResult.batchId } : {}),
+          ...(scanResult.codeType === 'LEGACY' ? { binId: scanResult.binId } : {}),
           location: scanResult.location
         }
       });
