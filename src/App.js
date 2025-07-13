@@ -20,6 +20,11 @@ import DumpingReport from './pages/DumpingReport';
 import Rewards from './pages/Rewards';
 import Activity from './pages/Activity';
 import Profile from './pages/Profile';
+import TestPickupFlow from './tests/TestPickupFlow';
+import CollectionTestFlow from './tests/CollectionTestFlow';
+import CollectionFlowTest from './tests/CollectionFlowTest';
+import CollectionForm from './pages/CollectionForm';
+import CollectionQRCode from './pages/CollectionQRCode';
 
 /**
  * Application content with auth state handling
@@ -98,9 +103,34 @@ const AppContent = () => {
                   <Activity />
                 </PrivateRoute>
               } />
+              <Route path="/collection/:collectionId" element={
+                <PrivateRoute>
+                  <CollectionForm />
+                </PrivateRoute>
+              } />
+              <Route path="/collection-qr" element={
+                <PrivateRoute>
+                  <CollectionQRCode />
+                </PrivateRoute>
+              } />
               <Route path="/profile" element={
                 <PrivateRoute>
                   <Profile />
+                </PrivateRoute>
+              } />
+              <Route path="/test-pickup" element={
+                <PrivateRoute>
+                  <TestPickupFlow />
+                </PrivateRoute>
+              } />
+              <Route path="/test-collection" element={
+                <PrivateRoute>
+                  <CollectionTestFlow />
+                </PrivateRoute>
+              } />
+              <Route path="/test-collection-flow" element={
+                <PrivateRoute>
+                  <CollectionFlowTest />
                 </PrivateRoute>
               } />
             </Route>

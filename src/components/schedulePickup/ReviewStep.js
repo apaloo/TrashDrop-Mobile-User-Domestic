@@ -109,6 +109,26 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
         </div>
       )}
       
+      {formData.photos && formData.photos.length > 0 && (
+        <div className="bg-gray-50 p-4 rounded-md mb-6">
+          <h3 className="text-lg font-semibold mb-3 text-gray-900">Bin/Trash Bag Photos</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {formData.photos.map((photo, index) => (
+              <div key={index} className="relative aspect-square">
+                <img 
+                  src={photo} 
+                  alt={`Bin/Trash Bag ${index + 1}`}
+                  className="w-full h-full object-cover rounded-lg border border-gray-200"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            {formData.photos.length} photo{formData.photos.length > 1 ? 's' : ''} attached
+          </p>
+        </div>
+      )}
+      
       <div className="bg-gray-50 p-4 rounded-md mb-6">
         <h3 className="text-lg font-semibold mb-3 text-gray-900">Pricing</h3>
         <p className="text-gray-900 font-medium">

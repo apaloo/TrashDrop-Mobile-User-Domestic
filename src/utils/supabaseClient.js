@@ -32,20 +32,64 @@ const clearAuthData = () => {
   }
 };
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create a custom fetch function to handle schema headers
+const customFetch = async (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  
+  // Set schema headers for all requests
+  headers.set('Accept-Profile', 'public');
+  headers.set('Content-Profile', 'public');
+  
+  // Add other necessary headers
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  
+  // Always add schema parameter to the URL
+  const urlWithSchema = url.includes('?') 
+    ? `${url}&schema=public`
+    : `${url}?schema=public`;
+  
+  // Clone the request to avoid modifying the original
+  const request = new Request(urlWithSchema, {
+    ...options,
+    headers
+  });
+  
+  try {
+    const response = await fetch(request);
+    return response;
+  } catch (error) {
+    console.error('Fetch error:', error);
+    throw error;
+  }
+};
+
+// Create Supabase client with custom fetch
+const createClientOptions = {
   auth: {
+    storage: typeof window !== 'undefined' ? window.localStorage : null,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storageKey: 'sb-auth-token',
   },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
+  db: {
+    schema: 'public',
   },
-  localStorage: typeof localStorage !== 'undefined' ? localStorage : null
-});
+  global: {
+    headers: {
+      'X-Client-Info': 'trashdrop-web/1.0',
+    },
+  },
+  // Use our custom fetch
+  fetch: customFetch
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, createClientOptions);
+
+// Helper function to ensure schema is included in table names
+export const withSchema = (table) => `public.${table}`;
 
 // Add event listener for auth state changes to detect problems
 supabase.auth.onAuthStateChange((event, session) => {

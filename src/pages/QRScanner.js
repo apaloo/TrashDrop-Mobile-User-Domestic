@@ -44,11 +44,25 @@ const QRScanner = () => {
   // Function to validate TrashDrops QR codes
   const validateQRCode = (qrData) => {
     try {
-      // TrashDrops QR codes should have a specific format like:
-      // For batch codes: TRASHDROP:BATCH:{batchId}:{bagCount}:{timestamp}:{signature}
-      // For bag codes: TRASHDROP:BAG:{bagId}:{batchId}:{timestamp}:{signature}
+      // Check if it's a collection QR code (JSON format)
+      try {
+        const data = JSON.parse(qrData);
+        if (data.type === 'TRASHDROP_COLLECTION' && data.collectionId && data.userId) {
+          return {
+            isValid: true,
+            codeType: 'COLLECTION',
+            collectionId: data.collectionId,
+            userId: data.userId,
+            timestamp: data.timestamp
+          };
+        }
+      } catch (e) {
+        // Not a JSON string, continue to other formats
+      }
+
+      // For backward compatibility, check old QR code formats
       if (!qrData.startsWith('TRASHDROP:')) {
-        return { isValid: false, message: 'This is not a valid TrashDrops QR code. Please scan codes from authorized trash bags only.' };
+        return { isValid: false, message: 'This is not a valid TrashDrops QR code. Please scan codes from authorized trash bags or collection QR codes.' };
       }
       
       const parts = qrData.split(':');
@@ -88,11 +102,58 @@ const QRScanner = () => {
       }
       else {
         // Invalid format
-        return { isValid: false, message: 'Invalid QR code format. Please use authorized trash bags.' };
+        return { isValid: false, message: 'Invalid QR code format. Please use authorized trash bags or collection QR codes.' };
       }
     } catch (error) {
       console.error('QR code validation error:', error);
       return { isValid: false, message: 'Error validating QR code.' };
+    }
+  };
+
+  // Function to handle collection QR code scan
+  const handleCollectionScan = async (validationResult) => {
+    try {
+      setLoading(true);
+      
+      // Update the collection status to 'scanned' and set the collector ID
+      const { data, error } = await supabase
+        .from('collections')
+        .update({
+          status: 'scanned',
+          collector_id: user.id,
+          scanned_at: new Date().toISOString()
+        })
+        .eq('id', validationResult.collectionId)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // After a short delay, update status to 'processing' to trigger form on user's device
+      setTimeout(async () => {
+        await supabase
+          .from('collections')
+          .update({ 
+            status: 'processing',
+            processing_at: new Date().toISOString()
+          })
+          .eq('id', validationResult.collectionId);
+      }, 2000);
+      
+      // Show success message to collector
+      setScanResult({
+        codeType: 'COLLECTION',
+        status: 'scanned',
+        collectionId: validationResult.collectionId,
+        userId: validationResult.userId,
+        message: 'Collection QR code scanned successfully! The user has been notified.'
+      });
+      
+    } catch (err) {
+      console.error('Error processing collection scan:', err);
+      setError('Failed to process collection QR code. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -131,90 +192,114 @@ const QRScanner = () => {
           // Simulate successful scan 80% of the time
           const success = Math.random() > 0.2;
           
-          if (success) {
-            // Generate a simulated QR code data
-            const timestamp = Date.now().toString();
-            const signature = `SIG-${Math.random().toString(36).substring(2, 15)}`;
-            
-            // 80% chance of valid TrashDrops QR code, 20% chance of invalid QR code
-            const randomValue = Math.random();
-            let qrData;
-            
-            if (randomValue > 0.8) {
-              // Invalid QR code
-              qrData = `https://example.com/some-other-qr-code`;
-            } else if (randomValue > 0.4) {
-              // Generate batch code
-              const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
-              const bagCount = Math.floor(1 + Math.random() * 10); // 1 to 10 bags
-              qrData = `TRASHDROP:BATCH:${batchId}:${bagCount}:${timestamp}:${signature}`;
-            } else {
-              // Generate bag code
-              const bagId = `BAG-${Math.floor(1000 + Math.random() * 9000)}`;
-              const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
-              qrData = `TRASHDROP:BAG:${bagId}:${batchId}:${timestamp}:${signature}`;
-            }
-            
-            // Validate the QR code
-            const validationResult = validateQRCode(qrData);
-            
-            if (validationResult.isValid) {
-              // Get location
-              const location = 'City Center, Main St';
-              const earnedPoints = Math.floor(10 + Math.random() * 30);
-              
-              // Set scan result based on code type
-              const scanResultData = {
-                codeType: validationResult.codeType,
-                location,
-                timestamp: new Date().toISOString(),
-                points: earnedPoints
-              };
-              
-              if (validationResult.codeType === 'BATCH') {
-                scanResultData.batchId = validationResult.batchId;
-                scanResultData.bagCount = validationResult.bagCount;
-              } else if (validationResult.codeType === 'BAG') {
-                scanResultData.bagId = validationResult.bagId;
-                scanResultData.batchId = validationResult.batchId;
-              } else {
-                // Legacy code
-                scanResultData.binId = validationResult.binId;
-              }
-              
-              setScanResult(scanResultData);
-              
-              // Update points
-              setPoints(earnedPoints);
-              
-              // Save scan to Supabase with appropriate data structure
-              const scanData = {
-                location,
-                timestamp: new Date().toISOString(),
-                userId: user?.id,
-                points: earnedPoints,
-                codeType: validationResult.codeType
-              };
-              
-              if (validationResult.codeType === 'BATCH') {
-                scanData.batchId = validationResult.batchId;
-                scanData.bagCount = validationResult.bagCount;
-              } else if (validationResult.codeType === 'BAG') {
-                scanData.bagId = validationResult.bagId;
-                scanData.batchId = validationResult.batchId;
-              } else {
-                // Legacy code
-                scanData.binId = validationResult.binId;
-              }
-              
-              saveScan(scanData);
-            } else {
-              // Invalid QR code
-              setError(validationResult.message);
-            }
-          } else {
+          if (!success) {
             // Simulate scan error
             setError('Could not recognize QR code. Please try again.');
+            stopCamera();
+            setScanning(false);
+            return;
+          }
+          
+          // For testing: 50% chance of a collection QR code, 50% chance of a regular QR code
+          const isCollectionCode = Math.random() > 0.5;
+          
+          if (isCollectionCode) {
+            // Simulate a collection QR code
+            const collectionId = `col_${Math.random().toString(36).substring(2, 10)}`;
+            const userId = `user_${Math.floor(1000 + Math.random() * 9000)}`;
+            const qrData = JSON.stringify({
+              type: 'TRASHDROP_COLLECTION',
+              collectionId,
+              userId,
+              timestamp: Date.now()
+            });
+            
+            const validationResult = validateQRCode(qrData);
+            handleCollectionScan(validationResult);
+            stopCamera();
+            setScanning(false);
+            return;
+          }
+          
+          // Generate a simulated regular QR code data
+          const timestamp = Date.now().toString();
+          const signature = `SIG-${Math.random().toString(36).substring(2, 15)}`;
+          
+          // 80% chance of valid TrashDrops QR code, 20% chance of invalid QR code
+          const randomValue = Math.random();
+          let qrData;
+          
+          if (randomValue > 0.8) {
+            // Invalid QR code
+            qrData = `https://example.com/some-other-qr-code`;
+          } else if (randomValue > 0.4) {
+            // Generate batch code
+            const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
+            const bagCount = Math.floor(1 + Math.random() * 10); // 1 to 10 bags
+            qrData = `TRASHDROP:BATCH:${batchId}:${bagCount}:${timestamp}:${signature}`;
+          } else {
+            // Generate bag code
+            const bagId = `BAG-${Math.floor(1000 + Math.random() * 9000)}`;
+            const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
+            qrData = `TRASHDROP:BAG:${bagId}:${batchId}:${timestamp}:${signature}`;
+          }
+          
+          // Validate the QR code
+          const validationResult = validateQRCode(qrData);
+          
+          if (validationResult.isValid) {
+            // Get location
+            const location = 'City Center, Main St';
+            const earnedPoints = Math.floor(10 + Math.random() * 30);
+            
+            // Set scan result based on code type
+            const scanResultData = {
+              codeType: validationResult.codeType,
+              location,
+              timestamp: new Date().toISOString(),
+              points: earnedPoints
+            };
+            
+            if (validationResult.codeType === 'BATCH') {
+              scanResultData.batchId = validationResult.batchId;
+              scanResultData.bagCount = validationResult.bagCount;
+            } else if (validationResult.codeType === 'BAG') {
+              scanResultData.bagId = validationResult.bagId;
+              scanResultData.batchId = validationResult.batchId;
+            } else {
+              // Legacy code
+              scanResultData.binId = validationResult.binId;
+            }
+            
+            setScanResult(scanResultData);
+            
+            // Update points
+            setPoints(earnedPoints);
+            
+            // Save scan to Supabase with appropriate data structure
+            const scanData = {
+              location,
+              timestamp: new Date().toISOString(),
+              userId: user?.id,
+              points: earnedPoints,
+              codeType: validationResult.codeType
+            };
+            
+            if (validationResult.codeType === 'BATCH') {
+              scanData.batchId = validationResult.batchId;
+              scanData.bagCount = validationResult.bagCount;
+            } else if (validationResult.codeType === 'BAG') {
+              scanData.bagId = validationResult.bagId;
+              scanData.batchId = validationResult.batchId;
+            } else {
+              // Legacy code
+              scanData.binId = validationResult.binId;
+            }
+            
+            saveScan(scanData);
+          } else {
+            // Invalid QR code
+            setError(validationResult.message || 'Invalid QR code');
           }
           
           // Stop the camera when done scanning
@@ -227,6 +312,40 @@ const QRScanner = () => {
         setError('Could not access camera. Please check your permissions.');
         setScanning(false);
       });
+  };
+
+  // Function to render scan result
+  const renderScanResult = () => {
+    if (!scanResult) return null;
+    
+    return (
+      <div className="mt-4 p-4 bg-green-50 dark:bg-green-900 rounded-md">
+        <h3 className="text-lg font-medium text-green-800 dark:text-green-200">
+          Scan Successful!
+        </h3>
+        <div className="mt-2 text-green-700 dark:text-green-300">
+          <p>Code Type: {scanResult.codeType}</p>
+          {scanResult.codeType === 'BATCH' && (
+            <>
+              <p>Batch ID: {scanResult.batchId}</p>
+              <p>Bag Count: {scanResult.bagCount}</p>
+            </>
+          )}
+          {scanResult.codeType === 'BAG' && (
+            <>
+              <p>Bag ID: {scanResult.bagId}</p>
+              <p>Batch ID: {scanResult.batchId}</p>
+            </>
+          )}
+          {scanResult.codeType === 'LEGACY' && (
+            <p>Bin ID: {scanResult.binId}</p>
+          )}
+          <p className="mt-2">
+            <span className="font-medium">+{scanResult.points} points</span> earned!
+          </p>
+        </div>
+      </div>
+    );
   };
 
   // Function to save scan result to Supabase
@@ -420,43 +539,17 @@ const QRScanner = () => {
         )}
         
         {/* Scan result */}
-        {scanResult && (
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Scan Details</h3>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-300">Bin ID:</span>
-                <span className="font-medium text-gray-800 dark:text-white">{scanResult.binId}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-300">Location:</span>
-                <span className="font-medium text-gray-800 dark:text-white">{scanResult.location}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-300">Time:</span>
-                <span className="font-medium text-gray-800 dark:text-white">
-                  {new Date(scanResult.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-              
-              <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600">
-                <span className="text-gray-600 dark:text-gray-300">Points Earned:</span>
-                <span className="font-bold text-lg text-green-600 dark:text-green-400">+{points}</span>
-              </div>
-            </div>
-            
-            {/* Request pickup button */}
-            <button
-              onClick={handleRequestPickup}
-              className="mt-4 w-full py-2 px-4 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
-            >
-              Request Pickup
-            </button>
-          </div>
-        )}
+        {renderScanResult()}
+        
+        {/* Request Pickup Button */}
+        <div className="mt-4">
+          <button
+            onClick={handleRequestPickup}
+            className="w-full py-2 px-4 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
+          >
+            Request Pickup
+          </button>
+        </div>
         
         {/* Instructions */}
         <div className="mt-6">
