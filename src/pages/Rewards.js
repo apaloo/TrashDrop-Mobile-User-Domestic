@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { supabase } from '../utils/supabaseClient';
+import { useAuth } from '../context/AuthContext.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
+import supabase from '../utils/supabaseClient.js';
 import { Link } from 'react-router-dom';
 
 /**

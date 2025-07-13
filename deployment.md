@@ -15,8 +15,8 @@ The `.env.production` file contains configuration settings optimized for product
 
 ```
 # API and Supabase Settings
-REACT_APP_API_URL=https://api.trashdrop.com
-REACT_APP_SUPABASE_URL=https://cpeyavpxqcloupolbvyh.supabase.co
+REACT_APP_API_URL=https://api.trashdrops.com
+REACT_APP_SUPABASE_URL=https://tfdedlqdsajjdjkerkli.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=[your-anon-key]
 
 # Feature Flags

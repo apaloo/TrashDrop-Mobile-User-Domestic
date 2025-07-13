@@ -42,3 +42,40 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Enhanced form element readability */
+select, input, textarea, option {
+  color: #000000 !important;
+  font-weight: 500 !important;
+}
+
+.dark select, .dark input, .dark textarea, .dark option,
+[data-theme='dark'] select, [data-theme='dark'] input, [data-theme='dark'] textarea, [data-theme='dark'] option {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+select::placeholder, input::placeholder, textarea::placeholder {
+  color: #555555 !important;
+  font-weight: 500 !important;
+  opacity: 1 !important;
+}
+
+.dark select::placeholder, .dark input::placeholder, .dark textarea::placeholder,
+[data-theme='dark'] select::placeholder, [data-theme='dark'] input::placeholder, [data-theme='dark'] textarea::placeholder {
+  color: #bbbbbb !important;
+  font-weight: 500 !important;
+  opacity: 1 !important;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #000000 !important;
+  font-weight: 500 !important;
+}
+
+.dark select option, [data-theme='dark'] select option {
+  background-color: #1a1a1a;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}

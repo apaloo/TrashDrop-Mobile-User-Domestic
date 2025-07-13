@@ -16,7 +16,7 @@
 
 # Environment settings for production
 [context.production.environment]
-  REACT_APP_API_URL = "https://api.trashdrop.com"
+  REACT_APP_API_URL = "https://api.trashdrops.com"
   # Note: Sensitive environment variables should be set in the Netlify dashboard
 
 # Enable PWA features and offline capabilities

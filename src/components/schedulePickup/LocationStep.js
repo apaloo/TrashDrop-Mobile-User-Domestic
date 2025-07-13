@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { supabase } from '../../utils/supabaseClient';
-import { useAuth } from '../../context/AuthContext';
+import supabase from '../../utils/supabaseClient.js';
+import { useAuth } from '../../context/AuthContext.js';
 
 // Fix for default marker icon in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;

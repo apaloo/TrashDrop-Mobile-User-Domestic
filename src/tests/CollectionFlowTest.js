@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { supabase, withSchema } from '../utils/supabaseClient';
+import { useAuth } from '../context/AuthContext.js';
+import supabase, { withSchema } from '../utils/supabaseClient.js';
 import { QRCodeSVG } from 'qrcode.react';
 import { v4 as uuidv4 } from 'uuid';
 

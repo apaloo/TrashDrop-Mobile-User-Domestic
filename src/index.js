@@ -2,13 +2,13 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
-import App from './App';
-import reportWebVitals from './reportWebVitals';
-import * as serviceWorkerRegistration from './serviceWorkerRegistration';
-import syncService from './utils/syncService';
+import App from './App.js';
+import reportWebVitals from './reportWebVitals.js';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration.js';
+import syncService from './utils/syncService.js';
 
 // Import auth tester for development testing
-import * as authTester from './utils/authTester';
+import * as authTester from './utils/authTester.js';
 
 // Initialize sync service
 const initializeApp = () => {

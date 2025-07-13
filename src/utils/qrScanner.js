@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient';
-import { getQRCode, invalidateQRCode } from './qrStorage';
+import supabase from './supabaseClient.js';
+import { getQRCode, invalidateQRCode } from './qrStorage.js';
 
 /**
  * Parse and validate the QR code data

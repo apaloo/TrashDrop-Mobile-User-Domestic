@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../utils/supabaseClient';
+import { useAuth } from '../context/AuthContext.js';
+import supabase from '../utils/supabaseClient.js';
 import { FaQrcode, FaPlus, FaSpinner, FaSync } from 'react-icons/fa';
-import { storeQRCode, getQRCode } from '../utils/qrStorage';
-import { subscribeToPickupUpdates, handlePickupUpdate } from '../utils/realtime';
-import LocationStep from '../components/schedulePickup/LocationStep';
-import ScheduleDetailsStep from '../components/schedulePickup/ScheduleDetailsStep';
-import WasteDetailsStep from '../components/schedulePickup/WasteDetailsStep';
-import AdditionalInfoStep from '../components/schedulePickup/AdditionalInfoStep';
-import ReviewStep from '../components/schedulePickup/ReviewStep';
-import ScheduledQRTab from '../components/schedulePickup/ScheduledQRTab';
+import { storeQRCode, getQRCode } from '../utils/qrStorage.js';
+import { subscribeToPickupUpdates, handlePickupUpdate } from '../utils/realtime.js';
+import LocationStep from '../components/schedulePickup/LocationStep.js';
+import ScheduleDetailsStep from '../components/schedulePickup/ScheduleDetailsStep.js';
+import WasteDetailsStep from '../components/schedulePickup/WasteDetailsStep.js';
+import AdditionalInfoStep from '../components/schedulePickup/AdditionalInfoStep.js';
+import ReviewStep from '../components/schedulePickup/ReviewStep.js';
+import ScheduledQRTab from '../components/schedulePickup/ScheduledQRTab.js';
 
 /**
  * Tab component for the schedule pickup page
@@ -147,15 +147,45 @@ const SchedulePickup = () => {
     setError('');
     
     try {
+      // First check if we have cached data to show immediately
+      const cachedPickups = localStorage.getItem('scheduledPickups');
+      if (cachedPickups) {
+        try {
+          const parsedPickups = JSON.parse(cachedPickups);
+          console.log('Using cached scheduled pickups:', parsedPickups.length);
+          // Show cached data immediately while we fetch fresh data
+          setScheduledPickups(parsedPickups);
+          setLastUpdated(localStorage.getItem('scheduledPickupsLastUpdated') || new Date().toISOString());
+        } catch (cacheError) {
+          console.error('Error parsing cached pickups:', cacheError);
+          // If cache is corrupted, clear it
+          localStorage.removeItem('scheduledPickups');
+        }
+      }
+      
       // Fetch both pickups and locations in parallel
       const [pickupsResponse, locationsResponse] = await Promise.all([
         fetchScheduledPickups(user.id),
         fetchUserLocations(user.id)
       ]);
       
-      setScheduledPickups(pickupsResponse);
+      // Only update if we got actual data back
+      if (Array.isArray(pickupsResponse)) {
+        // Save to state
+        setScheduledPickups(pickupsResponse);
+        
+        // Cache the results for persistence
+        const timestamp = new Date().toISOString();
+        localStorage.setItem('scheduledPickups', JSON.stringify(pickupsResponse));
+        localStorage.setItem('scheduledPickupsLastUpdated', timestamp);
+        localStorage.setItem('scheduledPickupsUserId', user.id);
+        
+        // Update last updated timestamp
+        setLastUpdated(timestamp);
+      }
+      
+      // Update locations in form data
       setFormData(prev => ({ ...prev, savedLocations: locationsResponse }));
-      setLastUpdated(new Date().toISOString());
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load data. Please try again.');
@@ -229,9 +259,122 @@ const SchedulePickup = () => {
     };
   }, [user]);
   
-  // Initial data fetch
+  // Ensure data is loaded every time component mounts and restore cached data immediately
   useEffect(() => {
-    fetchData();
+    // Immediately restore from cache to avoid the "disappearing" effect
+    const cachedPickups = localStorage.getItem('scheduledPickups');
+    const cachedUserId = localStorage.getItem('scheduledPickupsUserId');
+    
+    if (cachedPickups && user && cachedUserId === user.id) {
+      try {
+        const parsedPickups = JSON.parse(cachedPickups);
+        console.log('Restoring cached scheduled pickups:', parsedPickups.length);
+        setScheduledPickups(parsedPickups);
+        setLastUpdated(localStorage.getItem('scheduledPickupsLastUpdated') || new Date().toISOString());
+        setIsLoading(false); // Immediately stop loading indicator
+      } catch (cacheError) {
+        console.error('Error parsing cached pickups:', cacheError);
+      }
+    }
+    
+    const loadData = async () => {
+      try {
+        // Only show loading indicator if we don't have cached data
+        if (!cachedPickups || !user || cachedUserId !== user.id) {
+          setIsLoading(true);
+        }
+        
+        // Always fetch fresh data from the server when the component mounts
+        if (user) {
+          try {
+            const { data, error } = await supabase
+              .from('scheduled_pickups')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('pickup_date', { ascending: true });
+              
+            if (error) throw error;
+            if (Array.isArray(data) && data.length > 0) {
+              console.log('Fetched fresh scheduled pickups:', data.length);
+              setScheduledPickups(data);
+              
+              // Update cache with the latest data
+              const timestamp = new Date().toISOString();
+              localStorage.setItem('scheduledPickups', JSON.stringify(data));
+              localStorage.setItem('scheduledPickupsLastUpdated', timestamp);
+              localStorage.setItem('scheduledPickupsUserId', user.id);
+              setLastUpdated(timestamp);
+            }
+          } catch (fetchError) {
+            console.error('Error fetching scheduled pickups:', fetchError);
+            // If fetch fails, we'll rely on the cached data we've already loaded
+          }
+        }
+        
+        // Subscribe to updates
+        if (user) {
+          subscriptionRef.current = subscribeToPickupUpdates(user.id, (payload) => {
+            console.log('Received real-time update:', payload);
+            setScheduledPickups(prevPickups => {
+              const updatedPickups = handlePickupUpdate(payload, prevPickups);
+              // Only update if something actually changed
+              if (updatedPickups !== prevPickups) {
+                const timestamp = new Date().toISOString();
+                setLastUpdated(timestamp);
+                // Update cache with the latest data
+                localStorage.setItem('scheduledPickups', JSON.stringify(updatedPickups));
+                localStorage.setItem('scheduledPickupsLastUpdated', timestamp);
+                return updatedPickups;
+              }
+              return prevPickups;
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Cleanup
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+    };
+  }, [user]);
+  
+  // Add an event listener to handle page visibility changes
+  // This ensures we refresh data when the user comes back to this tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        console.log('Page became visible, refreshing pickup data');
+        fetchData(false);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Add a listener for route changes to refresh data
+    const handleRouteChange = () => {
+      if (user) {
+        console.log('Route changed, refreshing pickup data');
+        fetchData(false);
+      }
+    };
+    
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('popstate', handleRouteChange);
+    };
   }, [user]);
   
   // Fetch scheduled pickups and locations with error handling and retry logic

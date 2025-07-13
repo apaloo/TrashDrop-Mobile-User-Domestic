@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { processQRCode, updatePickupStatus, completePickup } from '../utils/qrScanner';
 import PaymentAndRating from '../components/collection/PaymentAndRating';
@@ -148,6 +148,8 @@ const CollectorPickup = () => {
     try {
       switch (field) {
         case 'specialHandling':
+          setSpecialHandling(!specialHandling);
+          break;
           setSpecialHandling(prev => !prev);
           break;
         case 'contamination':
@@ -189,6 +191,34 @@ const CollectorPickup = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto p-4">
+          {/* Scanner Section */}
+          {renderScanner()}
+
+          {/* Pickup Details */}
+          <PickupDetails
+            currentPickup={currentPickup}
+            formData={formData}
+            onInputChange={handleInputChange}
+            onToggleTag={toggleBooleanField}
+            onCapturePhoto={capturePhoto}
+            onRemovePhoto={removePhoto}
+            onUpdatePhotoNotes={updatePhotoNotes}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            status={status}
+            showPayment={showPayment}
+            pickupComplete={pickupComplete}
+            onCompletePickup={handleCompletePickup}
+          />
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
   const [activeTab, setActiveTab] = useState('details'); // 'details' or 'photos' or 'review'
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -632,16 +662,18 @@ const CollectorPickup = () => {
     );
   };
 
-  // Memoize the pickup details component to prevent unnecessary re-renders
-  const PickupDetails = memo(({ currentPickup, formData, onInputChange, onToggleTag, onCapturePhoto, onRemovePhoto, onUpdatePhotoNotes, activeTab, setActiveTab, status, showPayment, pickupComplete, onCompletePickup }) => {
-    if (!currentPickup) return null;
-    
-    // Tab content component to improve readability
-    const TabContent = ({ children, active, tabName }) => (
+  // Tab content component to improve readability
+  const TabContent = ({ children, active, tabName }) => {
+    return (
       <div className={active === tabName ? 'block' : 'hidden'}>
         {children}
       </div>
     );
+  };
+
+  // Memoize the pickup details component to prevent unnecessary re-renders
+  const PickupDetails = memo(({ currentPickup, formData, onInputChange, onToggleTag, onCapturePhoto, onRemovePhoto, onUpdatePhotoNotes, activeTab, setActiveTab, status, showPayment, pickupComplete, onCompletePickup }) => {
+    if (!currentPickup) return null;
     
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -1124,7 +1156,7 @@ const CollectorPickup = () => {
                   onComplete={handlePaymentAndRatingComplete}
                   onBack={() => setShowPayment(false)}
                 />
-              ) : status === 'completed' ? (
+              ) : status === 'completed' && (
                 <div className="text-center py-6">
                   <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                     <FaCheckCircle className="text-green-500 text-3xl" />
@@ -1225,7 +1257,7 @@ const CollectorPickup = () => {
         </div>
       </div>
     );
-  });
+  };
   
   // Render error state with improved accessibility
   const renderError = () => {

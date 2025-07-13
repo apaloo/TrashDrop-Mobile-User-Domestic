@@ -191,7 +191,19 @@ const networkFirstStrategy = new NetworkFirst({
   ],
 });
 
-// Set default handler for all fetch requests
+// Ensure authentication requests are never cached
+registerRoute(
+  ({ url }) => 
+    url.pathname.includes('/auth/') || 
+    url.pathname.includes('/token') || 
+    url.pathname.includes('/session') || 
+    url.pathname.endsWith('refresh') || 
+    url.pathname.includes('supabase'),
+  new NetworkOnly(),
+  'ANY'
+);
+
+// Set default handler for all other fetch requests
 setDefaultHandler(new NetworkOnly());
 
 // Define an offlineFallback strategy

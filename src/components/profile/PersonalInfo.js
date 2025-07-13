@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext.js';
 
 /**
  * Personal Information tab component for the Profile page
  * Allows users to view and update their personal information
  */
 const PersonalInfo = () => {
+  const { user } = useAuth();
+  
   // Sample user data - in a real app, this would come from a context or API
   const [userData, setUserData] = useState({
     firstName: '',
     lastName: '',
-    email: 'user@example.com',
+    email: user?.email || 'user@example.com',
     phone: '',
     address: '',
     profileImage: null,
     memberSince: 'Jan 2025'
   });
+
+  // Load profile data from localStorage on component mount
+  useEffect(() => {
+    const userId = user?.id || 'guest';
+    const storedProfile = localStorage.getItem(`profile_${userId}`);
+    
+    if (storedProfile) {
+      try {
+        const parsedProfile = JSON.parse(storedProfile);
+        setUserData(prevData => ({ ...prevData, ...parsedProfile }));
+      } catch (error) {
+        console.error('Error parsing stored profile:', error);
+      }
+    }
+  }, [user]);
 
   // State to track form changes
   const [formData, setFormData] = useState({ ...userData });
@@ -34,10 +52,30 @@ const PersonalInfo = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
+        const newProfileImage = reader.result;
+        
+        // Update form data with new image
         setFormData({
           ...formData,
-          profileImage: reader.result
+          profileImage: newProfileImage
         });
+        
+        // Save image to localStorage immediately for persistence
+        const userId = user?.id || 'guest';
+        const storedProfile = localStorage.getItem(`profile_${userId}`);
+        let profileData = {};
+        
+        try {
+          if (storedProfile) {
+            profileData = JSON.parse(storedProfile);
+          }
+        } catch (error) {
+          console.error('Error parsing stored profile:', error);
+        }
+        
+        // Update profile with new image
+        profileData.profileImage = newProfileImage;
+        localStorage.setItem(`profile_${userId}`, JSON.stringify(profileData));
       };
       reader.readAsDataURL(file);
     }
@@ -48,6 +86,11 @@ const PersonalInfo = () => {
     e.preventDefault();
     // In a real app, this would make an API call to update the user data
     setUserData({ ...formData });
+    
+    // Save all form data to localStorage for persistence
+    const userId = user?.id || 'guest';
+    localStorage.setItem(`profile_${userId}`, JSON.stringify(formData));
+    
     alert('Personal information updated!');
   };
 
@@ -85,7 +128,7 @@ const PersonalInfo = () => {
               className="hidden"
             />
           </div>
-          <h3 className="text-lg font-medium mt-4">User Name</h3>
+          <h3 className="text-lg font-medium mt-4">{user?.email ? user.email.split('@')[0] : 'User Name'}</h3>
           <p className="text-sm text-gray-500">Member since: {userData.memberSince}</p>
         </div>
 

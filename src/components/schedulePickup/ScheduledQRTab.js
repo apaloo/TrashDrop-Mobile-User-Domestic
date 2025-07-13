@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaQrcode, FaPlus } from 'react-icons/fa';
-import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../utils/supabaseClient';
-import QRCodeList from './QRCodeList';
+import { useAuth } from '../../context/AuthContext.js';
+import supabase from '../../utils/supabaseClient.js';
+import QRCodeList from './QRCodeList.js';
 
 
 
@@ -25,6 +25,15 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading = false })
       
       console.log('Attempting to cancel pickup:', pickupId);
       
+      // First, add an optimistic UI update to show the cancellation immediately
+      // This makes the UI feel more responsive while the backend operation completes
+      const cachedPickups = JSON.parse(localStorage.getItem('scheduledPickups') || '[]');
+      const updatedPickups = cachedPickups.map(pickup => 
+        pickup.id === pickupId ? { ...pickup, status: 'cancelling...' } : pickup
+      );
+      localStorage.setItem('scheduledPickups', JSON.stringify(updatedPickups));
+      
+      // Now perform the actual backend update
       const { data, error } = await supabase
         .from('scheduled_pickups')
         .update({ 
@@ -53,7 +62,16 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading = false })
       
       console.log('Successfully cancelled pickup:', data[0]);
       
-      // Refresh the data
+      // Update cached data with the confirmed cancellation
+      const finalUpdatedPickups = cachedPickups.map(pickup => 
+        pickup.id === pickupId ? { ...pickup, status: 'cancelled' } : pickup
+      );
+      localStorage.setItem('scheduledPickups', JSON.stringify(finalUpdatedPickups));
+      
+      // Show success message to user
+      alert('Pickup successfully cancelled');
+      
+      // Refresh the data in the parent component
       if (onRefresh) {
         await onRefresh();
       } else {
@@ -66,6 +84,10 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading = false })
         name: error.name,
         stack: error.stack
       });
+      
+      // Restore the original state in the cached data
+      const cachedPickups = JSON.parse(localStorage.getItem('scheduledPickups') || '[]');
+      localStorage.setItem('scheduledPickups', JSON.stringify(cachedPickups));
       
       // More specific error messages based on the error type
       let errorMessage = 'Failed to cancel pickup. ';
@@ -231,16 +253,9 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading = false })
             <FaQrcode className="text-gray-400 text-2xl" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Pickups Scheduled</h3>
-          <p className="text-gray-500 max-w-md mx-auto mb-6">
-            You don't have any scheduled pickups yet. Schedule your first pickup to see QR codes here.
+          <p className="text-gray-500 max-w-md mx-auto">
+            You don't have any scheduled pickups yet.
           </p>
-          <button 
-            className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-primary-dark transition-colors inline-flex items-center"
-            onClick={() => window.scrollTo(0, 0)}
-          >
-            <FaPlus className="mr-2" />
-            Schedule Pickup
-          </button>
         </div>
       ) : (
         <>

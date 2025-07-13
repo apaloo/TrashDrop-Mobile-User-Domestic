@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 // Dynamic import for leaflet-routing-machine to prevent SSR issues
-import { supabase } from '../utils/supabaseClient';
+import supabase from '../utils/supabaseClient.js';
 
 // Component to update the map view when position changes
 const MapUpdater = ({ position }) => {
@@ -387,8 +387,14 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
       {/* Cancel button */}
       <div className="p-4 bg-gray-50 dark:bg-gray-700 flex justify-end">
         <button 
-          onClick={() => onCancel(activePickup.id)}
+          onClick={() => {
+            if (window.confirm('Are you sure you want to cancel this pickup request?')) {
+              console.log('Cancelling pickup request with ID:', activePickup.id);
+              onCancel && onCancel(activePickup.id);
+            }
+          }}
           className="px-4 py-2 bg-red-500 text-white font-medium rounded-md hover:bg-red-600 transition-colors"
+          disabled={!activePickup.id}
         >
           Cancel Request
         </button>

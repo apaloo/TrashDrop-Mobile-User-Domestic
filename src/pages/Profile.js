@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import PersonalInfo from '../components/profile/PersonalInfo';
-import Locations from '../components/profile/Locations';
-import Preferences from '../components/profile/Preferences';
-import Notifications from '../components/profile/Notifications';
-import Security from '../components/profile/Security';
+import PersonalInfo from '../components/profile/PersonalInfo.js';
+import Locations from '../components/profile/Locations.js';
+import Preferences from '../components/profile/Preferences.js';
+import Notifications from '../components/profile/Notifications.js';
+import Security from '../components/profile/Security.js';
 
 /**
  * Profile page component that displays user profile information and settings

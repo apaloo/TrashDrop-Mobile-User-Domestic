@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { useAuth } from '../context/AuthContext.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
 
 /**
  * ResetPassword page component for password recovery

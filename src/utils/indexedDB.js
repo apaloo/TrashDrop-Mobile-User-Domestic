@@ -1,5 +1,5 @@
 import { openDB } from 'idb';
-import appConfig from './app-config';
+import appConfig from './app-config.js';
 
 /**
  * IndexedDB utility for offline data persistence

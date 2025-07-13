@@ -1,7 +1,11 @@
 // Authentication Flow Test Script
 // This script can be run to test Supabase authentication integration
 
-import { supabase, authService } from '../utils/supabaseClient';
+// Load environment variables using dotenv
+import dotenv from 'dotenv';
+dotenv.config({ path: '../.env' });
+
+import supabase, { authService } from '../utils/supabaseClient.js';
 
 // Test credentials - DO NOT use real credentials
 const TEST_EMAIL = 'test@trashdrop.com';
@@ -50,19 +54,19 @@ async function testSignIn() {
 
 // Test session retrieval
 async function testGetSession() {
-  console.log('🧪 Testing Get Session...');
+  console.log('🧪 Testing Session Flow...');
   try {
-    const { session, error } = await authService.getSession();
+    const { data, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('❌ Get Session Error:', error.message);
+      console.error('❌ Session Error:', error.message);
       return false;
     }
     
-    console.log('✅ Session Retrieved:', session ? 'Valid Session' : 'No Active Session');
+    console.log('✅ Session Success:', data.session);
     return true;
   } catch (err) {
-    console.error('❌ Get Session Exception:', err.message);
+    console.error('❌ Session Exception:', err.message);
     return false;
   }
 }
@@ -88,23 +92,38 @@ async function testSignOut() {
 
 // Run the tests in sequence
 async function runAuthTests() {
-  console.log('🔍 Starting Authentication Flow Tests...');
-  console.log('------------------------------------');
+  console.log('🚀 Starting Authentication Tests...');
   
-  // Test if Supabase is configured
-  console.log('Supabase URL:', supabase.supabaseUrl);
-  
-  // Run test sequence
-  await testSignUp();
-  await testSignIn();
-  await testGetSession();
+  // Clear any existing session
   await testSignOut();
   
-  console.log('------------------------------------');
-  console.log('🏁 Authentication Flow Tests Completed');
+  // Run tests
+  const signUpResult = await testSignUp();
+  if (!signUpResult) {
+    console.error('❌ Sign Up Test Failed');
+    return;
+  }
+
+  const signInResult = await testSignIn();
+  if (!signInResult) {
+    console.error('❌ Sign In Test Failed');
+    return;
+  }
+
+  const sessionResult = await testGetSession();
+  if (!sessionResult) {
+    console.error('❌ Session Test Failed');
+    return;
+  }
+
+  const signOutResult = await testSignOut();
+  if (!signOutResult) {
+    console.error('❌ Sign Out Test Failed');
+    return;
+  }
+
+  console.log('✅ All Authentication Tests Passed!');
 }
 
-// Uncomment to run the tests
-// runAuthTests();
-
-export { runAuthTests, testSignUp, testSignIn, testGetSession, testSignOut };
+// Run the tests
+runAuthTests();

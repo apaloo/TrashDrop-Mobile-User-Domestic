@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { supabase } from '../utils/supabaseClient';
+import { useAuth } from '../context/AuthContext.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
+import supabase from '../utils/supabaseClient.js';
 
 /**
  * QR Scanner component for scanning trash bin QR codes
@@ -541,15 +541,7 @@ const QRScanner = () => {
         {/* Scan result */}
         {renderScanResult()}
         
-        {/* Request Pickup Button */}
-        <div className="mt-4">
-          <button
-            onClick={handleRequestPickup}
-            className="w-full py-2 px-4 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
-          >
-            Request Pickup
-          </button>
-        </div>
+        {/* Request Pickup Button removed as it's no longer needed in this view */}
         
         {/* Instructions */}
         <div className="mt-6">

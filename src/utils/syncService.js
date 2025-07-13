@@ -1,5 +1,5 @@
-import idbUtils from './indexedDB';
-import { supabase } from './supabaseClient';
+import idbUtils from './indexedDB.js';
+import supabase from './supabaseClient.js';
 
 /**
  * Service to handle synchronization of data between IndexedDB and backend

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { useAuth } from '../context/AuthContext.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
 
 /**
  * Login page component
@@ -28,16 +28,31 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      const { success, error } = await signIn(formData.email, formData.password);
+      console.log('[Login] Attempting to sign in with:', { 
+        email: formData.email,
+        passwordLength: formData.password ? formData.password.length : 0 
+      });
       
-      if (success) {
-        navigate('/dashboard');
+      const result = await signIn(formData.email, formData.password);
+      console.log('[Login] Sign in result:', { 
+        success: result?.success, 
+        hasError: !!result?.error,
+        user: result?.user ? 'Present' : 'Missing'
+      });
+      
+      if (result?.success) {
+        console.log('[Login] Sign in successful, navigating to dashboard...');
+        // Add a slight delay to ensure state updates propagate
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 100);
       } else {
-        setError(error || 'Failed to sign in');
+        console.error('[Login] Sign in failed:', result?.error);
+        setError(result?.error?.message || 'Failed to sign in');
       }
     } catch (err) {
+      console.error('[Login] Unexpected error during sign in:', err);
       setError('An unexpected error occurred');
-      console.error('Login error:', err);
     } finally {
       setIsSubmitting(false);
     }

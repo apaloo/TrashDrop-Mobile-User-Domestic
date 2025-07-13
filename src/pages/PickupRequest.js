@@ -4,10 +4,10 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../utils/supabaseClient';
-import LoadingSpinner from '../components/LoadingSpinner';
-import appConfig from '../utils/app-config';
+import { useAuth } from '../context/AuthContext.js';
+import supabase from '../utils/supabaseClient.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
+import appConfig from '../utils/app-config.js';
 
 // Location marker component with draggable functionality
 const LocationMarker = ({ position, setPosition }) => {
@@ -371,13 +371,19 @@ const PickupRequest = () => {
         
         {insufficientBags && (
           <div className="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-md text-yellow-700 dark:text-yellow-200 mb-4">
-            <p>No bags available in your account. Please topup your bags now or use the Schedule Pickup option.</p>
-            <div className="mt-3">
+            <p>You don't have any bags available. Please purchase bags to continue OR use the schedule Pickup module.</p>
+            <div className="mt-3 flex space-x-4">
               <button 
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
+                onClick={() => navigate('/store')}
+              >
+                Purchase Bags
+              </button>
+              <button 
+                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
                 onClick={() => navigate('/schedule-pickup')}
               >
-                Go to Schedule Pickup
+                Schedule Pickup
               </button>
             </div>
           </div>
@@ -430,7 +436,7 @@ const PickupRequest = () => {
                       name="savedLocationId"
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
                     >
-                      <option value="">-- Select a saved location --</option>
+                      <option value="" className="text-gray-900 dark:text-white font-medium">-- Select a saved location --</option>
                       {savedLocations.map(location => (
                         <option key={location.id} value={location.id}>{location.name} - {location.address}</option>
                       ))}
@@ -500,9 +506,28 @@ const PickupRequest = () => {
                       <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.numberOfBags}</div>
                     )}
                     {userStats.totalBags <= 0 && (
-                      <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
-                        You don't have any bags available. Please collect more bags or purchase bags to continue.
-                      </div>
+                      <>
+                        <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
+                          You don't have any bags available. Please purchase bags to continue OR use the schedule Pickup module.
+                        </div>
+                        <div className="mt-2 flex justify-center space-x-4">
+                          <button 
+                            className="bg-blue-500 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-600 transition-colors cursor-not-allowed opacity-75"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              alert('Coming out soon!');
+                            }}
+                          >
+                            Purchase Bags
+                          </button>
+                          <button 
+                            className="bg-green-500 text-white px-3 py-1.5 rounded-md text-sm hover:bg-green-600 transition-colors"
+                            onClick={() => navigate('/schedule-pickup')}
+                          >
+                            Schedule Pickup
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                   
@@ -517,7 +542,7 @@ const PickupRequest = () => {
                       name="priority"
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
                     >
-                      <option value="normal">Normal</option>
+                      <option value="normal" className="text-gray-900 dark:text-white font-medium">Normal</option>
                       <option value="urgent">Urgent</option>
                       <option value="low">Low Priority</option>
                     </Field>

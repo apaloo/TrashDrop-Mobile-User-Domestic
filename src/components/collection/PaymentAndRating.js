@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaStar, FaCheckCircle, FaTimesCircle, FaSpinner, FaArrowLeft, FaMoneyBillWave } from 'react-icons/fa';
-import { supabase } from '../../supabaseClient';
+import supabase from '../../supabaseClient';
 
 export const PaymentAndRating = ({ 
   pickup, 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import NavBar from './NavBar';
-import OfflineIndicator from './OfflineIndicator';
+import NavBar from './NavBar.js';
+import OfflineIndicator from './OfflineIndicator.js';
 
 /**
  * Main layout component that wraps all pages
@@ -31,7 +31,7 @@ const Layout = () => {
       <NavBar />
       <OfflineIndicator />
       {/* Add extra bottom padding for pages with maps on mobile */}
-      <main className={`flex-grow container mx-auto px-4 pt-6 ${hasBottomPadding ? 'pb-32 md:pb-6' : 'pb-6'}`}>
+      <main className={`flex-grow container mx-auto px-2 md:px-4 pt-2 md:pt-6 ${hasBottomPadding ? 'pb-20 md:pb-6' : 'pb-2 md:pb-6'}`}>
         <Outlet />
       </main>
       <footer className="bg-gray-100 dark:bg-gray-800 py-4 text-center text-gray-600 dark:text-gray-400 text-sm">

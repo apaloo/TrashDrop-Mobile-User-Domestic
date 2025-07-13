@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import supabase from './supabaseClient.js';
 
 /**
  * Subscribe to real-time updates for scheduled pickups

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../utils/supabaseClient';
+import { useAuth } from '../context/AuthContext.js';
+import supabase from '../utils/supabaseClient.js';
 import { v4 as uuidv4 } from 'uuid';
 import { QRCodeSVG } from 'qrcode.react';
-import LoadingSpinner from '../components/LoadingSpinner';
+import LoadingSpinner from '../components/LoadingSpinner.js';
 
 const CollectionQRCode = () => {
   const { user } = useAuth();

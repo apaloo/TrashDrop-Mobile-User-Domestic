@@ -4,7 +4,7 @@
  * for testing authentication flows directly in the browser console.
  */
 
-import { authService } from './supabaseClient';
+import { authService } from './supabaseClient.js';
 
 // Test user credentials
 const testUser = {

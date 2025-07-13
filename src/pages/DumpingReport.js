@@ -4,10 +4,10 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/LoadingSpinner';
-import appConfig from '../utils/app-config';
-import { supabase } from '../utils/supabaseClient';
+import { useAuth } from '../context/AuthContext.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
+import appConfig from '../utils/app-config.js';
+import supabase from '../utils/supabaseClient.js';
 
 // Component to update map view when position changes
 const MapUpdater = ({ position }) => {
@@ -88,8 +88,8 @@ const DumpingReport = () => {
     description: Yup.string()
       .min(10, 'Description is too short')
       .max(500, 'Description is too long')
-      .required('Please provide a description'),
-    address: Yup.string().required('Please provide an address'),
+      .optional(),
+    illegal_size: Yup.string().required('Please select the size of the illegal dumping'),
     location: Yup.object().shape({
       lat: Yup.number().required('Latitude is required'),
       lng: Yup.number().required('Longitude is required'),
@@ -383,16 +383,16 @@ const DumpingReport = () => {
         
         switch(error.code) {
           case error.PERMISSION_DENIED:
-            setError('Location permission denied. Please enable location services in your browser settings.');
+            setError('Location permission denied. Please enable location services in your browser settings or use the "Use My Location" button to try again.');
             break;
           case error.POSITION_UNAVAILABLE:
-            setError('Location information is unavailable. Please try again.');
+            setError('Location information is unavailable. You can manually set your location by clicking on the map or use the address field above.');
             break;
           case error.TIMEOUT:
-            setError('The request to get user location timed out. Please try again.');
+            setError('The request to get your location timed out. You can manually set your location by clicking on the map.');
             break;
           default:
-            setError('An unknown error occurred when trying to get your location.');
+            setError('Unable to detect your location. You can manually set your location by clicking on the map.');
             break;
         }
       },
@@ -412,12 +412,45 @@ const DumpingReport = () => {
     }
   }, []);
 
-  // Import the offline storage utility
-  const { saveOfflineReport, isOnline } = require('../utils/offlineStorage');
+  // Inline implementation of offline storage utility
+  const saveOfflineReport = async (reportData) => {
+    try {
+      // Get existing offline reports or initialize empty array
+      const existingReports = JSON.parse(localStorage.getItem('offline_dumping_reports') || '[]');
+      
+      // Add timestamp to the report
+      const reportWithTimestamp = {
+        ...reportData,
+        offline_timestamp: new Date().toISOString()
+      };
+      
+      // Add to reports array
+      existingReports.push(reportWithTimestamp);
+      
+      // Save back to localStorage
+      localStorage.setItem('offline_dumping_reports', JSON.stringify(existingReports));
+      
+      console.log('Report saved to offline storage');
+      return true;
+    } catch (error) {
+      console.error('Error saving report to offline storage:', error);
+      return false;
+    }
+  };
+  
+  const isOnline = () => {
+    return navigator.onLine;
+  };
   
   // Enhanced session refresh function with validation
   const refreshAndValidateSession = async () => {
     try {
+      // Check for test/development account - bypass actual refresh
+      if (appConfig.features.enableMocks && user && user.email === 'prince02@mailinator.com') {
+        console.log('Using test account, bypassing session validation');
+        return { success: true };
+      }
+
       // First try to refresh the session
       const { data, error } = await supabase.auth.refreshSession();
       
@@ -436,24 +469,27 @@ const DumpingReport = () => {
           const { data: sessionData } = await supabase.auth.getSession();
           
           if (!sessionData?.session) {
-            throw new Error('No valid session available');
+            // Instead of throwing error, return failure status
+            console.warn('No valid session available, but allowing operation to continue');
+            return { success: false, tokenError: true, continueOperation: true };
           }
           
-          return { success: false, tokenError: true };
+          return { success: false, tokenError: true, continueOperation: true };
         }
         
-        return { success: false, tokenError: false, error };
+        return { success: false, tokenError: false, error, continueOperation: true };
       }
       
       if (!data?.session) {
         console.warn('Session refresh did not return a valid session');
-        return { success: false, tokenError: true };
+        return { success: false, tokenError: true, continueOperation: true };
       }
       
       return { success: true };
     } catch (err) {
       console.error('Error during session refresh and validation:', err);
-      return { success: false, tokenError: true, error: err };
+      // Don't throw error, return status and continue
+      return { success: false, tokenError: true, error: err, continueOperation: true };
     }
   };
   
@@ -551,14 +587,24 @@ const DumpingReport = () => {
         
         if (!sessionStatus.success && sessionStatus.tokenError) {
           console.warn('Authentication token issues detected, saving report offline');
-          await saveOfflineReport({
-            ...reportData,
-            offline_reason: 'auth_token_error'
-          });
-          sessionStorage.setItem('pendingReports', 'true');
-          setFormSubmitted(true);
-          setTimeout(() => navigate('/dashboard'), 3000);
-          return;
+          try {
+            await saveOfflineReport({
+              ...reportData,
+              offline_reason: 'auth_token_error'
+            });
+            sessionStorage.setItem('pendingReports', 'true');
+            setFormSubmitted(true);
+            
+            // Show success message even though we're using offline mode
+            setError('');
+            setActionSuccess('Report saved successfully (offline mode). Will sync when connection restored.');
+            setTimeout(() => navigate('/dashboard'), 3000);
+            return;
+          } catch (offlineError) {
+            console.error('Failed to save offline report:', offlineError);
+            // Continue with submission attempt instead of failing
+            console.log('Continuing with submission despite token issues');
+          }
         }
         
         // Step 1: Submit the report with retry logic
@@ -812,9 +858,9 @@ const DumpingReport = () => {
                   <Field
                     as="select"
                     name="wasteType"
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white text-gray-900 rounded-md"
                   >
-                    <option value="">Select waste type</option>
+                    <option value="" className="text-gray-900 dark:text-gray-300">Select waste type</option>
                     <option value="household">Household Waste</option>
                     <option value="construction">Construction Debris</option>
                     <option value="hazardous">Hazardous Materials</option>
@@ -856,7 +902,7 @@ const DumpingReport = () => {
                 
                 <div>
                   <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Description *
+                    Description (optional)
                   </label>
                   <Field
                     as="textarea"
@@ -869,16 +915,22 @@ const DumpingReport = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Address / Location Description *
+                  <label htmlFor="illegal_size" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Size of the illegal dumping *
                   </label>
-                  <Field
-                    type="text"
-                    name="address"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
-                    placeholder="Enter nearest address or describe the location"
-                  />
-                  <ErrorMessage name="address" component="div" className="mt-1 text-sm text-red-600 dark:text-red-400" />
+                  <Field as="select" 
+                    name="illegal_size"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="" className="text-gray-900 dark:text-gray-300">Select a size option</option>
+                    <option value="Fits into a Bin/bag">Fits into a Bin/bag</option>
+                    <option value="Fits into a wheel barrow">Fits into a wheel barrow</option>
+                    <option value="Fits into a trycircle">Fits into a trycircle</option>
+                    <option value="Fits into small truck">Fits into small truck</option>
+                    <option value="Fits into heavy truck">Fits into heavy truck</option>
+                    <option value="Needs more than 1 truck">Needs more than 1 truck</option>
+                  </Field>
+                  <ErrorMessage name="illegal_size" component="div" className="mt-1 text-sm text-red-600 dark:text-red-400" />
                 </div>
                 
                 <div>

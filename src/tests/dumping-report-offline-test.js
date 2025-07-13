@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import DumpingReport from '../pages/DumpingReport';
 import { AuthContext } from '../context/AuthContext';
-import { supabase } from '../utils/supabaseClient';
+import supabase from '../utils/supabaseClient';
 import * as offlineStorage from '../utils/offlineStorage';
 
 // Mock supabase

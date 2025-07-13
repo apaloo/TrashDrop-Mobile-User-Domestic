@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import appConfig from '../utils/app-config';
+import appConfig from '../utils/app-config.js';
 
 const ThemeContext = createContext(null);
 

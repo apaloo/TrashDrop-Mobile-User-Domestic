@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import PickupRequest from '../pages/PickupRequest';
 import { AuthContext } from '../context/AuthContext';
-import { supabase } from '../utils/supabaseClient';
+import supabase from '../utils/supabaseClient';
 
 // Mock supabase
 jest.mock('../utils/supabaseClient', () => ({

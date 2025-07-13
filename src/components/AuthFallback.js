@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext.js';
 import Logo from '../logo.svg';
-import LoadingSpinner from './LoadingSpinner';
+import LoadingSpinner from './LoadingSpinner.js';
 
 /**
  * AuthFallback component

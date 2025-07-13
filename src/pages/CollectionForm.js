@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../utils/supabaseClient';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { useAuth } from '../context/AuthContext.js';
+import supabase from '../utils/supabaseClient.js';
+import LoadingSpinner from '../components/LoadingSpinner.js';
 
 const CollectionForm = () => {
   const { collectionId } = useParams();

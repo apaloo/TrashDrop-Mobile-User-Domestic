@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import supabase from './supabaseClient.js';
 
 // Default expiration time: 7 days in seconds
 const DEFAULT_EXPIRATION = 7 * 24 * 60 * 60;
