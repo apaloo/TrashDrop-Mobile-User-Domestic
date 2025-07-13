@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaChevronDown, FaChevronUp, FaQrcode, FaCalendarAlt, FaMapMarkerAlt, 
   FaTrash, FaInfoCircle, FaClock, FaCheckCircle, FaExclamationTriangle, FaShare,
   FaSpinner, FaSync } from 'react-icons/fa';
-import { supabase } from '../../utils/supabaseClient';
+import supabase from '../../utils/supabaseClient.js';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 // Status badge component
@@ -363,6 +363,7 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
                   Show Less
                 </button>
                 
+                {/* Cancel Pickup button temporarily hidden
                 {pickup.status === 'scheduled' && (
                   <button 
                     className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center"
@@ -372,6 +373,7 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
                     Cancel Pickup
                   </button>
                 )}
+                */}
               </div>
             </div>
           </div>
