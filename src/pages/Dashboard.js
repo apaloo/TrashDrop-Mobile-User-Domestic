@@ -387,7 +387,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 pb-28 md:pb-6">
       {/* User Stats Card */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+      <div className="bg-white dark:bg-gray-800 pt-2 px-6 pb-6 rounded-lg shadow-md mb-6">
         
         {/* Stats cards - horizontal scroll on mobile, grid on desktop */}
         <div className="flex md:grid md:grid-cols-4 gap-4 mb-6 overflow-x-auto pb-4 snap-x snap-mandatory scroll-pl-6 touch-pan-x">
@@ -526,7 +526,7 @@ const Dashboard = () => {
       </div>
       
       {/* Recent activity */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+      <div className="bg-white dark:bg-gray-800 pt-2 px-6 pb-6 rounded-lg shadow-md mb-6">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Recent Activity</h2>
         
         {recentActivity.length > 0 ? (

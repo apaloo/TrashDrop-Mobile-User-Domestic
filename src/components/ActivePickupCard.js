@@ -5,6 +5,9 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 // Dynamic import for leaflet-routing-machine to prevent SSR issues
 import supabase from '../utils/supabaseClient.js';
+import { FaQrcode, FaTimes } from 'react-icons/fa';
+import { QRCodeSVG } from 'qrcode.react';
+import { createPortal } from 'react-dom';
 
 // Component to update the map view when position changes
 const MapUpdater = ({ position }) => {
@@ -115,6 +118,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
   const [distance, setDistance] = useState(null);
   const [collectorLocation, setCollectorLocation] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
 
   // Handle offline functionality by checking navigator.onLine
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -226,6 +230,45 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
       default:
         return <span className="px-3 py-1 bg-gray-400 dark:bg-gray-500 text-gray-800 dark:text-gray-100 rounded-full font-medium flex items-center justify-center text-center">{status}</span>;
     }
+  };
+
+  // QR Code Modal Component
+  const QRCodeModal = () => {
+    if (!showQRCode) return null;
+    
+    return createPortal(
+      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+        <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl flex flex-col items-center relative">
+          <button 
+            onClick={() => setShowQRCode(false)}
+            className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 transition-colors"
+            aria-label="Close QR code view"
+          >
+            <FaTimes size={24} />
+          </button>
+          
+          <h3 className="text-xl font-bold mb-4 text-center text-gray-800">Scan this QR Code</h3>
+          <p className="text-gray-600 mb-6 text-center">Present this QR code to your collector for pickup verification</p>
+          
+          <div className="bg-white p-4 rounded-lg shadow-inner">
+            <QRCodeSVG 
+              value={activePickup ? JSON.stringify({
+                id: activePickup.id,
+                type: 'pickup',
+                timestamp: Date.now()
+              }) : 'invalid'}
+              size={250}
+              level="H"
+              includeMargin={true}
+              className="w-full h-full"
+            />
+          </div>
+          
+          <p className="mt-6 text-sm text-gray-500">Pickup ID: {activePickup?.id || 'Unknown'}</p>
+        </div>
+      </div>,
+      document.body
+    );
   };
 
   return (
@@ -370,20 +413,110 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
               </div>
             )}
           </div>
+
+          {/* ETA Section */}
+          <div className="w-full">
+            <p className="text-lg font-medium text-gray-800 dark:text-white">
+              {etaMinutes !== null ? `${etaMinutes} minutes` : 'ETA unavailable'}
+            </p>
+            {/* Countdown timer visualization */}
+            <div className="w-full h-2 bg-blue-200 dark:bg-blue-700 rounded-full mt-2">
+              <div className="h-2 bg-blue-600 dark:bg-blue-400 rounded-full" 
+                style={{ width: etaMinutes ? `${Math.max(0, 100 - (etaMinutes * 3))}%` : '0%' }}>
+              </div>
+            </div>
+            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+              {etaMinutes ? `Arrives in ${etaMinutes} min` : 'Calculating arrival time...'}
+            </p>
+          </div>
         </div>
 
-        {/* Map with collector's location and route */}
-        <div className="h-64 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-0 relative z-0">
-          <PickupMap 
-            userLocation={activePickup.location} 
-            collectorLocation={collectorLocation}
-          />
+        {/* Row 2: Waste Type, Location, Points */}
+        {/* Waste Type & Quantity with gamification */}
+        <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-green-700 dark:text-green-300">Waste</h3>
+            <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+              {activePickup.waste_type === 'Recyclables' ? 'Eco+' : 'Standard'}
+            </span>
+          </div>
+          <p className="text-lg font-medium text-gray-800 dark:text-white">
+            {activePickup.waste_type} ({activePickup.number_of_bags} {parseInt(activePickup.number_of_bags) === 1 ? 'bag' : 'bags'})
+          </p>
+          {/* Visual indicator of waste type */}
+          <div className="flex mt-2">
+            {[...Array(parseInt(activePickup.number_of_bags) || 1)].map((_, i) => (
+              <div key={i} className="w-4 h-4 mr-1 bg-green-400 dark:bg-green-600 rounded-full"></div>
+            ))}
+          </div>
+          <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+            {activePickup.waste_type === 'Recyclables' ? 'Recycling bonus +10%' : 'Regular disposal'}
+          </p>
         </div>
-        
-        {/* Extra space to prevent bottom nav overlap on mobile */}
-        <div className="md:hidden h-16 mt-4"></div>
+
+        {/* Pickup Location with gamification */}
+        <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">Location</h3>
+            <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">Verified</span>
+          </div>
+          <p className="text-lg font-medium text-gray-800 dark:text-white truncate">
+            {activePickup.address || 'Location unavailable'}
+          </p>
+          {/* Map pin animation */}
+          <div className="flex items-center mt-2">
+            <svg className="w-5 h-5 text-red-500 animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+            </svg>
+            <span className="ml-1 text-xs text-red-600 dark:text-red-300">Location confirmed</span>
+          </div>
+        </div>
+
+        {/* Earned Points with gamification */}
+        <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">Points</h3>
+            <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">+{activePickup.points || 0}</span>
+          </div>
+          <p className="text-lg font-medium text-gray-800 dark:text-white">
+            {activePickup.points || 0}
+          </p>
+          {/* Points sparkle animation */}
+          <div className="flex justify-between mt-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className={`w-3 h-3 rounded-full ${i < (activePickup.points / 10) ? 'bg-yellow-400' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
+            ))}
+          </div>
+          <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
+            {activePickup.points >= 50 ? 'Achievement unlocked!' : `${50 - (activePickup.points || 0)} more for next badge`}
+          </p>
+          {activePickup.points >= 50 && (
+            <div className="absolute -top-1 -right-1">
+              <span className="flex h-5 w-5">
+                <span className="animate-ping absolute h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                <span className="relative rounded-full h-5 w-5 bg-yellow-500 flex items-center justify-center text-xs text-white">★</span>
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Map with collector's location and route */}
+      <div className="h-64 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-0 relative z-0">
+        <PickupMap 
+          userLocation={activePickup.location} 
+          collectorLocation={collectorLocation}
+        />
+        
+        {/* QR Code Floating Action Button */}
+        <button
+          onClick={() => setShowQRCode(true)}
+          className="absolute bottom-4 right-4 h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center shadow-lg z-10 hover:bg-primary-dark transition-colors duration-200"
+          aria-label="Show QR Code"
+        >
+          <FaQrcode size={20} />
+        </button>
+      </div>
       {/* Cancel button */}
       <div className="p-4 bg-gray-50 dark:bg-gray-700 flex justify-end">
         <button 

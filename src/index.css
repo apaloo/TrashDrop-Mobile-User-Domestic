@@ -1,5 +1,9 @@
+/* These are valid Tailwind CSS directives used for the framework's utility classes */
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind utilities;
 
 :root {
@@ -43,15 +47,16 @@ code {
     monospace;
 }
 
-/* Enhanced form element readability */
+/* Enhanced form element readability - enforced black text for all inputs regardless of theme */
 select, input, textarea, option {
   color: #000000 !important;
   font-weight: 500 !important;
 }
 
+/* Ensuring dark theme doesn't override text color but keeps other styling */
 .dark select, .dark input, .dark textarea, .dark option,
 [data-theme='dark'] select, [data-theme='dark'] input, [data-theme='dark'] textarea, [data-theme='dark'] option {
-  color: #ffffff !important;
+  color: #000000 !important; /* Enforcing black text regardless of theme */
   font-weight: 500 !important;
 }
 

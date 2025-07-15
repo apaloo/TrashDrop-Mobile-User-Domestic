@@ -15,6 +15,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
           value={formData.numberOfBags}
           onChange={(e) => updateFormData({ numberOfBags: e.target.value })}
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          style={{color: '#333'}}
         >
           <option value="1">1 Bag</option>
           <option value="2">2 Bags</option>

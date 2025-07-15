@@ -5,6 +5,7 @@ import supabase from '../utils/supabaseClient.js';
 import { FaQrcode, FaPlus, FaSpinner, FaSync } from 'react-icons/fa';
 import { storeQRCode, getQRCode } from '../utils/qrStorage.js';
 import { subscribeToPickupUpdates, handlePickupUpdate } from '../utils/realtime.js';
+import { syncPickupsWithServer, setupNetworkSyncListener } from '../utils/pickupSyncService.js';
 import LocationStep from '../components/schedulePickup/LocationStep.js';
 import ScheduleDetailsStep from '../components/schedulePickup/ScheduleDetailsStep.js';
 import WasteDetailsStep from '../components/schedulePickup/WasteDetailsStep.js';
@@ -130,7 +131,18 @@ const SchedulePickup = () => {
   };
   
   // Function to manually refresh data
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    
+    // First try to sync any offline changes
+    if (navigator.onLine && user) {
+      try {
+        await syncPickupsWithServer(user.id);
+      } catch (error) {
+        console.error('Error syncing pickups during refresh:', error);
+      }
+    }
+    
     fetchData(true); // Pass true to show refreshing state
   };
   
@@ -232,7 +244,7 @@ const SchedulePickup = () => {
     }
   };
   
-  // Setup real-time subscription
+  // Setup real-time subscription and network sync listener
   useEffect(() => {
     if (!user) return;
     
@@ -243,12 +255,41 @@ const SchedulePickup = () => {
         const updatedPickups = handlePickupUpdate(payload, prevPickups);
         // Only update if something actually changed
         if (updatedPickups !== prevPickups) {
-          setLastUpdated(new Date().toISOString());
+          const timestamp = new Date().toISOString();
+          setLastUpdated(timestamp);
+          
+          // Update localStorage with new data
+          localStorage.setItem('scheduledPickups', JSON.stringify(updatedPickups));
+          localStorage.setItem('scheduledPickupsLastUpdated', timestamp);
           return updatedPickups;
         }
         return prevPickups;
       });
     });
+    
+    // Set up network sync listener to handle offline/online transitions
+    const cleanupNetworkSync = setupNetworkSyncListener(user.id);
+    
+    // Listen for pickupsSynced events (fired when offline changes are synced)
+    const handlePickupsSynced = (event) => {
+      if (event.detail?.changes) {
+        console.log('Pickups synced with server. Refreshing data...');
+        fetchData(false); // Refresh data without showing loading indicator
+      }
+    };
+    
+    window.addEventListener('pickupsSynced', handlePickupsSynced);
+    
+    // Attempt to sync pickups with server on mount
+    const syncOnMount = async () => {
+      try {
+        await syncPickupsWithServer(user.id);
+      } catch (error) {
+        console.error('Error syncing pickups on mount:', error);
+      }
+    };
+    
+    syncOnMount();
     
     // Cleanup on unmount
     return () => {
@@ -256,11 +297,16 @@ const SchedulePickup = () => {
         subscriptionRef.current.unsubscribe();
         subscriptionRef.current = null;
       }
+      cleanupNetworkSync();
+      window.removeEventListener('pickupsSynced', handlePickupsSynced);
     };
   }, [user]);
   
   // Ensure data is loaded every time component mounts and restore cached data immediately
   useEffect(() => {
+    // Set a flag to track if we've already mounted to prevent duplicate data fetching
+    const hasComponentMounted = sessionStorage.getItem('schedulePickupMounted');
+    
     // Immediately restore from cache to avoid the "disappearing" effect
     const cachedPickups = localStorage.getItem('scheduledPickups');
     const cachedUserId = localStorage.getItem('scheduledPickupsUserId');
@@ -272,10 +318,22 @@ const SchedulePickup = () => {
         setScheduledPickups(parsedPickups);
         setLastUpdated(localStorage.getItem('scheduledPickupsLastUpdated') || new Date().toISOString());
         setIsLoading(false); // Immediately stop loading indicator
+        
+        // If we're navigating to the scheduled tab directly, make it active
+        // This helps maintain context when returning to this page
+        const shouldShowScheduledTab = sessionStorage.getItem('showScheduledQRTab') === 'true';
+        if (shouldShowScheduledTab && parsedPickups.length > 0) {
+          setActiveTab('scheduled');
+          // Clear the flag after use
+          sessionStorage.removeItem('showScheduledQRTab');
+        }
       } catch (cacheError) {
         console.error('Error parsing cached pickups:', cacheError);
       }
     }
+    
+    // Set flag that we've mounted to prevent duplicate data fetching on navigation
+    sessionStorage.setItem('schedulePickupMounted', 'true');
     
     const loadData = async () => {
       try {
@@ -349,8 +407,9 @@ const SchedulePickup = () => {
     };
   }, [user]);
   
-  // Add an event listener to handle page visibility changes
+  // Add event listeners to handle page visibility changes and network status
   // This ensures we refresh data when the user comes back to this tab
+  // and sync pickups when the network connection is restored
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && user) {
@@ -369,11 +428,53 @@ const SchedulePickup = () => {
       }
     };
     
+    // Handle network status changes
+    const handleNetworkChange = () => {
+      const networkStatus = navigator.onLine ? 'online' : 'offline';
+      console.log(`Network status changed: ${networkStatus}`);
+      
+      // Display a toast message to inform the user
+      const statusMessage = networkStatus === 'online' 
+        ? 'You are back online. Syncing data...' 
+        : 'You are offline. Changes will be saved locally.';  
+      
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-20 left-1/2 transform -translate-x-1/2 ${networkStatus === 'online' ? 'bg-green-600' : 'bg-orange-600'} bg-opacity-90 text-white px-4 py-2 rounded-lg text-sm z-50`;
+      toast.style.minWidth = '250px';
+      toast.style.textAlign = 'center';
+      toast.textContent = statusMessage;
+      document.body.appendChild(toast);
+      
+      // Remove toast after 3 seconds
+      setTimeout(() => {
+        if (document.body.contains(toast)) {
+          document.body.removeChild(toast);
+        }
+      }, 3000);
+      
+      // If back online, sync data
+      if (networkStatus === 'online' && user) {
+        syncPickupsWithServer(user.id)
+          .then(result => {
+            if (result.success && result.changes) {
+              fetchData(false);
+            }
+          })
+          .catch(error => {
+            console.error('Error syncing pickups:', error);
+          });
+      }
+    };
+    
     window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('online', handleNetworkChange);
+    window.addEventListener('offline', handleNetworkChange);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('online', handleNetworkChange);
+      window.removeEventListener('offline', handleNetworkChange);
     };
   }, [user]);
   

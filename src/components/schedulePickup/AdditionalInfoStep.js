@@ -248,6 +248,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           placeholder="Any special instructions?"
           rows={3}
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          style={{color: '#333'}}
         />
         <p className="text-sm text-gray-500 mt-1">
           Add any special instructions or notes for the collector

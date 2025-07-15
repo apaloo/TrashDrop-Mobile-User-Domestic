@@ -39,6 +39,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           value={formData.frequency}
           onChange={(e) => updateFormData({ frequency: e.target.value })}
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          style={{color: '#333'}}
         >
           <option value="weekly">Weekly</option>
           <option value="biweekly">Bi-weekly</option>
@@ -63,6 +64,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
             placeholder="dd/mm/yyyy"
             min={new Date().toISOString().split('T')[0]} // Prevent past dates
+            style={{color: '#333'}}
           />
           <div className="absolute top-0 right-0 px-3 py-3 pointer-events-none">
             <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
@@ -82,6 +84,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           value={formData.preferredTime}
           onChange={(e) => updateFormData({ preferredTime: e.target.value })}
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          style={{color: '#333'}}
         >
           <option value="morning">Morning (8am - 12pm)</option>
           <option value="afternoon">Afternoon (12pm - 4pm)</option>

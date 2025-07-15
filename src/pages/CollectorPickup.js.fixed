@@ -132,12 +132,6 @@ const CollectorPickup = () => {
         case 'notes':
           setNotes(value);
           break;
-        case 'specialHandling':
-          setSpecialHandling(value);
-          break;
-        case 'contamination':
-          setContamination(value);
-          break;
         case 'contaminationNotes':
           setContaminationNotes(value);
           break;
@@ -304,7 +298,37 @@ const CollectorPickup = () => {
     }
   };
 
-  // Handle manual QR code input
+  // Memoized input handler for form fields
+  const handleInputChange = useCallback((field, value) => {
+    switch (field) {
+      case 'bagCount':
+        setBagCount(Number(value) || 0);
+        break;
+      case 'wasteType':
+        setWasteType(value);
+        break;
+      case 'weight':
+        setWeight(Number(value) || 0);
+        break;
+      case 'volume':
+        setVolume(Number(value) || 0);
+        break;
+      case 'notes':
+        setNotes(value);
+        break;
+      case 'specialHandling':
+        setSpecialHandling(value);
+        break;
+      case 'contamination':
+        setContamination(value);
+        break;
+      case 'contaminationNotes':
+        setContaminationNotes(value);
+        break;
+      default:
+        console.warn(`Unknown field: ${field}`);
+    }
+  }, []);
   
   // Memoize tag toggle handler
   const toggleTag = useCallback((tag) => {
@@ -629,10 +653,9 @@ const CollectorPickup = () => {
           <input
             type="text"
             id="manual-qr"
-            value={manualQRInput}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+            placeholder="Enter QR code data"
             onChange={handleManualInput}
-            placeholder="Enter QR Code..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-black"
             disabled={isLoading}
           />
         </div>
@@ -701,8 +724,8 @@ const CollectorPickup = () => {
               <p className="mt-1 text-gray-900 whitespace-pre-line">
                 {currentPickup.special_instructions}
               </p>
-            </div>
-          )}
+                </div>
+              </TabContent>
           
           {status === 'scanned' && (
             <div className="pt-4 mt-4 border-t border-gray-100">
@@ -772,7 +795,7 @@ const CollectorPickup = () => {
                           max="100"
                           value={formData.bagCount}
                           onChange={(e) => handleInputChange('bagCount', parseInt(e.target.value) || 1)}
-                          className="w-full px-4 py-2 text-center border-0 focus:ring-0 text-black"
+                          className="w-full px-4 py-2 text-center border-0 focus:ring-0"
                           required
                         />
                         <button
@@ -800,7 +823,7 @@ const CollectorPickup = () => {
                           min="0"
                           value={formData.weight}
                           onChange={(e) => handleInputChange('weight', e.target.value)}
-                          className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-black"
+                          className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                           placeholder="0.0"
                         />
                       </div>
@@ -821,7 +844,7 @@ const CollectorPickup = () => {
                           min="0"
                           value={formData.volume}
                           onChange={(e) => handleInputChange('volume', e.target.value)}
-                          className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-black"
+                          className="w-full pl-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                           placeholder="0.0"
                         />
                       </div>
@@ -856,7 +879,7 @@ const CollectorPickup = () => {
                         id="special-handling"
                         checked={formData.specialHandling}
                         onChange={(e) => handleInputChange('specialHandling', e.target.checked)}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded text-black"
+                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                       />
                       <label htmlFor="special-handling" className="ml-2 block text-sm text-gray-700">
                         Requires special handling
@@ -870,7 +893,7 @@ const CollectorPickup = () => {
                           id="contamination"
                           checked={formData.contamination}
                           onChange={(e) => handleInputChange('contamination', e.target.checked)}
-                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded text-black"
+                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                         />
                       </div>
                       <label htmlFor="contamination" className="ml-2 block text-sm text-gray-700">
@@ -888,11 +911,11 @@ const CollectorPickup = () => {
                           rows="2"
                           value={formData.contaminationNotes}
                           onChange={(e) => handleInputChange('contaminationNotes', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-black"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                           placeholder="Describe the contamination..."
                         ></textarea>
-                      </div>
-                    )}
+                </div>
+              </TabContent>
                   </div>
                   
                   <div>
@@ -904,7 +927,7 @@ const CollectorPickup = () => {
                       rows="3"
                       value={formData.notes}
                       onChange={(e) => handleInputChange('notes', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-black"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                       placeholder="Any additional notes about this pickup..."
                     ></textarea>
                   </div>
@@ -917,7 +940,6 @@ const CollectorPickup = () => {
                     >
                       Next: Add Photos
                     </button>
-                  </div>
                 </div>
               </TabContent>
               
@@ -956,7 +978,7 @@ const CollectorPickup = () => {
                             value={photo.notes}
                             onChange={(e) => updatePhotoNotes(photo.id, e.target.value)}
                             placeholder="Add notes..."
-                            className="w-full bg-white border-0 border-b border-gray-300 focus:ring-0 focus:border-primary text-black placeholder-gray-500"
+                            className="w-full bg-transparent border-0 border-b border-white/30 focus:ring-0 focus:border-white text-white placeholder-white/70"
                           />
                         </div>
                       </div>
@@ -1010,14 +1032,14 @@ const CollectorPickup = () => {
                           <div>
                             <p className="text-sm text-gray-500">Weight</p>
                             <p className="text-sm font-medium text-gray-900">{formData.weight} kg</p>
-                          </div>
-                        )}
+                </div>
+              </TabContent>
                         {formData.volume && (
                           <div>
                             <p className="text-sm text-gray-500">Volume</p>
                             <p className="text-sm font-medium text-gray-900">{formData.volume} L</p>
-                          </div>
-                        )}
+                </div>
+              </TabContent>
                       </div>
                     </div>
                     
@@ -1030,9 +1052,8 @@ const CollectorPickup = () => {
                               {tag}
                             </span>
                           ))}
-                        </div>
-                      </div>
-                    )}
+                </div>
+              </TabContent>
                     
                     {(formData.specialHandling || formData.contamination) && (
                       <div>
@@ -1048,15 +1069,15 @@ const CollectorPickup = () => {
                             </>
                           )}
                         </ul>
-                      </div>
-                    )}
+                </div>
+              </TabContent>
                     
                     {formData.notes && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-500">Collector Notes</h4>
                         <p className="mt-1 text-sm text-gray-700 whitespace-pre-line">{formData.notes}</p>
-                      </div>
-                    )}
+                </div>
+              </TabContent>
                     
                     {formData.photos.length > 0 && (
                       <div>
@@ -1072,13 +1093,12 @@ const CollectorPickup = () => {
                               {photo.notes && (
                                 <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate">
                                   {photo.notes}
-                                </div>
-                              )}
+                </div>
+              </TabContent>
                             </div>
                           ))}
-                        </div>
-                      </div>
-                    )}
+                </div>
+              </TabContent>
                   </div>
                   
                   <div className="flex justify-between pt-4">
@@ -1118,12 +1138,8 @@ const CollectorPickup = () => {
                         )}
                       </button>
                     </div>
-                  </div>
                 </div>
-                ) : null}
               </TabContent>
-            </div>
-          )}
           
           {status === 'scanned' && (
             <div className="mt-6">
@@ -1166,9 +1182,9 @@ const CollectorPickup = () => {
                     </button>
                   )}
                 </div>
-              )}
-            </div>
-          )}
+              </TabContent>
+                </div>
+              </TabContent>
         </div>
       </div>
     );
@@ -1237,27 +1253,6 @@ const CollectorPickup = () => {
           </div>
         </div>
       </div>
-    );
-  };
-  
-  // Render pickup details when QR code is scanned
-  const renderPickupDetails = () => {
-    return (
-      <PickupDetails
-        currentPickup={currentPickup}
-        formData={formData}
-        onInputChange={handleInputChange}
-        onToggleTag={toggleTag}
-        onCapturePhoto={handleCapturePhoto}
-        onRemovePhoto={handleRemovePhoto}
-        onUpdatePhotoNotes={updatePhotoNotes}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        status={status}
-        showPayment={showPayment}
-        pickupComplete={pickupComplete}
-        onCompletePickup={handleCompletePickup}
-      />
     );
   };
   
@@ -1350,16 +1345,15 @@ const CollectorPickup = () => {
                   You're currently offline. Some features may be limited.
                 </p>
               </div>
-            </div>
-          </div>
-        )}
+                </div>
+              </TabContent>
         
         {/* Error message */}
         {error && (
           <div className="mb-4">
             {renderError()}
-          </div>
-        )}
+                </div>
+              </TabContent>
         
         {/* Loading overlay */}
         {isLoading && (
@@ -1367,9 +1361,8 @@ const CollectorPickup = () => {
             <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
               <FaSpinner className="animate-spin h-8 w-8 text-primary mb-4" />
               <p className="text-gray-700">Processing your request...</p>
-            </div>
-          </div>
-        )}
+                </div>
+              </TabContent>
         
         <div className="pb-20">
           {status === 'ready' ? renderScanner() : renderPickupDetails()}
