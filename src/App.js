@@ -33,6 +33,9 @@ import LoadingSpinner from './components/LoadingSpinner.js';
 import InstallPrompt from './components/InstallPrompt.js';
 import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
+import AppPerformanceProvider from './components/AppPerformanceProvider.js';
+import PerformanceSummary from './components/PerformanceSummary.js';
+import PerformanceTester from './components/PerformanceTester.js';
 
 // Styling
 import { CssBaseline, ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
@@ -275,23 +278,31 @@ const AppContent = () => {
  */
 const App = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AuthErrorBoundary>
-          <Suspense 
-            fallback={
-              <div className="flex justify-center items-center h-screen">
-                <LoadingSpinner size="lg" />
-              </div>
-            }
-          >
-            <AppContent />
-            {/* Debug component removed as requested */}
-          </Suspense>
-        </AuthErrorBoundary>
-        <InstallPrompt />
-      </AuthProvider>
-    </ThemeProvider>
+    <AppPerformanceProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AuthErrorBoundary>
+            <Suspense 
+              fallback={
+                <div className="flex justify-center items-center h-screen">
+                  <LoadingSpinner size="lg" />
+                </div>
+              }
+            >
+              <AppContent />
+              {/* Performance monitoring components - development only */}
+              {process.env.NODE_ENV === 'development' && (
+                <>
+                  <PerformanceSummary />
+                  <PerformanceTester />
+                </>
+              )}
+            </Suspense>
+          </AuthErrorBoundary>
+          <InstallPrompt />
+        </AuthProvider>
+      </ThemeProvider>
+    </AppPerformanceProvider>
   );
 };
 

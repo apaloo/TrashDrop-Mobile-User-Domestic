@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../context/AuthContext.js';
 import { dumpingService } from '../services/dumpingService.js';
 import { notificationService } from '../services/notificationService.js';
 import CameraModal from './CameraModal.js';
@@ -151,6 +151,13 @@ const DumpingReportForm = ({ onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Check if user is authenticated
+    if (!user?.id) {
+      setError('You must be logged in to submit a report.');
+      return;
+    }
+    
     if (!formData.coordinates) {
       setError('Location is required. Please enable location services.');
       return;
@@ -184,18 +191,28 @@ const DumpingReportForm = ({ onSuccess }) => {
         throw new Error(reportError.message);
       }
 
+      // Ensure we have valid report data before proceeding
+      if (!data?.id) {
+        throw new Error('Invalid report data received from server');
+      }
+
       // Create notification for authorities
-      await notificationService.createNotification(
-        'authorities',
-        'dumping_report',
-        'New Illegal Dumping Report',
-        `New dumping reported at ${formData.location}`,
-        {
-          report_id: data.id,
-          severity: formData.severity,
-          coordinates: formData.coordinates
-        }
-      );
+      try {
+        await notificationService.createNotification(
+          'authorities',
+          'dumping_report',
+          'New Illegal Dumping Report',
+          `New dumping reported at ${formData.location || 'Unknown location'}`,
+          {
+            report_id: data.id,
+            severity: formData.severity,
+            coordinates: formData.coordinates
+          }
+        );
+      } catch (notificationError) {
+        console.warn('Failed to create notification:', notificationError);
+        // Don't fail the whole process if notification fails
+      }
 
       // Reset form
       setFormData({
@@ -246,7 +263,7 @@ const DumpingReportForm = ({ onSuccess }) => {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off" noValidate>
           {/* Type of Waste */}
           <div className="mb-6">
             <label className="block text-gray-300 text-sm font-medium mb-2">
@@ -257,6 +274,7 @@ const DumpingReportForm = ({ onSuccess }) => {
               value={formData.waste_type}
               onChange={handleChange}
               required
+              autoComplete="off"
               className="w-full px-3 py-3 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
             >
               <option value="">Select waste type</option>
@@ -317,6 +335,7 @@ const DumpingReportForm = ({ onSuccess }) => {
               value={formData.estimated_volume}
               onChange={handleChange}
               required
+              autoComplete="off"
               className="w-full px-3 py-3 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
             >
               <option value="">Select a size option</option>

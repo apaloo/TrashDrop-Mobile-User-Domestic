@@ -6,10 +6,12 @@
 
 // Constants for IndexedDB
 const DB_NAME = 'trashdrop_offline_db';
-const DB_VERSION = 2; // Increment version for schema changes
+const DB_VERSION = 3; // Increment version for schema changes with user stats caching
 const REPORTS_STORE = 'dumping_reports';
 const LOCATIONS_STORE = 'saved_locations';
 const SYNC_QUEUE_STORE = 'sync_queue';
+const USER_STATS_STORE = 'user_stats';
+const USER_ACTIVITY_STORE = 'user_activity';
 
 /**
  * Initialize IndexedDB
@@ -55,6 +57,19 @@ const initDB = () => {
         syncQueueStore.createIndex('operation', 'operation', { unique: false });
         syncQueueStore.createIndex('storeName', 'storeName', { unique: false });
         syncQueueStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      
+      if (!db.objectStoreNames.contains(USER_STATS_STORE)) {
+        console.log('Creating user stats store');
+        const userStatsStore = db.createObjectStore(USER_STATS_STORE, { keyPath: 'user_id' });
+        userStatsStore.createIndex('last_updated', 'last_updated', { unique: false });
+      }
+      
+      if (!db.objectStoreNames.contains(USER_ACTIVITY_STORE)) {
+        console.log('Creating user activity store');
+        const userActivityStore = db.createObjectStore(USER_ACTIVITY_STORE, { keyPath: 'id', autoIncrement: true });
+        userActivityStore.createIndex('user_id', 'user_id', { unique: false });
+        userActivityStore.createIndex('created_at', 'created_at', { unique: false });
       }
     };
   });
@@ -355,12 +370,199 @@ export const isOnline = () => {
   return navigator.onLine;
 };
 
-export default {
+/**
+ * Cache user stats for offline access
+ * @param {string} userId - User ID
+ * @param {Object} stats - User stats object
+ * @returns {Promise} - Promise resolving when stats are cached
+ */
+export const cacheUserStats = async (userId, stats) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([USER_STATS_STORE], 'readwrite');
+      const store = transaction.objectStore(USER_STATS_STORE);
+      
+      const statsToSave = {
+        user_id: userId,
+        ...stats,
+        last_updated: new Date().toISOString(),
+        cached_at: Date.now()
+      };
+      
+      const request = store.put(statsToSave);
+      
+      request.onsuccess = () => {
+        console.log('User stats cached successfully for user:', userId);
+        resolve(statsToSave);
+      };
+      
+      request.onerror = (event) => {
+        console.error('Error caching user stats:', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  } catch (error) {
+    console.error('Failed to cache user stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get cached user stats
+ * @param {string} userId - User ID
+ * @returns {Promise} - Promise resolving to cached stats or null
+ */
+export const getCachedUserStats = async (userId) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([USER_STATS_STORE], 'readonly');
+      const store = transaction.objectStore(USER_STATS_STORE);
+      
+      const request = store.get(userId);
+      
+      request.onsuccess = () => {
+        const result = request.result;
+        if (result) {
+          // Check if cache is still valid (24 hours)
+          const cacheAge = Date.now() - result.cached_at;
+          const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+          
+          if (cacheAge < maxCacheAge) {
+            console.log('Retrieved cached user stats for user:', userId);
+            resolve(result);
+          } else {
+            console.log('Cached user stats expired for user:', userId);
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      };
+      
+      request.onerror = (event) => {
+        console.error('Error retrieving cached user stats:', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  } catch (error) {
+    console.error('Failed to get cached user stats:', error);
+    return null;
+  }
+};
+
+/**
+ * Cache user activity for offline access
+ * @param {string} userId - User ID
+ * @param {Array} activities - Array of activity objects
+ * @returns {Promise} - Promise resolving when activities are cached
+ */
+export const cacheUserActivity = async (userId, activities) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([USER_ACTIVITY_STORE], 'readwrite');
+      const store = transaction.objectStore(USER_ACTIVITY_STORE);
+      
+      // Clear existing activities for this user first
+      const userIndex = store.index('user_id');
+      const deleteRequest = userIndex.openCursor(IDBKeyRange.only(userId));
+      
+      deleteRequest.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        } else {
+          // Now add new activities
+          const promises = activities.map(activity => {
+            const activityToSave = {
+              ...activity,
+              user_id: userId,
+              cached_at: Date.now()
+            };
+            return store.add(activityToSave);
+          });
+          
+          Promise.all(promises).then(() => {
+            console.log('User activities cached successfully for user:', userId);
+            resolve();
+          }).catch(reject);
+        }
+      };
+      
+      deleteRequest.onerror = (event) => {
+        console.error('Error caching user activities:', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  } catch (error) {
+    console.error('Failed to cache user activities:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get cached user activities
+ * @param {string} userId - User ID
+ * @param {number} limit - Maximum number of activities to return
+ * @returns {Promise} - Promise resolving to cached activities
+ */
+export const getCachedUserActivity = async (userId, limit = 10) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([USER_ACTIVITY_STORE], 'readonly');
+      const store = transaction.objectStore(USER_ACTIVITY_STORE);
+      const userIndex = store.index('user_id');
+      
+      const activities = [];
+      const request = userIndex.openCursor(IDBKeyRange.only(userId));
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor && activities.length < limit) {
+          const activity = cursor.value;
+          // Check if cache is still valid (24 hours)
+          const cacheAge = Date.now() - activity.cached_at;
+          const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+          
+          if (cacheAge < maxCacheAge) {
+            activities.push(activity);
+          }
+          cursor.continue();
+        } else {
+          // Sort by created_at descending
+          activities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          console.log(`Retrieved ${activities.length} cached activities for user:`, userId);
+          resolve(activities);
+        }
+      };
+      
+      request.onerror = (event) => {
+        console.error('Error retrieving cached user activities:', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  } catch (error) {
+    console.error('Failed to get cached user activities:', error);
+    return [];
+  }
+};
+
+const offlineStorageAPI = {
   saveOfflineReport,
   getPendingReports,
   markReportSynced,
   deleteOfflineReport,
   saveOfflineLocation,
   getOfflineLocations,
-  isOnline
+  isOnline,
+  cacheUserStats,
+  getCachedUserStats,
+  cacheUserActivity,
+  getCachedUserActivity
 };
+
+export default offlineStorageAPI;

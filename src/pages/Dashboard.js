@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import appConfig from '../utils/app-config.js';
 import { useAuth } from '../context/AuthContext.js';
-import LoadingSpinner from '../components/LoadingSpinner.js';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import DashboardSkeleton from '../components/SkeletonLoader.js';
 import ActivePickupCard from '../components/ActivePickupCard.js';
 import supabase from '../utils/supabaseClient.js';
 import { userService, activityService, pickupService } from '../services/index.js';
+import { 
+  cacheUserStats, 
+  getCachedUserStats, 
+  cacheUserActivity, 
+  getCachedUserActivity,
+  isOnline 
+} from '../utils/offlineStorage.js';
+
+// Lazy-loaded map components removed since map is not currently used in dashboard
+// Can be re-enabled when map functionality is needed
 
 /**
  * Dashboard page component showing user's activity and nearby trash drop points
@@ -21,277 +30,300 @@ const Dashboard = () => {
     totalBags: 0,
   });
   const [recentActivity, setRecentActivity] = useState([]);
-  const [dropPoints, setDropPoints] = useState([]);
   const [activePickup, setActivePickup] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
+  const [dataSource, setDataSource] = useState('loading'); // 'cache', 'network', 'loading'
+  const sessionRefreshRef = useRef(null);
+  const mountedRef = useRef(true);
   
+  // Cleanup function
   useEffect(() => {
-    // Enhanced session refresh function with validation
-    const refreshAndValidateSession = async () => {
-      // Special case for our test account
-      if (user && user.email === 'prince02@mailinator.com') {
-        console.log('Using test account - skipping session refresh');
-        return { success: true, testAccount: true };
-      }
-      
-      // Skip real session refresh in development mode with mocks enabled
-      if (appConfig && appConfig.features && appConfig.features.enableMocks) {
-        console.log('Development mode with mocks enabled - skipping real session refresh');
-        return { success: true, mock: true };
-      }
-      
-      try {
-        // Check if we have a session already before trying to refresh
-        const currentSession = (supabase.auth.session && supabase.auth.session()) || null;
-        if (!currentSession) {
-          console.log('No existing session found, skipping refresh');
-          return { success: true, noSession: true };
-        }
-        
-        console.log('Attempting to refresh session for dashboard data');
-        const { data, error } = await supabase.auth.refreshSession();
-        
-        if (error) {
-          // Handle common session missing error gracefully - check for multiple possible error messages
-          if (error.message === 'Auth session missing!' || 
-              error.message?.includes('missing') ||
-              error.message?.includes('not found') ||
-              error.message?.includes('invalid') ||
-              error.status === 401) {
-            console.log('Auth session issue detected - this is normal for test accounts or in development mode');
-            return { success: true, noSession: true };
-          }
-          
-          console.warn('Session refresh failed in Dashboard component:', error.message);
-          // Even with error, return success to continue loading data
-          return { success: true, noSession: true, error };
-        }
-        
-        if (!data?.session) {
-          console.warn('Session refresh did not return a valid session in Dashboard component');
-          return { success: true, noSession: true }; 
-        }
-        
-        console.log('Session refreshed successfully in Dashboard component');
-        return { success: true, session: data.session };
-      } catch (err) {
-        console.error('Error during session refresh in Dashboard component:', err);
-        return { success: true, noSession: true, error: err };
-      }
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
     };
-    
-    // Retry operation with timeout and exponential backoff
-    const retryOperation = async (operation, maxRetries = 2, initialDelay = 500) => {
-      let retries = 0;
-      let lastError = null;
+  }, []);
+
+  // Online status listener
+  useEffect(() => {
+    const handleOnlineStatusChange = () => {
+      setIsOnlineStatus(isOnline());
+    };
+
+    window.addEventListener('online', handleOnlineStatusChange);
+    window.addEventListener('offline', handleOnlineStatusChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineStatusChange);
+      window.removeEventListener('offline', handleOnlineStatusChange);
+    };
+  }, []);
+
+  // Optimized session refresh function with caching
+  const getValidSession = useCallback(async () => {
+    // Return cached result if still valid
+    if (sessionRefreshRef.current && 
+        sessionRefreshRef.current.timestamp > Date.now() - 300000) { // 5 minutes cache
+      return sessionRefreshRef.current.result;
+    }
+
+    // Special cases
+    if (user && user.email === 'prince02@mailinator.com') {
+      const result = { success: true, testAccount: true };
+      sessionRefreshRef.current = { result, timestamp: Date.now() };
+      return result;
+    }
+
+    if (appConfig?.features?.enableMocks) {
+      const result = { success: true, mock: true };
+      sessionRefreshRef.current = { result, timestamp: Date.now() };
+      return result;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      const result = error ? 
+        { success: true, noSession: true, error } : 
+        { success: true, session: data.session };
       
-      while (retries <= maxRetries) {
-        try {
-          // Add a timeout wrapper around the operation
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Dashboard operation timeout')), 10000));
-          
-          const result = await Promise.race([
-            operation(),
-            timeoutPromise
+      sessionRefreshRef.current = { result, timestamp: Date.now() };
+      return result;
+    } catch (err) {
+      const result = { success: true, noSession: true, error: err };
+      sessionRefreshRef.current = { result, timestamp: Date.now() };
+      return result;
+    }
+  }, [user]);
+
+  // Optimized data fetching with offline support
+  useEffect(() => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Step 1: Try to load cached data immediately for better UX
+        if (isOnlineStatus) {
+          console.log('Loading cached data while fetching fresh data...');
+          const [cachedStats, cachedActivity] = await Promise.all([
+            getCachedUserStats(user.id),
+            getCachedUserActivity(user.id, 3)
           ]);
           
-          return result;
-        } catch (err) {
-          console.warn(`Dashboard operation failed (attempt ${retries + 1}/${maxRetries + 1}):`, err);
-          lastError = err;
-          
-          // If this is the last retry, don't delay, just throw
-          if (retries === maxRetries) {
-            throw lastError;
+          if (cachedStats && !isCancelled) {
+            setStats({
+              points: cachedStats.points || 0,
+              pickups: cachedStats.pickups || 0,
+              reports: cachedStats.reports || 0,
+              batches: cachedStats.batches || 0,
+              totalBags: cachedStats.totalBags || 0,
+            });
+            setDataSource('cache');
           }
           
-          // If this is a token error, try refreshing immediately
-          if (err.message && (
-            err.message.includes('JWT') || 
-            err.message.includes('auth') ||
-            err.message.includes('token')
-          )) {
-            await refreshAndValidateSession();
+          if (cachedActivity && cachedActivity.length > 0 && !isCancelled) {
+            setRecentActivity(cachedActivity.map(activity => ({
+              id: activity.id,
+              type: activity.type,
+              message: activity.details || `${activity.type} activity`,
+              timestamp: activity.created_at,
+              points: activity.points || 0
+            })));
+          }
+        }
+        
+        // Step 2: Fetch fresh data if online
+        if (isOnlineStatus) {
+          console.log('Fetching fresh dashboard data...');
+          
+          // Get valid session
+          await getValidSession();
+          
+          // Parallel data fetching for better performance
+          const [statsResult, activityResult, pickupResult] = await Promise.allSettled([
+            userService.getUserStats(user.id),
+            activityService.getUserActivity(user.id, 3),
+            pickupService.getActivePickup(user.id)
+          ]);
+          
+          if (!isCancelled) {
+            // Process stats
+            if (statsResult.status === 'fulfilled' && !statsResult.value.error) {
+              const statsData = statsResult.value.data;
+              const newStats = {
+                points: statsData?.points || 0,
+                pickups: statsData?.pickups || 0,
+                reports: statsData?.reports || 0,
+                batches: statsData?.batches || 0,
+                totalBags: statsData?.totalBags || 0,
+              };
+              setStats(newStats);
+              setDataSource('network');
+              
+              // Cache the fresh data
+              await cacheUserStats(user.id, newStats).catch(console.warn);
+            }
+            
+            // Process activity
+            if (activityResult.status === 'fulfilled' && !activityResult.value.error) {
+              const activityData = activityResult.value.data || [];
+              const formattedActivity = activityData.map(activity => ({
+                id: activity.id,
+                type: activity.type,
+                message: activity.details || `${activity.type} activity`,
+                timestamp: activity.created_at,
+                points: activity.points || 0
+              }));
+              setRecentActivity(formattedActivity);
+              
+              // Cache the fresh activity
+              await cacheUserActivity(user.id, activityData).catch(console.warn);
+            }
+            
+            // Process pickup
+            if (pickupResult.status === 'fulfilled' && !pickupResult.value.error) {
+              const pickupData = pickupResult.value.data;
+              if (pickupData) {
+                const formattedPickup = {
+                  id: pickupData.id,
+                  status: pickupData.status,
+                  collector_id: pickupData.collector_id,
+                  collector_name: pickupData.collector_name || 'Assigned Collector',
+                  location: pickupData.location,
+                  address: pickupData.location?.address || pickupData.address,
+                  waste_type: pickupData.waste_type,
+                  number_of_bags: pickupData.bags || 0,
+                  points: pickupData.points_earned || 0,
+                  eta_minutes: pickupData.eta_minutes,
+                  distance: pickupData.distance,
+                  created_at: pickupData.created_at,
+                  updated_at: pickupData.updated_at
+                };
+                setActivePickup(formattedPickup);
+                sessionStorage.setItem(`activePickup_${user.id}`, JSON.stringify(formattedPickup));
+              } else {
+                setActivePickup(null);
+                sessionStorage.removeItem(`activePickup_${user.id}`);
+              }
+            } else {
+              // Try to load cached pickup
+              try {
+                const cachedPickup = sessionStorage.getItem(`activePickup_${user.id}`);
+                if (cachedPickup) {
+                  setActivePickup(JSON.parse(cachedPickup));
+                }
+              } catch (e) {
+                console.warn('Error loading cached pickup:', e);
+              }
+            }
+          }
+        } else {
+          // Offline mode - load from cache only
+          console.log('Offline mode: Loading data from cache...');
+          setDataSource('cache');
+          
+          const [cachedStats, cachedActivity] = await Promise.all([
+            getCachedUserStats(user.id),
+            getCachedUserActivity(user.id, 3)
+          ]);
+          
+          if (cachedStats && !isCancelled) {
+            setStats({
+              points: cachedStats.points || 0,
+              pickups: cachedStats.pickups || 0,
+              reports: cachedStats.reports || 0,
+              batches: cachedStats.batches || 0,
+              totalBags: cachedStats.totalBags || 0,
+            });
           }
           
-          // Add delay with exponential backoff
-          const delay = initialDelay * Math.pow(2, retries);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          retries++;
+          if (cachedActivity && !isCancelled) {
+            setRecentActivity(cachedActivity.map(activity => ({
+              id: activity.id,
+              type: activity.type,
+              message: activity.details || `${activity.type} activity`,
+              timestamp: activity.created_at,
+              points: activity.points || 0
+            })));
+          }
+          
+          // Load cached pickup
+          try {
+            const cachedPickup = sessionStorage.getItem(`activePickup_${user.id}`);
+            if (cachedPickup && !isCancelled) {
+              setActivePickup(JSON.parse(cachedPickup));
+            }
+          } catch (e) {
+            console.warn('Error loading cached pickup:', e);
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        if (!isCancelled) {
+          // Try to load cached data as fallback
+          const [cachedStats, cachedActivity] = await Promise.all([
+            getCachedUserStats(user.id).catch(() => null),
+            getCachedUserActivity(user.id, 3).catch(() => [])
+          ]);
+          
+          if (cachedStats) {
+            setStats({
+              points: cachedStats.points || 0,
+              pickups: cachedStats.pickups || 0,
+              reports: cachedStats.reports || 0,
+              batches: cachedStats.batches || 0,
+              totalBags: cachedStats.totalBags || 0,
+            });
+            setDataSource('cache');
+          }
+          
+          if (cachedActivity && cachedActivity.length > 0) {
+            setRecentActivity(cachedActivity.map(activity => ({
+              id: activity.id,
+              type: activity.type,
+              message: activity.details || `${activity.type} activity`,
+              timestamp: activity.created_at,
+              points: activity.points || 0
+            })));
+          }
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
         }
       }
     };
 
-    // Fetch user data including stats and recent activity using database services
-    const fetchUserData = async () => {
-      setIsLoading(true);
-      
-      if (!user) {
-        console.log('No user found, cannot fetch user data');
-        setIsLoading(false);
-        return;
-      }
-      
-      try {
-        // Refresh session first
-        const sessionResult = await refreshAndValidateSession();
-        
-        if (sessionResult.noSession) {
-          console.log('No active session but continuing with data load');
-        }
-        
-        // Fetch user stats using userService
-        const { data: statsData, error: statsError } = await userService.getUserStats(user.id);
-        
-        if (statsError) {
-          console.warn('Error fetching user stats:', statsError.message);
-          // Set default values for stats
-          setStats({
-            points: 0,
-            pickups: 0,
-            reports: 0,
-            batches: 0,
-            totalBags: 0,
-          });
-        } else if (statsData) {
-          setStats({
-            points: statsData.points || 0,
-            pickups: statsData.pickups || 0,
-            reports: statsData.reports || 0,
-            batches: statsData.batches || 0,
-            totalBags: statsData.totalBags || 0,
-          });
-        }
-        
-        // Fetch recent activity using activityService
-        const { data: activityData, error: activityError } = await activityService.getUserActivity(user.id, 3);
-        
-        if (activityError) {
-          console.warn('Error fetching recent activity:', activityError.message);
-          setRecentActivity([]);
-        }
-        
-        const formattedActivity = activityData?.map(activity => ({
-          id: activity.id,
-          type: activity.type,
-          message: activity.details || `${activity.type} activity`,
-          timestamp: activity.created_at,
-          points: activity.points || 0
-        })) || [];
-        
-        setRecentActivity(formattedActivity);
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setIsLoading(false);
-      }
+    loadDashboardData();
+
+    return () => {
+      isCancelled = true;
     };
-    
-    fetchUserData();
-    
-    // Fetch active pickup using pickup service
-    const fetchActivePickup = async () => {
-      if (!user || !user.id) {
-        setActivePickup(null);
-        return;
-      }
-      
-      // Check session storage first for cached data
-      try {
-        const cachedPickup = sessionStorage.getItem(`activePickup_${user.id}`);
-        if (cachedPickup) {
-          setActivePickup(JSON.parse(cachedPickup));
-          // Still fetch from server to ensure data is fresh
-        }
-        
-        // Fetch active pickup using pickupService
-        console.log('Dashboard: Fetching active pickup for user:', user.id);
-        const { data, error } = await pickupService.getActivePickup(user.id);
-        
-        if (error) {
-          console.warn('Error fetching active pickup:', error.message);
-          // Use cached pickup if available
-          if (cachedPickup) {
-            console.log('Using cached pickup data');
-            setActivePickup(JSON.parse(cachedPickup));
-          }
-          return;
-        }
-        
-        if (data) {
-          // Format pickup data for the card
-          const formattedPickup = {
-            id: data.id,
-            status: data.status,
-            collector_id: data.collector_id,
-            collector_name: data.collector_name || 'Assigned Collector',
-            location: data.location,
-            address: data.location?.address || data.address,
-            waste_type: data.waste_type,
-            number_of_bags: data.bags || 0,
-            points: data.points_earned || 0,
-            eta_minutes: data.eta_minutes,
-            distance: data.distance,
-            created_at: data.created_at,
-            updated_at: data.updated_at
-          };
-          
-          setActivePickup(formattedPickup);
-          
-          // Save to session storage for persistence across page reloads
-          sessionStorage.setItem(`activePickup_${user.id}`, JSON.stringify(formattedPickup));
-        } else {
-          // No active pickup found
-          setActivePickup(null);
-          // Clear from session storage
-          sessionStorage.removeItem(`activePickup_${user.id}`);
-        }
-      } catch (error) {
-        console.error('Error fetching active pickup:', error);
-        setActivePickup(null);
-      }
-    };
-    
-    // Call the function to fetch active pickup
-    fetchActivePickup();
-    
-    // Set up real-time subscription for pickup status changes
-    const setupPickupSubscription = async () => {
-      if (user && user.id) {
-        // Subscribe to changes in the pickups table for this user
-        const pickupSubscription = supabase
-          .channel('pickup-changes')
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'pickups', filter: `user_id=eq.${user.id}` },
-            (payload) => {
-              console.log('Pickup update received:', payload);
-              
-              // If the pickup status was changed to completed or cancelled, remove from active pickup
-              if (payload.new && (payload.new.status === 'completed' || payload.new.status === 'cancelled')) {
-                setActivePickup(null);
-                sessionStorage.removeItem(`activePickup_${user.id}`);
-              } else if (payload.new) {
-                // Update the active pickup with new data
-                fetchActivePickup();
-              }
-            }
-          )
-          .subscribe();
-          
-        return () => {
-          pickupSubscription.unsubscribe();
-        };
-      }
-    };
-    
-    // Setup the subscription
-    setupPickupSubscription();
-    
-  }, [user]);
-  
+  }, [user?.id, isOnlineStatus, getValidSession]);
+
+  // Memoized calculations for better performance
+  const memoizedStats = useMemo(() => ({
+    batchLevel: Math.floor(stats.batches / 2) + 1,
+    pickupLevel: Math.floor(stats.pickups / 5) + 1,
+    pointsLevel: Math.floor(stats.points / 100) + 1,
+    batchProgress: (stats.batches % 2) * 50,
+    pickupProgress: (stats.pickups % 5) * 20,
+    pointsProgress: stats.points % 100,
+    batchesNeeded: 2 - (stats.batches % 2),
+    pickupsNeeded: 5 - (stats.pickups % 5),
+    pointsNeeded: 100 - (stats.points % 100),
+    hasPickupAchievement: stats.pickups >= 5,
+    hasPointsAchievement: stats.points >= 250
+  }), [stats]);
+
   const ActivityIcon = ({ type }) => {
     if (type === 'pickup') {
       return (
@@ -307,16 +339,38 @@ const Dashboard = () => {
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+  // Show skeleton loader during initial loading
+  if (isLoading && dataSource === 'loading') {
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="space-y-6 pb-28 md:pb-6">
+      {/* Offline/Data Source Indicator */}
+      {!isOnlineStatus && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg p-3 mb-4">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="text-amber-800 dark:text-amber-200 text-sm">
+              You're offline. Showing cached data from your last sync.
+            </span>
+          </div>
+        </div>
+      )}
+      {dataSource === 'cache' && isOnlineStatus && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-2 mb-4">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-blue-800 dark:text-blue-200 text-xs">
+              Showing cached data while loading fresh updates...
+            </span>
+          </div>
+        </div>
+      )}
       {/* User Stats Card */}
       <div className="bg-white dark:bg-gray-800 pt-2 px-6 pb-6 rounded-lg shadow-md mb-6">
         
@@ -325,7 +379,7 @@ const Dashboard = () => {
           <div className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-purple-700 dark:text-purple-300">Batches & Bags</h3>
-              <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.batches / 2) + 1}</span>
+              <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded-full">Lv {memoizedStats.batchLevel}</span>
             </div>
             <div className="flex items-end gap-2">
               <div>
@@ -341,11 +395,11 @@ const Dashboard = () => {
             <div className="w-full h-2 bg-purple-200 dark:bg-purple-700 rounded-full mt-2">
               <div 
                 className="h-2 bg-purple-600 dark:bg-purple-400 rounded-full" 
-                style={{ width: `${(stats.batches % 2) * 50}%` }}
+                style={{ width: `${memoizedStats.batchProgress}%` }}
               ></div>
             </div>
             <div className="flex justify-between text-xs mt-1">
-              <p className="text-purple-600 dark:text-purple-300">{2 - (stats.batches % 2)} more to level up</p>
+              <p className="text-purple-600 dark:text-purple-300">{memoizedStats.batchesNeeded} more to level up</p>
               <p className="text-indigo-600 dark:text-indigo-300">
                 {stats.totalBags > 0 ? `${stats.totalBags} bags available` : "No bags available"}
               </p>
@@ -355,19 +409,19 @@ const Dashboard = () => {
           <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-green-700 dark:text-green-300">Pickups</h3>
-              <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.pickups / 5) + 1}</span>
+              <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Lv {memoizedStats.pickupLevel}</span>
             </div>
             <p className="text-2xl md:text-3xl font-bold text-green-800 dark:text-green-200">{stats.pickups}</p>
             {/* Progress bar */}
             <div className="w-full h-2 bg-green-200 dark:bg-green-700 rounded-full mt-2">
               <div 
                 className="h-2 bg-green-600 dark:bg-green-400 rounded-full" 
-                style={{ width: `${(stats.pickups % 5) * 20}%` }}
+                style={{ width: `${memoizedStats.pickupProgress}%` }}
               ></div>
             </div>
-            <p className="text-xs text-green-600 dark:text-green-300 mt-1">{5 - (stats.pickups % 5)} more to level up</p>
+            <p className="text-xs text-green-600 dark:text-green-300 mt-1">{memoizedStats.pickupsNeeded} more to level up</p>
             {/* Achievement badge */}
-            {stats.pickups >= 5 && (
+            {memoizedStats.hasPickupAchievement && (
               <div className="absolute -top-1 -right-1">
                 <span className="flex h-6 w-6">
                   <span className="relative rounded-full h-6 w-6 bg-green-500 flex items-center justify-center">
@@ -383,19 +437,19 @@ const Dashboard = () => {
           <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden md:min-w-0 min-w-[280px] flex-shrink-0 md:flex-1 snap-center">
             <div className="flex justify-between items-center">
               <h3 className="text-sm md:text-lg font-semibold text-blue-700 dark:text-blue-300">Points Earned</h3>
-              <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Lv {Math.floor(stats.points / 100) + 1}</span>
+              <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Lv {memoizedStats.pointsLevel}</span>
             </div>
             <p className="text-2xl md:text-3xl font-bold text-blue-800 dark:text-blue-200">{stats.points}</p>
             {/* Progress bar */}
             <div className="w-full h-2 bg-blue-200 dark:bg-blue-700 rounded-full mt-2">
               <div 
                 className="h-2 bg-blue-600 dark:bg-blue-400 rounded-full" 
-                style={{ width: `${(stats.points % 100)}%` }}
+                style={{ width: `${memoizedStats.pointsProgress}%` }}
               ></div>
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">{100 - (stats.points % 100)} points to next level</p>
+            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">{memoizedStats.pointsNeeded} points to next level</p>
             {/* Badge */}
-            {stats.points >= 250 && (
+            {memoizedStats.hasPointsAchievement && (
               <div className="absolute -top-1 -right-1">
                 <span className="flex h-6 w-6">
                   <span className="animate-ping absolute h-full w-full rounded-full bg-blue-400 opacity-75"></span>
