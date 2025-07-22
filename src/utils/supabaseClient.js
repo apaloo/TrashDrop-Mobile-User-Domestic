@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import appConfig from './app-config.js';
 
-// Using environment variables for Supabase credentials
-const supabaseUrl = appConfig.supabase?.url;
-const supabaseAnonKey = appConfig.supabase?.anonKey;
+// Import environment variables directly to avoid circular dependency or initialization timing issues
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 // Log configuration status for debugging
 const logConfigStatus = () => {

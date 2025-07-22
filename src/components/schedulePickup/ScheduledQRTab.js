@@ -129,7 +129,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading = false })
     };
     
     mergePickups();
-  }, [scheduledPickups, localPickups]);
+  }, [scheduledPickups]);
   
   // Handle pickup status changes (from collector scan or cancellation)
   const handlePickupStatusChange = useCallback((updatedPickup) => {

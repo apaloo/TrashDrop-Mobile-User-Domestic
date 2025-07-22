@@ -348,7 +348,7 @@ export const AuthProvider = ({ children }) => {
   const checkSession = useCallback(async (force = false) => {
     // First, check for test account before any other logic
     const storedUser = getStoredUser();
-    if (storedUser && storedUser.email === 'prince02@mailinator.com') {
+    if (storedUser?.email === 'prince02@mailinator.com' && process.env.NODE_ENV === 'development') {
       console.log('[Auth] Test account detected - bypassing session check');
       
       // Ensure mock data mode is enabled for test account
@@ -356,10 +356,28 @@ export const AuthProvider = ({ children }) => {
         window.appConfig.features.enableMocks = true;
       }
       
-      // Return successful auth for test account
+      // Create a persistent test session
+      const testUser = {
+        id: '12345678-1234-5678-1234-567812345678',
+        email: 'prince02@mailinator.com',
+        user_metadata: { name: 'Test User' },
+        last_authenticated: new Date().toISOString()
+      };
+      
+      // Store test user data
+      localStorage.setItem(appConfig.storage.userKey, JSON.stringify(testUser));
+      
+      // Update auth state for test account
+      updateAuthState({
+        status: AUTH_STATES.AUTHENTICATED,
+        user: testUser,
+        session: { access_token: 'test_session_token' },
+        lastAction: 'test_account_login'
+      });
+      
       return { 
         success: true, 
-        user: storedUser,
+        user: testUser,
         isTestAccount: true
       };
     }

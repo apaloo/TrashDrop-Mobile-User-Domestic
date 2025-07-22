@@ -43,7 +43,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       : [40.7128, -74.0060] // Default to NYC
   );
   const [savedLocations, setSavedLocations] = useState([]);
-  const [addressInput, setAddressInput] = useState(formData.address || '');
+  const [addressInput, setAddressInput] = useState(formData.address ?? '');
   const [addressError, setAddressError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -65,7 +65,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         
         // Then fetch from Supabase to ensure we have the latest
         const { data, error } = await supabase
-          .from('user_locations') // Use the correct table name
+          .from('locations') // Use the correct table name
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });

@@ -81,17 +81,17 @@ const PickupRequest = () => {
         }
         
         // Then fetch from Supabase to ensure we have the latest
-        const { data, error } = await supabase
-          .from('user_locations') // Use the correct table name
+        const { data: locationsData, error: locationsError } = await supabase
+          .from('locations') // Use the correct table name
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (locationsError) throw locationsError;
         
-        if (data && data.length > 0) {
+        if (locationsData && locationsData.length > 0) {
           // Format locations to match component's expected structure
-          const formattedLocations = data.map(location => ({
+          const formattedLocations = locationsData.map(location => ({
             id: location.id,
             name: location.name,
             address: location.address || '',
@@ -193,7 +193,7 @@ const PickupRequest = () => {
             .from('user_stats')
             .select('*')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
             
           if (statsError) throw statsError;
           

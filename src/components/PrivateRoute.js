@@ -10,7 +10,10 @@ import LoadingSpinner from './LoadingSpinner.js';
  * @param {React.ReactNode} props.children - Child components to render if authenticated
  */
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  
+  // Special case for test account in development
+  const isTestAccount = process.env.NODE_ENV === 'development' && user?.email === 'prince02@mailinator.com';
 
   // Show loading spinner while checking authentication status
   if (isLoading) {
@@ -21,8 +24,13 @@ const PrivateRoute = ({ children }) => {
     );
   }
 
-  // Redirect to login if not authenticated, otherwise render the protected route
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  // Allow access for test account in development or if properly authenticated
+  if (isTestAccount || isAuthenticated) {
+    return children;
+  }
+  
+  // Redirect to login for all other cases
+  return <Navigate to="/login" replace />;
 };
 
 export default PrivateRoute;

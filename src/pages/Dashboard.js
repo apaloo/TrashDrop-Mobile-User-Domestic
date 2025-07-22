@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useContext } from 'react';
-import appConfig from '../utils/app-config.js';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import appConfig from '../utils/app-config.js';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import ActivePickupCard from '../components/ActivePickupCard.js';
 import supabase from '../utils/supabaseClient.js';
+import { userService, activityService, pickupService } from '../services/index.js';
 
 /**
  * Dashboard page component showing user's activity and nearby trash drop points
@@ -41,7 +42,7 @@ const Dashboard = () => {
       
       try {
         // Check if we have a session already before trying to refresh
-        const currentSession = supabase.auth.session && supabase.auth.session() || null;
+        const currentSession = (supabase.auth.session && supabase.auth.session()) || null;
         if (!currentSession) {
           console.log('No existing session found, skipping refresh');
           return { success: true, noSession: true };
@@ -122,9 +123,7 @@ const Dashboard = () => {
       }
     };
 
-    // Access to structured mock data from mocks directory
-    
-    // Fetch user data including stats and recent activity with enhanced error handling
+    // Fetch user data including stats and recent activity using database services
     const fetchUserData = async () => {
       setIsLoading(true);
       
@@ -134,46 +133,19 @@ const Dashboard = () => {
         return;
       }
       
-      // Mocks have been removed
-      const useMocks = false;
-      
       try {
-        // Always attempt to refresh session first
-        {
-          const sessionResult = await refreshAndValidateSession();
-          
-          if (sessionResult.noSession) {
-            console.log('No active session but continuing with data load');
-            // Continue with whatever data we can get
-          }
+        // Refresh session first
+        const sessionResult = await refreshAndValidateSession();
+        
+        if (sessionResult.noSession) {
+          console.log('No active session but continuing with data load');
         }
         
-        // Continue with the rest of the function regardless of session status
-        
-        // Fetch user stats from Supabase with explicit schema
-        const { data: statsData, error: statsError } = await retryOperation(async () => {
-          return await supabase
-            .from('user_stats')
-            .select('*', { schema: 'public' })
-            .eq('user_id', user.id)
-            .maybeSingle(); // Use maybeSingle instead of single to handle the no-rows case
-        });
+        // Fetch user stats using userService
+        const { data: statsData, error: statsError } = await userService.getUserStats(user.id);
         
         if (statsError) {
-          if (statsError.code === '22P02') {
-            // Invalid UUID format - should be fixed now, but handle gracefully
-            console.warn('Invalid UUID format for user_id. This should be fixed after refresh.');
-          } else if (statsError.code === '42P01') {
-            // Table doesn't exist - expected in dev/test environment with mocks
-            console.warn('user_stats table does not exist. This is normal in the dev environment with mocks enabled.');
-          } else if (statsError.code === 'PGRST116') {
-            // No rows found - this is expected for new users
-            console.log('No stats found for user. This is normal for new users.');
-            // Continue to mocks or default values
-          } else {
-            console.error('Error fetching user stats:', statsError);
-          }
-          
+          console.warn('Error fetching user stats:', statsError.message);
           // Set default values for stats
           setStats({
             points: 0,
@@ -182,52 +154,33 @@ const Dashboard = () => {
             batches: 0,
             totalBags: 0,
           });
-          // Don't throw, continue with default values
         } else if (statsData) {
           setStats({
-            points: statsData.total_points || 0,
-            pickups: statsData.total_pickups || 0,
-            reports: statsData.total_reports || 0,
-            batches: statsData.total_batches || 0,
-            totalBags: statsData.total_bags || 0,
+            points: statsData.points || 0,
+            pickups: statsData.pickups || 0,
+            reports: statsData.reports || 0,
+            batches: statsData.batches || 0,
+            totalBags: statsData.totalBags || 0,
           });
         }
         
-        // Fetch recent activity from Supabase with explicit schema
-        const { data: activityData, error: activityError } = await retryOperation(async () => {
-          return await supabase
-            .from('user_activity')
-            .select('*', { schema: 'public' })
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(3);
-        });
+        // Fetch recent activity using activityService
+        const { data: activityData, error: activityError } = await activityService.getUserActivity(user.id, 3);
         
         if (activityError) {
-          if (activityError.code === '22P02') {
-            // Invalid UUID format - should be fixed now, but handle gracefully
-            console.warn('Invalid UUID format for user_id in recent activity. This should be fixed after refresh.');
-          } else if (activityError.code === '42P01') {
-            // Table doesn't exist - expected in dev/test environment with mocks
-            console.warn('user_activity table does not exist. This is normal in the dev environment with mocks enabled.');
-          } else {
-            console.error('Error fetching recent activity:', activityError);
-          }
-          
-          // Set empty array for activity
+          console.warn('Error fetching recent activity:', activityError.message);
           setRecentActivity([]);
-          // Don't throw, continue with empty activity
         }
         
-        if (activityData && activityData.length > 0) {
-          setRecentActivity(activityData.map(activity => ({
-            id: activity.id,
-            type: activity.activity_type,
-            status: activity.status,
-            date: activity.created_at,
-            points: activity.points || 0
-          })));
-        }
+        const formattedActivity = activityData?.map(activity => ({
+          id: activity.id,
+          type: activity.type,
+          message: activity.details || `${activity.type} activity`,
+          timestamp: activity.created_at,
+          points: activity.points || 0
+        })) || [];
+        
+        setRecentActivity(formattedActivity);
         
         setIsLoading(false);
       } catch (error) {
@@ -238,88 +191,66 @@ const Dashboard = () => {
     
     fetchUserData();
     
-    // Fetch active pickup from supabase
+    // Fetch active pickup using pickup service
     const fetchActivePickup = async () => {
-      if (user && user.id) {
-        try {
-          // Check session storage first for cached active pickup status
-          const sessionActivePickup = sessionStorage.getItem(`activePickup_${user.id}`);
-          const cachedPickup = sessionActivePickup ? JSON.parse(sessionActivePickup) : null;
-          
-          // Always fetch from Supabase to ensure data is fresh
-          // No more mock data
-          
-          try {
-            const { data, error } = await retryOperation(async () => {
-              return await supabase
-                .from('pickups')
-                .select('*', { schema: 'public' })
-                .eq('user_id', user.id)
-                .in('status', ['waiting_for_collector', 'collector_assigned', 'en_route', 'arrived'])
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-            });
-            
-            if (error) {
-              if (error.code === 'PGRST116') {
-                // No active pickup found, this is not an error
-                return;
-              } else if (error.code === '42P01' || error.status === 404) {
-              // Table doesn't exist - this is expected in dev/test environment with mocks enabled
-              console.warn('Pickups table does not exist. This is normal in the dev environment with mocks enabled.');
-              // Use cached pickup if available, otherwise use mock data if mocks are enabled
-              if (cachedPickup) {
-                setActivePickup(cachedPickup);
-
-              }
-              return;
-            }
-            console.error('Error fetching active pickup:', error);
-            // Don't throw, continue with no active pickup
-            return;
-          }
-          
-          if (data) {
-            // Format pickup data for the card
-            const formattedPickup = {
-              id: data.id,
-              status: data.status,
-              collector_id: data.collector_id,
-              collector_name: data.collector_name || 'Assigned Collector',
-              location: data.location,
-              address: data.address,
-              waste_type: data.waste_type,
-              number_of_bags: data.number_of_bags,
-              points: data.points || 0,
-              eta_minutes: data.eta_minutes,
-              distance: data.distance,
-              created_at: data.created_at,
-              updated_at: data.updated_at
-            };
-            
-            setActivePickup(formattedPickup);
-            
-            // Save to session storage for persistence across page reloads
-            sessionStorage.setItem(`activePickup_${user.id}`, JSON.stringify(formattedPickup));
-          } else {
-            // No active pickup found in database
-            setActivePickup(null);
-            // Clear from session storage
-            sessionStorage.removeItem(`activePickup_${user.id}`);
-          }
-          } catch (supabaseError) {
-            console.error('Error with Supabase pickups query:', supabaseError);
-            // Use cached pickup if available
-            if (cachedPickup) {
-              console.log('Using cached pickup data');
-              setActivePickup(cachedPickup);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching active pickup:', error);
-          setActivePickup(null);
+      if (!user || !user.id) {
+        setActivePickup(null);
+        return;
+      }
+      
+      // Check session storage first for cached data
+      try {
+        const cachedPickup = sessionStorage.getItem(`activePickup_${user.id}`);
+        if (cachedPickup) {
+          setActivePickup(JSON.parse(cachedPickup));
+          // Still fetch from server to ensure data is fresh
         }
+        
+        // Fetch active pickup using pickupService
+        console.log('Dashboard: Fetching active pickup for user:', user.id);
+        const { data, error } = await pickupService.getActivePickup(user.id);
+        
+        if (error) {
+          console.warn('Error fetching active pickup:', error.message);
+          // Use cached pickup if available
+          if (cachedPickup) {
+            console.log('Using cached pickup data');
+            setActivePickup(JSON.parse(cachedPickup));
+          }
+          return;
+        }
+        
+        if (data) {
+          // Format pickup data for the card
+          const formattedPickup = {
+            id: data.id,
+            status: data.status,
+            collector_id: data.collector_id,
+            collector_name: data.collector_name || 'Assigned Collector',
+            location: data.location,
+            address: data.location?.address || data.address,
+            waste_type: data.waste_type,
+            number_of_bags: data.bags || 0,
+            points: data.points_earned || 0,
+            eta_minutes: data.eta_minutes,
+            distance: data.distance,
+            created_at: data.created_at,
+            updated_at: data.updated_at
+          };
+          
+          setActivePickup(formattedPickup);
+          
+          // Save to session storage for persistence across page reloads
+          sessionStorage.setItem(`activePickup_${user.id}`, JSON.stringify(formattedPickup));
+        } else {
+          // No active pickup found
+          setActivePickup(null);
+          // Clear from session storage
+          sessionStorage.removeItem(`activePickup_${user.id}`);
+        }
+      } catch (error) {
+        console.error('Error fetching active pickup:', error);
+        setActivePickup(null);
       }
     };
     
@@ -357,7 +288,7 @@ const Dashboard = () => {
     };
     
     // Setup the subscription
-    const unsubscribe = setupPickupSubscription();
+    setupPickupSubscription();
     
   }, [user]);
   
@@ -634,6 +565,8 @@ const Dashboard = () => {
           }}
         />
       )}
+      
+      {/* Development Tools section removed */}
     </div>
   );
 };

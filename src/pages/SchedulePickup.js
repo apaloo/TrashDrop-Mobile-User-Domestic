@@ -231,7 +231,7 @@ const SchedulePickup = () => {
   const fetchUserLocations = async (userId) => {
     try {
       const { data, error } = await supabase
-        .from('user_locations')
+        .from('locations')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });

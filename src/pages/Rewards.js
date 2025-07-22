@@ -66,14 +66,18 @@ const Rewards = () => {
         // Fetch user stats to get current points
         const { data: userStats, error: userStatsError } = await supabase
           .from('user_stats')
-          .select('total_points')
+          .select('*')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
-        if (userStatsError) throw userStatsError;
+        if (userStatsError && userStatsError.code !== 'PGRST116') {
+          console.warn('Error fetching user stats:', userStatsError);
+        }
         
         if (userStats) {
-          setUserPoints(userStats.total_points || 0);
+          // Calculate points from available stats or use a default
+          const calculatedPoints = (userStats.total_pickups || 0) * 10 + (userStats.total_reports || 0) * 5;
+          setUserPoints(calculatedPoints);
         }
         
         // Fetch available rewards from Supabase

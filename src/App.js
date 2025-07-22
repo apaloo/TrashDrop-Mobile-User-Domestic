@@ -21,6 +21,10 @@ import QRScanner from './pages/QRScanner.js';
 import CollectionForm from './pages/CollectionForm.js';
 import CollectionQRCode from './pages/CollectionQRCode.js';
 import Activity from './pages/Activity.js';
+import SchemaTest from './pages/SchemaTest.js';
+import PaymentMethods from './pages/PaymentMethods.js';
+import Notifications from './pages/Notifications.js';
+import CollectorTracking from './pages/CollectorTracking.js';
 
 // Components
 import Layout from './components/Layout.js';
@@ -83,6 +87,12 @@ const AppContent = () => {
         return; // Allow navigation without redirect
       }
       
+      // Skip auth checks in development mode completely
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[App] Development mode - skipping auth session check');
+        return;
+      }
+      
       // Check for development mode with mocks
       const appConfig = window.appConfig || {};
       const useDevelopmentMocks = appConfig.features && appConfig.features.enableMocks;
@@ -91,19 +101,34 @@ const AppContent = () => {
         return;
       }
       
-      const { error } = await checkSession();
-      
-      // If not authenticated and not on a public route, redirect to login
-      if (error && !isAuthenticated) {
-        console.log('[App] Not authenticated, redirecting to login');
-        navigate('/login', { 
-          state: { from: location },
-          replace: true 
-        });
+      // Only do strict auth checks in production
+      try {
+        const { error } = await checkSession();
+        
+        // If not authenticated and not on a public route, redirect to login
+        if (error && !isAuthenticated) {
+          console.log('[App] Not authenticated, redirecting to login:', error);
+          navigate('/login', { 
+            state: { from: location },
+            replace: true 
+          });
+        }
+      } catch (err) {
+        console.error('[App] Auth check failed:', err);
+        // In development, don't redirect on auth errors
+        if (process.env.NODE_ENV === 'production') {
+          navigate('/login', { 
+            state: { from: location },
+            replace: true 
+          });
+        }
       }
     };
     
-    handleAuthCheck();
+    // Add a small delay to prevent auth check race conditions
+    const timeoutId = setTimeout(handleAuthCheck, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [location.pathname, checkSession, isAuthenticated, navigate, location]);
   
   // Show loading spinner during initial load, but with a maximum time limit
@@ -175,6 +200,11 @@ const AppContent = () => {
                   <Activity />
                 </PrivateRoute>
               } />
+              <Route path="/schema-test" element={
+                <PrivateRoute>
+                  <SchemaTest />
+                </PrivateRoute>
+              } />
               <Route path="/collection/:collectionId" element={
                 <PrivateRoute>
                   <CollectionForm />
@@ -188,6 +218,21 @@ const AppContent = () => {
               <Route path="/profile" element={
                 <PrivateRoute>
                   <Profile />
+                </PrivateRoute>
+              } />
+              <Route path="/payment-methods" element={
+                <PrivateRoute>
+                  <PaymentMethods />
+                </PrivateRoute>
+              } />
+              <Route path="/notifications" element={
+                <PrivateRoute>
+                  <Notifications />
+                </PrivateRoute>
+              } />
+              <Route path="/collector-tracking" element={
+                <PrivateRoute>
+                  <CollectorTracking />
                 </PrivateRoute>
               } />
               <Route path="/test-pickup" element={

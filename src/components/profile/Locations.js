@@ -112,7 +112,7 @@ const Locations = () => {
                 const { data: sessionData } = await supabase.auth.refreshSession();
                 
                 const { data, error } = await supabase
-                  .from('user_locations')
+                  .from('locations')
                   .select('*')
                   .eq('user_id', user.id);
                   
@@ -438,7 +438,7 @@ const Locations = () => {
           // By now we've confirmed we have a valid session
           // Proceed with API call
           const { data, error } = await supabase
-            .from('user_locations')
+            .from('locations')
             .insert({
               user_id: user.id,
               name: newLocation.name,
@@ -547,7 +547,7 @@ const Locations = () => {
       if (isOnline()) {
         // Online: Delete from Supabase
         const { error } = await supabase
-          .from('user_locations')
+          .from('locations')
           .delete()
           .eq('id', id);
           
