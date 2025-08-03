@@ -2,18 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import supabase, { isTokenValid, clearAuthData, getCurrentUser } from '../utils/supabaseClient.js';
 import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
 import performanceMonitor from '../utils/performanceMonitor.js';
+import appConfigImport from '../utils/app-config.js';
 
 // Safe app config access with fallbacks
-let appConfig;
-try {
-  appConfig = require('../utils/app-config.js').default;
-} catch (error) {
-  console.warn('[Auth] App config not available during initialization, using defaults');
-  appConfig = {
-    storage: { userKey: 'trashdrop_user' },
-    features: { enableMocks: false }
-  };
-}
+const appConfig = appConfigImport || {
+  storage: { userKey: 'trashdrop_user', tokenKey: 'trashdrop_auth_token' },
+  features: { enableMocks: false }
+};
 
 /**
  * Get the stored user from localStorage
@@ -380,7 +375,7 @@ export const AuthProvider = ({ children }) => {
       };
       
       // Store test user data
-      const userKey = appConfig?.storage?.userKey || 'trashdrop_user';
+      const userKey = 'trashdrop_user'; // Use direct fallback to avoid initialization issues
       localStorage.setItem(userKey, JSON.stringify(testUser));
       
       // Update auth state for test account
@@ -400,7 +395,7 @@ export const AuthProvider = ({ children }) => {
     
     // Check for development mode with mocks
     const appConfig = window.appConfig || {};
-    const useDevelopmentMocks = appConfig.features && appConfig.features.enableMocks;
+    const useDevelopmentMocks = appConfig?.features?.enableMocks || false;
     if (useDevelopmentMocks) {
       console.log('[Auth] Development mode with mocks detected in checkSession');
     }
@@ -453,7 +448,8 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Check if there's any session in localStorage before trying to refresh
-      const storedUser = localStorage.getItem(appConfig.storage.userKey);
+      const storageUserKey = appConfig?.storage?.userKey || 'trashdrop_user';
+      const storedUser = localStorage.getItem(storageUserKey);
       
       // Skip refresh if no token exists to avoid unnecessary API calls
       if (!storedToken) {
@@ -496,7 +492,7 @@ export const AuthProvider = ({ children }) => {
         
         // Check for development mode with mocks
         const appConfig = window.appConfig || {};
-        const useDevelopmentMocks = appConfig.features && appConfig.features.enableMocks;
+        const useDevelopmentMocks = appConfig?.features?.enableMocks || false;
         if (useDevelopmentMocks) {
           console.log('[Auth] Development mode with mocks - preserving session despite refresh error');
           return { success: true }; // Allow continued access
@@ -586,20 +582,20 @@ export const AuthProvider = ({ children }) => {
     // SPECIAL CASE: Use the hardcoded credentials for testing purposes
     // This will allow us to test the app without needing a working Supabase connection
     if (email === 'prince02@mailinator.com' && password === 'sChool@123') {
-      console.log('[Auth] Using special test account credentials');
-      
-      // Create a mock user and session for the test account
+      console.log('[Auth] Using mock credentials');
+      // Use UUID v4 format for compatibility with Supabase's auth.users table
       const mockUser = {
-        id: '12345678-1234-5678-1234-567812345678', // Valid UUID format
-        email: email,
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        email: 'prince02@mailinator.com',
         user_metadata: {
           first_name: 'Prince',
-          last_name: 'Test',
+          last_name: 'Test'
         },
         app_metadata: {
           role: 'authenticated'
         },
-        aud: 'authenticated'
+        aud: 'authenticated',
+        created_at: new Date().toISOString()
       };
       
       // Create a properly structured JWT mock token with three parts
@@ -616,7 +612,7 @@ export const AuthProvider = ({ children }) => {
           sub: mockUser.id,
           email: mockUser.email,
           iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600,
+          exp: Math.floor(Date.now() / 1000) + 86400,
           aud: 'authenticated',
           role: 'authenticated'
         })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -630,7 +626,8 @@ export const AuthProvider = ({ children }) => {
       const mockSession = {
         access_token: createMockJwt(),
         refresh_token: createMockJwt(), // Use the same structure for refresh token
-        expires_in: 3600,
+        expires_in: 86400, // 24 hours
+        expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
         user: mockUser
       };
       
@@ -669,8 +666,8 @@ export const AuthProvider = ({ children }) => {
     try {
       // Log the Supabase URL and key (masked)
       console.log('[Auth DEBUG] Supabase config:', { 
-        url: appConfig.supabase?.url ? 'Set' : 'Not set',
-        key: appConfig.supabase?.anonKey ? 'Set' : 'Not set'
+        url: appConfig?.supabase?.url ? 'Set' : 'Not set',
+        key: appConfig?.supabase?.anonKey ? 'Set' : 'Not set'
       });
       
       console.log('[Auth DEBUG] Calling signInWithPassword with:', { email });

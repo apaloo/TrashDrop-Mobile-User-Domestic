@@ -21,13 +21,24 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext.js';
 import { collectorService } from '../services/collectorService.js';
+import GeolocationService from '../utils/geolocationService.js';
 
-// Fix default Leaflet marker icons
+// Fix default Leaflet marker icons - use local files instead of unpkg
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  iconRetinaUrl: '/assets/marker-icon-2x.png',
+  iconUrl: '/assets/marker-icon.png',
+  shadowUrl: '/assets/marker-shadow.png',
+});
+
+// Create custom icon for current location
+const currentLocationIcon = new L.Icon({
+  iconUrl: '/assets/current-location.png',
+  iconRetinaUrl: '/assets/current-location-2x.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 
 const mapContainerStyle = {
@@ -46,27 +57,37 @@ const CollectorMap = ({ pickupLocation, onCollectorLocationUpdate }) => {
   const [userLocation, setUserLocation] = useState(null);
   const locationUpdateInterval = useRef(null);
 
-  // Get user's current location
+  // Get user's current location using improved GeolocationService
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setLoading(false);
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          setError('Failed to get your location. Please enable location services.');
-          setLoading(false);
+    const getUserLocation = async () => {
+      try {
+        setLoading(true);
+        const locationResult = await GeolocationService.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 300000 // 5 minutes
+        });
+        
+        // Format coords to match the expected format in this component
+        setUserLocation({
+          lat: locationResult.coords.latitude,
+          lng: locationResult.coords.longitude
+        });
+        
+        // Only show error if we're using default location and it wasn't intentional
+        if (!locationResult.success && locationResult.error.code !== 'NOT_SUPPORTED') {
+          console.warn('Geolocation issue:', locationResult.error);
+          setError('Using approximate location. Location services may be disabled.');
         }
-      );
-    } else {
-      setError('Geolocation is not supported by your browser.');
-      setLoading(false);
-    }
+      } catch (err) {
+        console.error('Geolocation error:', err);
+        setError('Failed to get your location. Using default location instead.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    getUserLocation();
   }, []);
 
   // Fetch nearby collectors

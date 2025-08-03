@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext.js';
 import { dumpingService } from '../services/dumpingService.js';
+import { toastService } from '../services/toastService.js';
+import { useCallback } from 'react'; // Add useCallback for toast functions
 import { notificationService } from '../services/notificationService.js';
 import CameraModal from './CameraModal.js';
 
@@ -31,7 +33,7 @@ const DumpingReportForm = ({ onSuccess }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [userLocation, setUserLocation] = useState(null);
+
   const [mapPosition, setMapPosition] = useState([5.614736, -0.208811]);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
@@ -40,7 +42,7 @@ const DumpingReportForm = ({ onSuccess }) => {
     coordinates: null,
     description: '',
     waste_type: '',
-    severity: 'Medium',
+    severity: 'medium',
     estimated_volume: '',
     hazardous_materials: false,
     accessibility_notes: '',
@@ -49,30 +51,72 @@ const DumpingReportForm = ({ onSuccess }) => {
     contact_consent: false
   });
 
-  // Get user's current location
+  // Memoized toast notification functions to prevent render-time calls
+  const showErrorToast = useCallback((message) => {
+    setTimeout(() => toastService.error(message), 0);
+  }, []);
+  
+  const showSuccessToast = useCallback((message) => {
+    setTimeout(() => toastService.success(message), 0);
+  }, []);
+  
+  const showWarningToast = useCallback((message) => {
+    setTimeout(() => toastService.warning(message), 0);
+  }, []);
+
+  // Default coordinates for Accra, Ghana (fallback location)
+  const DEFAULT_COORDINATES = [5.614736, -0.208811];
+  
+  // Camera modal state management - simplified approach
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-          setUserLocation(location);
-          setMapPosition([location.latitude, location.longitude]);
-          setFormData(prev => ({
-            ...prev,
-            coordinates: location
-          }));
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          setError('Failed to get your location. Please enable location services.');
-        }
-      );
-    } else {
-      setError('Geolocation is not supported by your browser.');
+    // Ensure camera is not shown on initial mount and clean up any resources
+    setShowCamera(false);
+    
+    // Clean up any global camera references
+    if (window.cameraStreamGlobal) {
+      try {
+        window.cameraStreamGlobal.getTracks().forEach(track => track.stop());
+        window.cameraStreamGlobal = null;
+        console.log('Cleaned up global camera stream on form initialization');
+      } catch (err) {
+        console.error('Error cleaning up camera stream:', err);
+      }
     }
+    
+    // Reset global modal state flag
+    window.cameraModalMounted = false;
+    
+    // Clear any persisted camera state
+    localStorage.removeItem('cameraModalOpen');
+    sessionStorage.removeItem('cameraClosed');
+    
+    return () => {
+      // Clean up on component unmount
+      if (window.cameraStreamGlobal) {
+        try {
+          window.cameraStreamGlobal.getTracks().forEach(track => track.stop());
+          window.cameraStreamGlobal = null;
+        } catch (err) {
+          console.error('Error cleaning up camera stream on unmount:', err);
+        }
+      }
+    };
+  }, []);
+
+  // Get user's current location on component mount
+  useEffect(() => {
+    // Default to Accra, Ghana coordinates first
+    setMapPosition(DEFAULT_COORDINATES);
+    setFormData(prev => ({
+      ...prev,
+      coordinates: {
+        latitude: DEFAULT_COORDINATES[0],
+        longitude: DEFAULT_COORDINATES[1]
+      }
+    }));
+    
+    // Then try to get current location
+    handleUseMyLocation(false);
   }, []);
 
   const handleChange = (e) => {
@@ -87,21 +131,121 @@ const DumpingReportForm = ({ onSuccess }) => {
   const handleSeverityClick = (severity) => {
     setFormData(prev => ({
       ...prev,
-      severity: severity
+      severity: severity.toLowerCase() // Ensure lowercase values for backend validation
     }));
   };
 
-  const handleUseMyLocation = () => {
-    if (userLocation) {
-      setMapPosition([userLocation.latitude, userLocation.longitude]);
-      setFormData(prev => ({
-        ...prev,
-        coordinates: userLocation
-      }));
+  // Helper to get user-friendly geolocation error messages
+  const getGeolocationErrorMessage = (error) => {
+    switch(error.code) {
+      case error.PERMISSION_DENIED:
+        return 'Location access denied. Using approximate location. You can adjust by tapping on the map.';
+      case error.POSITION_UNAVAILABLE:
+        return 'GPS signal unavailable. Using approximate location. You can adjust by tapping on the map.';
+      case error.TIMEOUT:
+        return 'Location request timed out. Using approximate location instead. You can adjust by tapping on the map.';
+      default:
+        return 'Location not available. Please select your location on the map.';
     }
   };
 
+  // Helper to handle geolocation fallback
+  const handleGeolocationFallback = useCallback((errorMessage) => {
+    // Set default coordinates
+    const defaultCoordinates = {
+      latitude: DEFAULT_COORDINATES[0],
+      longitude: DEFAULT_COORDINATES[1]
+    };
+    
+    // Update form data with default coordinates
+    setFormData(prev => ({
+      ...prev,
+      coordinates: defaultCoordinates
+    }));
+    
+    // Update map position
+    setMapPosition(DEFAULT_COORDINATES);
+    
+    // Show non-blocking toast notification instead of error
+    if (errorMessage) {
+      showWarningToast(errorMessage + ' Using approximate location.');
+    }
+  }, [DEFAULT_COORDINATES, showWarningToast]);
+
+  const handleUseMyLocation = useCallback((showFeedback = true) => {
+    // Clear any previous errors
+    setError(null);
+    
+    if (navigator.geolocation) {
+      try {
+        if (showFeedback) {
+          setLoading(true);
+        }
+        
+        const options = {
+          enableHighAccuracy: false, // Set to false to avoid Google API errors
+          timeout: 6000, // Shorter timeout for better user experience
+          maximumAge: 600000 // Accept cached positions up to 10 minutes old
+        };
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            try {
+              const location = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              };
+              
+              setFormData(prev => ({
+                ...prev,
+                coordinates: location
+              }));
+              
+              setMapPosition([location.latitude, location.longitude]);
+              
+              // Show success message only if explicitly requested
+              if (showFeedback) {
+                showSuccessToast('📍 Location updated successfully');
+                setLoading(false);
+              }
+            } catch (processingError) {
+              console.warn('Error processing location data:', processingError);
+              handleGeolocationFallback('Could not process your location data');
+              if (showFeedback) {
+                setLoading(false);
+              }
+            }
+          },
+          (error) => {
+            console.warn('Geolocation error:', error);
+            handleGeolocationFallback(`${getGeolocationErrorMessage(error)}`);
+            if (showFeedback) {
+              setLoading(false);
+            }
+          },
+          options
+        );
+      } catch (exception) {
+        console.warn('Geolocation exception:', exception);
+        handleGeolocationFallback('Unexpected error accessing location services');
+        if (showFeedback) {
+          setLoading(false);
+        }
+      }
+    } else {
+      handleGeolocationFallback('Geolocation is not supported by your browser');
+      if (showFeedback) {
+        setLoading(false);
+      }
+    }
+  }, [handleGeolocationFallback, getGeolocationErrorMessage, setError, showSuccessToast]);
+
   const handleMapClick = (latlng) => {
+    // Clear any location errors when user manually selects location
+    if (error && error.includes('location')) {
+      setError(null);
+    }
+    
     setMapPosition([latlng.lat, latlng.lng]);
     setFormData(prev => ({
       ...prev,
@@ -110,27 +254,121 @@ const DumpingReportForm = ({ onSuccess }) => {
         longitude: latlng.lng
       }
     }));
+    
+    // Show success toast message
+    showSuccessToast('Location selected successfully');
   };
 
-  const handleTakePhoto = () => {
-    console.log('Opening camera modal...');
-    setShowCamera(true);
+  const handleTakePhoto = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only allow opening camera if we're not already showing it
+    if (!showCamera) {
+      console.log('Opening camera modal...');
+      
+      // Clean up any existing camera resources first
+      if (window.cameraStreamGlobal) {
+        try {
+          window.cameraStreamGlobal.getTracks().forEach(track => track.stop());
+          window.cameraStreamGlobal = null;
+        } catch (err) {
+          console.error('Error cleaning up camera stream before opening:', err);
+        }
+      }
+      
+      // Reset modal state
+      window.cameraModalMounted = false;
+      
+      // Show the camera modal
+      setShowCamera(true);
+    } else {
+      console.log('Camera modal already open, ignoring request');
+    }
   };
-  
-  // Handle camera close
+
   const handleCloseCamera = () => {
-    console.log('Closing camera modal...');
+    // Hide the modal
     setShowCamera(false);
+    
+    // Clean up camera resources
+    if (window.cameraStreamGlobal) {
+      try {
+        window.cameraStreamGlobal.getTracks().forEach(track => track.stop());
+        window.cameraStreamGlobal = null;
+      } catch (err) {
+        console.error('Error stopping camera stream:', err);
+      }
+    }
+    
+    // Reset flags and stored state
+    window.cameraModalMounted = false;
+    localStorage.removeItem('cameraModalOpen');
+    sessionStorage.removeItem('cameraClosed');
   };
-  
-  // Handle photo capture from CameraModal
+
   const handleCapturePhoto = (photo) => {
-    console.log('Photo captured:', photo);
-    setCapturedPhotos(prev => [...prev, photo]);
-    setFormData(prev => ({
-      ...prev,
-      photos: [...prev.photos, photo.url]
-    }));
+    try {
+      console.log('Photo captured. Size:', photo?.blob?.size || 'unknown');
+      
+      // Verify photo has the required properties
+      if (!photo || !photo.url || !photo.id) {
+        console.error('Invalid photo object received:', photo);
+        showErrorToast('Invalid photo data received. Please try again.');
+        return;
+      }
+      
+      // Temporarily disable form submission during photo processing
+      setLoading(true);
+      
+      // Use requestAnimationFrame to ensure DOM is stable before state updates
+      requestAnimationFrame(() => {
+        try {
+          setCapturedPhotos(prev => {
+            // Don't add if the photo ID already exists (prevent duplicates)
+            if (prev.some(p => p.id === photo.id)) {
+              console.log('Photo already exists, not adding duplicate');
+              setLoading(false);
+              return prev;
+            }
+            
+            // Limit to 6 photos maximum
+            if (prev.length >= 6) {
+              console.log('Maximum photos reached, not adding more');
+              showWarningToast('Maximum of 6 photos allowed.');
+              setLoading(false);
+              return prev;
+            }
+            
+            const updated = [...prev, photo];
+            
+            // Update formData photos synchronously to avoid race conditions
+            const newUrls = updated.map(p => p.url);
+            setFormData(prevForm => ({
+              ...prevForm,
+              photos: newUrls
+            }));
+            
+            // Show success message with accurate count
+            console.log(`Photo captured successfully. Total photos: ${updated.length}`);
+            showSuccessToast(`📸 Photo ${updated.length} captured successfully!`);
+            
+            // Re-enable form after successful photo processing
+            setTimeout(() => setLoading(false), 200);
+            
+            return updated;
+          });
+        } catch (stateError) {
+          console.error('Error updating photo state:', stateError);
+          showErrorToast('Failed to save photo. Please try again.');
+          setLoading(false);
+        }
+      });
+    } catch (error) {
+      console.error('Error handling captured photo:', error);
+      showErrorToast('Failed to process photo. Please try again.');
+      setLoading(false);
+    }
   };
   
   // Remove photo from captured photos
@@ -159,7 +397,7 @@ const DumpingReportForm = ({ onSuccess }) => {
     }
     
     if (!formData.coordinates) {
-      setError('Location is required. Please enable location services.');
+      setError('Location is required. Please click on the map to select a location.');
       return;
     }
 
@@ -211,16 +449,15 @@ const DumpingReportForm = ({ onSuccess }) => {
         );
       } catch (notificationError) {
         console.warn('Failed to create notification:', notificationError);
-        // Don't fail the whole process if notification fails
       }
 
       // Reset form
       setFormData({
         location: '',
-        coordinates: userLocation,
+        coordinates: null,
         description: '',
         waste_type: '',
-        severity: 'Medium',
+        severity: 'medium',
         estimated_volume: '',
         hazardous_materials: false,
         accessibility_notes: '',
@@ -242,12 +479,15 @@ const DumpingReportForm = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#374151', color: 'white' }}>
-      <div className="px-4 py-6">
-        {/* Header */}
-        <h1 className="text-2xl font-bold text-white mb-6">
+    <div className="min-h-screen pt-2" style={{ backgroundColor: '#374151', color: 'white' }}>
+      {/* Fixed Header (positioned below navbar) */}
+      <div className="px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md" style={{ backgroundColor: '#374151' }}>
+        <h1 className="text-2xl font-bold text-white text-center">
           Report Illegal Dumping
         </h1>
+      </div>
+      
+      <div className="px-4 py-2">
 
         {/* Info Box */}
         <div className="bg-blue-800 rounded-lg p-4 mb-6 flex items-start">
@@ -351,16 +591,17 @@ const DumpingReportForm = ({ onSuccess }) => {
             <label className="block text-gray-300 text-sm font-medium mb-2">
               Location <span className="text-red-400">*</span>
             </label>
-            <p className="text-gray-400 text-sm mb-3">
-              We've automatically detected your location. You can click on the map to adjust it or use the button below to use your current location.
-            </p>
+            <div>
+              <p className="text-sm text-gray-300 mb-2">
+                Please click on the map to select a location or use the button below to detect your current location.
+              </p>
             
             {/* Map */}
             <div className="mb-6">
               <label className="block mb-2 text-sm font-medium text-white">
                 Pin Location <span className="text-red-500">*</span>
               </label>
-              <div className="h-64 bg-gray-700 rounded-lg overflow-hidden">
+              <div className="h-64 bg-gray-700 rounded-lg overflow-hidden relative">
                 <MapContainer 
                   center={mapPosition} 
                   zoom={13} 
@@ -374,102 +615,100 @@ const DumpingReportForm = ({ onSuccess }) => {
                   <LocationMarker position={mapPosition} setPosition={setMapPosition} disabled={showCamera} />
                   {mapPosition && <Marker position={mapPosition} />}
                 </MapContainer>
-                <button 
-                  type="button"
-                  className="absolute top-4 right-4 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-4 rounded-lg shadow"
-                  onClick={handleUseMyLocation}
-                >
-                  Use My Location
-                </button>
+
               </div>
+            </div>
+            
             {/* Location coordinates */}
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm text-gray-400">
-                <div>Lat: {userLocation?.latitude?.toFixed(6) || '5.614736'}</div>
-                <div>Lng: {userLocation?.longitude?.toFixed(6) || '-0.208811'}</div>
+                <div>Lat: {formData?.coordinates?.latitude?.toFixed(6) || '5.614736'}</div>
+                <div>Lng: {formData?.coordinates?.longitude?.toFixed(6) || '-0.208811'}</div>
               </div>
               <button
                 type="button"
-                onClick={handleUseMyLocation}
+                onClick={() => handleUseMyLocation(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
               >
                 Use My Location
               </button>
             </div>
           </div>
-          </div>
+        </div>
 
-          {/* Take Photos */}
-          <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
-              Take Photos <span className="text-red-400">*</span>
-            </label>
-            
-            {/* Photo Grid */}
-            {capturedPhotos.length > 0 && (
-              <div className="mb-4">
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {capturedPhotos.map((photo) => (
-                    <div key={photo.id} className="relative">
-                      <img 
-                        src={photo.url} 
-                        alt="Captured evidence" 
-                        className="w-full h-32 object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(photo.id)}
-                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            <div className="border-2 border-dashed border-gray-500 rounded-lg p-8">
-              <div className="text-center">
-                <div className="mb-4">
-                  <svg className="w-16 h-16 mx-auto text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={handleTakePhoto}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg mb-3 transition-colors"
-                >
-                  Take Photo with Camera
-                </button>
-                
-                <p className="text-sm text-gray-400">
-                  Add at least 1 photo (up to 6) to document the illegal dumping
-                </p>
-                <p className="text-xs text-blue-400 mt-2">
-                  Note: Photos can only be taken with your device's camera
-                </p>
-                
-                {capturedPhotos.length > 0 && (
-                  <p className="text-sm text-green-400 mt-2">
-                    ✓ {capturedPhotos.length} photo(s) captured
-                  </p>
-                )}
+        {/* Take Photos */}
+        <div className="mb-6">
+          <label className="block text-gray-300 text-sm font-medium mb-2">
+            Take Photos <span className="text-red-400">*</span>
+          </label>
+          
+          {/* Photo Grid */}
+          {capturedPhotos.length > 0 && (
+            <div className="mb-4">
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {capturedPhotos.map((photo) => (
+                  <div key={photo.id} className="relative">
+                    <img 
+                      src={photo.url} 
+                      alt="Captured evidence" 
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(photo.id)}
+                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-
-          {/* Camera Modal */}
-          {showCamera && (
-            <CameraModal 
-              onClose={handleCloseCamera}
-              onCapture={handleCapturePhoto}
-              maxPhotos={6}
-              currentCount={capturedPhotos.length}
-            />
           )}
+          
+          <div className="border-2 border-dashed border-gray-500 rounded-lg p-8">
+            <div className="text-center">
+              {capturedPhotos.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm text-green-400 mb-2">
+                    ✓ {capturedPhotos.length} photo(s) captured
+                  </p>
+                </div>
+              )}
+              
+              <div className="mb-4">
+                <svg className="w-16 h-16 mx-auto text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                </svg>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleTakePhoto}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg mb-3 transition-colors"
+              >
+                Take Photo with Camera
+              </button>
+              
+              <p className="text-sm text-gray-400">
+                Add at least 1 photo (up to 6) to document the illegal dumping
+              </p>
+              <p className="text-xs text-blue-400 mt-2">
+                Note: Photos can only be taken with your device's camera
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Camera Modal */}
+        {showCamera && (
+          <CameraModal 
+            onClose={handleCloseCamera}
+            onCapture={handleCapturePhoto}
+            maxPhotos={6}
+            currentCount={capturedPhotos.length}
+          />
+        )}
 
           {/* Contact consent */}
           <div className="mb-6">

@@ -31,7 +31,7 @@ const NavBar = () => {
   
   return (
     <>
-      <nav className="bg-white py-3 px-4 shadow-md fixed top-0 left-0 right-0 z-10">
+      <nav className="bg-white py-3 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
         <div className="container mx-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
           <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] text-2xl font-bold">
@@ -56,7 +56,7 @@ const NavBar = () => {
               
               {/* Mobile Profile Dropdown */}
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-60">
                   <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     Your Profile
                   </NavLink>

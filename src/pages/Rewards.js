@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import supabase from '../utils/supabaseClient.js';
 import { Link } from 'react-router-dom';
+import { subscribeToRewardsUpdates, handleRewardsUpdate } from '../utils/realtime.js';
 
 /**
  * Rewards page component for viewing and redeeming rewards
@@ -18,6 +19,7 @@ const Rewards = () => {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const mountedRef = useRef(true);
 
   const fetchPointsHistory = async (limit = 3) => {
     if (!user) return;
@@ -54,6 +56,55 @@ const Rewards = () => {
     }
   };
 
+  // Cleanup function for component unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  
+  // Set up real-time subscriptions for rewards updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('[Rewards] Setting up real-time rewards subscription');
+    const subscription = subscribeToRewardsUpdates(user.id, (tableType, payload) => {
+      if (!mountedRef.current) return;
+
+      console.log(`[Rewards] Real-time ${tableType} update received`);      
+      
+      // Create current data state object for the handler
+      const currentData = {
+        userPoints,
+        availableRewards: rewards,
+        redemptionHistory: []  // Currently not loaded in this component but handler supports it
+      };
+      
+      // Update data based on real-time payload
+      const updatedData = handleRewardsUpdate(tableType, payload, currentData);
+      
+      // Apply updates to component state
+      if (updatedData.userPoints !== userPoints) {
+        setUserPoints(updatedData.userPoints);
+      }
+      
+      if (updatedData.availableRewards !== rewards) {
+        setRewards(updatedData.availableRewards);
+      }
+      
+      // For user_activity updates, refresh points history
+      if (tableType === 'user_activity' && payload.eventType === 'INSERT') {
+        fetchPointsHistory(showAllHistory ? 50 : 3);
+      }
+    });
+
+    return () => {
+      console.log('[Rewards] Cleaning up real-time rewards subscription');
+      subscription.unsubscribe();
+    };
+  }, [user?.id, userPoints, rewards, showAllHistory]);
+  
   useEffect(() => {
     // Fetch user points and available rewards from Supabase
     const fetchRewardsData = async () => {
@@ -84,7 +135,7 @@ const Rewards = () => {
         const { data: rewardsData, error: rewardsError } = await supabase
           .from('rewards')
           .select('*')
-          .eq('is_active', true)
+          .eq('active', true)
           .order('points_cost', { ascending: true });
         
         if (rewardsError) throw rewardsError;

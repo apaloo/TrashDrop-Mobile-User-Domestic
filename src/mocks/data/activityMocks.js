@@ -9,10 +9,10 @@ const activityMocks = {
     {
       id: 'act-12345-001',
       user_id: '12345678-1234-5678-1234-567812345678',
-      type: 'pickup',
+      type: 'digital_bin',
       status: 'completed',
       details: 'Collected 3 bags from Park Street',
-      pickup_id: 'pickup-12345-001',
+      location_id: 'loc-12345-001',
       points: 50,
       created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
       updated_at: new Date(Date.now() - 86400000).toISOString()
@@ -31,10 +31,10 @@ const activityMocks = {
     {
       id: 'act-12345-003',
       user_id: '12345678-1234-5678-1234-567812345678',
-      type: 'pickup',
+      type: 'digital_bin',
       status: 'completed',
       details: 'Collected 2 bags from River Walk',
-      pickup_id: 'pickup-12345-002',
+      location_id: 'loc-12345-002',
       points: 50,
       created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
       updated_at: new Date(Date.now() - 259200000).toISOString()

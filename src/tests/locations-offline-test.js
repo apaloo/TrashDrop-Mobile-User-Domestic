@@ -190,7 +190,7 @@ describe('Locations Component - Offline Functionality', () => {
     
     // Should try to sync with Supabase
     await waitFor(() => {
-      expect(supabase.from).toHaveBeenCalledWith('user_locations');
+      expect(supabase.from).toHaveBeenCalledWith('locations');
       expect(screen.getByText('Server Location')).toBeInTheDocument();
     });
   });

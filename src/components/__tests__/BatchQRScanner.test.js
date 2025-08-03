@@ -10,15 +10,17 @@ import { useAuth } from '../../contexts/AuthContext.js';
 jest.mock('../../services/batchService.js');
 jest.mock('../../services/notificationService.js');
 jest.mock('../../contexts/AuthContext.js');
-jest.mock('react-qr-reader', () => ({
-  QrReader: ({ onResult }) => (
+jest.mock('react-qr-scanner', () => 
+function MockQrScanner({ onScan }) {
+  return (
     <div data-testid="mock-qr-reader">
-      <button onClick={() => onResult({ text: 'BATCH-123' })}>
+      <button onClick={() => onScan({ text: 'BATCH-123' })}>
         Simulate Scan
       </button>
     </div>
-  )
-}));
+  );
+}
+);
 
 describe('BatchQRScanner', () => {
   const mockUser = { id: 'user123' };

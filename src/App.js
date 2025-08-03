@@ -13,7 +13,7 @@ import Register from './pages/Register.js';
 import ResetPassword from './pages/ResetPassword.js';
 import Profile from './pages/Profile.js';
 import Dashboard from './pages/Dashboard.js';
-import SchedulePickup from './pages/SchedulePickup.js';
+import DigitalBin from './pages/DigitalBin.js';
 import PickupRequest from './pages/PickupRequest.js';
 import DumpingReport from './pages/DumpingReport.js';
 import Rewards from './pages/Rewards.js';
@@ -25,17 +25,18 @@ import SchemaTest from './pages/SchemaTest.js';
 import PaymentMethods from './pages/PaymentMethods.js';
 import Notifications from './pages/Notifications.js';
 import CollectorTracking from './pages/CollectorTracking.js';
+import ToastTest from './pages/ToastTest.js';
 
 // Components
 import Layout from './components/Layout.js';
+// Auth notification removed - no longer using fallback auth
 import PrivateRoute from './components/PrivateRoute.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import InstallPrompt from './components/InstallPrompt.js';
 import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
 import AppPerformanceProvider from './components/AppPerformanceProvider.js';
-import PerformanceSummary from './components/PerformanceSummary.js';
-import PerformanceTester from './components/PerformanceTester.js';
+import ToastProvider from './components/ToastProvider.js';
 
 // Styling
 import { CssBaseline, ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
@@ -183,9 +184,9 @@ const AppContent = () => {
                   <PickupRequest />
                 </PrivateRoute>
               } />
-              <Route path="/schedule-pickup" element={
+              <Route path="/digital-bin" element={
                 <PrivateRoute>
-                  <SchedulePickup />
+                  <DigitalBin />
                 </PrivateRoute>
               } />
               <Route path="/report" element={
@@ -238,6 +239,11 @@ const AppContent = () => {
                   <CollectorTracking />
                 </PrivateRoute>
               } />
+              <Route path="/toast-test" element={
+                <PrivateRoute>
+                  <ToastTest />
+                </PrivateRoute>
+              } />
               <Route path="/test-pickup" element={
                 <PrivateRoute>
                   <TestPickupFlow />
@@ -280,27 +286,22 @@ const App = () => {
   return (
     <AppPerformanceProvider>
       <ThemeProvider>
-        <AuthProvider>
-          <AuthErrorBoundary>
-            <Suspense 
-              fallback={
-                <div className="flex justify-center items-center h-screen">
-                  <LoadingSpinner size="lg" />
-                </div>
-              }
-            >
-              <AppContent />
-              {/* Performance monitoring components - development only */}
-              {process.env.NODE_ENV === 'development' && (
-                <>
-                  <PerformanceSummary />
-                  <PerformanceTester />
-                </>
-              )}
-            </Suspense>
-          </AuthErrorBoundary>
-          <InstallPrompt />
-        </AuthProvider>
+        <ToastProvider position="top-right" maxToasts={5}>
+          <AuthProvider>
+            <AuthErrorBoundary>
+              <Suspense 
+                fallback={
+                  <div className="flex justify-center items-center h-screen">
+                    <LoadingSpinner size="lg" />
+                  </div>
+                }
+              >
+                <AppContent />
+              </Suspense>
+            </AuthErrorBoundary>
+            <InstallPrompt />
+          </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </AppPerformanceProvider>
   );

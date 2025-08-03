@@ -1,0 +1,58 @@
+/* Camera Modal CSS */
+
+/* Flash animation for photo capture */
+@keyframes cameraFlash {
+  0% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+  10% {
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+}
+
+.camera-view-container.flash::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0);
+  animation: cameraFlash 500ms ease-out forwards;
+  pointer-events: none;
+  z-index: 25;
+}
+
+/* Memory optimization for video element */
+video {
+  object-fit: cover;
+  transform: translateZ(0); /* Force hardware acceleration */
+  will-change: transform; /* Hint to browser for optimization */
+}
+
+/* Ensure canvas is properly hidden but accessible */
+canvas {
+  position: absolute;
+  left: -9999px;
+  visibility: hidden;
+}
+
+/* Optimize rendering for mobile devices */
+.camera-view-container {
+  -webkit-transform: translateZ(0);
+  -moz-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  -o-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -ms-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  -moz-perspective: 1000;
+  -ms-perspective: 1000;
+  perspective: 1000;
+}

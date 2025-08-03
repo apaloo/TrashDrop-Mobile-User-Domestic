@@ -17,7 +17,7 @@ export const rewardsService = {
       const { data, error } = await supabase
         .from('rewards')
         .select('*')
-        .eq('is_active', true)
+        .eq('active', true)
         .order('points_required', { ascending: true });
 
       if (error) {
@@ -221,7 +221,7 @@ export const rewardsService = {
       const { data, error } = await supabase
         .from('rewards')
         .select('category')
-        .eq('is_active', true);
+        .eq('active', true);
 
       if (error) {
         console.error('[RewardsService] Error fetching categories:', error);
@@ -263,7 +263,7 @@ export const rewardsService = {
         .from('rewards')
         .select('*')
         .eq('category', category)
-        .eq('is_active', true)
+        .eq('active', true)
         .order('points_required', { ascending: true });
 
       if (error) {

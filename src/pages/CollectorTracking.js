@@ -180,7 +180,7 @@ const CollectorTracking = () => {
             </p>
             {!user?.is_collector && (
               <button
-                onClick={() => navigate('/schedule-pickup')}
+                onClick={() => navigate('/digital-bin')}
                 className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
               >
                 Schedule a Pickup

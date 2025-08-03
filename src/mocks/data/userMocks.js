@@ -6,7 +6,7 @@
 const userMocks = {
   // Test user with valid UUID
   testUser: {
-    id: '12345678-1234-5678-1234-567812345678', 
+    id: '123e4567-e89b-12d3-a456-426614174000', 
     email: 'prince02@mailinator.com',
     user_metadata: { 
       first_name: 'Prince', 
@@ -15,7 +15,8 @@ const userMocks = {
     app_metadata: { 
       role: 'authenticated' 
     },
-    aud: 'authenticated'
+    aud: 'authenticated',
+    created_at: new Date().toISOString()
   },
   
   // Additional mock users if needed

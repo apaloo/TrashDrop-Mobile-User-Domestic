@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QrReader } from 'react-qr-reader';
+import QrScanner from 'react-qr-scanner';
 import { useAuth } from '../contexts/AuthContext.js';
 import { batchService } from '../services/batchService.js';
 import { notificationService } from '../services/notificationService.js';
@@ -12,7 +12,7 @@ const BatchQRScanner = ({ onScanComplete }) => {
   const [loading, setLoading] = useState(false);
 
   const handleScan = async (data) => {
-    if (data && !loading) {
+    if (data && data.text && !loading) {
       setLoading(true);
       setError(null);
       
@@ -108,9 +108,12 @@ const BatchQRScanner = ({ onScanComplete }) => {
         <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
           {scanning ? (
             <div className="relative w-full h-full">
-              <QrReader
-                constraints={{ facingMode: 'environment' }}
-                onResult={handleScan}
+              <QrScanner
+                delay={300}
+                constraints={{
+                  video: { facingMode: 'environment' }
+                }}
+                onScan={handleScan}
                 onError={handleError}
                 style={{
                   width: '100%',

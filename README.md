@@ -13,7 +13,7 @@ This repository contains the TrashDrop mobile application, a progressive web app
   - Mobile: Top navbar with logo and profile dropdown + bottom navigation bar
   - Desktop: Traditional horizontal navbar
 - **Waste Management**:
-  - Schedule pickups
+  - Digital Bin
   - Report illegal dumping
   - Scan QR codes at collection points
   - Track activity and rewards

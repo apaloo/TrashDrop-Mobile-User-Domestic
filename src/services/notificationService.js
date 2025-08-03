@@ -16,49 +16,94 @@ export const notificationService = {
    */
   async createNotification(userId, type, title, message, metadata = {}) {
     try {
-      if (!userId || !type || !message) {
-        throw new Error('User ID, type, and message are required');
+      if (!userId || !type) {
+        throw new Error('User ID and type are required');
       }
 
       console.log('[NotificationService] Creating notification for user:', userId);
 
-      // Check user's notification preferences
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('notification_preferences')
-        .eq('id', userId)
-        .single();
-
-      // Don't create notification if user has disabled this type
-      if (profile?.notification_preferences?.[type] === false) {
-        console.log('[NotificationService] User has disabled notifications of type:', type);
-        return { data: null, error: null };
+      try {
+        // Check user's notification preferences
+        // Note: We're now wrapping this in a try-catch to handle potential schema issues
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('notification_preferences')
+          .eq('id', userId)
+          .single();
+  
+        // Don't create notification if user has disabled this type
+        if (profile?.notification_preferences?.[type] === false) {
+          console.log('[NotificationService] User has disabled notifications of type:', type);
+          return { data: null, error: null };
+        }
+      } catch (prefError) {
+        // If there's an error checking preferences, log it but continue
+        console.warn('[NotificationService] Error checking notification preferences:', prefError);
+        // We'll still try to create the notification
       }
 
+      // Based on schema analysis, we need to adapt our notification object
+      // to match the actual database schema
       const notification = {
         user_id: userId,
         type,
-        title: title || type,
-        message,
-        metadata,
-        status: 'unread',
-        created_at: new Date().toISOString()
+        // Instead of title and message fields which may not exist,
+        // we'll use content to store our notification data in a flexible way
+        content: JSON.stringify({
+          title: title || type,
+          message: message || '',
+          metadata
+        }),
+        status: 'unread'
+        // Remove created_at to allow database to auto-generate timestamp
       };
 
-      const { data, error } = await supabase
-        .from('alerts')
-        .insert(notification)
-        .select()
-        .single();
+      console.log('[NotificationService] Creating notification with data:', 
+        JSON.stringify(notification, null, 2));
 
-      if (error) {
-        console.error('[NotificationService] Error creating notification:', error);
-        throw error;
+      try {
+        const { data, error } = await supabase
+          .from('alerts')
+          .insert(notification)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[NotificationService] Error creating notification:', error);
+          throw error;
+        }
+
+        console.log('[NotificationService] Successfully created notification:', data?.id || 'unknown');
+        return { data, error: null };
+      } catch (insertError) {
+        // If we still can't insert, try a minimal fallback approach
+        console.warn('[NotificationService] Trying minimal notification insert as fallback');
+        try {
+          // Create minimal notification with just required fields
+          const minimalNotification = {
+            user_id: userId,
+            type
+          };
+          
+          const { data, error } = await supabase
+            .from('alerts')
+            .insert(minimalNotification)
+            .select()
+            .single();
+            
+          if (error) {
+            console.error('[NotificationService] Error with minimal notification:', error);
+            throw error;
+          }
+          
+          console.log('[NotificationService] Successfully created minimal notification');
+          return { data, error: null };
+        } catch (fallbackError) {
+          // If even minimal approach fails, give up and log the error
+          console.error('[NotificationService] All notification attempts failed:', fallbackError);
+          throw fallbackError;
+        }
       }
-
-      console.log('[NotificationService] Successfully created notification:', data.id);
-      return { data, error: null };
-
     } catch (error) {
       console.error('[NotificationService] Error in createNotification:', error);
       return {
@@ -217,19 +262,19 @@ export const notificationService = {
    * @param {Object} details - Additional details
    * @returns {Object} Created notification
    */
-  async createPickupStatusNotification(userId, pickupId, status, details = {}) {
+  async createBinStatusNotification(userId, locationId, status, details = {}) {
     const statusMessages = {
-      accepted: 'Your pickup request has been accepted',
+      accepted: 'Your digital bin request has been accepted',
       in_transit: 'Collector is on the way',
-      completed: 'Your pickup has been completed',
-      cancelled: 'Your pickup has been cancelled'
+      completed: 'Your bin has been serviced',
+      cancelled: 'Your bin has been cancelled'
     };
 
-    const title = 'Pickup Status Update';
-    const message = statusMessages[status] || `Pickup status changed to ${status}`;
+    const title = 'Digital Bin Status Update';
+    const message = statusMessages[status] || `Bin status changed to ${status}`;
 
-    return await this.createNotification(userId, 'pickup_status', title, message, {
-      pickup_id: pickupId,
+    return await this.createNotification(userId, 'bin_status', title, message, {
+      location_id: locationId,
       status,
       ...details
     });

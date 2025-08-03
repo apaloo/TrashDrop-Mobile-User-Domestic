@@ -80,10 +80,10 @@ const Activity = () => {
       // Calculate pagination offset
       const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
       
-      // Build query based on filter with timeout safety
+      // Build query based on filter with timeout safety - increased timeout for slow connections
       const fetchWithTimeout = async (operation) => {
         const timeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Activity fetch timeout')), 15000));
+          setTimeout(() => reject(new Error('Activity fetch timeout - please check your internet connection')), 30000));
         return Promise.race([operation(), timeout]);
       };
       

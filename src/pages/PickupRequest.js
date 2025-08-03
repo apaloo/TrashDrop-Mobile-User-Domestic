@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import appConfig from '../utils/app-config.js';
+import GeolocationService from '../utils/geolocationService.js';
 
 // Location marker component with draggable functionality
 const LocationMarker = ({ position, setPosition }) => {
@@ -356,11 +357,15 @@ const PickupRequest = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-0">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-0 pt-2"> {/* Reduced padding-top to 0.5rem */}
+      {/* Fixed Header (positioned below navbar) */}
+      <div className="p-4 bg-white dark:bg-gray-800 fixed top-16 left-0 right-0 z-40 shadow-md max-w-2xl mx-auto rounded-t-lg">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white text-center">
           Request Pickup
         </h1>
+      </div>
+      
+      <div className="p-6 pt-0"> {/* Adjusted padding-top to 0 since we have the fixed header now */}
         
         {/* Display bag availability information */}
         <div className="mb-4">
@@ -371,7 +376,7 @@ const PickupRequest = () => {
         
         {insufficientBags && (
           <div className="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-md text-yellow-700 dark:text-yellow-200 mb-4">
-            <p>You don't have any bags available. Please purchase bags to continue OR use the schedule Pickup module.</p>
+            <p>You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.</p>
             <div className="mt-3 flex space-x-4">
               <button 
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
@@ -381,9 +386,9 @@ const PickupRequest = () => {
               </button>
               <button 
                 className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
-                onClick={() => navigate('/schedule-pickup')}
+                onClick={() => navigate('/digital-bin')}
               >
-                Schedule Pickup
+                Digital Bin
               </button>
             </div>
           </div>
@@ -508,7 +513,7 @@ const PickupRequest = () => {
                     {userStats.totalBags <= 0 && (
                       <>
                         <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
-                          You don't have any bags available. Please purchase bags to continue OR use the schedule Pickup module.
+                          You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.
                         </div>
                         <div className="mt-2 flex justify-center space-x-4">
                           <button 
@@ -522,9 +527,9 @@ const PickupRequest = () => {
                           </button>
                           <button 
                             className="bg-green-500 text-white px-3 py-1.5 rounded-md text-sm hover:bg-green-600 transition-colors"
-                            onClick={() => navigate('/schedule-pickup')}
+                            onClick={() => navigate('/digital-bin')}
                           >
-                            Schedule Pickup
+                            Digital Bin
                           </button>
                         </div>
                       </>

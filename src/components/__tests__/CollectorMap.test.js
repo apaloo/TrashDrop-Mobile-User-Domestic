@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import CollectorMap from '../CollectorMap.js';
 import { collectorService } from '../../services/collectorService.js';
@@ -72,11 +72,18 @@ describe('CollectorMap', () => {
       data: [mockCollector],
       error: null
     });
-    collectorService.getActiveSession.mockResolvedValue({
+    geolocationService.getCurrentPosition.mockResolvedValue({
+      success: true,
+      coords: {
+        latitude: mockLocation.lat,
+        longitude: mockLocation.lng
+      }
+    });
+    collectorService.updateLocation.mockResolvedValue({
       data: null,
       error: null
     });
-    collectorService.updateLocation.mockResolvedValue({
+    collectorService.getActiveSession.mockResolvedValue({
       data: null,
       error: null
     });
@@ -90,26 +97,40 @@ describe('CollectorMap', () => {
     });
   });
 
-  it('renders map with user location', async () => {
-    render(<CollectorMap />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-google-map')).toBeInTheDocument();
-      expect(screen.getByText(`Marker at: ${mockLocation.lat}, ${mockLocation.lng}`)).toBeInTheDocument();
+  it('renders with user location', async () => {
+    await act(async () => {
+      render(<CollectorMap />);
     });
+
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    });
+
+    // Check map and marker
+    expect(screen.getByTestId('map-container')).toBeInTheDocument();
+    const markers = screen.getAllByTestId('marker');
+    expect(markers).toHaveLength(2); // User location + collector
   });
 
   it('displays nearby collectors', async () => {
-    render(<CollectorMap />);
-
-    await waitFor(() => {
-      expect(screen.getByText(`Marker at: ${mockCollector.current_location.latitude}, ${mockCollector.current_location.longitude}`)).toBeInTheDocument();
-      expect(screen.getByText('1 collectors found nearby')).toBeInTheDocument();
+    await act(async () => {
+      render(<CollectorMap />);
     });
 
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    });
+
+    // Check collectors
+    const markers = screen.getAllByTestId('marker');
+    expect(markers).toHaveLength(2);
+    expect(screen.getByText('1 collectors found nearby')).toBeInTheDocument();
+
     expect(collectorService.getNearbyCollectors).toHaveBeenCalledWith(
-      mockLocation,
-      5
+      mockLocation.lat,
+      mockLocation.lng
     );
   });
 
@@ -124,7 +145,7 @@ describe('CollectorMap', () => {
     render(<CollectorMap />);
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to get your location. Please enable location services.')).toBeInTheDocument();
+      expect(screen.getByText('Using approximate location. Location services may be disabled.')).toBeInTheDocument();
     });
   });
 
@@ -134,10 +155,12 @@ describe('CollectorMap', () => {
       lng: -123.4194
     };
 
-    render(<CollectorMap pickupLocation={pickupLocation} />);
+    await act(async () => {
+      render(<CollectorMap pickupLocation={pickupLocation} />);
+    });
 
     await waitFor(() => {
-      expect(screen.getByText(`Marker at: ${pickupLocation.lat}, ${pickupLocation.lng}`)).toBeInTheDocument();
+      expect(screen.getByText('Pickup Location')).toBeInTheDocument();
     });
 
     expect(collectorService.getNearbyCollectors).toHaveBeenCalledWith(
@@ -247,15 +270,23 @@ describe('CollectorMap', () => {
   });
 
   it('displays collector info when marker is clicked', async () => {
-    render(<CollectorMap />);
+    await act(async () => {
+      render(<CollectorMap />);
+    });
+
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    });
 
     // Find and click the collector marker
-    const marker = await screen.findByText(`Marker at: ${mockCollector.current_location.latitude}, ${mockCollector.current_location.longitude}`);
-    fireEvent.click(marker);
+    const markers = screen.getAllByTestId('marker');
+    // Click the second marker (collector)
+    fireEvent.click(markers[1]);
 
     await waitFor(() => {
-      expect(screen.getByText(`Collector ${mockCollector.id}`)).toBeInTheDocument();
-      expect(screen.getByText(`Status: ${mockCollector.status}`)).toBeInTheDocument();
+      expect(screen.getByText('Select Collector')).toBeInTheDocument();
+      expect(screen.getByText('Status: active')).toBeInTheDocument();
     });
   });
 });

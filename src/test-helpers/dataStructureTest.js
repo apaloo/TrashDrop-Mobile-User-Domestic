@@ -110,11 +110,11 @@ const testActivityDataStructure = () => {
   
   const activityData = {
     user_id: 'test-user-123',
-    activity_type: 'pickup_request',
+    activity_type: 'digital_bin',
     status: 'waiting_for_collector',
     points: 15,
     details: {
-      pickup_id: 'pickup-123',
+      location_id: 'loc-123',
       waste_type: 'recycling',
       number_of_bags: 3
     },

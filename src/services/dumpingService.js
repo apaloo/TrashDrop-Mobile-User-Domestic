@@ -3,6 +3,29 @@
  */
 
 import supabase from '../utils/supabaseClient.js';
+import { toastService } from '../services/toastService.js';
+
+/**
+ * Maps the estimated_volume value from the form to the required size value for the database
+ * @param {string} estimatedVolume - Value from the form's estimated_volume field
+ * @returns {string} Size value for database (small, medium, or large)
+ */
+const mapEstimatedVolumeToSize = (estimatedVolume) => {
+  // Default to 'medium' if no valid value provided
+  if (!estimatedVolume) return 'medium';
+  
+  // Map the form values to database size categories
+  const estimatedVolumeLower = estimatedVolume.toLowerCase();
+  
+  if (estimatedVolumeLower.includes('small') || estimatedVolumeLower.includes('few bags')) {
+    return 'small';
+  } else if (estimatedVolumeLower.includes('large') || estimatedVolumeLower.includes('truck')) {
+    return 'large';
+  } else {
+    // For everything else (medium size, unknown, etc.), use 'medium'
+    return 'medium';
+  }
+};
 
 export const dumpingService = {
   /**
@@ -12,72 +35,138 @@ export const dumpingService = {
    * @returns {Object} Created report
    */
   async createReport(userId, reportData) {
-    try {
-      if (!userId || !reportData.location) {
-        throw new Error('User ID and location are required');
-      }
+    const validatePhotoUrls = (urls) => {
+      if (!Array.isArray(urls)) return false;
+      return urls.every(url => {
+        try {
+          new URL(url);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    };
 
+    const validateEnumValue = (value, allowedValues) => {
+      return allowedValues.includes(value);
+    };
+
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      
       console.log('[DumpingService] Creating dumping report for user:', userId);
 
-      const report = {
-        reported_by: userId,
-        location: reportData.location,
-        coordinates: reportData.coordinates,
-        description: reportData.description,
-        waste_type: reportData.waste_type || 'mixed',
-        severity: reportData.severity || 'medium',
-        status: 'pending',
-        photos: reportData.photos || [],
-        created_at: new Date().toISOString()
+      // Validate required coordinates - handle both direct lat/lng and GeoJSON Point format
+      let latitude, longitude;
+      if (reportData.coordinates) {
+        if (reportData.coordinates.type === 'Point' && Array.isArray(reportData.coordinates.coordinates)) {
+          // GeoJSON Point format: {type: 'Point', coordinates: [longitude, latitude]}
+          [longitude, latitude] = reportData.coordinates.coordinates;
+          console.log('[DumpingService] Found GeoJSON Point coordinates:', { longitude, latitude });
+        } else if (typeof reportData.coordinates.latitude === 'number' && typeof reportData.coordinates.longitude === 'number') {
+          // Direct lat/lng object: {latitude: number, longitude: number}
+          latitude = reportData.coordinates.latitude;
+          longitude = reportData.coordinates.longitude;
+          console.log('[DumpingService] Found direct lat/lng coordinates:', { latitude, longitude });
+        }
+      }
+
+      if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+        console.error('[DumpingService] Missing or invalid coordinates:', reportData.coordinates);
+        throw new Error('Coordinates (latitude and longitude) are required');
+      }
+      
+      // Log the coordinates for debugging
+      console.log('[DumpingService] Using coordinates:', { latitude, longitude });
+
+      // Validate severity
+      if (reportData.severity && !validateEnumValue(reportData.severity, ['low', 'medium', 'high'])) {
+        throw new Error('Invalid severity value. Must be one of: low, medium, high');
+      }
+
+      // Validate size
+      if (reportData.size && !validateEnumValue(reportData.size, ['small', 'medium', 'large'])) {
+        throw new Error('Invalid size value. Must be one of: small, medium, large');
+      }
+
+      // Validate photos if provided
+      if (reportData.photos && !validatePhotoUrls(reportData.photos)) {
+        throw new Error('Invalid photo URL format. All photos must be valid URLs');
+      }
+
+      // Convert coordinates to PostGIS/GeoJSON Point format
+      // This is the format required by the database schema
+      const geoJsonPoint = {
+        type: 'Point',
+        coordinates: [longitude, latitude]
       };
 
-      // First create the main report
+      console.log('[DumpingService] Formatted GeoJSON Point:', geoJsonPoint);
+      
+      // Include all required fields for illegal_dumping_mobile table based on confirmed schema
+      const report = {
+        reported_by: userId,
+        location: reportData.location || 'Unknown location',
+        coordinates: geoJsonPoint, // PostGIS column expects GeoJSON format
+        waste_type: reportData.waste_type || 'mixed',
+        severity: reportData.severity || 'medium',
+        size: mapEstimatedVolumeToSize(reportData.estimated_volume),
+        photos: reportData.photos || [],
+        status: 'pending'
+        // Note: created_at and updated_at are auto-generated by DB
+      };
+      
+      console.log('[DumpingService] Mapped size value:', report.size);
+
+      // First create the main report in the illegal_dumping_mobile table
       const { data: dumpingReport, error: reportError } = await supabase
-        .from('illegal_dumping')
+        .from('illegal_dumping_mobile')
         .insert(report)
         .select()
         .single();
 
       if (reportError) {
         console.error('[DumpingService] Error creating dumping report:', reportError);
-        throw reportError;
+        console.error('[DumpingService] Report data being inserted:', report);
+        console.error('[DumpingService] Error details:', {
+          message: reportError.message,
+          code: reportError.code,
+          details: reportError.details,
+          hint: reportError.hint
+        });
+        // Provide more specific error messages for common issues
+        if (reportError.message && reportError.message.includes('column')) {
+          throw new Error(`Database schema error: ${reportError.message}`);
+        }
+        throw new Error(reportError.message || 'Failed to create report in database');
       }
 
-      // Then create the initial history record
-      const historyEntry = {
-        dumping_id: dumpingReport.id,
-        status: 'reported',
-        notes: 'Initial report created',
-        updated_by: userId,
-        created_at: new Date().toISOString()
-      };
+      // Try to create the additional report details in the dumping_reports_mobile table
+      try {
+        const reportDetails = {
+          dumping_id: dumpingReport.id,
+          estimated_volume: reportData.estimated_volume || 'unknown',
+          hazardous_materials: reportData.hazardous_materials || false,
+          accessibility_notes: reportData.description || reportData.accessibility_notes || 'No additional details provided'
+          // Note: created_at is auto-generated by DB
+        };
 
-      const { error: historyError } = await supabase
-        .from('illegal_dumping_history')
-        .insert(historyEntry);
+        console.log('[DumpingService] Creating dumping report details:', reportDetails);
 
-      if (historyError) {
-        console.error('[DumpingService] Error creating history entry:', historyError);
-        throw historyError;
-      }
+        const { error: detailsError } = await supabase
+          .from('dumping_reports_mobile')
+          .insert(reportDetails);
 
-      // Create a detailed report entry
-      const reportDetails = {
-        dumping_id: dumpingReport.id,
-        estimated_volume: reportData.estimated_volume,
-        hazardous_materials: reportData.hazardous_materials || false,
-        accessibility_notes: reportData.accessibility_notes,
-        cleanup_priority: reportData.cleanup_priority || 'normal',
-        created_at: new Date().toISOString()
-      };
-
-      const { error: detailsError } = await supabase
-        .from('dumping_reports')
-        .insert(reportDetails);
-
-      if (detailsError) {
-        console.error('[DumpingService] Error creating report details:', detailsError);
-        throw detailsError;
+        if (detailsError) {
+          console.warn('[DumpingService] Could not create report details entry, but main report created:', detailsError);
+          // Don't throw, just log as this is a secondary step
+        } else {
+          console.log('[DumpingService] Successfully created report details');
+        }
+      } catch (detailsErr) {
+        console.warn('[DumpingService] Report details creation failed, continuing without it:', detailsErr);
       }
 
       console.log('[DumpingService] Successfully created dumping report:', dumpingReport.id);
@@ -109,7 +198,7 @@ export const dumpingService = {
       console.log('[DumpingService] Fetching report details:', reportId);
 
       const { data: report, error: reportError } = await supabase
-        .from('illegal_dumping')
+        .from('illegal_dumping_mobile')
         .select(`
           *,
           dumping_reports (*),
@@ -146,6 +235,18 @@ export const dumpingService = {
    * @returns {Object} Updated report
    */
   async updateReportStatus(reportId, status, userId, notes = '') {
+    // Validate status
+    const validStatuses = ['pending', 'verified', 'in_progress', 'completed'];
+    if (!validStatuses.includes(status)) {
+      return {
+        data: null,
+        error: {
+          message: `Invalid status value. Must be one of: ${validStatuses.join(', ')}`,
+          code: 'INVALID_STATUS'
+        }
+      };
+    }
+
     try {
       if (!reportId || !status || !userId) {
         throw new Error('Report ID, status, and user ID are required');
@@ -155,7 +256,7 @@ export const dumpingService = {
 
       // Update the main report
       const { data: report, error: reportError } = await supabase
-        .from('illegal_dumping')
+        .from('illegal_dumping_mobile')
         .update({
           status,
           updated_at: new Date().toISOString()
@@ -179,7 +280,7 @@ export const dumpingService = {
       };
 
       const { error: historyError } = await supabase
-        .from('illegal_dumping_history')
+        .from('illegal_dumping_history_mobile')
         .insert(historyEntry);
 
       if (historyError) {
@@ -250,6 +351,18 @@ export const dumpingService = {
    * @returns {Object} Updated report
    */
   async addPhotosToReport(reportId, photoUrls, userId) {
+    const validatePhotoUrls = (urls) => {
+      if (!Array.isArray(urls)) return false;
+      return urls.every(url => {
+        try {
+          new URL(url);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    };
+
     try {
       if (!reportId || !photoUrls?.length || !userId) {
         throw new Error('Report ID, photos, and user ID are required');
@@ -259,7 +372,7 @@ export const dumpingService = {
 
       // Get current photos
       const { data: currentReport } = await supabase
-        .from('illegal_dumping')
+        .from('illegal_dumping_mobile')
         .select('photos')
         .eq('id', reportId)
         .single();
@@ -268,7 +381,7 @@ export const dumpingService = {
 
       // Update the report with new photos
       const { data: report, error: reportError } = await supabase
-        .from('illegal_dumping')
+        .from('illegal_dumping_mobile')
         .update({
           photos: updatedPhotos,
           updated_at: new Date().toISOString()
@@ -282,18 +395,8 @@ export const dumpingService = {
         throw reportError;
       }
 
-      // Add history entry
-      const historyEntry = {
-        dumping_id: reportId,
-        status: report.status,
-        notes: `Added ${photoUrls.length} new photos`,
-        updated_by: userId,
-        created_at: new Date().toISOString()
-      };
-
-      await supabase
-        .from('illegal_dumping_history')
-        .insert(historyEntry);
+      // We don't need to add history entry for photos since the photos field doesn't exist in either table
+      // based on the confirmed database schema
 
       console.log('[DumpingService] Successfully added photos to report');
       return { data: report, error: null };

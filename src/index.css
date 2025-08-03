@@ -84,3 +84,13 @@ select option {
   color: #ffffff !important;
   font-weight: 500 !important;
 }
+
+/* Hide scrollbars for horizontal scrollable containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
