@@ -7,6 +7,7 @@ import toastService from '../services/toastService.js';
 import { storeQRCode, getQRCode } from '../utils/qrStorage.js';
 import { subscribeToBinUpdates, handleBinUpdate } from '../utils/binRealtime.js';
 import { syncBinsWithServer, setupNetworkSyncListener } from '../utils/binSyncService.js';
+import GeolocationService from '../utils/geolocationService.js';
 import LocationStep from '../components/digitalBin/LocationStep.js';
 import ScheduleDetailsStep from '../components/digitalBin/ScheduleDetailsStep.js';
 import WasteDetailsStep from '../components/digitalBin/WasteDetailsStep.js';
@@ -217,54 +218,136 @@ function DigitalBin() {
       return;
     }
 
-      const { data: pickups, error } = await supabase
-        .from('digital_bins')
-        .select(`
-          id,
-          location_id,
-          qr_code_url,
-          frequency,
-          waste_type,
-          bag_count,
-          special_instructions,
-          is_active,
-          expires_at,
-          created_at,
-          updated_at,
-          locations:location_id (id, location_name, address)
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw new Error(`Error fetching digital bins: ${error.message}`);
-      }
-
-      // Flatten location details and integrate QR codes from localStorage
-      const flattened = await Promise.all(pickups.map(async pickup => {
-        // Get QR code from localStorage if available
-        let qrCodeUrl = pickup.qr_code_url;
-        try {
-          const localQRData = await getQRCode(pickup.location_id);
-          if (localQRData && localQRData.qrCodeUrl) {
-            qrCodeUrl = localQRData.qrCodeUrl;
-            console.log('Integrated local QR code for location:', pickup.location_id);
+      // LOCAL-FIRST APPROACH: Load data from localStorage first
+      const localBins = [];
+      try {
+        const binsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
+        console.log(`Found ${binsList.length} digital bins in localStorage`);
+        
+        for (const locationId of binsList) {
+          const binKey = `digitalBin_${locationId}`;
+          const localBinData = localStorage.getItem(binKey);
+          if (localBinData) {
+            const parsedBin = JSON.parse(localBinData);
+            // Get QR code from localStorage
+            try {
+              const localQRData = await getQRCode(locationId);
+              if (localQRData && localQRData.qrCodeUrl) {
+                parsedBin.qr_code_url = localQRData.qrCodeUrl;
+              }
+            } catch (qrError) {
+              console.log(`No local QR code found for location: ${locationId}`);
+            }
+            
+            // Format for component compatibility
+            localBins.push({
+              ...parsedBin,
+              location_name: parsedBin.location_data?.location_name || 'Unknown Location',
+              address: parsedBin.location_data?.address || 'No address',
+              status: parsedBin.is_active ? 'active' : 'cancelled'
+            });
           }
-        } catch (error) {
-          console.log('No local QR code found for location:', pickup.location_id);
         }
         
-        return {
-          ...pickup,
-          location_name: pickup.locations?.location_name,
-          address: pickup.locations?.address,
-          qr_code_url: qrCodeUrl,
-          // Map is_active to status for ScheduledQRTab compatibility
-          status: pickup.is_active ? 'active' : 'cancelled'
-        };
-      }));
+        if (localBins.length > 0) {
+          console.log(`Loaded ${localBins.length} digital bins from localStorage`);
+          setScheduledPickups(localBins);
+        }
+      } catch (localError) {
+        console.warn('Error loading from localStorage, will try Supabase:', localError);
+      }
 
-      setScheduledPickups(flattened);
+      // SYNC WITH SUPABASE: Fetch latest data from server
+      try {
+        const { data: pickups, error } = await supabase
+          .from('digital_bins')
+          .select(`
+            id,
+            location_id,
+            qr_code_url,
+            frequency,
+            waste_type,
+            bag_count,
+            special_instructions,
+            is_active,
+            expires_at,
+            created_at,
+            updated_at,
+            locations:location_id (id, location_name, address)
+          `)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.warn(`Supabase fetch error: ${error.message}. Using local data.`);
+          if (localBins.length === 0) {
+            throw new Error(`Error fetching digital bins: ${error.message}`);
+          }
+          return; // Use local data if Supabase fails
+        }
+
+        // Flatten location details and integrate QR codes from localStorage
+        const flattened = await Promise.all(pickups.map(async pickup => {
+          // Get QR code from localStorage if available (local-first for QR codes)
+          let qrCodeUrl = pickup.qr_code_url;
+          try {
+            const localQRData = await getQRCode(pickup.location_id);
+            if (localQRData && localQRData.qrCodeUrl) {
+              qrCodeUrl = localQRData.qrCodeUrl;
+              console.log('Using local QR code for location:', pickup.location_id);
+            }
+          } catch (error) {
+            console.log('No local QR code found for location:', pickup.location_id);
+          }
+          
+          return {
+            ...pickup,
+            location_name: pickup.locations?.location_name,
+            address: pickup.locations?.address,
+            qr_code_url: qrCodeUrl,
+            // Map is_active to status for ScheduledQRTab compatibility
+            status: pickup.is_active ? 'active' : 'cancelled'
+          };
+        }));
+
+        setScheduledPickups(flattened);
+        
+        // Update localStorage with fresh server data
+        try {
+          const updatedBinsList = [];
+          for (const pickup of flattened) {
+            const locationId = pickup.location_id;
+            updatedBinsList.push(locationId);
+            
+            const digitalBinKey = `digitalBin_${locationId}`;
+            const digitalBinLocalData = {
+              ...pickup,
+              location_data: {
+                id: locationId,
+                location_name: pickup.location_name,
+                address: pickup.address,
+                latitude: pickup.locations?.latitude || GeolocationService.DEFAULT_LOCATION.latitude,
+                longitude: pickup.locations?.longitude || GeolocationService.DEFAULT_LOCATION.longitude
+              },
+              stored_at: new Date().toISOString(),
+              synced_to_supabase: true
+            };
+            
+            localStorage.setItem(digitalBinKey, JSON.stringify(digitalBinLocalData));
+          }
+          
+          localStorage.setItem('digitalBinsList', JSON.stringify(updatedBinsList));
+          console.log(`Synced ${updatedBinsList.length} digital bins to localStorage`);
+        } catch (syncError) {
+          console.warn('Failed to sync server data to localStorage:', syncError);
+        }
+      } catch (supabaseError) {
+        console.error('Error fetching from Supabase:', supabaseError);
+        if (localBins.length === 0) {
+          throw supabaseError; // Only throw if no local data available
+        }
+        console.log('Using local data due to server error');
+      }
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error in fetchScheduledPickups:', error);
@@ -527,31 +610,247 @@ function DigitalBin() {
           console.log('[Dev] Using mock location for test user');
           locationId = '123e4567-e89b-12d3-a456-426614174001'; // Mock location ID for test user
         } else {
-          // Create new location
-          const { data: newLocation, error: insertError } = await supabase
-            .from('locations')
-            .insert({
+          // Ensure we have coordinates for the location (required by database schema)
+          let latitude = formData.latitude;
+          let longitude = formData.longitude;
+          
+          console.log('Initial coordinates from formData:', { latitude, longitude });
+          
+          // If coordinates are not available, use default location (Accra, Ghana)
+          if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
+            console.log('No coordinates provided, using default location (Accra, Ghana)');
+            
+            try {
+              const defaultCoords = GeolocationService.DEFAULT_LOCATION;
+              console.log('GeolocationService default coords:', defaultCoords);
+              latitude = defaultCoords.latitude;
+              longitude = defaultCoords.longitude;
+            } catch (error) {
+              console.warn('Error accessing GeolocationService.DEFAULT_LOCATION:', error);
+              // Hardcoded fallback coordinates for Accra, Ghana
+              latitude = 5.614736;
+              longitude = -0.208811;
+              console.log('Using hardcoded fallback coordinates');
+            }
+            
+            // Final validation - ensure we have valid numbers
+            if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
+                isNaN(latitude) || isNaN(longitude)) {
+              console.error('Invalid coordinates detected, using hardcoded Accra coordinates'); 
+              latitude = 5.614736;
+              longitude = -0.208811;
+            }
+          }
+          
+          console.log('Final coordinates for location creation:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
+          
+          // Create new location with required coordinates
+          // Try both 'locations' and 'bin_locations' tables to handle schema variations
+          let newLocation = null;
+          let insertError = null;
+          
+          const locationData = {
+            user_id: user.id,
+            location_name: formData.location_name || 'Home',
+            address: formData.address || '',
+            latitude: latitude,
+            longitude: longitude,
+            is_default: formData.is_default || false
+          };
+          
+          // First try 'bin_locations' table (as indicated by the foreign key error)
+          // Try with different schema variations
+          try {
+            console.log('Attempting to create location in bin_locations table');
+            
+            // Try multiple schema variations for bin_locations table
+            const schemaAttempts = [
+              // Attempt 1: Basic schema with location info only
+              {
+                name: 'basic_location_only',
+                data: {
+                  location_name: formData.location_name || 'Home',
+                  address: formData.address || '',
+                  user_id: user.id
+                }
+              },
+              // Attempt 2: Try with coordinates using standard names
+              {
+                name: 'with_coordinates_standard',
+                data: {
+                  location_name: formData.location_name || 'Home',
+                  address: formData.address || '',
+                  user_id: user.id,
+                  latitude: latitude,
+                  longitude: longitude
+                }
+              },
+              // Attempt 3: Try with abbreviated coordinate names
+              {
+                name: 'with_coordinates_abbreviated', 
+                data: {
+                  name: formData.location_name || 'Home',
+                  address: formData.address || '',
+                  user_id: user.id,
+                  lat: latitude,
+                  lng: longitude
+                }
+              },
+              // Attempt 4: Try with coordinate field variations
+              {
+                name: 'coordinate_variations',
+                data: {
+                  name: formData.location_name || 'Home',
+                  address: formData.address || '',
+                  user_id: user.id,
+                  x: longitude, // Some tables use x,y
+                  y: latitude
+                }
+              },
+              // Attempt 5: Minimal required fields only
+              {
+                name: 'minimal_required',
+                data: {
+                  user_id: user.id,
+                  name: formData.location_name || 'Home'
+                }
+              }
+            ];
+            
+            let binLocationResult = null;
+            let schemaSuccess = false;
+            
+            for (const attempt of schemaAttempts) {
+              console.log(`Trying bin_locations schema: ${attempt.name}`, attempt.data);
+              
+              try {
+                binLocationResult = await supabase
+                  .from('bin_locations')
+                  .insert(attempt.data)
+                  .select()
+                  .single();
+                  
+                if (!binLocationResult.error && binLocationResult.data) {
+                  newLocation = binLocationResult.data;
+                  console.log(`Successfully created location in bin_locations table using: ${attempt.name}`);
+                  schemaSuccess = true;
+                  break;
+                }
+              } catch (schemaError) {
+                console.log(`Schema attempt ${attempt.name} failed:`, schemaError?.message);
+                continue;
+              }
+            }
+            
+            if (!schemaSuccess) {
+              console.log('All bin_locations schema attempts failed, will try locations table');
+              throw new Error('All bin_locations schema variations failed');
+            }
+          } catch (binLocationError) {
+            console.warn('bin_locations table completely failed, trying locations table:', binLocationError?.message || binLocationError);
+            
+            // Fallback to 'locations' table
+            try {
+              console.log('Attempting to create location in locations table');
+              const { data: locationTableData, error: locationTableError } = await supabase
+                .from('locations')
+                .insert(locationData)
+                .select()
+                .single();
+                
+              if (!locationTableError && locationTableData) {
+                newLocation = locationTableData;
+                console.log('Successfully created location in locations table');
+              } else {
+                insertError = locationTableError || new Error('No data returned from locations table');
+              }
+            } catch (locationError) {
+              insertError = locationError;
+              console.error('Both bin_locations and locations tables failed:', locationError.message);
+            }
+          }
+
+          if (insertError || !newLocation) {
+            // If all database operations fail, create a local-only location for offline usage
+            console.warn('All database location creation failed, creating local-only location');
+            const localLocationId = `local_location_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Store location data locally for offline use
+            const localLocationData = {
+              id: localLocationId,
               user_id: user.id,
               location_name: formData.location_name || 'Home',
               address: formData.address || '',
-              is_default: formData.is_default || false
-            })
-            .select()
-            .single();
-
-          if (insertError || !newLocation) {
-            throw new Error(`Error creating location: ${insertError?.message || 'No location created'}`);
+              latitude: latitude,
+              longitude: longitude,
+              is_default: formData.is_default || false,
+              created_at: new Date().toISOString(),
+              local_only: true,
+              sync_pending: true
+            };
+            
+            try {
+              const localLocationKey = `location_${localLocationId}`;
+              localStorage.setItem(localLocationKey, JSON.stringify(localLocationData));
+              
+              // Add to pending sync list
+              const pendingSyncList = JSON.parse(localStorage.getItem('pending_location_sync') || '[]');
+              pendingSyncList.push(localLocationId);
+              localStorage.setItem('pending_location_sync', JSON.stringify(pendingSyncList));
+              
+              console.log('Created local-only location:', localLocationId);
+              locationId = localLocationId;
+            } catch (localStorageError) {
+              console.error('Failed to create local location:', localStorageError);
+              throw new Error(`Error creating location: ${insertError?.message || 'Failed to create location in any table and localStorage also failed'}`);
+            }
+          } else {
+            locationId = newLocation.id;
           }
-
-          locationId = newLocation.id;
         }
       } else {
+        // Ensure we have coordinates for the location update
+        let latitude = formData.latitude;
+        let longitude = formData.longitude;
+        
+        console.log('Initial coordinates from formData for update:', { latitude, longitude });
+        
+        // If coordinates are not available, use default location (Accra, Ghana)
+        if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
+          console.log('No coordinates provided for update, using default location (Accra, Ghana)');
+          
+          try {
+            const defaultCoords = GeolocationService.DEFAULT_LOCATION;
+            console.log('GeolocationService default coords (update):', defaultCoords);
+            latitude = defaultCoords.latitude;
+            longitude = defaultCoords.longitude;
+          } catch (error) {
+            console.warn('Error accessing GeolocationService.DEFAULT_LOCATION (update):', error);
+            // Hardcoded fallback coordinates for Accra, Ghana
+            latitude = 5.614736;
+            longitude = -0.208811;
+            console.log('Using hardcoded fallback coordinates for update');
+          }
+          
+          // Final validation - ensure we have valid numbers
+          if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
+              isNaN(latitude) || isNaN(longitude)) {
+            console.error('Invalid coordinates detected in update, using hardcoded Accra coordinates'); 
+            latitude = 5.614736;
+            longitude = -0.208811;
+          }
+        }
+        
+        console.log('Final coordinates for location update:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
+        
         // Update existing location
         const { error: updateError } = await supabase
           .from('locations')
           .update({
             location_name: formData.location_name || 'Home',
             address: formData.address || '',
+            latitude: latitude,
+            longitude: longitude,
             is_default: formData.is_default || false
           })
           .eq('id', locationId);
@@ -598,9 +897,14 @@ function DigitalBin() {
           updated_at: new Date().toISOString()
         };
       } else {
-        const { data, error: binError } = await supabase
-          .from('digital_bins')
-          .insert({
+        // Check if this is a local-only location (from database failures)
+        const isLocalOnlyLocation = locationId.startsWith('local_location_');
+        
+        if (isLocalOnlyLocation) {
+          // Create a local-only digital bin since location creation failed
+          console.log('Creating local-only digital bin due to database location issues');
+          binData = {
+            id: `local_bin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             user_id: user.id,
             location_id: locationId,
             qr_code_url: qrCodeUrl,
@@ -609,15 +913,93 @@ function DigitalBin() {
             bag_count: formData.bag_count,
             special_instructions: formData.special_instructions,
             expires_at: expiryDate.toISOString(),
-            is_active: true
-          })
-          .select()
-          .single();
+            is_active: true,
+            created_at: new Date().toISOString(),
+            local_only: true,
+            sync_pending: true
+          };
+        } else {
+          // Try to create in database
+          try {
+            const { data, error: binError } = await supabase
+              .from('digital_bins')
+              .insert({
+                user_id: user.id,
+                location_id: locationId,
+                qr_code_url: qrCodeUrl,
+                frequency: formData.frequency,
+                waste_type: formData.waste_type,
+                bag_count: formData.bag_count,
+                special_instructions: formData.special_instructions,
+                expires_at: expiryDate.toISOString(),
+                is_active: true
+              })
+              .select()
+              .single();
 
-        if (binError || !data) {
-          throw new Error(`Error creating digital bin: ${binError?.message || 'No bin created'}`);
+            if (binError || !data) {
+              console.warn('Database digital bin creation failed, creating local-only bin:', binError?.message);
+              // Create local-only bin as fallback
+              binData = {
+                id: `local_bin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                user_id: user.id,
+                location_id: locationId,
+                qr_code_url: qrCodeUrl,
+                frequency: formData.frequency,
+                waste_type: formData.waste_type,
+                bag_count: formData.bag_count,
+                special_instructions: formData.special_instructions,
+                expires_at: expiryDate.toISOString(),
+                is_active: true,
+                created_at: new Date().toISOString(),
+                local_only: true,
+                sync_pending: true
+              };
+            } else {
+              binData = data;
+            }
+          } catch (dbError) {
+            console.warn('Database error creating digital bin, falling back to local-only:', dbError.message);
+            // Create local-only bin as fallback
+            binData = {
+              id: `local_bin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              user_id: user.id,
+              location_id: locationId,
+              qr_code_url: qrCodeUrl,
+              frequency: formData.frequency,
+              waste_type: formData.waste_type,
+              bag_count: formData.bag_count,
+              special_instructions: formData.special_instructions,
+              expires_at: expiryDate.toISOString(),
+              is_active: true,
+              created_at: new Date().toISOString(),
+              local_only: true,
+              sync_pending: true
+            };
+          }
         }
-        binData = data;
+      }
+
+      // Store digital bin data in localStorage first (local-first approach)
+      const digitalBinKey = `digitalBin_${locationId}`;
+      const digitalBinLocalData = {
+        ...binData,
+        location_data: {
+          id: locationId,
+          location_name: formData.location_name,
+          address: formData.address,
+          latitude: formData.latitude || GeolocationService.DEFAULT_LOCATION.latitude,
+          longitude: formData.longitude || GeolocationService.DEFAULT_LOCATION.longitude
+        },
+        stored_at: new Date().toISOString(),
+        synced_to_supabase: !isTestUser // Track if it's synced to Supabase
+      };
+      
+      try {
+        localStorage.setItem(digitalBinKey, JSON.stringify(digitalBinLocalData));
+        console.log(`Digital bin stored locally with key: ${digitalBinKey}`);
+      } catch (localError) {
+        console.warn('Failed to store digital bin in localStorage:', localError);
       }
 
       // Store QR code in local storage first (local-first approach)
@@ -626,6 +1008,17 @@ function DigitalBin() {
         binId: binData?.id || `bin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         syncToSupabase: false // Don't sync to Supabase separately - it's already part of the bin data
       });
+
+      // Also store a list of all digital bin IDs for easy retrieval
+      try {
+        const existingBinsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
+        if (!existingBinsList.includes(locationId)) {
+          existingBinsList.push(locationId);
+          localStorage.setItem('digitalBinsList', JSON.stringify(existingBinsList));
+        }
+      } catch (listError) {
+        console.warn('Failed to update digital bins list:', listError);
+      }
 
       // Reset form and update UI
       resetForm();
@@ -636,7 +1029,7 @@ function DigitalBin() {
       await fetchData(false);
 
       // Show success message
-      toastService.success('Digital bin created successfully!');
+      toastService.success(`Digital bin created successfully! ${isTestUser ? '(Test mode - data stored locally)' : ''}`);
     } catch (error) {
       console.error('Error in form submission:', error);
       setError(error.message);

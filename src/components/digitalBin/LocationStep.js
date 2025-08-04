@@ -5,6 +5,7 @@ import L from 'leaflet';
 import supabase from '../../utils/supabaseClient.js';
 import { useAuth } from '../../context/AuthContext.js';
 import toastService from '../../services/toastService.js';
+import GeolocationService from '../../utils/geolocationService.js';
 
 // Fix for default marker icon in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -47,6 +48,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const [addressInput, setAddressInput] = useState(formData.address || '');
   const [addressError, setAddressError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingLocation, setLoadingLocation] = useState(false);
 
   // Initialize form data with default values if not provided
   useEffect(() => {
@@ -160,121 +162,108 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     }
   };
   
-  // Handler for current location with improved timeout and error handling
+  // Handler for current location using GeolocationService
   const handleUseCurrentLocation = async (e) => {
-    const useCurrentLocation = e.target.checked;
-    updateFormData({ useCurrentLocation });
-
-    if (!useCurrentLocation) return;
-
-    if (!navigator.geolocation) {
-      toastService.warning('Geolocation is not supported. You can select location on the map.');
-      return;
-    }
-
-    // Set up geolocation options
-    const highAccuracyOptions = {
-      enableHighAccuracy: true,
-      timeout: 5000,
-      maximumAge: 0
-    };
-
-    const lowAccuracyOptions = {
-      enableHighAccuracy: false,
-      timeout: 6000,
-      maximumAge: 300000 // Allow 5-minute-old cached positions
-    };
-
-    const getPosition = (options) => new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error('Location request timed out'));
-      }, options.timeout + 1000); // Add 1s buffer to internal timeout
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          clearTimeout(timeoutId);
-          resolve(pos);
-        },
-        (err) => {
-          clearTimeout(timeoutId);
-          reject(err);
-        },
-        options
-      );
-    });
-
+    e.preventDefault();
+    
+    setLoadingLocation(true);
+    
     try {
-      let position;
-      let usingHighAccuracy = true;
-
-      try {
-        // First try with high accuracy
-        position = await getPosition(highAccuracyOptions);
-      } catch (highAccuracyError) {
-        console.log('High accuracy location failed:', highAccuracyError);
-        usingHighAccuracy = false;
-
-        // Fall back to low accuracy
-        try {
-          position = await getPosition(lowAccuracyOptions);
-        } catch (lowAccuracyError) {
-          throw lowAccuracyError; // Let outer catch handle it
-        }
+      console.log('Requesting current location using GeolocationService...');
+      
+      // Check if geolocation is supported and avoid problematic scenarios
+      if (!navigator.geolocation) {
+        console.log('Geolocation not supported, using default location');
+        throw new Error('Geolocation not supported');
       }
-
-      const { latitude, longitude } = position.coords;
-      setPosition([latitude, longitude]);
-      updateFormData({
-        latitude,
-        longitude,
-        useCurrentLocation: true
+      
+      // Try a single, quick geolocation attempt with immediate fallback
+      const locationPromise = GeolocationService.getCurrentPosition({
+        enableHighAccuracy: false, // Never use high accuracy to avoid Google API
+        timeout: 2000, // Very short timeout - just 2 seconds
+        maximumAge: 600000, // 10 minutes - use cached positions aggressively
+        silentFallback: false // Don't use service's internal fallback, we'll handle it
       });
+      
+      // Race the geolocation against a quick timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Quick timeout for immediate fallback')), 2500);
+      });
+      
+      const locationResult = await Promise.race([locationPromise, timeoutPromise]);
+      
+      console.log('Location result:', locationResult);
+      
+      if (locationResult.success && locationResult.coords) {
+        const { latitude, longitude } = locationResult.coords;
+        
+        setPosition([latitude, longitude]);
+        updateFormData({
+          latitude,
+          longitude,
+          useCurrentLocation: true
+        });
 
-      // Try to get address from coordinates
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-        );
-        const data = await response.json();
-        if (data.display_name) {
-          setAddressInput(data.display_name);
-          updateFormData({
-            address: data.display_name
-          });
+        // Try to get address from coordinates using OpenStreetMap
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.display_name) {
+              setAddressInput(data.display_name);
+              updateFormData({
+                address: data.display_name
+              });
+            }
+          }
+        } catch (geocodeError) {
+          console.warn('Error getting address from coordinates:', geocodeError);
+          // This is non-critical, continue without address
         }
-      } catch (geocodeError) {
-        console.error('Error getting address:', geocodeError);
-      }
 
-      // Show appropriate success message
-      if (!usingHighAccuracy) {
-        toastService.info('Using approximate location. You can adjust it on the map.');
+        // Show success message based on source
+        if (locationResult.source === 'default') {
+          toastService.info('Using approximate location. You can adjust it on the map.');
+        } else {
+          toastService.success('Location obtained successfully!');
+        }
+        
+        setLoadingLocation(false);
+        
+      } else {
+        // GeolocationService already provided fallback coordinates
+        const { latitude, longitude } = locationResult.coords;
+        
+        setPosition([latitude, longitude]);
+        updateFormData({
+          latitude,
+          longitude,
+          useCurrentLocation: false // Mark as not using current location since it's fallback
+        });
+        
+        toastService.info('Using default location (Accra, Ghana). You can adjust it on the map.');
+        setLoadingLocation(false);
       }
-
+      
     } catch (error) {
-      console.error('Geolocation error:', error);
-      let errorMessage = 'Location access failed. ';
+      console.error('GeolocationService error:', error);
       
-      if (error.code === 1) {
-        errorMessage += 'Please enable location access in your browser settings.';
-      } else if (error.code === 2) {
-        errorMessage += 'Location information is unavailable.';
-      } else if (error.code === 3 || error.message.includes('timed out')) {
-        errorMessage += 'Location request timed out.';
-      }
+      // Final fallback to hardcoded Accra coordinates
+      const defaultLat = 5.614736;
+      const defaultLng = -0.208811;
       
-      errorMessage += ' Using default location. You can adjust it on the map.';
-      toastService.warning(errorMessage);
-
-      // Set default location (Accra) as fallback
-      const defaultLat = 5.6037;
-      const defaultLng = -0.1870;
       setPosition([defaultLat, defaultLng]);
       updateFormData({
         latitude: defaultLat,
         longitude: defaultLng,
         useCurrentLocation: false
       });
+      
+      toastService.warning('Location service unavailable. Using default location (Accra, Ghana). You can adjust it on the map.');
+      setLoadingLocation(false);
     }
   };
   
