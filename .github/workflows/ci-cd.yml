@@ -33,11 +33,10 @@ jobs:
         REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
     
     - name: Build
-      run: |
-        # Use environment variables from GitHub secrets
-        export REACT_APP_SUPABASE_URL="${{ secrets.REACT_APP_SUPABASE_URL }}"
-        export REACT_APP_SUPABASE_ANON_KEY="${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}"
-        npm run build
+      env:
+        REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+        REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+      run: npm run build
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
