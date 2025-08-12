@@ -120,6 +120,25 @@ export const dumpingService = {
       
       console.log('[DumpingService] Mapped size value:', report.size);
 
+      // Helper to record a local user activity entry immediately (local-first)
+      const recordLocalActivity = (activity) => {
+        try {
+          const listKey = `userActivity_${userId}`;
+          const existing = JSON.parse(localStorage.getItem(listKey) || '[]');
+          const deduped = [activity, ...existing.filter(a => a.id !== activity.id && a.related_id !== activity.related_id)];
+          localStorage.setItem(listKey, JSON.stringify(deduped));
+          console.log('[DumpingService] Added local activity entry:', activity);
+          // Notify any listeners that a local activity was recorded
+          try {
+            window.dispatchEvent(new CustomEvent('local-activity', { detail: { userId, activity } }));
+          } catch (evtErr) {
+            // In non-browser/test envs window/custom events may fail silently
+          }
+        } catch (e) {
+          console.warn('[DumpingService] Failed to store local activity entry', e);
+        }
+      };
+
       // First create the main report in the illegal_dumping_mobile table
       const { data: dumpingReport, error: reportError } = await supabase
         .from('illegal_dumping_mobile')
@@ -136,7 +155,53 @@ export const dumpingService = {
           details: reportError.details,
           hint: reportError.hint
         });
-        // Provide more specific error messages for common issues
+
+        // Detect FK violation for reported_by (code 23503) and fall back to local-first storage
+        const msg = `${reportError.message || ''} ${reportError.details || ''}`;
+        const isFKViolation = msg.includes('23503') || msg.includes('reported_by_fkey') || msg.includes('not present in table "users"');
+        if (isFKViolation) {
+          console.warn('[DumpingService] Foreign key violation on reported_by. Storing report locally with pending sync.');
+
+          // Local-first fallback: persist report to localStorage with pending_sync status
+          const localId = `local_report_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const localReport = {
+            ...report,
+            id: localId,
+            status: 'pending',
+            sync_status: 'pending_sync',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          try {
+            const listKey = 'illegalDumpingList';
+            const itemKey = `illegalDumping_${localId}`;
+            const existingList = JSON.parse(localStorage.getItem(listKey) || '[]');
+            const updatedList = [localId, ...existingList.filter(id => id !== localId)];
+            localStorage.setItem(listKey, JSON.stringify(updatedList));
+            localStorage.setItem(itemKey, JSON.stringify(localReport));
+            console.log('[DumpingService] Stored local dumping report (pending sync):', localId);
+            // Also record an immediate local activity entry so Activity History updates instantly
+            recordLocalActivity({
+              id: `local_activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              user_id: userId,
+              activity_type: 'dumping_report',
+              status: 'submitted',
+              points_impact: 0,
+              related_id: localId,
+              created_at: new Date().toISOString(),
+              is_local: true,
+              sync_status: 'pending_sync'
+            });
+          } catch (lsErr) {
+            console.warn('[DumpingService] Failed to persist local report. Proceeding with in-memory return only.', lsErr);
+          }
+
+          // Return the local report so UI can proceed without blocking
+          return { data: localReport, error: null };
+        }
+
+        // Provide more specific error messages for other issues
         if (reportError.message && reportError.message.includes('column')) {
           throw new Error(`Database schema error: ${reportError.message}`);
         }
@@ -170,6 +235,18 @@ export const dumpingService = {
       }
 
       console.log('[DumpingService] Successfully created dumping report:', dumpingReport.id);
+      // Record an immediate local activity entry for the successful report creation
+      recordLocalActivity({
+        id: `local_activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        user_id: userId,
+        activity_type: 'dumping_report',
+        status: 'submitted',
+        points_impact: 0,
+        related_id: dumpingReport.id,
+        created_at: new Date().toISOString(),
+        is_local: true,
+        sync_status: 'synced'
+      });
       return { data: dumpingReport, error: null };
 
     } catch (error) {

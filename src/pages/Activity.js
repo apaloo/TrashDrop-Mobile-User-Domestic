@@ -53,13 +53,8 @@ const Activity = () => {
       return;
     }
     
-    // Check if we're offline
-    if (!navigator.onLine) {
-      console.log('Device is offline, cannot fetch activities');
-      setError('You appear to be offline. Please check your internet connection.');
-      setIsLoading(false);
-      return;
-    }
+    // If offline, we will still show local activities without server fetch
+    const isOffline = !navigator.onLine;
     
     console.log('Fetching activities for user:', user.id);
     setIsLoading(true);
@@ -87,6 +82,41 @@ const Activity = () => {
         return Promise.race([operation(), timeout]);
       };
       
+      // If offline, skip remote count and load local-only activities
+      if (isOffline) {
+        try {
+          const localKey = `userActivity_${user.id}`;
+          const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
+          const localFiltered = Array.isArray(localRaw)
+            ? localRaw.filter(a => (filter === 'all' ? true : a.activity_type === filter))
+            : [];
+          const localActivitiesFormatted = localFiltered.map(a => ({
+            id: a.id,
+            type: a.activity_type,
+            status: a.status || 'submitted',
+            date: new Date(a.created_at).toLocaleDateString(),
+            points: a.points_impact || 0,
+            related_id: a.related_id || null,
+            description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
+            address: a.details?.address || '',
+            isLocal: true,
+            sync_status: a.sync_status || 'pending_sync'
+          }));
+          const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
+          const totalPages = Math.ceil(localActivitiesFormatted.length / pagination.itemsPerPage) || 1;
+          setPagination(prev => ({ ...prev, totalPages }));
+          const pageSlice = localActivitiesFormatted.slice(offset, offset + pagination.itemsPerPage);
+          setActivities(pageSlice);
+          setError('');
+        } catch (le) {
+          console.warn('Failed to load local activities while offline', le);
+          setError('You appear to be offline. Showing cached activities if available.');
+        } finally {
+          setIsLoading(false);
+        }
+        return; // stop here when offline
+      }
+
       // Fetch the count first with its own error handling
       let filteredCount = 0;
       try {
@@ -173,7 +203,8 @@ const Activity = () => {
           type: activity.activity_type,
           status: activity.status || 'submitted',
           date: new Date(activity.created_at).toLocaleDateString(),
-          points: activity.points || 0,
+          points: activity.points || activity.points_impact || 0,
+          related_id: activity.related_id || null,
           description: '',
           address: ''
         };
@@ -199,8 +230,49 @@ const Activity = () => {
         return formattedActivity;
       });
       
-      // Calculate total pages
-      const totalPages = Math.ceil(filteredCount / pagination.itemsPerPage) || 1;
+      // Merge in LOCAL-FIRST activities stored in localStorage
+      let localActivitiesFormatted = [];
+      try {
+        const localKey = `userActivity_${user.id}`;
+        const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
+        const localFiltered = Array.isArray(localRaw)
+          ? localRaw.filter(a => (filter === 'all' ? true : a.activity_type === filter))
+          : [];
+        localActivitiesFormatted = localFiltered.map(a => ({
+          id: a.id,
+          type: a.activity_type,
+          status: a.status || 'submitted',
+          date: new Date(a.created_at).toLocaleDateString(),
+          points: a.points_impact || 0,
+          related_id: a.related_id || null,
+          description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
+          address: a.details?.address || '',
+          isLocal: true,
+          sync_status: a.sync_status || 'pending_sync'
+        }));
+      } catch (le) {
+        console.warn('Failed to load local activities', le);
+      }
+
+      // Combine local-first (on top) + server results
+      // Dedupe priority: prefer local for the same type+related_id; otherwise dedupe by id
+      const localKeys = new Set(
+        localActivitiesFormatted
+          .filter(a => a.type && a.related_id)
+          .map(a => `${a.type}::${a.related_id}`)
+      );
+      const seenIds = new Set(localActivitiesFormatted.map(a => a.id));
+      const serverFiltered = formattedActivities.filter(item => {
+        const key = item.type && item.related_id ? `${item.type}::${item.related_id}` : null;
+        if (key && localKeys.has(key)) return false; // local wins
+        if (seenIds.has(item.id)) return false; // avoid duplicate IDs
+        return true;
+      });
+      const combined = [...localActivitiesFormatted, ...serverFiltered];
+
+      // Recalculate total count and pages including locals
+      const combinedCount = combined.length;
+      const totalPages = Math.ceil(combinedCount / pagination.itemsPerPage) || 1;
       console.log('Calculated pagination:', { 
         count: filteredCount, 
         perPage: pagination.itemsPerPage, 
@@ -212,8 +284,10 @@ const Activity = () => {
         ...prev,
         totalPages: Math.max(1, totalPages)
       }));
-      
-      setActivities(formattedActivities);
+
+      // Apply front-end pagination to combined list using the same offset
+      const pageSlice = combined.slice(offset, offset + pagination.itemsPerPage);
+      setActivities(pageSlice);
       setError(''); // Clear any previous errors on success
       
     } catch (error) {
@@ -259,6 +333,31 @@ const Activity = () => {
   useEffect(() => {
     fetchActivities();
   }, [fetchActivities]);
+
+  // Listen to storage changes (e.g., other tabs) for userActivity updates
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e) return;
+      if (!user) return;
+      if (e.key === `userActivity_${user.id}`) {
+        fetchActivities(0);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [user, fetchActivities]);
+  // Listen for local activity events to refresh immediately
+  useEffect(() => {
+    const onLocalActivity = (e) => {
+      try {
+        const detailUserId = e?.detail?.userId;
+        if (!user || (detailUserId && detailUserId !== user.id)) return;
+        fetchActivities(0);
+      } catch (_) {}
+    };
+    window.addEventListener('local-activity', onLocalActivity);
+    return () => window.removeEventListener('local-activity', onLocalActivity);
+  }, [user, fetchActivities]);
 
   // Manual refresh handler
   const handleRefresh = () => {
@@ -371,6 +470,11 @@ const Activity = () => {
                     'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'}`}>
                   {activity.status.charAt(0).toUpperCase() + activity.status.slice(1)}
                 </span>
+                {activity.isLocal && activity.sync_status === 'pending_sync' && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 ml-2">
+                    Pending Sync
+                  </span>
+                )}
                 {activity.points !== 0 && (
                   <div className="mt-2">
                     <span className={`font-medium ${activity.points > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>

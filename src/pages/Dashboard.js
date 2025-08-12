@@ -45,6 +45,49 @@ const Dashboard = () => {
   const sessionRefreshRef = useRef(null);
   const mountedRef = useRef(true);
   
+  // Helpers: load local user activities and format for dashboard card
+  const getLocalActivities = useCallback((limit = 5) => {
+    if (!user?.id) return [];
+    try {
+      const localKey = `userActivity_${user.id}`;
+      const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
+      if (!Array.isArray(localRaw)) return [];
+      const formatted = localRaw
+        .map(a => ({
+          id: a.id,
+          type: a.activity_type,
+          message: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
+          timestamp: a.created_at,
+          points: a.points_impact || 0,
+          isLocal: true,
+          sync_status: a.sync_status || 'pending_sync',
+          related_id: a.related_id || null,
+        }))
+        .sort((x, y) => new Date(y.timestamp) - new Date(x.timestamp));
+      return typeof limit === 'number' ? formatted.slice(0, limit) : formatted;
+    } catch (e) {
+      console.warn('[Dashboard] Failed to parse local activities', e);
+      return [];
+    }
+  }, [user?.id]);
+
+  const mergeRecentActivities = useCallback((serverList = [], limit = 5) => {
+    const locals = getLocalActivities(limit * 2); // grab extra before dedupe
+    const localKeys = new Set(
+      locals.filter(a => a.type && a.related_id).map(a => `${a.type}::${a.related_id}`)
+    );
+    const seenIds = new Set(locals.map(a => a.id));
+    const serverFiltered = (serverList || []).filter(item => {
+      const key = item.type && item.related_id ? `${item.type}::${item.related_id}` : null;
+      if (key && localKeys.has(key)) return false; // prefer local entry
+      if (seenIds.has(item.id)) return false;
+      return true;
+    });
+    const combined = [...locals, ...serverFiltered]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return combined.slice(0, limit);
+  }, [getLocalActivities]);
+  
   // Cleanup function
   useEffect(() => {
     mountedRef.current = true;
@@ -190,13 +233,15 @@ const Dashboard = () => {
       
       if (cachedActivity?.length > 0) {
         console.log('Using cached activity data');
-        setRecentActivity(cachedActivity.map(activity => ({
+        const serverFormatted = cachedActivity.map(activity => ({
           id: activity.id,
           type: activity.type,
           message: activity.details || `${activity.type} activity`,
           timestamp: activity.created_at,
-          points: activity.points || 0
-        })));
+          points: activity.points || 0,
+          related_id: activity.related_id || null,
+        }));
+        setRecentActivity(mergeRecentActivities(serverFormatted, 5));
         // Only reduce loading state if we already set stats
         if (cachedStats) {
           setIsLoading(false);
@@ -244,23 +289,21 @@ const Dashboard = () => {
         
         // Process activity when it completes
         activityPromise.then(result => {
-          if (!result.error && result.data?.length > 0 && mountedRef.current) {
-            const activityData = result.data;
-            setRecentActivity(activityData.map(activity => ({
-              id: activity.id,
-              type: activity.type,
-              message: activity.details || `${activity.type} activity`,
-              timestamp: activity.created_at,
-              points: activity.points || 0
-            })));
-            
-            // Cache the new activity data for offline use
-            cacheUserActivity(user.id, activityData);
-          }
-          // Make sure to clear loading state even if we don't have activity data
-          if (mountedRef.current) {
-            setIsLoading(false);
-          }
+          if (!mountedRef.current) return;
+          const activityData = (!result.error && Array.isArray(result.data)) ? result.data : [];
+          const serverFormatted = activityData.map(activity => ({
+            id: activity.id,
+            type: activity.type,
+            message: activity.details || `${activity.type} activity`,
+            timestamp: activity.created_at,
+            points: activity.points || 0,
+            related_id: activity.related_id || null,
+          }));
+          setRecentActivity(mergeRecentActivities(serverFormatted, 5));
+          // Cache the new activity data for offline use
+          if (activityData.length > 0) cacheUserActivity(user.id, activityData);
+          // Clear loading state
+          setIsLoading(false);
         }).catch(error => {
           console.error('Error fetching activity:', error);
           // Clear loading state
@@ -270,7 +313,11 @@ const Dashboard = () => {
         });
       } else {
         // We're offline and have shown cached data if available
-        // If we don't have cached data, clear loading state
+        // Populate from local activities if we don't have cached server activity
+        if (!cachedActivity || cachedActivity.length === 0) {
+          setRecentActivity(mergeRecentActivities([], 5));
+        }
+        // If we don't have cached stats or activity, clear loading state
         if (!cachedStats || !cachedActivity) {
           setIsLoading(false);
         }
@@ -298,6 +345,39 @@ const Dashboard = () => {
       clearInterval(autoRefreshInterval);
     };
   }, [loadDashboardData, isOnlineStatus]);
+
+  // Refresh recent activity immediately when a local activity is recorded
+  useEffect(() => {
+    const onLocalActivity = (e) => {
+      if (!user?.id) return;
+      const detailUserId = e?.detail?.userId;
+      if (detailUserId && detailUserId !== user.id) return;
+      // Merge locals with current server-derived items in state
+      setRecentActivity(prev => mergeRecentActivities(prev, 5));
+      // If this local activity is a dumping report, optimistically bump the Reports stat
+      const activityType = e?.detail?.activity?.activity_type || e?.detail?.activity_type;
+      if (activityType === 'dumping_report') {
+        setStats(prev => ({
+          ...prev,
+          reports: Number(prev.reports || 0) + 1,
+        }));
+      }
+    };
+    window.addEventListener('local-activity', onLocalActivity);
+    return () => window.removeEventListener('local-activity', onLocalActivity);
+  }, [user?.id, mergeRecentActivities]);
+
+  // Listen to storage changes from other tabs/windows and refresh
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!user?.id) return;
+      if (e?.key === `userActivity_${user.id}`) {
+        setRecentActivity(prev => mergeRecentActivities(prev, 5));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [user?.id, mergeRecentActivities]);
 
   // Memoized calculations for better performance
   const memoizedStats = useMemo(() => ({
@@ -565,7 +645,15 @@ const Dashboard = () => {
 
         {/* Recent Activity - Original Dark Theme */}
         <div className="bg-gradient-to-r from-purple-800 to-purple-700 rounded-lg shadow-lg p-6">
-          <h3 className="text-white text-lg font-bold mb-4">Recent Activity</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white text-lg font-bold">Recent Activity</h3>
+            <Link
+              to="/activity"
+              className="text-sm text-blue-300 hover:text-blue-200 underline underline-offset-2"
+            >
+              View all activity →
+            </Link>
+          </div>
           {recentActivity.length > 0 ? (
             <div className="space-y-4">
               {recentActivity.map((activity, activityIdx) => (
@@ -575,7 +663,14 @@ const Dashboard = () => {
                       <ActivityIcon type={activity.type} />
                     </div>
                     <div>
-                      <p className="text-white text-sm">{activity.message}</p>
+                      <p className="text-white text-sm flex items-center">
+                        <span>{activity.message}</span>
+                        {activity.isLocal && activity.sync_status === 'pending_sync' && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-yellow-400/20 text-yellow-200 border border-yellow-300/30">
+                            Pending Sync
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -587,11 +682,6 @@ const Dashboard = () => {
           ) : (
             <div className="text-center py-8">
               <p className="text-gray-300 text-center">No recent activity</p>
-              <div className="mt-4">
-                <Link to="/activity" className="text-blue-400 hover:text-blue-300 text-sm transition-colors">
-                  View all activity →
-                </Link>
-              </div>
             </div>
           )}
         </div>
