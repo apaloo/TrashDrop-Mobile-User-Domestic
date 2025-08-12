@@ -9,6 +9,7 @@ import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import appConfig from '../utils/app-config.js';
 import GeolocationService from '../utils/geolocationService.js';
+import { subscribeToStatsUpdates } from '../utils/realtime.js';
 
 // Location marker component with draggable functionality
 const LocationMarker = ({ position, setPosition }) => {
@@ -217,6 +218,26 @@ const PickupRequest = () => {
     
     fetchUserStats();
   }, [user]);
+
+  // Subscribe to real-time stats updates so bag counts stay in sync after scans
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const subscription = subscribeToStatsUpdates(user.id, (tableType, payload) => {
+      if (tableType !== 'user_stats') return;
+      const newRec = payload?.new;
+      if (!newRec) return;
+
+      const totalBags = newRec.total_bags ?? 0;
+      const totalBatches = newRec.total_batches ?? 0;
+      setUserStats({ totalBags, batches: totalBatches });
+      setInsufficientBags(totalBags <= 0);
+    });
+
+    return () => {
+      subscription?.unsubscribe?.();
+    };
+  }, [user?.id]);
 
   // Schema for form validation
   const validationSchema = Yup.object().shape({

@@ -37,6 +37,14 @@ const BatchQRScanner = ({ onScanComplete }) => {
           throw new Error('This batch is not assigned to you');
         }
 
+        // Activate batch and update stats
+        const { data: activationData, error: activationError } = await batchService.activateBatchForUser(batchId, user.id);
+        if (activationError) {
+          throw new Error(activationError.message || 'Failed to activate batch');
+        }
+
+        const alreadyActivated = activationData?.alreadyActivated;
+
         setScanResult(batchDetails);
         setScanning(false);
 
@@ -44,8 +52,10 @@ const BatchQRScanner = ({ onScanComplete }) => {
         await notificationService.createNotification(
           user.id,
           'batch_scan',
-          'Batch Scanned Successfully',
-          `Batch ${batchDetails.batch_qr_code} has been scanned`,
+          alreadyActivated ? 'Batch Already Activated' : 'Batch Activated',
+          alreadyActivated
+            ? `Batch ${batchDetails.batch_qr_code} has already been activated.`
+            : `Batch ${batchDetails.batch_qr_code} is now active and your bag balance has been updated.`,
           { batch_id: batchDetails.id }
         );
 

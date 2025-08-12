@@ -67,6 +67,130 @@ export const batchService = {
           ...batchOrder,
           bags: bags
         },
+
+  /**
+   * Activate a scanned batch for the user and update stats
+   * - Normalizes batch identifier (UUID or QR code or URL)
+   * - Prevents double-activation
+   * - Marks order as activated
+   * - Updates user_stats: increments total_bags and total_batches
+   * @param {string} batchIdentifier - Batch UUID, QR code string, or URL
+   * @param {string} userId - User ID
+   * @returns {Object} Activation result with updated counts
+   */
+  async activateBatchForUser(batchIdentifier, userId) {
+    try {
+      if (!batchIdentifier || !userId) {
+        throw new Error('Batch identifier and user ID are required');
+      }
+
+      // Helpers (duplicated here to avoid cross-scope access)
+      const isUUID = (str) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
+      const normalizeIdentifier = (input) => {
+        const s = String(input || '').trim();
+        if (!s) return s;
+        try {
+          if (s.startsWith('http://') || s.startsWith('https://')) {
+            const u = new URL(s);
+            const parts = u.pathname.split('/').filter(Boolean);
+            return parts[parts.length - 1] || s;
+          }
+        } catch (_) {}
+        return s;
+      };
+
+      const normalized = normalizeIdentifier(batchIdentifier);
+      console.log('[BatchService] Activating batch. Raw:', batchIdentifier, 'Normalized:', normalized);
+
+      // Look up the batch order by id or batch_qr_code
+      let batch = null;
+      if (isUUID(normalized)) {
+        const res = await supabase
+          .from('bag_orders')
+          .select('*')
+          .eq('id', normalized)
+          .single();
+        if (res.error) throw res.error;
+        batch = res.data;
+      } else {
+        const res = await supabase
+          .from('bag_orders')
+          .select('*')
+          .eq('batch_qr_code', normalized)
+          .maybeSingle();
+        if (res.error) throw res.error;
+        batch = res.data;
+      }
+
+      if (!batch) {
+        throw new Error('Batch not found for provided identifier');
+      }
+      if (batch.user_id !== userId) {
+        throw new Error('This batch is not assigned to the current user');
+      }
+
+      // Prevent double-activation
+      if (batch.status && ['activated', 'used'].includes(String(batch.status).toLowerCase())) {
+        return { data: { alreadyActivated: true }, error: null };
+      }
+
+      // Count bags in this batch
+      const bagCountRes = await supabase
+        .from('bag_inventory')
+        .select('id', { count: 'exact', head: true })
+        .eq('batch_id', batch.id);
+      if (bagCountRes.error) throw bagCountRes.error;
+      const bagCount = bagCountRes.count || 0;
+
+      // Mark the batch order as activated
+      const updateOrderRes = await supabase
+        .from('bag_orders')
+        .update({ status: 'activated', activated_at: new Date().toISOString() })
+        .eq('id', batch.id)
+        .select()
+        .single();
+      if (updateOrderRes.error) throw updateOrderRes.error;
+
+      // Fetch current user_stats
+      const statsRes = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (statsRes.error && statsRes.error.code !== 'PGRST116') throw statsRes.error;
+
+      const currentBags = statsRes.data?.total_bags || 0;
+      const currentBatches = statsRes.data?.total_batches || 0;
+
+      // Upsert updated totals
+      const newTotals = {
+        user_id: userId,
+        total_bags: currentBags + bagCount,
+        total_batches: currentBatches + 1,
+        updated_at: new Date().toISOString(),
+      };
+      const upsertRes = await supabase
+        .from('user_stats')
+        .upsert(newTotals)
+        .select()
+        .single();
+      if (upsertRes.error) throw upsertRes.error;
+
+      console.log('[BatchService] Activated batch and updated stats:', newTotals);
+      return { data: { activated: true, ...newTotals }, error: null };
+
+    } catch (error) {
+      console.error('[BatchService] Error in activateBatchForUser:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to activate batch',
+          code: error.code || 'ACTIVATE_BATCH_ERROR'
+        }
+      };
+    }
+  },
         error: null
       };
 
@@ -93,23 +217,65 @@ export const batchService = {
         throw new Error('Batch ID is required');
       }
 
-      console.log('[BatchService] Fetching batch details:', batchId);
+      // Helpers: UUID check and identifier normalization (handles URLs)
+      const isUUID = (str) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
 
-      const { data: batch, error: batchError } = await supabase
-        .from('bag_orders')
-        .select('*')
-        .eq('id', batchId)
-        .single();
+      const normalizeIdentifier = (input) => {
+        const s = String(input || '').trim();
+        if (!s) return s;
+        // If it's a URL, extract the last non-empty path segment
+        try {
+          if (s.startsWith('http://') || s.startsWith('https://')) {
+            const u = new URL(s);
+            const parts = u.pathname.split('/').filter(Boolean);
+            return parts[parts.length - 1] || s;
+          }
+        } catch (_) {
+          // Not a valid URL, fall through
+        }
+        return s;
+      };
+
+      const normalized = normalizeIdentifier(batchId);
+      console.log('[BatchService] Fetching batch details. Raw:', batchId, 'Normalized:', normalized);
+
+      // Decide which column to query based on identifier format
+      let batch = null;
+      let batchError = null;
+
+      if (isUUID(normalized)) {
+        const res = await supabase
+          .from('bag_orders')
+          .select('*')
+          .eq('id', normalized)
+          .single();
+        batch = res.data;
+        batchError = res.error;
+      } else {
+        // Try matching against the batch QR/code column for non-UUID identifiers
+        const res = await supabase
+          .from('bag_orders')
+          .select('*')
+          .eq('batch_qr_code', normalized)
+          .maybeSingle();
+        batch = res.data;
+        batchError = res.error;
+      }
 
       if (batchError) {
         console.error('[BatchService] Error fetching batch:', batchError);
         throw batchError;
       }
 
+      if (!batch) {
+        throw new Error('Batch not found for provided identifier');
+      }
+
       const { data: bags, error: bagsError } = await supabase
         .from('bag_inventory')
         .select('*')
-        .eq('batch_id', batchId);
+        .eq('batch_id', batch.id);
 
       if (bagsError) {
         console.error('[BatchService] Error fetching bags:', bagsError);

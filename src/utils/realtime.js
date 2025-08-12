@@ -243,7 +243,11 @@ export function handleStatsUpdate(tableType, payload, currentStats) {
         updatedStats.pickups = newRecord.pickups || updatedStats.pickups;
         updatedStats.reports = newRecord.reports || updatedStats.reports;
         updatedStats.batches = newRecord.batches || updatedStats.batches;
+        // Keep both snake_case and camelCase for compatibility across components
         updatedStats.total_bags = newRecord.total_bags || updatedStats.total_bags;
+        updatedStats.totalBags = newRecord.total_bags !== undefined
+          ? newRecord.total_bags
+          : (updatedStats.totalBags !== undefined ? updatedStats.totalBags : updatedStats.total_bags);
       }
       break;
       
