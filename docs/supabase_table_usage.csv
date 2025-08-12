@@ -1,0 +1,19 @@
+table,purpose,where_used,operations
+profiles,User profile and points and metadata,"src/services/userService.js; src/services/rewardsService.js; src/services/notificationService.js",select|update
+user_stats,Aggregated user KPIs (points,reports,pickups,bags),"src/services/userService.js",select
+user_activity,Canonical activity log for users,"src/services/activityService.js; src/pages/Rewards.js",select|insert
+illegal_dumping_mobile,Mobile-first dumping reports (local-first sync source),"src/services/dumpingService.js; src/utils/realtime.js",insert|select|delete
+dumping_reports_mobile,Detail records for mobile dumping reports,"src/services/dumpingService.js",insert|delete
+illegal_dumping_history_mobile,Status/history for mobile dumping reports,"src/services/dumpingService.js",insert|delete
+illegal_dumping,Server/global dumping reports (stats),"src/services/userService.js",select
+pickup_requests,Pickup requests (creation, assignment, stats),"src/services/pickupService.js; src/services/userService.js; src/services/collectorService.js",select|insert|update
+scheduled_pickups,Recurring/one-off scheduled pickups,"src/services/pickupService.js",select
+payment_methods,User payment methods and defaults,"src/services/paymentService.js; src/services/pickupService.js",select|insert|update
+bag_inventory,User bags issued/consumed; scanning impacts,"src/services/batchService.js; src/services/pickupService.js; src/services/userService.js",select|update
+bag_orders,Bag batch orders (issuing bags),"src/services/batchService.js",select|insert
+scans,Scan events for bags / batches,"src/services/batchService.js",insert|select
+rewards,Redeemable rewards catalog,"src/services/rewardsService.js",select
+reward_redemptions,Reward redemption records,"src/services/rewardsService.js",select|insert
+alerts,In-app notifications/alerts,"src/services/notificationService.js",select|insert|update
+collector_sessions,Live session/reservations for collectors,"src/services/collectorService.js",select|insert|update
+locations,User saved addresses for pickups,"src/services/pickupService.js",select
