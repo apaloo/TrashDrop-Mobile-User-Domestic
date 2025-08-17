@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import supabase, { isTokenValid, clearAuthData, getCurrentUser } from '../utils/supabaseClient.js';
+import supabase, { isTokenValid } from '../utils/supabaseClient.js';
 import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
 import performanceMonitor from '../utils/performanceMonitor.js';
 import appConfigImport from '../utils/app-config.js';
@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }) => {
     clearAuthData();
     
     // Update state to unauthenticated or error
-    updateAuthState(prev => ({
+    updateAuthState({
       status: error ? AUTH_STATES.ERROR : AUTH_STATES.UNAUTHENTICATED,
       user: null,
       session: null,
@@ -180,8 +180,8 @@ export const AuthProvider = ({ children }) => {
       lastAction: 'reset',
       retryCount: 0,
       lastUpdated: new Date().toISOString(),
-      previousState: prev.status === AUTH_STATES.AUTHENTICATED ? 'was_authenticated' : 'was_unauthenticated'
-    }));
+      previousState: authState.status === AUTH_STATES.AUTHENTICATED ? 'was_authenticated' : 'was_unauthenticated'
+    });
     
     try {
       // Force signOut to clean up any lingering session data
@@ -209,7 +209,7 @@ export const AuthProvider = ({ children }) => {
     
     console.log('[Auth] Auth state reset complete');
     return { success: true };
-  }, [clearAuthData, updateAuthState]);
+  }, [clearAuthData, updateAuthState, authState.status]);
   
   // Track if session check is in progress to prevent multiple concurrent checks
   const isCheckingSession = useRef(false);
@@ -368,7 +368,7 @@ export const AuthProvider = ({ children }) => {
       
       // Create a persistent test session
       const testUser = {
-        id: '12345678-1234-5678-1234-567812345678',
+        id: '123e4567-e89b-12d3-a456-426614174000',
         email: 'prince02@mailinator.com',
         user_metadata: { name: 'Test User' },
         last_authenticated: new Date().toISOString()

@@ -1,13 +1,19 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import CollectorMap from '../CollectorMap.js';
 import { collectorService } from '../../services/collectorService.js';
-import { useAuth } from '../../contexts/AuthContext.js';
+import { useAuth } from '../../context/AuthContext.js';
+import GeolocationService from '../../utils/geolocationService.js';
 
 // Mock the services and hooks
 jest.mock('../../services/collectorService.js');
-jest.mock('../../contexts/AuthContext.js');
+jest.mock('../../context/AuthContext.js');
+jest.mock('../../utils/geolocationService.js', () => ({
+  __esModule: true,
+  default: {
+    getCurrentPosition: jest.fn(),
+  },
+}));
 // Mock Leaflet components
 jest.mock('react-leaflet', () => ({
   MapContainer: ({ children }) => <div data-testid="map-container">{children}</div>,
@@ -25,14 +31,18 @@ jest.mock('react-leaflet', () => ({
 }));
 
 // Mock Leaflet itself
-jest.mock('leaflet', () => ({
-  Icon: {
-    Default: {
-      prototype: { _getIconUrl: jest.fn() },
-      mergeOptions: jest.fn(),
-    }
-  }
-}));
+jest.mock('leaflet', () => {
+  const mockDefault = {
+    prototype: { _getIconUrl: jest.fn() },
+    mergeOptions: jest.fn(),
+  };
+  const Icon = function Icon() { return {}; };
+  Icon.Default = mockDefault;
+  return { Icon };
+});
+
+// Import the component AFTER mocks are set up
+import CollectorMap from '../CollectorMap.js';
 
 describe('CollectorMap', () => {
   const mockUser = { id: 'user123', is_collector: false };
@@ -72,7 +82,7 @@ describe('CollectorMap', () => {
       data: [mockCollector],
       error: null
     });
-    geolocationService.getCurrentPosition.mockResolvedValue({
+    GeolocationService.getCurrentPosition.mockResolvedValue({
       success: true,
       coords: {
         latitude: mockLocation.lat,
@@ -97,9 +107,10 @@ describe('CollectorMap', () => {
     });
   });
 
-  it('renders with user location', async () => {
+  it('renders with pickup location', async () => {
+    const pickupLocation = { lat: mockLocation.lat, lng: mockLocation.lng };
     await act(async () => {
-      render(<CollectorMap />);
+      render(<CollectorMap pickupLocation={pickupLocation} />);
     });
 
     // Wait for loading to complete
@@ -110,12 +121,13 @@ describe('CollectorMap', () => {
     // Check map and marker
     expect(screen.getByTestId('map-container')).toBeInTheDocument();
     const markers = screen.getAllByTestId('marker');
-    expect(markers).toHaveLength(2); // User location + collector
+    expect(markers).toHaveLength(2); // Pickup location + collector
   });
 
   it('displays nearby collectors', async () => {
+    const pickupLocation = { lat: mockLocation.lat, lng: mockLocation.lng };
     await act(async () => {
-      render(<CollectorMap />);
+      render(<CollectorMap pickupLocation={pickupLocation} />);
     });
 
     // Wait for loading to complete
@@ -129,23 +141,25 @@ describe('CollectorMap', () => {
     expect(screen.getByText('1 collectors found nearby')).toBeInTheDocument();
 
     expect(collectorService.getNearbyCollectors).toHaveBeenCalledWith(
-      mockLocation.lat,
-      mockLocation.lng
+      pickupLocation,
+      5
     );
   });
 
   it('handles geolocation error', async () => {
-    const mockGeolocationError = {
-      getCurrentPosition: jest.fn().mockImplementation((success, error) =>
-        error({ message: 'Geolocation error' })
-      )
-    };
-    global.navigator.geolocation = mockGeolocationError;
+    // Force GeolocationService to return a failure result so component sets the error message
+    GeolocationService.getCurrentPosition.mockResolvedValueOnce({
+      success: false,
+      coords: { latitude: 5.614736, longitude: -0.208811 },
+      error: { code: 3, message: 'TIMEOUT' }
+    });
 
     render(<CollectorMap />);
 
     await waitFor(() => {
-      expect(screen.getByText('Using approximate location. Location services may be disabled.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Using approximate location. Location services may be disabled.')
+      ).toBeInTheDocument();
     });
   });
 
@@ -286,7 +300,8 @@ describe('CollectorMap', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Select Collector')).toBeInTheDocument();
-      expect(screen.getByText('Status: active')).toBeInTheDocument();
     });
+    // Popup content should include status line
+    expect(screen.getByText(/Status:\s*active/)).toBeInTheDocument();
   });
 });

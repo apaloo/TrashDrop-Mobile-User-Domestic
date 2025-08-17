@@ -239,6 +239,24 @@ const PickupRequest = () => {
     };
   }, [user?.id]);
 
+  // Optimistic update from BatchQRScanner via global event
+  useEffect(() => {
+    if (!user?.id) return;
+    const handler = (e) => {
+      const { userId, deltaBags } = e?.detail || {};
+      if (!userId || userId !== user.id) return;
+      const delta = Number(deltaBags);
+      if (!Number.isFinite(delta) || delta === 0) return;
+      setUserStats(prev => {
+        const updated = { ...prev, totalBags: Math.max(0, (prev.totalBags || 0) + delta) };
+        setInsufficientBags(updated.totalBags <= 0);
+        return updated;
+      });
+    };
+    window.addEventListener('trashdrop:bags-updated', handler);
+    return () => window.removeEventListener('trashdrop:bags-updated', handler);
+  }, [user?.id]);
+
   // Schema for form validation
   const validationSchema = Yup.object().shape({
     savedLocationId: Yup.string(),
@@ -670,11 +688,16 @@ const PickupRequest = () => {
                   <p className="text-gray-600 dark:text-gray-400 mb-4">No standard pickup fee</p>
                 </div>
               </div>
+              {userStats.totalBags <= 0 && (
+                <div className="text-sm text-yellow-700 bg-yellow-100 border border-yellow-300 rounded-md p-3 mb-3" role="alert">
+                  No bags available. Scan a batch to enable pickup.
+                </div>
+              )}
               {/* Submit button */}
               <button
                 type="submit"
                 className="w-full px-6 py-3 bg-green-600 text-white font-medium text-lg rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                disabled={isSubmitting}
+                disabled={isSubmitting || userStats.totalBags <= 0}
               >
                 {isSubmitting ? (
                   <div className="flex items-center justify-center">

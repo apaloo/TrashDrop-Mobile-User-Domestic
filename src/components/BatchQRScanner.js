@@ -1,91 +1,179 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import QrScanner from 'react-qr-scanner';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../context/AuthContext.js';
 import { batchService } from '../services/batchService.js';
 import { notificationService } from '../services/notificationService.js';
+import supabase from '../utils/supabaseClient.js';
+import offlineStorageAPI from '../utils/offlineStorage.js';
+ 
 
 const BatchQRScanner = ({ onScanComplete }) => {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading, status } = useAuth();
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState(null);
   const [scanResult, setScanResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const maxRetries = 3;
+  const [lastScan, setLastScan] = useState({ value: '', ts: 0 });
+  const [hasSupaSession, setHasSupaSession] = useState(false);
+  const cancelRef = useRef({ canceled: false });
+
+  // Lightweight check for Supabase session presence to drive UI enablement
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (mounted) setHasSupaSession(Boolean(data?.session && !error));
+      } catch (_) {
+        if (mounted) setHasSupaSession(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [status]);
+
+  // UI enablement is driven by loading states; startScanning will enforce user presence
+
+  const processBatchId = async (batchId) => {
+    if (!batchId || loading) return;
+    setLoading(true);
+    setLoadingMessage('Verifying batch...');
+    setError(null);
+    setAttempt(0);
+    cancelRef.current.canceled = false;
+
+    try {
+      console.log('[BatchQRScanner] Processing batchId:', batchId);
+      // Auth/session guards
+      if (!user?.id) {
+        throw new Error('Missing user context. Please sign in again.');
+      }
+
+      // If offline: local-first -> queue activation for later sync, prevent duplicate
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        // Prevent re-queueing the same batch locally
+        if (batchService.isBatchLocallyScanned(batchId)) {
+          setError('This batch is already queued or scanned.');
+          setLoading(false);
+          return;
+        }
+        setLoadingMessage('Offline — saving scan and queuing sync...');
+        const queued = await batchService.enqueueBatchActivation(batchId, user.id);
+        if (queued?.error) {
+          setError(queued.error.message || 'Failed to queue scan while offline. Please try again.');
+          setLoading(false);
+          return;
+        }
+        setScanResult({
+          batch_qr_code: batchId,
+          status: 'queued',
+          created_at: new Date().toISOString(),
+          bags: [],
+        });
+        setScanning(false);
+        if (onScanComplete) onScanComplete({ batch_id: batchId, status: 'queued' });
+        setLoading(false);
+        return;
+      }
+
+      // New primary flow: verify in 'batch' table and update user account
+      setLoadingMessage('Verifying batch...');
+      const verifyRes = await batchService.verifyBatchAndUpdateUser(batchId, user.id, {
+        timeoutMs: 10000,
+        maxRetries,
+      });
+      if (verifyRes.error) {
+        const code = verifyRes.error.code || '';
+        if (code === 'BATCH_DUPLICATE') {
+          throw new Error('Batch already scanned');
+        }
+        throw new Error(verifyRes.error.message || 'Verification failed, try again');
+      }
+
+      if (cancelRef.current.canceled) return;
+
+      const bagsAdded = verifyRes.data?.bagsAdded || verifyRes.data?.total_bags_count || 0;
+      const returnedBags = Array.isArray(verifyRes.data?.bags) ? verifyRes.data.bags : null;
+      setScanResult({
+        batch_qr_code: verifyRes.data?.batch_id || batchId,
+        status: 'verified',
+        created_at: verifyRes.data?.created_at || new Date().toISOString(),
+        bags: returnedBags ?? Array(bagsAdded).fill({}).map((_, i) => ({ id: `virtual-${i+1}` })),
+      });
+      setScanning(false);
+
+      await notificationService.createNotification(
+        user.id,
+        'batch_scan',
+        'Batch Verified',
+        `+${bagsAdded} bags added!`,
+        { batch_id: verifyRes.data?.batch_id || batchId }
+      );
+
+      // Broadcast optimistic bag update for other views (dashboard, pickup form)
+      try {
+        const evt = new CustomEvent('trashdrop:bags-updated', {
+          detail: { userId: user.id, deltaBags: bagsAdded, source: 'batch-scan' }
+        });
+        window.dispatchEvent(evt);
+      } catch (_) {
+        // no-op if CustomEvent not available
+      }
+
+      if (onScanComplete) onScanComplete(verifyRes.data);
+    } catch (err) {
+      console.warn('[BatchQRScanner] Scan failed for', batchId, err);
+      setError(err.message);
+      setScanResult(null);
+    } finally {
+      setLoading(false);
+      setAttempt(0);
+    }
+  };
 
   const handleScan = async (data) => {
-    if (data && data.text && !loading) {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        // Extract batch ID from QR code
-        const batchId = data?.text?.replace('BATCH-', '') || data;
-        
-        // Get batch details
-        const { data: batchDetails, error: batchError } = await batchService.getBatchDetails(batchId);
-        
-        if (batchError) {
-          throw new Error(batchError.message);
-        }
+    if (!data || !data.text) return;
 
-        // Validate batch
-        if (!batchDetails) {
-          throw new Error('Invalid batch QR code');
-        }
+    const raw = data.text;
+    const batchId = String(raw).trim();
+    console.log('[BatchQRScanner] Scanned raw:', raw, '-> batchId:', batchId);
 
-        // Check if batch belongs to user
-        if (batchDetails.user_id !== user.id) {
-          throw new Error('This batch is not assigned to you');
-        }
+    // Throttle duplicate scans within 2s or identical value
+    const now = Date.now();
+    if (lastScan.value === batchId && now - lastScan.ts < 2000) return;
+    setLastScan({ value: batchId, ts: now });
 
-        // Activate batch and update stats
-        const { data: activationData, error: activationError } = await batchService.activateBatchForUser(batchId, user.id);
-        if (activationError) {
-          throw new Error(activationError.message || 'Failed to activate batch');
-        }
+    // Basic sanity check to avoid spurious calls
+    if (batchId.length < 6) return;
 
-        const alreadyActivated = activationData?.alreadyActivated;
-
-        setScanResult(batchDetails);
-        setScanning(false);
-
-        // Create notification for successful scan
-        await notificationService.createNotification(
-          user.id,
-          'batch_scan',
-          alreadyActivated ? 'Batch Already Activated' : 'Batch Activated',
-          alreadyActivated
-            ? `Batch ${batchDetails.batch_qr_code} has already been activated.`
-            : `Batch ${batchDetails.batch_qr_code} is now active and your bag balance has been updated.`,
-          { batch_id: batchDetails.id }
-        );
-
-        // Call parent callback
-        if (onScanComplete) {
-          onScanComplete(batchDetails);
-        }
-
-      } catch (err) {
-        setError(err.message);
-        setScanResult(null);
-      } finally {
-        setLoading(false);
-      }
-    }
+    await processBatchId(batchId);
   };
 
   const handleError = (err) => {
     console.error('QR Scanner Error:', err);
-    setError('Failed to access camera. Please check permissions.');
+    const msg = String(err?.message || err || '');
+    if (msg.includes('Requested device not found')) {
+      setError('No camera found.');
+    } else if (msg.toLowerCase().includes('permission')) {
+      setError('Camera permission denied. Please allow camera access in your browser settings.');
+    } else {
+      setError('Failed to access camera. Please check permissions.');
+    }
   };
 
   const startScanning = () => {
+    // Always allow camera to open; auth is enforced on processing
     setScanning(true);
     setError(null);
     setScanResult(null);
+    setLoadingMessage('Scanning...');
   };
 
   const stopScanning = () => {
     setScanning(false);
+    cancelRef.current.canceled = true;
   };
 
   return (
@@ -109,6 +197,7 @@ const BatchQRScanner = ({ onScanComplete }) => {
       {loading && (
         <div className="flex justify-center my-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-3 text-sm text-blue-300">{loadingMessage || 'Loading...'}</span>
         </div>
       )}
 
@@ -226,6 +315,8 @@ const BatchQRScanner = ({ onScanComplete }) => {
           )}
         </div>
       </div>
+
+      {/* Manual Input Fallback removed as requested */}
 
       {/* Scan Result */}
       {scanResult && (

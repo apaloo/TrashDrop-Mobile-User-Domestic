@@ -11,7 +11,7 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../context/AuthContext.js';
 import { paymentService } from '../services/paymentService.js';
 
 const PaymentMethodForm = ({ onSuccess }) => {
@@ -129,44 +129,54 @@ const PaymentMethodForm = ({ onSuccess }) => {
       )}
 
       <FormControl fullWidth margin="normal">
-        <InputLabel>Payment Type</InputLabel>
+        <InputLabel id="payment-type-label" htmlFor="payment-type">Payment Type</InputLabel>
         <Select
+          native
+          labelId="payment-type-label"
+          id="payment-type"
+          label="Payment Type"
           name="type"
           value={formData.type}
           onChange={handleChange}
           required
         >
-          <MenuItem value="card">Credit/Debit Card</MenuItem>
-          <MenuItem value="bank">Bank Account</MenuItem>
-          <MenuItem value="mobile">Mobile Money</MenuItem>
+          <option aria-label="None" value="" />
+          <option value="card">Credit/Debit Card</option>
+          <option value="bank">Bank Account</option>
+          <option value="mobile">Mobile Money</option>
         </Select>
       </FormControl>
 
       <FormControl fullWidth margin="normal">
-        <InputLabel>Provider</InputLabel>
+        <InputLabel id="provider-label" htmlFor="provider">Provider</InputLabel>
         <Select
+          native
+          labelId="provider-label"
+          id="provider"
+          label="Provider"
           name="provider"
           value={formData.provider}
           onChange={handleChange}
           required
         >
+          <option aria-label="None" value="" />
           {formData.type === 'card' && (
             <>
-              <MenuItem value="visa">Visa</MenuItem>
-              <MenuItem value="mastercard">Mastercard</MenuItem>
+              <option value="visa">Visa</option>
+              <option value="mastercard">Mastercard</option>
             </>
           )}
           {formData.type === 'bank' && (
             <>
-              <MenuItem value="boa">Bank of America</MenuItem>
-              <MenuItem value="chase">Chase</MenuItem>
-              <MenuItem value="wells_fargo">Wells Fargo</MenuItem>
+              <option value="boa">Bank of America</option>
+              <option value="chase">Chase</option>
+              <option value="wells_fargo">Wells Fargo</option>
             </>
           )}
           {formData.type === 'mobile' && (
             <>
-              <MenuItem value="mpesa">M-Pesa</MenuItem>
-              <MenuItem value="airtel">Airtel Money</MenuItem>
+              <option value="mpesa">M-Pesa</option>
+              <option value="airtel">Airtel Money</option>
             </>
           )}
         </Select>

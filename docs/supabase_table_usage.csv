@@ -1,6 +1,6 @@
 table,purpose,where_used,operations
 profiles,User profile and points and metadata,"src/services/userService.js; src/services/rewardsService.js; src/services/notificationService.js",select|update
-user_stats,Aggregated user KPIs (points,reports,pickups,bags),"src/services/userService.js",select
+user_stats,Aggregated user KPIs (points,reports,pickups,bags),"src/services/userService.js; src/services/batchService.js",select|upsert
 user_activity,Canonical activity log for users,"src/services/activityService.js; src/pages/Rewards.js",select|insert
 illegal_dumping_mobile,Mobile-first dumping reports (local-first sync source),"src/services/dumpingService.js; src/utils/realtime.js",insert|select|delete
 dumping_reports_mobile,Detail records for mobile dumping reports,"src/services/dumpingService.js",insert|delete
@@ -17,3 +17,8 @@ reward_redemptions,Reward redemption records,"src/services/rewardsService.js",se
 alerts,In-app notifications/alerts,"src/services/notificationService.js",select|insert|update
 collector_sessions,Live session/reservations for collectors,"src/services/collectorService.js",select|insert|update
 locations,User saved addresses for pickups,"src/services/pickupService.js",select
+
+# New schema-first tables for Scan QR
+batches,Primary batches table (scan + activation),"src/services/batchService.js; src/components/BatchQRScanner.js",select|update
+bags,Individual bags linked to batches (returned on scan),"src/services/batchService.js",select
+batch_count,Aggregate count of batches (optional),"src/services/batchService.js",select

@@ -1,7 +1,11 @@
 import { dumpingService } from '../services/dumpingService';
 import supabase from '../utils/supabaseClient';
 
-describe('DumpingService Mobile Tests', () => {
+// Only run these integration tests when explicitly enabled
+const runIntegration = process.env.RUN_INTEGRATION === 'true';
+const integrationDescribe = runIntegration ? describe : describe.skip;
+
+integrationDescribe('DumpingService Mobile Tests', () => {
   // Create test user before running tests
   beforeAll(async () => {
     const { error } = await supabase.auth.signUp({

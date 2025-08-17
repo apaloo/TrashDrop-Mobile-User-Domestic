@@ -19,7 +19,7 @@ import {
   Stop as StopIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../context/AuthContext.js';
 import { collectorService } from '../services/collectorService.js';
 import GeolocationService from '../utils/geolocationService.js';
 

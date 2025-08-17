@@ -1,25 +1,17 @@
 import qrStorage from '../qrStorage';
 import supabase from '../supabaseClient';
 
-// Mock Supabase client
+// Mock Supabase client (only methods actually used in current implementation)
 jest.mock('../supabaseClient', () => ({
   from: jest.fn(() => ({
-    insert: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    gt: jest.fn().mockReturnThis(),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockReturnThis(),
-    single: jest.fn()
+    eq: jest.fn()
   })),
   rpc: jest.fn()
 }));
 
 describe('QR Code Storage Tests', () => {
   const mockLocationId = '123e4567-e89b-12d3-a456-426614174000';
-  const mockUserId = '123e4567-e89b-12d3-a456-426614174001';
   const mockQrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=test';
 
   beforeEach(() => {
@@ -27,68 +19,47 @@ describe('QR Code Storage Tests', () => {
   });
 
   describe('storeQRCode', () => {
-    it('should store a new QR code successfully', async () => {
-      const mockResponse = {
-        data: {
-          id: '1',
-          location_id: mockLocationId,
-          qr_code_url: mockQrCodeUrl,
-          is_active: true
-        },
-        error: null
-      };
+    it('should store a new QR code locally and return stored object', async () => {
+      const setSpy = jest.spyOn(Storage.prototype, 'setItem');
 
-      supabase.from().single.mockResolvedValue(mockResponse);
+      const result = await qrStorage.storeQRCode(mockLocationId, mockQrCodeUrl);
 
-      const result = await qrStorage.storeQRCode({
-        userId: mockUserId,
-        locationId: mockLocationId,
-        qrCodeUrl: mockQrCodeUrl
-      });
+      expect(result).toBeTruthy();
+      expect(result.locationId).toBe(mockLocationId);
+      expect(result.qrCodeUrl).toBe(mockQrCodeUrl);
+      expect(result.storedAt).toBeDefined();
+      expect(setSpy).toHaveBeenCalledWith(
+        `qr_${mockLocationId}`,
+        expect.any(String)
+      );
 
-      expect(result).toEqual(mockResponse.data);
-      expect(supabase.from).toHaveBeenCalledWith('digital_bins');
-    });
-
-    it('should handle storage errors', async () => {
-      const mockError = new Error('Database error');
-      supabase.from().single.mockRejectedValue(mockError);
-
-      await expect(qrStorage.storeQRCode({
-        userId: mockUserId,
-        locationId: mockLocationId,
-        qrCodeUrl: mockQrCodeUrl
-      })).rejects.toThrow('Database error');
+      setSpy.mockRestore();
     });
   });
 
   describe('getQRCode', () => {
-    it('should retrieve an active QR code', async () => {
-      const mockResponse = {
-        data: {
-          id: '1',
-          location_id: mockLocationId,
-          qr_code_url: mockQrCodeUrl,
-          is_active: true
-        },
-        error: null
+    it('should retrieve an active QR code from localStorage', async () => {
+      const validData = {
+        locationId: mockLocationId,
+        qrCodeUrl: mockQrCodeUrl,
+        expires: Date.now() + 60_000,
+        storedAt: Date.now()
       };
-
-      supabase.from().maybeSingle.mockResolvedValue(mockResponse);
+      localStorage.setItem(`qr_${mockLocationId}`, JSON.stringify(validData));
 
       const result = await qrStorage.getQRCode(mockLocationId);
 
-      expect(result).toEqual(mockResponse.data);
-      expect(supabase.from).toHaveBeenCalledWith('digital_bins');
+      expect(result).toEqual(validData);
     });
 
-    it('should return null for expired QR codes', async () => {
-      const mockResponse = {
-        data: null,
-        error: null
+    it('should return null for expired QR codes in localStorage', async () => {
+      const expiredData = {
+        locationId: mockLocationId,
+        qrCodeUrl: mockQrCodeUrl,
+        expires: Date.now() - 60_000,
+        storedAt: Date.now() - 120_000
       };
-
-      supabase.from().maybeSingle.mockResolvedValue(mockResponse);
+      localStorage.setItem(`qr_${mockLocationId}`, JSON.stringify(expiredData));
 
       const result = await qrStorage.getQRCode(mockLocationId);
 
@@ -98,17 +69,17 @@ describe('QR Code Storage Tests', () => {
 
   describe('invalidateQRCode', () => {
     it('should mark a QR code as inactive', async () => {
-      const mockResponse = {
-        error: null
-      };
-
-      supabase.from().update.mockReturnThis();
-      supabase.from().update().eq.mockResolvedValue(mockResponse);
+      const mockResponse = { error: null };
+      const eqMock = jest.fn().mockResolvedValue(mockResponse);
+      const updateMock = jest.fn(() => ({ eq: eqMock }));
+      supabase.from.mockReturnValue({ update: updateMock });
 
       const result = await qrStorage.invalidateQRCode('1');
 
       expect(result).toBe(true);
       expect(supabase.from).toHaveBeenCalledWith('digital_bins');
+      expect(updateMock).toHaveBeenCalled();
+      expect(eqMock).toHaveBeenCalledWith('id', '1');
     });
   });
 

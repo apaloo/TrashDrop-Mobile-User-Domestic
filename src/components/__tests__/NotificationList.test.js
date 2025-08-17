@@ -1,14 +1,14 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react.js';
-import userEvent from '@testing-library/user-event.js';
-import '@testing-library/jest-dom.js';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
 import NotificationList from '../NotificationList.js';
 import { notificationService } from '../../services/notificationService.js';
-import { useAuth } from '../../contexts/AuthContext.js';
+import { useAuth } from '../../context/AuthContext.js';
 
 // Mock the services and hooks
 jest.mock('../../services/notificationService.js');
-jest.mock('../../contexts/AuthContext.js');
+jest.mock('../../context/AuthContext.js');
 
 describe('NotificationList', () => {
   const mockUser = { id: 'user123' };
@@ -84,30 +84,38 @@ describe('NotificationList', () => {
   it('marks notification as read', async () => {
     render(<NotificationList />);
 
-    // Just verify the component renders
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    // Wait for loading to finish and header to render
+    await waitFor(() => {
+      expect(screen.getByText('Notifications')).toBeInTheDocument();
+    });
   });
 
   it('renders notification preferences toggle', async () => {
     render(<NotificationList />);
 
-    // Just verify the component renders
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    // Wait for loading to finish and header to render
+    await waitFor(() => {
+      expect(screen.getByText('Notifications')).toBeInTheDocument();
+    });
   });
 
   it('updates notification preferences', async () => {
     render(<NotificationList />);
 
-    // Just verify the component renders and service exists
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    // Wait for loading to finish and header to render
+    await waitFor(() => {
+      expect(screen.getByText('Notifications')).toBeInTheDocument();
+    });
     expect(notificationService.updateNotificationPreferences).toBeDefined();
   });
 
   it('can delete old notifications', async () => {
     render(<NotificationList />);
 
-    // Just verify the component renders and service exists
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    // Wait for loading to finish and header to render
+    await waitFor(() => {
+      expect(screen.getByText('Notifications')).toBeInTheDocument();
+    });
     expect(notificationService.deleteOldNotifications).toBeDefined();
   });
 

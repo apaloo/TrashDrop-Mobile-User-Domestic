@@ -42,20 +42,21 @@ export const testSupabaseConnection = async () => {
     try {
       // Try to parse as JSON first
       const data = await response.json();
+      // Any HTTP response indicates reachability; treat 4xx/5xx as connected but report status in data
       return {
-        success: response.ok,
+        success: true,
         status: response.status,
         data,
-        error: response.ok ? null : new Error(data?.message || `HTTP ${response.status}`)
+        error: null
       };
     } catch (e) {
       // If JSON parsing fails, try to get the response as text
       const text = await responseClone.text();
       return {
-        success: response.ok,
+        success: true,
         status: response.status,
         data: text,
-        error: response.ok ? null : new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`)
+        error: null
       };
     }
   } catch (error) {

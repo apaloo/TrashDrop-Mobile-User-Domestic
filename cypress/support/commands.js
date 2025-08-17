@@ -13,11 +13,20 @@ Cypress.Commands.add('login', () => {
 });
 
 // Wait for toast notification with specific message
-Cypress.Commands.add('waitForToast', (message, type = '') => {
-  const selector = type ? `.toast-notification.${type}` : '.toast-notification';
-  cy.get(selector)
+// More robust: searches by text content, allows longer timeout, and validates type class if provided
+Cypress.Commands.add('waitForToast', (message, type = '', options = {}) => {
+  const { timeout = 10000 } = options;
+  const baseSelector = '.toast-notification';
+  const selector = type ? `${baseSelector}.${type}` : baseSelector;
+
+  // Use cy.contains to match exact toast element containing the message
+  cy.contains(selector, message, { timeout })
     .should('be.visible')
-    .and('contain', message);
+    .then(($el) => {
+      if (type) {
+        expect($el).to.have.class(type);
+      }
+    });
 });
 
 // Wait for toast notification to disappear

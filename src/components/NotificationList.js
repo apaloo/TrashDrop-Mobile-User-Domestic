@@ -24,7 +24,7 @@ import {
   DeleteOutline,
   Settings as SettingsIcon
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../context/AuthContext.js';
 import { notificationService } from '../services/notificationService.js';
 
 const NotificationList = () => {

@@ -242,7 +242,9 @@ export function handleStatsUpdate(tableType, payload, currentStats) {
         updatedStats.points = newRecord.points || updatedStats.points;
         updatedStats.pickups = newRecord.pickups || updatedStats.pickups;
         updatedStats.reports = newRecord.reports || updatedStats.reports;
-        updatedStats.batches = newRecord.batches || updatedStats.batches;
+        updatedStats.batches = (newRecord.total_batches !== undefined)
+          ? newRecord.total_batches
+          : (newRecord.batches !== undefined ? newRecord.batches : updatedStats.batches);
         // Keep both snake_case and camelCase for compatibility across components
         updatedStats.total_bags = newRecord.total_bags || updatedStats.total_bags;
         updatedStats.totalBags = newRecord.total_bags !== undefined

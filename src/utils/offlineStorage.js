@@ -6,12 +6,15 @@
 
 // Constants for IndexedDB
 const DB_NAME = 'trashdrop_offline_db';
-const DB_VERSION = 3; // Increment version for schema changes with user stats caching
+const DB_VERSION = 4; // Incremented for new stores: batches, bags, batch_count
 const REPORTS_STORE = 'dumping_reports';
 const LOCATIONS_STORE = 'saved_locations';
 const SYNC_QUEUE_STORE = 'sync_queue';
 const USER_STATS_STORE = 'user_stats';
 const USER_ACTIVITY_STORE = 'user_activity';
+const BATCHES_STORE = 'batches';
+const BAGS_STORE = 'bags';
+const BATCH_COUNT_STORE = 'batch_count';
 
 /**
  * Initialize IndexedDB
@@ -70,6 +73,27 @@ const initDB = () => {
         const userActivityStore = db.createObjectStore(USER_ACTIVITY_STORE, { keyPath: 'id', autoIncrement: true });
         userActivityStore.createIndex('user_id', 'user_id', { unique: false });
         userActivityStore.createIndex('created_at', 'created_at', { unique: false });
+      }
+
+      // Mirror remote schema tables used by Scan QR for offline parity
+      if (!db.objectStoreNames.contains(BATCHES_STORE)) {
+        console.log('Creating batches store');
+        const batchesStore = db.createObjectStore(BATCHES_STORE, { keyPath: 'id' });
+        batchesStore.createIndex('batch_number', 'batch_number', { unique: false });
+        batchesStore.createIndex('status', 'status', { unique: false });
+        batchesStore.createIndex('created_by', 'created_by', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains(BAGS_STORE)) {
+        console.log('Creating bags store');
+        const bagsStore = db.createObjectStore(BAGS_STORE, { keyPath: 'id' });
+        bagsStore.createIndex('batch_id', 'batch_id', { unique: false });
+        bagsStore.createIndex('status', 'status', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains(BATCH_COUNT_STORE)) {
+        console.log('Creating batch_count store');
+        db.createObjectStore(BATCH_COUNT_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -370,6 +394,102 @@ export const isOnline = () => {
   return navigator.onLine;
 };
 
+// -----------------------
+// Batch/bags cache helpers
+// -----------------------
+
+export const cacheBatch = async (batch) => {
+  if (!batch || !batch.id) return null;
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BATCHES_STORE], 'readwrite');
+    const store = tx.objectStore(BATCHES_STORE);
+    const req = store.put(batch);
+    req.onsuccess = () => resolve(batch);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getCachedBatchById = async (id) => {
+  if (!id) return null;
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BATCHES_STORE], 'readonly');
+    const store = tx.objectStore(BATCHES_STORE);
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getCachedBatchByNumber = async (batchNumber) => {
+  if (!batchNumber) return null;
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BATCHES_STORE], 'readonly');
+    const store = tx.objectStore(BATCHES_STORE);
+    const index = store.index('batch_number');
+    const req = index.get(batchNumber);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const cacheBags = async (batchId, bags) => {
+  if (!batchId || !Array.isArray(bags)) return 0;
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BAGS_STORE], 'readwrite');
+    const store = tx.objectStore(BAGS_STORE);
+    let count = 0;
+    const onComplete = () => resolve(count);
+    tx.oncomplete = onComplete;
+    tx.onerror = (e) => reject(e.target.error);
+    bags.forEach((bag) => {
+      try {
+        store.put({ ...bag, batch_id: bag.batch_id || batchId });
+        count += 1;
+      } catch (_) {}
+    });
+  });
+};
+
+export const getCachedBags = async (batchId) => {
+  if (!batchId) return [];
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BAGS_STORE], 'readonly');
+    const store = tx.objectStore(BAGS_STORE);
+    const index = store.index('batch_id');
+    const req = index.getAll(batchId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const cacheBatchCount = async (row) => {
+  if (!row || !row.id) return null; // row like { id: 'singleton', count: N }
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BATCH_COUNT_STORE], 'readwrite');
+    const store = tx.objectStore(BATCH_COUNT_STORE);
+    const req = store.put(row);
+    req.onsuccess = () => resolve(row);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getCachedBatchCount = async (id = 'singleton') => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BATCH_COUNT_STORE], 'readonly');
+    const store = tx.objectStore(BATCH_COUNT_STORE);
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
 /**
  * Cache user stats for offline access
  * @param {string} userId - User ID
@@ -562,7 +682,14 @@ const offlineStorageAPI = {
   cacheUserStats,
   getCachedUserStats,
   cacheUserActivity,
-  getCachedUserActivity
+  getCachedUserActivity,
+  cacheBatch,
+  getCachedBatchById,
+  getCachedBatchByNumber,
+  cacheBags,
+  getCachedBags,
+  cacheBatchCount,
+  getCachedBatchCount
 };
 
 export default offlineStorageAPI;

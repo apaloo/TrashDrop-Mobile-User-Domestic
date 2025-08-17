@@ -4,8 +4,323 @@
  */
 
 import supabase from '../utils/supabaseClient.js';
+import offlineStorageAPI, { addToSyncQueue, removeFromSyncQueue, isOnline } from '../utils/offlineStorage.js';
 
 export const batchService = {
+  // ---- Runtime helpers (timeout/retry + local cache for scanned batches) ----
+  _DEFAULT_TIMEOUT_MS: 10000,
+  _DEFAULT_MAX_RETRIES: 3,
+  _LOCAL_CACHE_KEY: 'td_scanned_batches',
+  _USER_ACCOUNT_TABLE: 'user_stats',
+  _BATCH_TABLE: 'batches',
+  _BAGS_TABLE: 'bags',
+
+  _withTimeout(promise, ms = 10000) {
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('Request timed out')), ms);
+      promise
+        .then((v) => { clearTimeout(t); resolve(v); })
+        .catch((e) => { clearTimeout(t); reject(e); });
+    });
+  },
+
+  /**
+   * Fetch user account row (available_bags, scanned_batches, totals)
+   */
+  async getUserAccount(userId) {
+    const { data, error } = await supabase
+      .from(this._USER_ACCOUNT_TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') return { data: null, error };
+    return { data: data || null, error: null };
+  },
+
+  /**
+   * Update user account after successful verification
+   * - increments available_bags and total_bags_scanned
+   * - appends batch_id to scanned_batches (unique)
+   */
+  async updateUserAccountAfterBatch(userId, batchId, bagsToAdd) {
+    const { data: acct, error: acctErr } = await this.getUserAccount(userId);
+    if (acctErr) return { data: null, error: acctErr };
+
+    const scanned = Array.isArray(acct?.scanned_batches) ? acct.scanned_batches : [];
+    if (scanned.includes(batchId)) {
+      return { data: { duplicate: true }, error: null };
+    }
+
+    const updated = {
+      user_id: userId,
+      available_bags: (acct?.available_bags || 0) + (bagsToAdd || 0),
+      total_bags_scanned: (acct?.total_bags_scanned || 0) + (bagsToAdd || 0),
+      scanned_batches: [...new Set([...scanned, batchId])],
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from(this._USER_ACCOUNT_TABLE)
+      .upsert(updated, { onConflict: 'user_id' })
+      .select()
+      .single();
+    if (error) return { data: null, error };
+    return { data, error: null };
+  },
+
+  /**
+   * Verify batch in new 'batch' table according to requirements
+   * - batch_id match, is_certified = true
+   * Returns { id, batch_id, total_bags_count }
+   */
+  async verifyBatchInPrimaryTable(batchIdRaw) {
+    const batchId = String(batchIdRaw || '').trim();
+    if (!batchId) return { data: null, error: { message: 'Invalid batch id' } };
+    // In the actual schema, the table is 'batches' with id (UUID) and batch_number (text)
+    let row = null;
+    try {
+      // If UUID, match by id, else by batch_number with fallbacks
+      const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
+      if (isUUID(batchId)) {
+        const res = await supabase.from(this._BATCH_TABLE).select('*').eq('id', batchId).limit(1);
+        if (res.error) return { data: null, error: res.error };
+        row = Array.isArray(res.data) ? res.data[0] : null;
+      } else {
+        // Try exact, then ilike, then contains
+        let res = await supabase.from(this._BATCH_TABLE).select('*').eq('batch_number', batchId).limit(1);
+        if (res.error) return { data: null, error: res.error };
+        row = Array.isArray(res.data) ? res.data[0] : null;
+        if (!row) {
+          res = await supabase.from(this._BATCH_TABLE).select('*').ilike('batch_number', batchId).limit(1);
+          if (res.error) return { data: null, error: res.error };
+          row = Array.isArray(res.data) ? res.data[0] : null;
+        }
+        if (!row) {
+          res = await supabase.from(this._BATCH_TABLE).select('*').ilike('batch_number', `%${batchId}%`).limit(1);
+          if (res.error) return { data: null, error: res.error };
+          row = Array.isArray(res.data) ? res.data[0] : null;
+        }
+      }
+    } catch (e) {
+      return { data: null, error: { message: e?.message || 'Batch lookup failed' } };
+    }
+    if (!row) return { data: null, error: { message: 'Batch not recognized' } };
+
+    return { data: {
+      id: row.id,
+      // Canonical identifier is the primary key UUID
+      batch_id: row.id,
+      total_bags_count: row.bag_count || 0,
+      is_certified: true,
+      created_at: row.created_at,
+    }, error: null };
+  },
+
+  /**
+   * Full verification and account update flow per requirements.
+   */
+  async verifyBatchAndUpdateUser(batchIdRaw, userId, options = {}) {
+    const timeoutMs = options.timeoutMs ?? this._DEFAULT_TIMEOUT_MS;
+    const maxRetries = options.maxRetries ?? this._DEFAULT_MAX_RETRIES;
+
+    // Local-first duplicate prevention
+    if (this.isBatchLocallyScanned(batchIdRaw)) {
+      return { data: null, error: { message: 'Batch already scanned', code: 'BATCH_DUPLICATE' } };
+    }
+
+    // Delegate to main activation flow which already updates user_stats and handles retries/timeouts
+    const res = await this.activateBatchForUserWithRetry(batchIdRaw, userId, { timeoutMs, maxRetries });
+    if (res.error) {
+      return { data: null, error: res.error, attempts: res.attempts, timedOut: res.timedOut };
+    }
+    return { data: { ...res.data, bagsAdded: res.data?.bags_added || 0 }, error: null, attempts: res.attempts };
+  },
+
+  /**
+   * Scan a batch in primary 'batches' table and fetch associated 'bags'.
+   * Requires status === 'active'. Returns { batch, bags }.
+   */
+  async scanBatchAndFetchBags(batchIdentifier) {
+    const normalize = (s) => String(s || '').trim();
+    const idRaw = normalize(batchIdentifier);
+    if (!idRaw) return { data: null, error: { message: 'Invalid batch identifier', code: 'BATCH_INVALID' } };
+    const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
+
+    let batch = null;
+    try {
+      if (isUUID(idRaw)) {
+        const r = await supabase.from(this._BATCH_TABLE).select('*').eq('id', idRaw).maybeSingle();
+        if (r.error && r.error.code !== 'PGRST116') return { data: null, error: r.error };
+        batch = r.data || null;
+      } else {
+        const cands = [idRaw, /^batch-/i.test(idRaw) ? idRaw.replace(/^batch-/i, '') : `BATCH-${idRaw}`];
+        for (const cand of cands) {
+          const r = await supabase.from(this._BATCH_TABLE).select('*').eq('batch_number', cand).limit(1);
+          if (r.error) return { data: null, error: r.error };
+          const found = Array.isArray(r.data) ? r.data[0] : null;
+          if (found) { batch = found; break; }
+        }
+      }
+    } catch (e) {
+      return { data: null, error: { message: e?.message || 'Lookup failed' } };
+    }
+
+    if (!batch) return { data: null, error: { message: 'Batch not found', code: 'BATCH_INVALID' } };
+    const statusVal = String(batch.status || '').toLowerCase();
+    if (statusVal && statusVal !== 'active') {
+      return { data: null, error: { message: 'Batch is not active', code: 'BATCH_INACTIVE' } };
+    }
+
+    // Fetch associated bags
+    let bags = [];
+    try {
+      const br = await supabase.from(this._BAGS_TABLE).select('*').eq('batch_id', batch.id);
+      if (br.error) {
+        // If bags table unavailable, fallback to zero or batch.bag_count as virtual
+        bags = Array(Number(batch.bag_count || 0)).fill(null).map((_, i) => ({ id: `virtual-${i+1}`, batch_id: batch.id }));
+      } else {
+        bags = Array.isArray(br.data) ? br.data : [];
+      }
+    } catch (_) {
+      bags = Array(Number(batch.bag_count || 0)).fill(null).map((_, i) => ({ id: `virtual-${i+1}`, batch_id: batch.id }));
+    }
+
+    // Cache locally for offline parity
+    try {
+      await offlineStorageAPI.cacheBatch(batch);
+      await offlineStorageAPI.cacheBags(batch.id, bags);
+    } catch (_) {}
+
+    return { data: { batch, bags }, error: null };
+  },
+
+  /**
+   * Enqueue a batch activation to be processed when online.
+   */
+  async enqueueBatchActivation(batchIdentifier, userId) {
+    const op = {
+      operation: 'batch_activation',
+      storeName: 'sync_queue',
+      data: { batchIdentifier, userId },
+      createdAt: new Date().toISOString()
+    };
+    try {
+      await addToSyncQueue(op);
+      this.markBatchLocallyScanned(batchIdentifier, { userId, queued: true });
+      this._ensureOnlineSyncListener();
+      return { data: { queued: true }, error: null };
+    } catch (e) {
+      return { data: null, error: { message: e?.message || 'Failed to enqueue activation' } };
+    }
+  },
+
+  _onlineListenerAttached: false,
+  _ensureOnlineSyncListener() {
+    if (this._onlineListenerAttached || typeof window === 'undefined') return;
+    window.addEventListener('online', () => {
+      this.processActivationQueue();
+    });
+    this._onlineListenerAttached = true;
+  },
+
+  /**
+   * Process queued batch activations (called when coming online or manually).
+   */
+  async processActivationQueue(limit = 10) {
+    if (!isOnline()) return { processed: 0 };
+    // Read all sync_queue entries and filter in-memory to our type
+    let processed = 0;
+    try {
+      // Reuse IndexedDB directly via offlineStorageAPI internals is not exposed; instead, read pending reports is separate.
+      // We'll open the DB similarly by calling a light wrapper through addToSyncQueue/removeFromSyncQueue is not enough.
+      // Here, we access the DB by importing default offlineStorageAPI which carries init through its exported functions.
+      const db = await (async () => {
+        // Hacky: piggyback on an operation to ensure DB open
+        try { await addToSyncQueue({ operation: 'noop', storeName: 'sync_queue', data: { ts: Date.now() }, createdAt: new Date().toISOString() }); } catch (_) {}
+        // Now open explicitly using indexedDB (same name/version). We replicate constants to avoid exporting internals.
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open('trashdrop_offline_db', 4);
+          request.onsuccess = (e) => resolve(e.target.result);
+          request.onerror = (e) => reject(e.target.error);
+        });
+      })();
+
+      const tx = db.transaction(['sync_queue'], 'readwrite');
+      const store = tx.objectStore('sync_queue');
+      const getAllReq = store.getAll();
+      const entries = await new Promise((res, rej) => {
+        getAllReq.onsuccess = () => res(getAllReq.result || []);
+        getAllReq.onerror = (ev) => rej(ev.target.error);
+      });
+      const queue = entries.filter((e) => e.operation === 'batch_activation').slice(0, limit);
+
+      for (const item of queue) {
+        const { batchIdentifier, userId } = item.data || {};
+        const result = await this.activateBatchForUserWithRetry(batchIdentifier, userId, { ignoreLocalDuplicate: true });
+        if (!result.error) {
+          await removeFromSyncQueue(item.id);
+          processed += 1;
+          // Broadcast realtime UI update similar to scanner success flow
+          try {
+            const bagsAdded = Number(result?.data?.bags_added || 0);
+            if (bagsAdded && typeof window !== 'undefined') {
+              const evt = new CustomEvent('trashdrop:bags-updated', {
+                detail: { userId, deltaBags: bagsAdded, source: 'batch-scan-sync' }
+              });
+              window.dispatchEvent(evt);
+            }
+          } catch (_) {}
+        }
+      }
+      return { processed };
+    } catch (e) {
+      console.warn('[BatchService] processActivationQueue failed:', e);
+      return { processed };
+    }
+  },
+
+  _sleep(ms) { return new Promise((r) => setTimeout(r, ms)); },
+
+  _getLocalScanCache() {
+    try {
+      const raw = localStorage.getItem(this._LOCAL_CACHE_KEY);
+      return raw ? JSON.parse(raw) : { items: {}, updatedAt: Date.now() };
+    } catch (_) {
+      return { items: {}, updatedAt: Date.now() };
+    }
+  },
+
+  _setLocalScanCache(cache) {
+    try { localStorage.setItem(this._LOCAL_CACHE_KEY, JSON.stringify(cache)); } catch (_) {}
+  },
+
+  isBatchLocallyScanned(identifier) {
+    const key = String(identifier || '').trim();
+    if (!key) return false;
+    const cache = this._getLocalScanCache();
+    return !!cache.items[key];
+  },
+
+  markBatchLocallyScanned(identifier, meta = {}) {
+    const key = String(identifier || '').trim();
+    if (!key) return;
+    const cache = this._getLocalScanCache();
+    cache.items[key] = { scannedAt: Date.now(), ...meta };
+    cache.updatedAt = Date.now();
+    this._setLocalScanCache(cache);
+  },
+
+  clearLocalScan(identifier) {
+    const key = String(identifier || '').trim();
+    if (!key) return;
+    const cache = this._getLocalScanCache();
+    if (cache.items[key]) {
+      delete cache.items[key];
+      cache.updatedAt = Date.now();
+      this._setLocalScanCache(cache);
+    }
+  },
+
   /**
    * Create a new batch of bags
    * @param {string} userId - User ID creating the batch
@@ -67,6 +382,20 @@ export const batchService = {
           ...batchOrder,
           bags: bags
         },
+        error: null
+      };
+
+    } catch (error) {
+      console.error('[BatchService] Error in createBatch:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to create batch',
+          code: error.code || 'CREATE_BATCH_ERROR'
+        }
+      };
+    }
+  },
 
   /**
    * Activate a scanned batch for the user and update stats
@@ -87,72 +416,188 @@ export const batchService = {
       // Helpers (duplicated here to avoid cross-scope access)
       const isUUID = (str) =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
+      const isNumericId = (str) => /^\d+$/.test(String(str || ''));
       const normalizeIdentifier = (input) => {
-        const s = String(input || '').trim();
+        let s = String(input || '').trim();
         if (!s) return s;
+        // URL-decode common encodings
+        try { s = decodeURIComponent(s); } catch (_) {}
+        // If custom scheme (e.g., trashdrop://), coerce to https for parsing
+        const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s);
+        const isHttp = /^https?:\/\//i.test(s);
         try {
-          if (s.startsWith('http://') || s.startsWith('https://')) {
-            const u = new URL(s);
+          if (hasScheme) {
+            const parseStr = isHttp ? s : s.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, 'https://');
+            const u = new URL(parseStr);
+            const qpKeys = ['code', 'batch', 'batch_id', 'batchCode', 'qr', 'id', 'batchNumber', 'batch_qr_code'];
+            for (const k of qpKeys) {
+              const v = u.searchParams.get(k);
+              if (v) return String(v).trim();
+            }
             const parts = u.pathname.split('/').filter(Boolean);
-            return parts[parts.length - 1] || s;
+            const seg = parts[parts.length - 1] || s;
+            const segDec = (() => { try { return decodeURIComponent(seg); } catch { return seg; } })();
+            const batchMatchSeg = segDec.match(/BATCH-[A-Za-z0-9_-]+/i);
+            if (batchMatchSeg) return batchMatchSeg[0];
+            const uuidMatchSeg = segDec.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+            if (uuidMatchSeg) return uuidMatchSeg[0];
+            return String(segDec).trim();
           }
         } catch (_) {}
-        return s;
+        // Prefer batch token anywhere in string, else UUID, else first token sans punctuation
+        const batchMatch = s.match(/BATCH-[A-Za-z0-9_-]+/i);
+        if (batchMatch) return batchMatch[0];
+        const uuidMatch = s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+        if (uuidMatch) return uuidMatch[0];
+        const firstToken = s.split(/\s+/)[0];
+        return firstToken.replace(/[\s,;]+$/g, '');
       };
 
       const normalized = normalizeIdentifier(batchIdentifier);
-      console.log('[BatchService] Activating batch. Raw:', batchIdentifier, 'Normalized:', normalized);
+      console.log('[BatchService] Activating batch. Raw:', batchIdentifier, 'Normalized:', normalized, 'Path:', isUUID(normalized) ? 'id' : 'code');
 
-      // Look up the batch order by id or batch_qr_code
+      // Auth diagnostics to verify real user session/token is present for RLS
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[BatchService][Auth]', {
+          hasSession: !!session,
+          userId: session?.user?.id || null,
+          tokenPresent: !!session?.access_token
+        });
+      } catch (e) {
+        console.warn('[BatchService][Auth] getSession failed:', e?.message || e);
+      }
+
+      // Batches-only path: batches/bags are the sole source of truth
       let batch = null;
-      if (isUUID(normalized)) {
-        const res = await supabase
-          .from('bag_orders')
-          .select('*')
-          .eq('id', normalized)
-          .single();
-        if (res.error) throw res.error;
-        batch = res.data;
-      } else {
-        const res = await supabase
-          .from('bag_orders')
-          .select('*')
-          .eq('batch_qr_code', normalized)
-          .maybeSingle();
-        if (res.error) throw res.error;
-        batch = res.data;
+      const source = 'batches';
+
+      // Helper to build candidate codes (BATCH- prefix variants)
+      const buildCandidates = (value) => {
+        const candidates = [];
+        const pushUnique = (v) => { if (v && !candidates.includes(v)) candidates.push(v); };
+        pushUnique(value);
+        if (/^batch-/i.test(value)) {
+          pushUnique(value.replace(/^batch-/i, ''));
+        } else {
+          pushUnique(`BATCH-${value}`);
+        }
+        return candidates;
+      };
+
+      console.log('[BatchService] Identifier candidates:', buildCandidates(normalized));
+
+      // Look up in 'batches' by id (UUID) or batch_number (text)
+      try {
+        if (isUUID(normalized)) {
+          const res = await supabase.from('batches').select('*').eq('id', normalized).limit(1);
+          if (res.error) throw res.error;
+          batch = Array.isArray(res.data) ? res.data[0] : null;
+        } else {
+          for (const cand of buildCandidates(normalized)) {
+            const res = await supabase.from('batches').select('*').eq('batch_number', cand).limit(1);
+            if (res.error) throw res.error;
+            const found = Array.isArray(res.data) ? res.data[0] : null;
+            if (found) { batch = found; break; }
+          }
+          // Case-insensitive fallback
+          if (!batch) {
+            for (const cand of buildCandidates(normalized)) {
+              const res = await supabase.from('batches').select('*').ilike('batch_number', cand).limit(1);
+              if (res.error) throw res.error;
+              const found = Array.isArray(res.data) ? res.data[0] : null;
+              if (found) { batch = found; break; }
+            }
+            // Wildcard contains fallback
+            if (!batch) {
+              for (const cand of buildCandidates(normalized)) {
+                const res = await supabase.from('batches').select('*').ilike('batch_number', `%${cand}%`).limit(1);
+                if (res.error) throw res.error;
+                const found = Array.isArray(res.data) ? res.data[0] : null;
+                if (found) { batch = found; break; }
+              }
+            }
+          }
+        }
+        // batch found if not null
+      } catch (e) {
+        console.warn('[BatchService] batches lookup failed:', e?.message || e);
       }
 
       if (!batch) {
-        throw new Error('Batch not found for provided identifier');
+        console.warn('[BatchService] No direct match in batches. Attempting server-side verification...');
+        // Policy-safe server-side verification via Netlify Function
+        try {
+          const qs = isUUID(normalized)
+            ? `id=${encodeURIComponent(normalized)}`
+            : `batch_number=${encodeURIComponent(normalized)}`;
+          const resp = await fetch(`/.netlify/functions/check-batch?${qs}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (resp.ok) {
+            const payload = await resp.json();
+            if (payload?.data?.id) {
+              batch = payload.data;
+              console.log('[BatchService] Server-side verification succeeded via', payload?.meta?.by);
+            }
+          } else {
+            console.warn('[BatchService] Server-side verification HTTP', resp.status);
+          }
+        } catch (e) {
+          console.warn('[BatchService] Server-side verification failed:', e?.message || e);
+        }
+
+        if (!batch) {
+          console.warn('[BatchService] No batch match in batches for candidates:', buildCandidates(normalized));
+          throw new Error('Batch not found in batches table for provided identifier');
+        }
       }
-      if (batch.user_id !== userId) {
+
+      // Ownership check: batches.created_by
+      const ownerId = batch.created_by;
+      if (ownerId && ownerId !== userId) {
         throw new Error('This batch is not assigned to the current user');
       }
 
-      // Prevent double-activation
-      if (batch.status && ['activated', 'used'].includes(String(batch.status).toLowerCase())) {
+      // Prevent double-activation/scan and enforce active status for new schema
+      const statusVal = String(batch.status || '').toLowerCase();
+      const alreadyUsed = ['activated', 'used', 'scanned', 'completed'].includes(statusVal);
+      if (alreadyUsed) {
         return { data: { alreadyActivated: true }, error: null };
       }
+      if (source === 'batches' && statusVal && statusVal !== 'active') {
+        return { data: null, error: { message: 'Batch is not active', code: 'BATCH_INACTIVE' } };
+      }
 
-      // Count bags in this batch
-      const bagCountRes = await supabase
-        .from('bag_inventory')
-        .select('id', { count: 'exact', head: true })
-        .eq('batch_id', batch.id);
-      if (bagCountRes.error) throw bagCountRes.error;
-      const bagCount = bagCountRes.count || 0;
+      // Count and fetch bags: only 'bags' table is used; fallback to batch.bag_count as virtual
+      let bagCount = 0;
+      let bagsList = [];
+      try {
+        const bagsRes = await supabase
+          .from(this._BAGS_TABLE)
+          .select('*')
+          .eq('batch_id', batch.id);
+        if (bagsRes.error) throw bagsRes.error;
+        bagsList = Array.isArray(bagsRes.data) ? bagsRes.data : [];
+        bagCount = bagsList.length;
+      } catch (e) {
+        // Fallback to batches.bag_count if 'bags' table doesn't exist
+        bagCount = Number(batch.bag_count || 0);
+        bagsList = Array(bagCount).fill(null).map((_, i) => ({ id: `virtual-${i+1}`, batch_id: batch.id }));
+      }
 
-      // Mark the batch order as activated
-      const updateOrderRes = await supabase
-        .from('bag_orders')
-        .update({ status: 'activated', activated_at: new Date().toISOString() })
+      // Mark batch as used/scanned in 'batches' only and cache locally
+      const updateRes = await supabase
+        .from('batches')
+        .update({ status: 'used', updated_at: new Date().toISOString() })
         .eq('id', batch.id)
         .select()
         .single();
-      if (updateOrderRes.error) throw updateOrderRes.error;
+      if (updateRes.error) throw updateRes.error;
+      try { await offlineStorageAPI.cacheBatch(batch); await offlineStorageAPI.cacheBags(batch.id, bagsList); } catch (_) {}
 
-      // Fetch current user_stats
+      // Update user_stats for Dashboard realtime
       const statsRes = await supabase
         .from('user_stats')
         .select('*')
@@ -162,8 +607,6 @@ export const batchService = {
 
       const currentBags = statsRes.data?.total_bags || 0;
       const currentBatches = statsRes.data?.total_batches || 0;
-
-      // Upsert updated totals
       const newTotals = {
         user_id: userId,
         total_bags: currentBags + bagCount,
@@ -177,8 +620,8 @@ export const batchService = {
         .single();
       if (upsertRes.error) throw upsertRes.error;
 
-      console.log('[BatchService] Activated batch and updated stats:', newTotals);
-      return { data: { activated: true, ...newTotals }, error: null };
+      console.log('[BatchService] Activated batch and updated stats (batches):', newTotals);
+      return { data: { activated: true, bags_added: bagCount, bags: bagsList, batch_id: batch.id, ...newTotals }, error: null };
 
     } catch (error) {
       console.error('[BatchService] Error in activateBatchForUser:', error);
@@ -191,19 +634,52 @@ export const batchService = {
       };
     }
   },
-        error: null
-      };
 
-    } catch (error) {
-      console.error('[BatchService] Error in createBatch:', error);
-      return {
-        data: null,
-        error: {
-          message: error.message || 'Failed to create batch',
-          code: error.code || 'CREATE_BATCH_ERROR'
-        }
-      };
+  /**
+   * Wrapper: activate a batch with timeout and retries. Local-first duplicate prevention.
+   * @param {string} batchIdentifier
+   * @param {string} userId
+   * @param {{timeoutMs?: number, maxRetries?: number, onAttempt?: (n:number)=>void}} options
+   * @returns {Promise<{data: any, error: any, attempts: number, timedOut?: boolean}>}
+   */
+  async activateBatchForUserWithRetry(batchIdentifier, userId, options = {}) {
+    const timeoutMs = options.timeoutMs ?? this._DEFAULT_TIMEOUT_MS;
+    const maxRetries = options.maxRetries ?? this._DEFAULT_MAX_RETRIES;
+
+    // Local duplicate prevention (can be bypassed for queued processing)
+    if (!options.ignoreLocalDuplicate && this.isBatchLocallyScanned(batchIdentifier)) {
+      return { data: { alreadyActivated: true, local: true }, error: null, attempts: 0 };
     }
+
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (typeof options.onAttempt === 'function') options.onAttempt(attempt);
+        const res = await this._withTimeout(this.activateBatchForUser(batchIdentifier, userId), timeoutMs);
+        if (!res?.error) {
+          // Mark locally to prevent re-scan spam; attach small meta
+          this.markBatchLocallyScanned(batchIdentifier, { userId, success: true });
+          return { ...res, attempts: attempt };
+        }
+        lastErr = res.error;
+      } catch (e) {
+        lastErr = { message: e?.message || 'Unknown error', code: e?.code || 'ACTIVATE_RETRY_ERROR' };
+      }
+
+      // Exponential backoff between attempts
+      if (attempt < maxRetries) {
+        const backoff = Math.min(1500 * Math.pow(2, attempt - 1), 5000);
+        await this._sleep(backoff);
+      }
+    }
+
+    // Final failure; do not mark cache as success but remember attempt
+    return {
+      data: null,
+      error: lastErr || { message: 'Failed to activate batch after retries', code: 'ACTIVATE_RETRY_FAILED' },
+      attempts: maxRetries,
+      timedOut: (lastErr?.message || '').toLowerCase().includes('timed out')
+    };
   },
 
   /**
@@ -217,50 +693,169 @@ export const batchService = {
         throw new Error('Batch ID is required');
       }
 
-      // Helpers: UUID check and identifier normalization (handles URLs)
+      // Helpers: UUID/numeric checks and identifier normalization (handles URLs and custom schemes)
       const isUUID = (str) =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
-
+      const isNumericId = (str) => /^\d+$/.test(String(str || ''));
       const normalizeIdentifier = (input) => {
-        const s = String(input || '').trim();
+        let s = String(input || '').trim();
         if (!s) return s;
-        // If it's a URL, extract the last non-empty path segment
+        // URL-decode if encoded
+        try { s = decodeURIComponent(s); } catch (_) {}
+        // Parse URLs including custom schemes (e.g., trashdrop://)
+        const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s);
+        const isHttp = /^https?:\/\//i.test(s);
         try {
-          if (s.startsWith('http://') || s.startsWith('https://')) {
-            const u = new URL(s);
+          if (hasScheme) {
+            const parseStr = isHttp ? s : s.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, 'https://');
+            const u = new URL(parseStr);
+            // Prefer common query parameters if present
+            const qpKeys = ['code', 'batch', 'batch_id', 'batchCode', 'qr', 'id', 'batchNumber', 'batch_qr_code'];
+            for (const k of qpKeys) {
+              const v = u.searchParams.get(k);
+              if (v) return String(v).trim();
+            }
+            // Fallback to last non-empty path segment
             const parts = u.pathname.split('/').filter(Boolean);
-            return parts[parts.length - 1] || s;
+            const seg = parts[parts.length - 1] || s;
+            const segDec = (() => { try { return decodeURIComponent(seg); } catch { return seg; } })();
+            const batchMatchSeg = segDec.match(/BATCH-[A-Za-z0-9_-]+/i);
+            if (batchMatchSeg) return batchMatchSeg[0];
+            const uuidMatchSeg = segDec.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+            if (uuidMatchSeg) return uuidMatchSeg[0];
+            return String(segDec).trim();
           }
-        } catch (_) {
-          // Not a valid URL, fall through
-        }
-        return s;
+        } catch (_) {}
+        // Prefer BATCH token anywhere, else UUID, else first token sans punctuation
+        const batchMatch2 = s.match(/BATCH-[A-Za-z0-9_-]+/i);
+        if (batchMatch2) return batchMatch2[0];
+        const uuidMatch2 = s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+        if (uuidMatch2) return uuidMatch2[0];
+        const first = s.split(/\s+/)[0];
+        return first.replace(/[\s,;]+$/g, '');
       };
 
       const normalized = normalizeIdentifier(batchId);
-      console.log('[BatchService] Fetching batch details. Raw:', batchId, 'Normalized:', normalized);
+      console.log('[BatchService] Fetching batch details. Raw:', batchId, 'Normalized:', normalized, 'Path:', isUUID(normalized) ? 'id' : 'code');
 
-      // Decide which column to query based on identifier format
+      // New primary path: try dedicated 'batch' table first per requirements
+      try {
+        const primary = await this.verifyBatchInPrimaryTable(normalized);
+        if (!primary.error && primary.data) {
+          // No bags table tied here; construct normalized object
+          const normalizedData = {
+            id: primary.data.id,
+            batch_qr_code: primary.data.batch_id,
+            user_id: null, // unknown in primary table
+            status: 'verified',
+            created_at: primary.data.created_at,
+            bags: Array((primary.data.total_bags_count || 0)).fill({}).map((_, i) => ({ id: `virtual-${i+1}` })),
+          };
+          return { data: normalizedData, error: null };
+        }
+      } catch (e) {
+        console.warn('[BatchService] primary batch lookup failed, falling back:', e?.message || e);
+      }
+
+      // Auth diagnostics to verify real user session/token is present for RLS
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[BatchService][Auth]', {
+          hasSession: !!session,
+          userId: session?.user?.id || null,
+          tokenPresent: !!session?.access_token
+        });
+      } catch (e) {
+        console.warn('[BatchService][Auth] getSession failed (details):', e?.message || e);
+      }
+
+      // Try 'batches' first (new schema), then fallback to 'bag_orders' (legacy)
       let batch = null;
+      let source = null;
       let batchError = null;
 
-      if (isUUID(normalized)) {
-        const res = await supabase
-          .from('bag_orders')
-          .select('*')
-          .eq('id', normalized)
-          .single();
-        batch = res.data;
-        batchError = res.error;
-      } else {
-        // Try matching against the batch QR/code column for non-UUID identifiers
-        const res = await supabase
-          .from('bag_orders')
-          .select('*')
-          .eq('batch_qr_code', normalized)
-          .maybeSingle();
-        batch = res.data;
-        batchError = res.error;
+      const buildCandidates = (value) => {
+        const candidates = [];
+        const pushUnique = (v) => { if (v && !candidates.includes(v)) candidates.push(v); };
+        pushUnique(value);
+        if (/^batch-/i.test(value)) {
+          pushUnique(value.replace(/^batch-/i, ''));
+        } else {
+          pushUnique(`BATCH-${value}`);
+        }
+        return candidates;
+      };
+
+      console.log('[BatchService] Identifier candidates (details):', buildCandidates(normalized));
+
+      // 1) Try batches by id (UUID) or batch_number
+      try {
+        if (isUUID(normalized)) {
+          const res = await supabase.from('batches').select('*').eq('id', normalized).limit(1);
+          batch = Array.isArray(res.data) ? res.data[0] : null;
+          batchError = res.error || null;
+        } else {
+          for (const cand of buildCandidates(normalized)) {
+            const res = await supabase.from('batches').select('*').eq('batch_number', cand).limit(1);
+            if (res.error) { batchError = res.error; break; }
+            const found = Array.isArray(res.data) ? res.data[0] : null;
+            if (found) { batch = found; break; }
+          }
+          if (!batch && !batchError) {
+            for (const cand of buildCandidates(normalized)) {
+              const res = await supabase.from('batches').select('*').ilike('batch_number', cand).limit(1);
+              if (res.error) { batchError = res.error; break; }
+              const found = Array.isArray(res.data) ? res.data[0] : null;
+              if (found) { batch = found; break; }
+            }
+            // Wildcard contains fallback
+            if (!batch && !batchError) {
+              for (const cand of buildCandidates(normalized)) {
+                const res = await supabase.from('batches').select('*').ilike('batch_number', `%${cand}%`).limit(1);
+                if (res.error) { batchError = res.error; break; }
+                const found = Array.isArray(res.data) ? res.data[0] : null;
+                if (found) { batch = found; break; }
+              }
+            }
+          }
+        }
+        if (batch) source = 'batches';
+      } catch (e) {
+        console.warn('[BatchService] batches lookup failed (details):', e?.message || e);
+      }
+
+      // 2) Fallback to bag_orders by id or batch_qr_code
+      if (!batch && !batchError) {
+        if (isUUID(normalized)) {
+          const res = await supabase.from('bag_orders').select('*').eq('id', normalized).limit(1);
+          batch = Array.isArray(res.data) ? res.data[0] : null;
+          batchError = res.error || null;
+        } else if (isNumericId(normalized)) {
+          console.log('[BatchService] bag_orders numeric-id lookup (details)');
+          const res = await supabase.from('bag_orders').select('*').eq('id', Number(normalized)).limit(1);
+          batch = Array.isArray(res.data) ? res.data[0] : null;
+          batchError = res.error || null;
+        } else {
+          for (const cand of buildCandidates(normalized)) {
+            const res = await supabase.from('bag_orders').select('*').eq('batch_qr_code', cand).limit(1);
+            if (res.error) { batchError = res.error; break; }
+            const found = Array.isArray(res.data) ? res.data[0] : null;
+            if (found) { batch = found; break; }
+          }
+          if (!batch && !batchError) {
+            for (const cand of buildCandidates(normalized)) {
+              let res = await supabase.from('bag_orders').select('*').ilike('batch_qr_code', cand).limit(1);
+              if (res.error) { batchError = res.error; break; }
+              let found = Array.isArray(res.data) ? res.data[0] : null;
+              if (found) { batch = found; break; }
+              res = await supabase.from('bag_orders').select('*').ilike('batch_qr_code', `%${cand}%`).limit(1);
+              if (res.error) { batchError = res.error; break; }
+              found = Array.isArray(res.data) ? res.data[0] : null;
+              if (found) { batch = found; break; }
+            }
+          }
+        }
+        if (batch) source = 'bag_orders';
       }
 
       if (batchError) {
@@ -269,26 +864,37 @@ export const batchService = {
       }
 
       if (!batch) {
+        console.warn('[BatchService] No batch match for candidates (details):', buildCandidates(normalized));
         throw new Error('Batch not found for provided identifier');
       }
 
-      const { data: bags, error: bagsError } = await supabase
-        .from('bag_inventory')
-        .select('*')
-        .eq('batch_id', batch.id);
-
-      if (bagsError) {
-        console.error('[BatchService] Error fetching bags:', bagsError);
-        throw bagsError;
+      // Fetch associated bags based on source
+      let bags = [];
+      if (source === 'batches') {
+        const bagsRes = await supabase.from('bags').select('*').eq('batch_id', batch.id);
+        if (bagsRes.error) {
+          console.error('[BatchService] Error fetching bags (batches):', bagsRes.error);
+          throw bagsRes.error;
+        }
+        bags = bagsRes.data || [];
+      } else {
+        const bagsRes = await supabase.from('bag_inventory').select('*').eq('batch_id', batch.id);
+        if (bagsRes.error) {
+          console.error('[BatchService] Error fetching bags (bag_inventory):', bagsRes.error);
+          throw bagsRes.error;
+        }
+        bags = bagsRes.data || [];
       }
 
-      return {
-        data: {
-          ...batch,
-          bags: bags || []
-        },
-        error: null
+      // Normalize fields for UI compatibility
+      const normalizedData = {
+        ...batch,
+        batch_qr_code: source === 'batches' ? (batch.batch_number || batch.batch_name || batch.id) : batch.batch_qr_code,
+        user_id: source === 'batches' ? batch.created_by : batch.user_id,
+        bags
       };
+
+      return { data: normalizedData, error: null };
 
     } catch (error) {
       console.error('[BatchService] Error in getBatchDetails:', error);

@@ -1,14 +1,14 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react.js';
-import userEvent from '@testing-library/user-event.js';
-import '@testing-library/jest-dom.js';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
 import PaymentMethodForm from '../PaymentMethodForm.js';
 import { paymentService } from '../../services/paymentService.js';
-import { useAuth } from '../../contexts/AuthContext.js';
+import { useAuth } from '../../context/AuthContext.js';
 
 // Mock the services and hooks
 jest.mock('../../services/paymentService.js');
-jest.mock('../../contexts/AuthContext.js');
+jest.mock('../../context/AuthContext.js');
 
 describe('PaymentMethodForm', () => {
   const mockUser = { id: 'user123' };
@@ -37,17 +37,14 @@ describe('PaymentMethodForm', () => {
     // Check for required fields
     expect(screen.getByLabelText(/Payment Type/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Provider/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add Payment Method/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add Payment Method/i })).toBeInTheDocument();
   });
 
   it('shows card fields when card payment type is selected', async () => {
     render(<PaymentMethodForm />);
     
-    // Select card payment type using fireEvent
-    const typeSelect = screen.getByLabelText(/Payment Type/i);
-    fireEvent.mouseDown(typeSelect);
-    const cardOption = screen.getByText(/Credit\/Debit Card/i);
-    fireEvent.click(cardOption);
+    // Select card payment type via native change
+    fireEvent.change(screen.getByLabelText(/Payment Type/i), { target: { value: 'card' } });
 
     // Check for card-specific fields
     await waitFor(() => {
@@ -60,17 +57,22 @@ describe('PaymentMethodForm', () => {
   it('validates card number format', async () => {
     render(<PaymentMethodForm />);
     
-    // Select card payment type
-    const typeSelect = screen.getByLabelText(/Payment Type/i);
-    userEvent.click(typeSelect);
-    userEvent.click(screen.getByText(/Credit\/Debit Card/i));
+    // Select card payment type via native change
+    fireEvent.change(screen.getByLabelText(/Payment Type/i), { target: { value: 'card' } });
 
     // Enter invalid card number
     const cardInput = await screen.findByLabelText(/Card Number/i);
     fireEvent.change(cardInput, { target: { value: '1234' } });
 
+    // Set required related fields so we hit card number validation
+    fireEvent.change(screen.getByLabelText(/Provider/i), { target: { value: 'visa' } });
+    const expiryOk = screen.getByLabelText(/Expiry Date/i);
+    fireEvent.change(expiryOk, { target: { value: '12/25' } });
+    const cvvOk = screen.getByLabelText(/CVV/i);
+    fireEvent.change(cvvOk, { target: { value: '123' } });
+
     // Submit form
-    const submitButton = screen.getByText(/Add Payment Method/i);
+    const submitButton = screen.getByRole('button', { name: /Add Payment Method/i });
     fireEvent.click(submitButton);
 
     // Check for error message
@@ -80,17 +82,22 @@ describe('PaymentMethodForm', () => {
   it('validates expiry date format', async () => {
     render(<PaymentMethodForm />);
     
-    // Select card payment type
-    const typeSelect = screen.getByLabelText(/Payment Type/i);
-    userEvent.click(typeSelect);
-    userEvent.click(screen.getByText(/Credit\/Debit Card/i));
+    // Select card payment type via native change
+    fireEvent.change(screen.getByLabelText(/Payment Type/i), { target: { value: 'card' } });
 
     // Enter invalid expiry date
     const expiryInput = await screen.findByLabelText(/Expiry Date/i);
     fireEvent.change(expiryInput, { target: { value: '1234' } });
 
+    // Set required related fields so we hit expiry validation
+    fireEvent.change(screen.getByLabelText(/Provider/i), { target: { value: 'visa' } });
+    const cardOk = screen.getByLabelText(/Card Number/i);
+    fireEvent.change(cardOk, { target: { value: '4242424242424242' } });
+    const cvvOk2 = screen.getByLabelText(/CVV/i);
+    fireEvent.change(cvvOk2, { target: { value: '123' } });
+
     // Submit form
-    const submitButton = screen.getByText(/Add Payment Method/i);
+    const submitButton = screen.getByRole('button', { name: /Add Payment Method/i });
     fireEvent.click(submitButton);
 
     // Check for error message
@@ -115,7 +122,7 @@ describe('PaymentMethodForm', () => {
     fireEvent.change(cvvInput, { target: { value: '123' } });
 
     // Submit form
-    const submitButton = screen.getByText(/Add Payment Method/i);
+    const submitButton = screen.getByRole('button', { name: /Add Payment Method/i });
     fireEvent.click(submitButton);
 
     // Verify service call
@@ -139,17 +146,12 @@ describe('PaymentMethodForm', () => {
 
     render(<PaymentMethodForm />);
     
-    // Fill out minimal form
-    const typeSelect = screen.getByLabelText(/Payment Type/i);
-    userEvent.click(typeSelect);
-    userEvent.click(screen.getByText(/Bank Account/i));
-
-    const providerSelect = screen.getByLabelText(/Provider/i);
-    userEvent.click(providerSelect);
-    userEvent.click(screen.getByText(/Bank of America/i));
+    // Fill out minimal form using native change
+    fireEvent.change(screen.getByLabelText(/Payment Type/i), { target: { value: 'bank' } });
+    fireEvent.change(screen.getByLabelText(/Provider/i), { target: { value: 'boa' } });
 
     // Submit form
-    const submitButton = screen.getByText(/Add Payment Method/i);
+    const submitButton = screen.getByRole('button', { name: /Add Payment Method/i });
     fireEvent.click(submitButton);
 
     // Check for error message
@@ -172,7 +174,7 @@ describe('PaymentMethodForm', () => {
     fireEvent.change(screen.getByLabelText(/Payment Type/i), { target: { value: 'bank' } });
     fireEvent.change(screen.getByLabelText(/Provider/i), { target: { value: 'chase' } });
 
-    const submitButton = screen.getByText(/Add Payment Method/i);
+    const submitButton = screen.getByRole('button', { name: /Add Payment Method/i });
     fireEvent.click(submitButton);
 
     // Check that service was called

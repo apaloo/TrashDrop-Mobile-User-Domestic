@@ -20,12 +20,14 @@ test('renders TrashDrop application with proper styling', () => {
     </BrowserRouter>
   );
   
-  // Test that the app renders with TrashDrop title/branding
-  expect(screen.getByText(/TrashDrop/i)).toBeInTheDocument();
-  
-  // Test that login form elements appear
-  const emailInput = screen.getByPlaceholderText(/email/i) || screen.getByLabelText(/email/i);
-  const passwordInput = screen.getByPlaceholderText(/password/i) || screen.getByLabelText(/password/i);
+  // Brand/title presence (either logo alt text or heading)
+  expect(
+    screen.getByRole('img', { name: /trashdrop logo/i })
+  ).toBeInTheDocument();
+
+  // Test that login form elements appear via accessible labels
+  const emailInput = screen.getByLabelText(/email/i);
+  const passwordInput = screen.getByLabelText(/password/i);
   const loginButton = screen.getByRole('button', { name: /sign in|login/i });
   
   expect(emailInput).toBeInTheDocument();
@@ -33,7 +35,6 @@ test('renders TrashDrop application with proper styling', () => {
   expect(loginButton).toBeInTheDocument();
   
   // Check that styles are applied properly
-  // This tests that our CSS fix was successful
   const appContainer = document.querySelector('div');
   const computedStyle = window.getComputedStyle(appContainer);
   

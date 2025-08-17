@@ -35,7 +35,7 @@ const QRScanner = () => {
         <div className="space-y-3 text-gray-300">
           <div className="flex items-start">
             <span className="text-white font-medium mr-3">1.</span>
-            <span>Find the TrashDrop Batch QR code wrapped on the bags</span>
+            <span>Find the TrashDrop Batch QR code wrapped on the bundle of bags</span>
           </div>
           <div className="flex items-start">
             <span className="text-white font-medium mr-3">2.</span>

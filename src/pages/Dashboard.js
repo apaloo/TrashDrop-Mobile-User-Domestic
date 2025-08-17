@@ -44,6 +44,8 @@ const Dashboard = () => {
   const [dataSource, setDataSource] = useState('loading'); // 'cache', 'network', 'loading'
   const sessionRefreshRef = useRef(null);
   const mountedRef = useRef(true);
+  const [bagsPulse, setBagsPulse] = useState(false);
+  const bagsPulseTimerRef = useRef(null);
   
   // Helpers: load local user activities and format for dashboard card
   const getLocalActivities = useCallback((limit = 5) => {
@@ -95,6 +97,28 @@ const Dashboard = () => {
       mountedRef.current = false;
     };
   }, []);
+
+  // Optimistic bag updates from scanner
+  useEffect(() => {
+    if (!user?.id) return;
+    const onBagsUpdated = (e) => {
+      const { userId, deltaBags } = e?.detail || {};
+      if (!userId || userId !== user.id) return;
+      const delta = Number(deltaBags);
+      if (!Number.isFinite(delta) || delta === 0) return;
+      setStats(prev => ({
+        ...prev,
+        totalBags: Math.max(0, Number(prev.totalBags || 0) + delta)
+      }));
+      setBagsPulse(true);
+      if (bagsPulseTimerRef.current) {
+        clearTimeout(bagsPulseTimerRef.current);
+      }
+      bagsPulseTimerRef.current = setTimeout(() => setBagsPulse(false), 600);
+    };
+    window.addEventListener('trashdrop:bags-updated', onBagsUpdated);
+    return () => window.removeEventListener('trashdrop:bags-updated', onBagsUpdated);
+  }, [user?.id]);
 
   // Set up real-time subscriptions for stats updates
   useEffect(() => {
@@ -364,8 +388,30 @@ const Dashboard = () => {
       }
     };
     window.addEventListener('local-activity', onLocalActivity);
-    return () => window.removeEventListener('local-activity', onLocalActivity);
+    return () => window.removeEventListener('local-activity', onLocalActivity)
   }, [user?.id, mergeRecentActivities]);
+
+  // Cypress test hook to simulate realtime stats updates (test-only)
+  useEffect(() => {
+    // Only attach in test environment
+    if (typeof window === 'undefined') return;
+    if (!window.Cypress) return;
+
+    // Expose a helper to emit a stats update payload
+    const emitFn = (tableType, payload) => {
+      setStats(prev => handleStatsUpdate(tableType || 'user_stats', payload, prev));
+    };
+
+    // Namespace under Cypress to avoid globals
+    window.Cypress.emitStatsUpdate = emitFn;
+
+    return () => {
+      // Cleanup on unmount
+      if (window.Cypress && window.Cypress.emitStatsUpdate === emitFn) {
+        try { delete window.Cypress.emitStatsUpdate; } catch (_) {}
+      }
+    };
+  }, []);
 
   // Listen to storage changes from other tabs/windows and refresh
   useEffect(() => {
@@ -512,7 +558,7 @@ const Dashboard = () => {
                     </div>
                     <div className="text-center">
                       <p className="text-emerald-200 text-sm">Bags</p>
-                      <p className="text-white text-2xl font-bold">{stats.totalBags || 0}</p>
+                      <p className={`text-white text-2xl font-bold ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
                     </div>
                   </div>
                   
