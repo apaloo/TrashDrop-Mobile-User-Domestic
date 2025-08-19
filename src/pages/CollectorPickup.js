@@ -155,8 +155,6 @@ const CollectorPickup = () => {
     try {
       switch (field) {
         case 'specialHandling':
-          setSpecialHandling(!specialHandling);
-          break;
           setSpecialHandling(prev => !prev);
           break;
         case 'contamination':
@@ -184,6 +182,7 @@ const CollectorPickup = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [qrReader, setQrReader] = useState(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [manualQRInput, setManualQRInput] = useState('');
   
   // Handle online/offline status
   useEffect(() => {
@@ -198,34 +197,7 @@ const CollectorPickup = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto p-4">
-          {/* Scanner Section */}
-          {renderScanner()}
-
-          {/* Pickup Details */}
-          <PickupDetails
-            currentPickup={currentPickup}
-            formData={formData}
-            onInputChange={handleInputChange}
-            onToggleTag={toggleBooleanField}
-            onCapturePhoto={capturePhoto}
-            onRemovePhoto={removePhoto}
-            onUpdatePhotoNotes={updatePhotoNotes}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            status={status}
-            showPayment={showPayment}
-            pickupComplete={pickupComplete}
-            onCompletePickup={handleCompletePickup}
-          />
-        </div>
-      </div>
-    </ErrorBoundary>
-  );
+  
   const [activeTab, setActiveTab] = useState('details'); // 'details' or 'photos' or 'review'
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -297,10 +269,16 @@ const CollectorPickup = () => {
   };
 
   // Handle manual QR code input
-  const handleManualInput = (e) => {
-    const value = e.target.value.trim();
-    if (value) {
-      handleScan(value);
+  const handleManualInputChange = (e) => {
+    setManualQRInput(e.target.value);
+  };
+
+  const handleManualInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      const value = manualQRInput.trim();
+      if (value) {
+        handleScan(value);
+      }
     }
   };
 
@@ -630,7 +608,8 @@ const CollectorPickup = () => {
             type="text"
             id="manual-qr"
             value={manualQRInput}
-            onChange={handleManualInput}
+            onChange={handleManualInputChange}
+            onKeyDown={handleManualInputKeyDown}
             placeholder="Enter QR Code..."
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-black"
             disabled={isLoading}
@@ -837,7 +816,7 @@ const CollectorPickup = () => {
                         <button
                           key={tag}
                           type="button"
-                          onClick={() => toggleTag(tag)}
+                          onClick={() => onToggleTag(tag)}
                           className={`px-3 py-1 text-xs rounded-full flex items-center ${formData.tags.includes(tag) 
                             ? 'bg-primary text-white' 
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
@@ -1217,21 +1196,11 @@ const CollectorPickup = () => {
               </button>
               
               <button
-                onClick={handleManualInput}
-                disabled={isLoading}
-                className={`w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isLoading ? 'bg-primary-light' : 'bg-primary hover:bg-primary-dark'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary`}
-                aria-busy={isLoading}
-                aria-live="polite"
-                aria-describedby={isLoading ? 'scanning-status' : undefined}
+                onClick={shareQRCode}
+                className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
               >
-                {isLoading ? (
-                  <>
-                    <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" aria-hidden="true" />
-                    <span id="scanning-status">Processing QR Code...</span>
-                  </>
-                ) : (
-                  'Enter Manually'
-                )}
+                <FaShare className="mr-2" />
+                Share
               </button>
             </div>
           </div>

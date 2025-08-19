@@ -1,6 +1,6 @@
 // Pickup request bag limitation feature tests
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import PickupRequest from '../pages/PickupRequest';
 import { AuthContext } from '../context/AuthContext';
@@ -8,31 +8,31 @@ import supabase from '../utils/supabaseClient';
 
 // Mock supabase
 jest.mock('../utils/supabaseClient', () => ({
-  supabase: {
-    from: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({
-      data: { total_bags: 3, total_batches: 1 },
-      error: null
-    }),
-    insert: jest.fn().mockResolvedValue({
-      data: [{ id: '123' }],
-      error: null
-    }),
-    rpc: jest.fn().mockResolvedValue({
-      data: true,
-      error: null
-    }),
-    delete: jest.fn().mockResolvedValue({
-      data: null,
-      error: null
-    }),
-    channel: jest.fn().mockReturnValue({
-      on: jest.fn().mockReturnThis(),
-      subscribe: jest.fn()
-    })
-  }
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  // Support locations fetch chaining: .order('created_at', { ascending: false })
+  order: jest.fn().mockResolvedValue({ data: [], error: null }),
+  maybeSingle: jest.fn().mockResolvedValue({
+    data: { total_bags_scanned: 3, scanned_batches: [1] },
+    error: null
+  }),
+  insert: jest.fn().mockResolvedValue({
+    data: [{ id: '123' }],
+    error: null
+  }),
+  rpc: jest.fn().mockResolvedValue({
+    data: true,
+    error: null
+  }),
+  delete: jest.fn().mockResolvedValue({
+    data: null,
+    error: null
+  }),
+  channel: jest.fn().mockReturnValue({
+    on: jest.fn().mockReturnThis(),
+    subscribe: jest.fn()
+  })
 }));
 
 // Mock react-router-dom
@@ -71,8 +71,8 @@ describe('PickupRequest - Bag Limitation Feature', () => {
   
   test('displays the correct number of bag options based on available bags', async () => {
     // Mock user with 3 bags available
-    supabase.from().select().eq().single.mockResolvedValueOnce({
-      data: { total_bags: 3, total_batches: 1 },
+    supabase.from().select().eq().maybeSingle.mockResolvedValueOnce({
+      data: { total_bags_scanned: 3, scanned_batches: [1] },
       error: null
     });
     
@@ -80,7 +80,8 @@ describe('PickupRequest - Bag Limitation Feature', () => {
     
     // Wait for the component to fetch user stats
     await waitFor(() => {
-      expect(screen.getByText(/You have 3 bags available/)).toBeInTheDocument();
+      // Matches either header note or inline label copy
+      expect(screen.getAllByText(/You have\s*3\s*bag/i).length).toBeGreaterThan(0);
     });
     
     // Open the dropdown and check the options
@@ -88,7 +89,7 @@ describe('PickupRequest - Bag Limitation Feature', () => {
     fireEvent.click(bagSelect);
     
     // Check that there are exactly 3 options for bags (1, 2, 3)
-    const options = screen.getAllByRole('option');
+    const options = within(bagSelect).getAllByRole('option');
     expect(options).toHaveLength(3);
     expect(options[0].value).toBe('1');
     expect(options[1].value).toBe('2');
@@ -100,8 +101,8 @@ describe('PickupRequest - Bag Limitation Feature', () => {
   
   test('disables the dropdown when user has 0 bags available', async () => {
     // Mock user with 0 bags available
-    supabase.from().select().eq().single.mockResolvedValueOnce({
-      data: { total_bags: 0, total_batches: 1 },
+    supabase.from().select().eq().maybeSingle.mockResolvedValueOnce({
+      data: { total_bags_scanned: 0, scanned_batches: [1] },
       error: null
     });
     
@@ -119,8 +120,8 @@ describe('PickupRequest - Bag Limitation Feature', () => {
   
   test('shows maximum of 10 options when user has more than 10 bags', async () => {
     // Mock user with 15 bags available
-    supabase.from().select().eq().single.mockResolvedValueOnce({
-      data: { total_bags: 15, total_batches: 2 },
+    supabase.from().select().eq().maybeSingle.mockResolvedValueOnce({
+      data: { total_bags_scanned: 15, scanned_batches: [1,2] },
       error: null
     });
     
@@ -147,8 +148,8 @@ describe('PickupRequest - Bag Limitation Feature', () => {
   
   test('prevents submission when selecting more bags than available', async () => {
     // Mock user with 2 bags available but try to select 3
-    supabase.from().select().eq().single.mockResolvedValueOnce({
-      data: { total_bags: 2, total_batches: 1 },
+    supabase.from().select().eq().maybeSingle.mockResolvedValueOnce({
+      data: { total_bags_scanned: 2, scanned_batches: [1] },
       error: null
     });
     
@@ -164,7 +165,7 @@ describe('PickupRequest - Bag Limitation Feature', () => {
     fireEvent.change(bagSelect, { target: { value: '3' } });
     
     // Try to submit the form
-    const submitButton = screen.getByText(/Submit Request/i);
+    const submitButton = screen.getByRole('button', { name: /request pickup/i });
     fireEvent.click(submitButton);
     
     // Should show validation error

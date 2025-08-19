@@ -24,3 +24,18 @@
   for = "/service-worker.js"
   [headers.values]
     Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
+
+# Local development configuration
+[dev]
+  # Netlify Dev UI port
+  port = 8889
+  # Proxy to an already running CRA dev server
+  targetPort = 3010
+  # Directory for Netlify Functions
+  functions = "netlify/functions"
+  # Disable framework auto-detection to avoid auto-starting CRA
+  framework = "#custom"
+  # Do not auto open browser
+  autoLaunch = false
+  # No-op command; CRA is already running on targetPort
+  command = "npm run dev:noop"

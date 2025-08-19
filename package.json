@@ -43,6 +43,7 @@
     "test": "craco test",
     "test:e2e": "cypress run",
     "cypress:open": "cypress open",
+    "dev:noop": "node -e \"setInterval(()=>{}, 1<<30)\"",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -67,6 +68,7 @@
     "autoprefixer": "^10.4.16",
     "cypress": "^14.5.1",
     "esm": "^3.2.25",
+    "http-proxy-middleware": "^3.0.5",
     "postcss": "^8.4.32",
     "postcss-flexbugs-fixes": "^5.0.2",
     "postcss-normalize": "^13.0.1",

@@ -220,6 +220,37 @@ export const removeFromSyncQueue = async (id) => {
 };
 
 /**
+ * Get all operations from the sync queue
+ * @returns {Promise<Array>} - All entries in sync_queue
+ */
+export const getAllSyncQueue = async () => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['sync_queue'], 'readonly');
+      const store = transaction.objectStore('sync_queue');
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = (event) => reject(event.target.error);
+    });
+  } catch (error) {
+    console.error('Failed to read sync queue:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get sync queue operations filtered by operation type
+ * @param {string} opType - operation name e.g., 'batch_activation'
+ * @returns {Promise<Array>} - Matching entries
+ */
+export const getSyncQueueByOperation = async (opType) => {
+  const all = await getAllSyncQueue();
+  if (!opType) return all;
+  return all.filter((e) => e && e.operation === opType);
+};
+
+/**
  * Get all pending reports that need to be synced
  * @returns {Promise} - Promise resolving to an array of pending reports
  */
@@ -671,6 +702,125 @@ export const getCachedUserActivity = async (userId, limit = 10) => {
   }
 };
 
+/**
+ * Clear all items from the sync queue store
+ * @returns {Promise<number>} - number of removed items
+ */
+export const clearSyncQueueAll = async () => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([SYNC_QUEUE_STORE], 'readwrite');
+    const store = tx.objectStore(SYNC_QUEUE_STORE);
+    let count = 0;
+    const reqCount = store.count();
+    reqCount.onsuccess = () => { count = Number(reqCount.result || 0); };
+    const req = store.clear();
+    req.onsuccess = () => resolve(count);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+/**
+ * Clear sync queue items by operation type (e.g., 'batch_activation')
+ * @param {string} opType
+ * @returns {Promise<number>} - number of removed items
+ */
+export const clearSyncQueueByOperation = async (opType) => {
+  if (!opType) return 0;
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([SYNC_QUEUE_STORE], 'readwrite');
+    const store = tx.objectStore(SYNC_QUEUE_STORE);
+    const index = store.index('operation');
+    let removed = 0;
+    const cursorReq = index.openCursor(IDBKeyRange.only(opType));
+    cursorReq.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        cursor.delete();
+        removed += 1;
+        cursor.continue();
+      } else {
+        resolve(removed);
+      }
+    };
+    cursorReq.onerror = (e) => reject(e.target.error);
+  });
+};
+
+/**
+ * Clear localStorage cache used to prevent duplicate scans
+ */
+export const clearLocalScannedBatchesCache = () => {
+  try { localStorage.removeItem('td_scanned_batches'); } catch (_) {}
+};
+
+/**
+ * Clear IndexedDB caches for batches, bags, and batch_count
+ * @returns {Promise<{batches:number,bags:number,batch_count:number}>}
+ */
+export const clearBatchCaches = async () => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BATCHES_STORE, BAGS_STORE, BATCH_COUNT_STORE], 'readwrite');
+    const batches = tx.objectStore(BATCHES_STORE);
+    const bags = tx.objectStore(BAGS_STORE);
+    const count = tx.objectStore(BATCH_COUNT_STORE);
+
+    let result = { batches: 0, bags: 0, batch_count: 0 };
+
+    const finishIfDone = () => {
+      // We resolve on tx.oncomplete to ensure all clears finished
+    };
+
+    const c1 = batches.count();
+    c1.onsuccess = () => { result.batches = Number(c1.result || 0); };
+    const c2 = bags.count();
+    c2.onsuccess = () => { result.bags = Number(c2.result || 0); };
+    const c3 = count.count();
+    c3.onsuccess = () => { result.batch_count = Number(c3.result || 0); };
+
+    batches.clear();
+    bags.clear();
+    count.clear();
+
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = (e) => reject(e.target.error);
+  });
+};
+
+/**
+ * Debug helper: list available object stores in the IndexedDB database
+ * @returns {Promise<string[]>}
+ */
+export const getIndexedDBStores = async () => {
+  const db = await initDB();
+  try {
+    return Array.from(db.objectStoreNames);
+  } catch (_) {
+    return [];
+  }
+};
+
+/**
+ * Convenience: clear common caches related to batch activation debugging
+ * - local scanned cache
+ * - sync queue (optionally scoped to 'batch_activation')
+ * - batches/bags caches
+ */
+export const clearAllCachesForBatchDebug = async (onlyBatchActivationQueue = true) => {
+  try { clearLocalScannedBatchesCache(); } catch (_) {}
+  try {
+    if (onlyBatchActivationQueue) {
+      await clearSyncQueueByOperation('batch_activation');
+    } else {
+      await clearSyncQueueAll();
+    }
+  } catch (_) {}
+  try { await clearBatchCaches(); } catch (_) {}
+  return true;
+};
+
 const offlineStorageAPI = {
   saveOfflineReport,
   getPendingReports,
@@ -689,7 +839,17 @@ const offlineStorageAPI = {
   cacheBags,
   getCachedBags,
   cacheBatchCount,
-  getCachedBatchCount
+  getCachedBatchCount,
+  // Expose sync queue readers for services like batchService
+  getAllSyncQueue,
+  getSyncQueueByOperation,
+  // New clearing and debug helpers
+  clearSyncQueueAll,
+  clearSyncQueueByOperation,
+  clearLocalScannedBatchesCache,
+  clearBatchCaches,
+  getIndexedDBStores,
+  clearAllCachesForBatchDebug
 };
 
 export default offlineStorageAPI;

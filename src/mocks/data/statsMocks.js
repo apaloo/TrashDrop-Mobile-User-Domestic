@@ -10,8 +10,8 @@ const statsMocks = {
     total_points: 325,
     total_pickups: 7,
     total_reports: 4,
-    total_batches: 3,
-    total_bags: 12,
+    total_bags_scanned: 12,
+    scanned_batches: [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }],
     avg_response_time: 18, // in minutes
     completion_rate: 92.5, // percentage
     last_activity: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
@@ -25,8 +25,8 @@ const statsMocks = {
       total_points: 450,
       total_pickups: 10,
       total_reports: 6,
-      total_batches: 4,
-      total_bags: 15,
+      total_bags_scanned: 15,
+      scanned_batches: [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }, { id: 'b4' }],
       avg_response_time: 15,
       completion_rate: 95,
       last_activity: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
@@ -37,8 +37,8 @@ const statsMocks = {
       total_points: 225,
       total_pickups: 5,
       total_reports: 3,
-      total_batches: 2,
-      total_bags: 8,
+      total_bags_scanned: 8,
+      scanned_batches: [{ id: 'b1' }, { id: 'b2' }],
       avg_response_time: 20,
       completion_rate: 90,
       last_activity: new Date(Date.now() - 259200000).toISOString(), // 3 days ago

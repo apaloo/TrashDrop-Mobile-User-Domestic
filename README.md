@@ -15,7 +15,7 @@ This repository contains the TrashDrop mobile application, a progressive web app
 - **Waste Management**:
   - Digital Bin
   - Report illegal dumping
-  - Scan QR codes at collection points
+  - Scan QR codes for batch of bags purchased
   - Track activity and rewards
 
 ## Live Demo

@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
         .filter(key => key && (key.includes('supabase') || key.includes('sb-'))),
       // App-specific keys
       appConfig?.storage?.userKey || 'trashdrop_user',
-      appConfig?.storage?.tokenKey || 'trashdrop_token'
+      appConfig?.storage?.tokenKey || 'trashdrop_auth_token'
     ];
     
     // Remove duplicates
@@ -254,7 +254,7 @@ export const AuthProvider = ({ children }) => {
         };
         
         const userKey = appConfig?.storage?.userKey || 'trashdrop_user';
-        const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_token';
+        const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_auth_token';
         localStorage.setItem(userKey, JSON.stringify(userData));
         
         // Store token if session exists
@@ -323,7 +323,7 @@ export const AuthProvider = ({ children }) => {
       action,
       errorCode,
       isOnline: navigator.onLine,
-      hasLocalToken: !!localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_token'),
+      hasLocalToken: !!localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token'),
       timestamp: new Date().toISOString(),
       retryAfter: errorCode === 'RATE_LIMIT' ? (parseInt(error?.headers?.get('Retry-After')) || 5) : 0
     };
@@ -394,8 +394,8 @@ export const AuthProvider = ({ children }) => {
     }
     
     // Check for development mode with mocks
-    const appConfig = window.appConfig || {};
-    const useDevelopmentMocks = appConfig?.features?.enableMocks || false;
+    const runtimeConfig = window.appConfig || {};
+    const useDevelopmentMocks = runtimeConfig?.features?.enableMocks || false;
     if (useDevelopmentMocks) {
       console.log('[Auth] Development mode with mocks detected in checkSession');
     }
@@ -441,7 +441,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // First check if the stored token is valid before attempting to use it
-      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_token');
+      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
       if (storedToken && !isTokenValid(storedToken)) {
         console.warn('[Auth] Stored token is invalid or malformed, clearing auth data');
         clearAuthData();
@@ -491,8 +491,8 @@ export const AuthProvider = ({ children }) => {
         }
         
         // Check for development mode with mocks
-        const appConfig = window.appConfig || {};
-        const useDevelopmentMocks = appConfig?.features?.enableMocks || false;
+        const runtimeConfig2 = window.appConfig || {};
+        const useDevelopmentMocks = runtimeConfig2?.features?.enableMocks || false;
         if (useDevelopmentMocks) {
           console.log('[Auth] Development mode with mocks - preserving session despite refresh error');
           return { success: true }; // Allow continued access
@@ -634,7 +634,7 @@ export const AuthProvider = ({ children }) => {
       try {
         // Store user data in localStorage for persistence
         const userKey = appConfig?.storage?.userKey || 'trashdrop_user';
-        const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_token';
+        const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_auth_token';
         localStorage.setItem(userKey, JSON.stringify(mockUser));
         localStorage.setItem(tokenKey, mockSession.access_token);
         
@@ -720,7 +720,7 @@ export const AuthProvider = ({ children }) => {
           };
           
           const userKey = appConfig?.storage?.userKey || 'trashdrop_user';
-          const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_token';
+          const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_auth_token';
           localStorage.setItem(userKey, JSON.stringify(userData));
           
           // Store token for quick validation
@@ -852,7 +852,7 @@ export const AuthProvider = ({ children }) => {
       isAuthInitialized.current = true;
       
       // Clear any potentially corrupted tokens first
-      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_token');
+      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
       if (storedToken && !storedToken.includes('.') || storedToken === 'undefined' || storedToken === 'null') {
         console.warn('[Auth] Found corrupted token, clearing auth data');
         clearAuthData();
@@ -860,7 +860,7 @@ export const AuthProvider = ({ children }) => {
       
       try {
         // First, check if we have a stored token in localStorage
-        const hasStoredToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_token');
+        const hasStoredToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
         
         if (!hasStoredToken) {
           console.log('[Auth] No stored token found, skipping session check');

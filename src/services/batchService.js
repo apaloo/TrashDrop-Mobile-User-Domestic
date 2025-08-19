@@ -4,11 +4,15 @@
  */
 
 import supabase from '../utils/supabaseClient.js';
-import offlineStorageAPI, { addToSyncQueue, removeFromSyncQueue, isOnline } from '../utils/offlineStorage.js';
+import offlineStorageAPI, { addToSyncQueue, removeFromSyncQueue, isOnline, getSyncQueueByOperation } from '../utils/offlineStorage.js';
+
+// Base URL for serverless functions. Allows bypassing CRA proxy in development
+// by setting REACT_APP_FUNCTIONS_URL (e.g., http://localhost:9999/.netlify/functions)
+const FUNCTIONS_BASE = (process.env.REACT_APP_FUNCTIONS_URL || '/.netlify/functions').replace(/\/$/, '');
 
 export const batchService = {
   // ---- Runtime helpers (timeout/retry + local cache for scanned batches) ----
-  _DEFAULT_TIMEOUT_MS: 10000,
+  _DEFAULT_TIMEOUT_MS: 30000,
   _DEFAULT_MAX_RETRIES: 3,
   _LOCAL_CACHE_KEY: 'td_scanned_batches',
   _USER_ACCOUNT_TABLE: 'user_stats',
@@ -51,10 +55,21 @@ export const batchService = {
       return { data: { duplicate: true }, error: null };
     }
 
+    const safeAdd = Number(bagsToAdd || 0);
+    const priorAvailable = Number(acct?.available_bags || 0);
+    const priorScanned = Number(acct?.total_bags_scanned || 0);
+    const priorTotalBags = (
+      acct && (acct.total_bags !== undefined)
+        ? Number(acct.total_bags || 0)
+        : Number(acct?.total_bags_scanned || 0)
+    );
+
     const updated = {
       user_id: userId,
-      available_bags: (acct?.available_bags || 0) + (bagsToAdd || 0),
-      total_bags_scanned: (acct?.total_bags_scanned || 0) + (bagsToAdd || 0),
+      available_bags: priorAvailable + safeAdd,
+      total_bags_scanned: priorScanned + safeAdd,
+      // Maintain explicit total_bags if column exists; harmless if ignored by DB
+      total_bags: priorTotalBags + safeAdd,
       scanned_batches: [...new Set([...scanned, batchId])],
       updated_at: new Date().toISOString(),
     };
@@ -63,7 +78,7 @@ export const batchService = {
       .from(this._USER_ACCOUNT_TABLE)
       .upsert(updated, { onConflict: 'user_id' })
       .select()
-      .single();
+      .maybeSingle();
     if (error) return { data: null, error };
     return { data, error: null };
   },
@@ -123,8 +138,31 @@ export const batchService = {
     const timeoutMs = options.timeoutMs ?? this._DEFAULT_TIMEOUT_MS;
     const maxRetries = options.maxRetries ?? this._DEFAULT_MAX_RETRIES;
 
-    // Local-first duplicate prevention
+    // Local-first duplicate prevention, with special handling for queued offline activations
     if (this.isBatchLocallyScanned(batchIdRaw)) {
+      try {
+        // If we're online and this batch exists in the sync_queue as a queued activation,
+        // try to process it immediately instead of blocking with a duplicate error.
+        if (isOnline()) {
+          const queued = await getSyncQueueByOperation('batch_activation');
+          const match = (queued || []).find((q) => {
+            const qid = q?.data?.batchIdentifier;
+            return qid && String(qid).trim() === String(batchIdRaw || '').trim();
+          });
+          if (match) {
+            console.log('[BatchService] Duplicate detected but queued; attempting immediate activation for', batchIdRaw);
+            const res = await this.activateBatchForUserWithRetry(batchIdRaw, userId, { timeoutMs, maxRetries, ignoreLocalDuplicate: true });
+            if (!res.error) {
+              try { await removeFromSyncQueue(match.id); } catch (_) {}
+              return { data: { ...res.data, bagsAdded: res.data?.bags_added || 0 }, error: null, attempts: res.attempts };
+            }
+            // If it still fails, fall through to duplicate message but indicate it's queued
+            return { data: null, error: { message: 'Batch already scanned (queued and awaiting sync)', code: 'BATCH_DUPLICATE_QUEUED', cause: res.error } };
+          }
+        }
+      } catch (e) {
+        console.warn('[BatchService] Immediate activation on duplicate check failed:', e?.message || e);
+      }
       return { data: null, error: { message: 'Batch already scanned', code: 'BATCH_DUPLICATE' } };
     }
 
@@ -221,6 +259,13 @@ export const batchService = {
       this.processActivationQueue();
     });
     this._onlineListenerAttached = true;
+    // If already online when attaching (e.g., app reload), process immediately
+    try {
+      if (isOnline()) {
+        // Defer to next tick to avoid blocking initialization
+        setTimeout(() => { this.processActivationQueue(); }, 0);
+      }
+    } catch (_) {}
   },
 
   /**
@@ -228,38 +273,22 @@ export const batchService = {
    */
   async processActivationQueue(limit = 10) {
     if (!isOnline()) return { processed: 0 };
-    // Read all sync_queue entries and filter in-memory to our type
+    // Use offlineStorage helpers to fetch queued activations
     let processed = 0;
     try {
-      // Reuse IndexedDB directly via offlineStorageAPI internals is not exposed; instead, read pending reports is separate.
-      // We'll open the DB similarly by calling a light wrapper through addToSyncQueue/removeFromSyncQueue is not enough.
-      // Here, we access the DB by importing default offlineStorageAPI which carries init through its exported functions.
-      const db = await (async () => {
-        // Hacky: piggyback on an operation to ensure DB open
-        try { await addToSyncQueue({ operation: 'noop', storeName: 'sync_queue', data: { ts: Date.now() }, createdAt: new Date().toISOString() }); } catch (_) {}
-        // Now open explicitly using indexedDB (same name/version). We replicate constants to avoid exporting internals.
-        return new Promise((resolve, reject) => {
-          const request = indexedDB.open('trashdrop_offline_db', 4);
-          request.onsuccess = (e) => resolve(e.target.result);
-          request.onerror = (e) => reject(e.target.error);
-        });
-      })();
-
-      const tx = db.transaction(['sync_queue'], 'readwrite');
-      const store = tx.objectStore('sync_queue');
-      const getAllReq = store.getAll();
-      const entries = await new Promise((res, rej) => {
-        getAllReq.onsuccess = () => res(getAllReq.result || []);
-        getAllReq.onerror = (ev) => rej(ev.target.error);
-      });
-      const queue = entries.filter((e) => e.operation === 'batch_activation').slice(0, limit);
+      console.log('[BatchService] processActivationQueue: starting...');
+      const entries = await getSyncQueueByOperation('batch_activation');
+      const queue = (Array.isArray(entries) ? entries : []).slice(0, limit);
+      console.log(`[BatchService] processActivationQueue: ${entries?.length || 0} total queued, processing up to ${queue.length}`);
 
       for (const item of queue) {
         const { batchIdentifier, userId } = item.data || {};
+        console.log('[BatchService] Processing queued activation:', { id: item.id, batchIdentifier, userId });
         const result = await this.activateBatchForUserWithRetry(batchIdentifier, userId, { ignoreLocalDuplicate: true });
         if (!result.error) {
           await removeFromSyncQueue(item.id);
           processed += 1;
+          console.log('[BatchService] Activation succeeded, removed from queue:', { id: item.id, processed });
           // Broadcast realtime UI update similar to scanner success flow
           try {
             const bagsAdded = Number(result?.data?.bags_added || 0);
@@ -270,8 +299,11 @@ export const batchService = {
               window.dispatchEvent(evt);
             }
           } catch (_) {}
+        } else {
+          console.warn('[BatchService] Activation failed for queued item (will remain queued):', { id: item.id, error: result.error });
         }
       }
+      console.log('[BatchService] processActivationQueue: done. processed =', processed);
       return { processed };
     } catch (e) {
       console.warn('[BatchService] processActivationQueue failed:', e);
@@ -349,7 +381,7 @@ export const batchService = {
           points_used: 0
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (batchError) {
         console.error('[BatchService] Error creating batch order:', batchError);
@@ -531,10 +563,15 @@ export const batchService = {
           const qs = isUUID(normalized)
             ? `id=${encodeURIComponent(normalized)}`
             : `batch_number=${encodeURIComponent(normalized)}`;
-          const resp = await fetch(`/.netlify/functions/check-batch?${qs}`, {
+          // Abortable fetch to avoid hanging connections
+          const controller = new AbortController();
+          const fetchTimeout = setTimeout(() => controller.abort('function_fetch_timeout'), 12000);
+          const resp = await fetch(`${FUNCTIONS_BASE}/check-batch?${qs}`, {
             method: 'GET',
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json' },
+            signal: controller.signal,
           });
+          clearTimeout(fetchTimeout);
           if (resp.ok) {
             const payload = await resp.json();
             if (payload?.data?.id) {
@@ -545,7 +582,7 @@ export const batchService = {
             console.warn('[BatchService] Server-side verification HTTP', resp.status);
           }
         } catch (e) {
-          console.warn('[BatchService] Server-side verification failed:', e?.message || e);
+          console.warn('[BatchService] Server-side verification failed:', e?.name === 'AbortError' ? 'aborted (timeout)' : (e?.message || e));
         }
 
         if (!batch) {
@@ -591,37 +628,34 @@ export const batchService = {
       const updateRes = await supabase
         .from('batches')
         .update({ status: 'used', updated_at: new Date().toISOString() })
-        .eq('id', batch.id)
-        .select()
-        .single();
+        .eq('id', batch.id);
       if (updateRes.error) throw updateRes.error;
       try { await offlineStorageAPI.cacheBatch(batch); await offlineStorageAPI.cacheBags(batch.id, bagsList); } catch (_) {}
 
       // Update user_stats for Dashboard realtime
-      const statsRes = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (statsRes.error && statsRes.error.code !== 'PGRST116') throw statsRes.error;
+      // Use schema-flexible updater that avoids hardcoded columns like total_bags
+      let acctUpdate = null;
+      try {
+        const res = await this.updateUserAccountAfterBatch(userId, batch.id, bagCount);
+        acctUpdate = res?.data || null;
+        if (res?.error) {
+          console.warn('[BatchService] updateUserAccountAfterBatch error (non-fatal):', res.error);
+        }
+      } catch (e) {
+        console.warn('[BatchService] Failed to update user account after batch (non-fatal):', e?.message || e);
+      }
 
-      const currentBags = statsRes.data?.total_bags || 0;
-      const currentBatches = statsRes.data?.total_batches || 0;
-      const newTotals = {
-        user_id: userId,
-        total_bags: currentBags + bagCount,
-        total_batches: currentBatches + 1,
-        updated_at: new Date().toISOString(),
-      };
-      const upsertRes = await supabase
-        .from('user_stats')
-        .upsert(newTotals)
-        .select()
-        .single();
-      if (upsertRes.error) throw upsertRes.error;
-
-      console.log('[BatchService] Activated batch and updated stats (batches):', newTotals);
-      return { data: { activated: true, bags_added: bagCount, bags: bagsList, batch_id: batch.id, ...newTotals }, error: null };
+      console.log('[BatchService] Activated batch and updated account (flex):', { user_id: userId, bags_added: bagCount });
+      // Broadcast realtime-like UI update to decouple from schema fields
+      try {
+        if (typeof window !== 'undefined') {
+          const evt = new CustomEvent('trashdrop:bags-updated', {
+            detail: { userId, deltaBags: bagCount, source: 'batch-scan' }
+          });
+          window.dispatchEvent(evt);
+        }
+      } catch (_) {}
+      return { data: { activated: true, bags_added: bagCount, bags: bagsList, batch_id: batch.id, account: acctUpdate }, error: null };
 
     } catch (error) {
       console.error('[BatchService] Error in activateBatchForUser:', error);
@@ -935,7 +969,7 @@ export const batchService = {
           scanned_at: new Date().toISOString()
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (scanError) {
         console.error('[BatchService] Error recording scan:', scanError);

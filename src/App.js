@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 // Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext.js';
@@ -73,6 +73,26 @@ const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Persist last visited path for bookmark/refresh restore
+  useEffect(() => {
+    try {
+      if (location?.pathname) {
+        sessionStorage.setItem('trashdrop_last_path', location.pathname + (location.search || ''));
+      }
+    } catch (_) {}
+  }, [location?.pathname, location?.search]);
+
+  // Restore last path after refresh if authenticated and at root/public
+  useEffect(() => {
+    try {
+      const lastPath = sessionStorage.getItem('trashdrop_last_path');
+      const isPublic = ['/', '/login', '/register', '/reset-password'].includes(location.pathname);
+      if (isAuthenticated && lastPath && isPublic && lastPath !== location.pathname) {
+        navigate(lastPath, { replace: true });
+      }
+    } catch (_) {}
+  }, [isAuthenticated]);
+
   // Check session on mount and when pathname changes
   useEffect(() => {
     const handleAuthCheck = async () => {
@@ -164,8 +184,11 @@ const AppContent = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             
-            {/* Redirect root path to login */}
-            <Route path="/" element={<Login />} />
+            {/* Root route: if authenticated, go to dashboard; else login */}
+            <Route
+              path="/"
+              element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
+            />
             
             {/* Protected routes */}
             <Route element={<Layout />}>

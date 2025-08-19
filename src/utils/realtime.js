@@ -242,14 +242,41 @@ export function handleStatsUpdate(tableType, payload, currentStats) {
         updatedStats.points = newRecord.points || updatedStats.points;
         updatedStats.pickups = newRecord.pickups || updatedStats.pickups;
         updatedStats.reports = newRecord.reports || updatedStats.reports;
-        updatedStats.batches = (newRecord.total_batches !== undefined)
+        // Also accept snake_case totals if provided by payload
+        if (newRecord.total_points !== undefined) {
+          updatedStats.points = newRecord.total_points;
+        }
+        if (newRecord.total_pickups !== undefined) {
+          updatedStats.pickups = newRecord.total_pickups;
+        }
+        if (newRecord.total_reports !== undefined) {
+          updatedStats.reports = newRecord.total_reports;
+        }
+        // Batches: prefer total_batches, then batches, then scanned_batches length
+        const scannedLen = Array.isArray(newRecord.scanned_batches) ? newRecord.scanned_batches.length : undefined;
+        const batchesVal = (newRecord.total_batches !== undefined)
           ? newRecord.total_batches
-          : (newRecord.batches !== undefined ? newRecord.batches : updatedStats.batches);
-        // Keep both snake_case and camelCase for compatibility across components
-        updatedStats.total_bags = newRecord.total_bags || updatedStats.total_bags;
-        updatedStats.totalBags = newRecord.total_bags !== undefined
-          ? newRecord.total_bags
-          : (updatedStats.totalBags !== undefined ? updatedStats.totalBags : updatedStats.total_bags);
+          : (newRecord.batches !== undefined)
+            ? newRecord.batches
+            : (scannedLen !== undefined ? scannedLen : undefined);
+        if (batchesVal !== undefined) {
+          updatedStats.batches = batchesVal;
+          updatedStats.total_batches = batchesVal;
+        }
+        // Bags: prefer available_bags, then total_bags, then total_bags_scanned, then scanned_batches length (as proxy)
+        const bagsFallback = (newRecord.total_bags_scanned !== undefined)
+          ? newRecord.total_bags_scanned
+          : (scannedLen !== undefined ? scannedLen : undefined);
+        const bagsVal = (newRecord.available_bags !== undefined)
+          ? newRecord.available_bags
+          : ((newRecord.total_bags !== undefined) ? newRecord.total_bags : bagsFallback);
+        if (bagsVal !== undefined) {
+          updatedStats.total_bags = bagsVal;
+          updatedStats.totalBags = bagsVal;
+          if (newRecord.available_bags !== undefined) {
+            updatedStats.available_bags = newRecord.available_bags;
+          }
+        }
       }
       break;
       
