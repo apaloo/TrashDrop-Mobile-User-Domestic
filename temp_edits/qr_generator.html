@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator - TrashDrops Batch</title>
+    <!-- Using QR.js library instead -->
+<script>
+// Simple QR Code generation using online API
+function generateQRCodeImage(text, size = 300) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=png&margin=10`;
+}
+</script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .qr-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px;
+        }
+        .batch-info {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .download-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .download-btn:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>🗑️ TrashDrops Batch QR Code</h1>
+    
+    <div class="batch-info">
+        <h2>Test Batch: SCAN-TEST-001</h2>
+        <p><strong>Batch ID:</strong> e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed</p>
+        <p><strong>Bags:</strong> 5</p>
+        <p><strong>Status:</strong> Active</p>
+    </div>
+
+    <div class="qr-container">
+        <h3>Batch ID QR Code</h3>
+        <img id="batchQR" style="border: 1px solid #ccc; margin: 10px;" />
+        <br>
+        <button class="download-btn" onclick="downloadQRImage('batchQR', 'TrashDrops_Batch_e9dcf72b.png')">
+            📱 Download Batch QR Code
+        </button>
+    </div>
+
+    <div class="qr-container">
+        <h3>Bag QR Codes (for individual bag scanning)</h3>
+        <div id="bagQRs"></div>
+    </div>
+
+    <div class="qr-container">
+        <h3>Instructions</h3>
+        <p>1. Download the QR code image(s) above</p>
+        <p>2. Open TrashDrops app and go to Batch QR Scanner</p>
+        <p>3. Scan the QR code using your device's camera</p>
+        <p>4. The batch should be detected and ready for activation</p>
+    </div>
+
+    <script>
+        // Use a working batch ID from your Supabase batches table
+        const batchId = 'e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed';
+        const batchNumber = 'SCAN-TEST-001';
+
+        // Wait for DOM to load
+        window.addEventListener('load', function() {
+            console.log('Page loaded, generating QR codes...');
+            
+            // Generate batch QR code using API
+            const batchQRImg = document.getElementById('batchQR');
+            batchQRImg.src = generateQRCodeImage(batchId, 300);
+            batchQRImg.alt = `QR Code for batch ${batchId}`;
+            console.log('Batch QR code generated successfully!');
+
+            // Generate individual bag QR codes
+            generateBagQRCodes();
+        });
+
+        function generateBagQRCodes() {
+            const bagQRsContainer = document.getElementById('bagQRs');
+            for (let i = 1; i <= 5; i++) {
+                const bagQRCode = `${batchNumber}-BAG-${i}`;
+                
+                const bagContainer = document.createElement('div');
+                bagContainer.style.display = 'inline-block';
+                bagContainer.style.margin = '10px';
+                
+                const bagLabel = document.createElement('h4');
+                bagLabel.textContent = `Bag ${i}`;
+                bagContainer.appendChild(bagLabel);
+                
+                const bagImg = document.createElement('img');
+                bagImg.id = `bagQR${i}`;
+                bagImg.src = generateQRCodeImage(bagQRCode, 200);
+                bagImg.alt = `QR Code for ${bagQRCode}`;
+                bagImg.style.border = '1px solid #ccc';
+                bagImg.style.margin = '5px';
+                bagContainer.appendChild(bagImg);
+                
+                const bagButton = document.createElement('button');
+                bagButton.className = 'download-btn';
+                bagButton.textContent = `📦 Download Bag ${i}`;
+                bagButton.onclick = () => downloadQRImage(`bagQR${i}`, `TrashDrops_Bag_${i}.png`);
+                bagContainer.appendChild(bagButton);
+                
+                bagQRsContainer.appendChild(bagContainer);
+                console.log(`Bag ${i} QR code generated successfully!`);
+            }
+        }
+
+        // Download function for images
+        function downloadQRImage(imgId, filename) {
+            const img = document.getElementById(imgId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = img.src;
+            link.target = '_blank';
+            link.click();
+        }
+
+        console.log('QR codes ready for TrashDrops batch testing!');
+    </script>
+</body>
+</html>

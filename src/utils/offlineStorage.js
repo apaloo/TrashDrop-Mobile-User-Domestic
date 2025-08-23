@@ -566,39 +566,56 @@ export const cacheUserStats = async (userId, stats) => {
  */
 export const getCachedUserStats = async (userId) => {
   try {
+    // Validate userId parameter
+    if (!userId || typeof userId !== 'string') {
+      console.warn('getCachedUserStats: Invalid userId provided:', userId);
+      return null;
+    }
+
     const db = await initDB();
+    if (!db) {
+      console.warn('getCachedUserStats: Database not available');
+      return null;
+    }
+
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([USER_STATS_STORE], 'readonly');
-      const store = transaction.objectStore(USER_STATS_STORE);
-      
-      const request = store.get(userId);
-      
-      request.onsuccess = () => {
-        const result = request.result;
-        if (result) {
-          // Check if cache is still valid (24 hours)
-          const cacheAge = Date.now() - result.cached_at;
-          const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
-          
-          if (cacheAge < maxCacheAge) {
-            console.log('Retrieved cached user stats for user:', userId);
-            resolve(result);
+      try {
+        const transaction = db.transaction([USER_STATS_STORE], 'readonly');
+        const store = transaction.objectStore(USER_STATS_STORE);
+        
+        const request = store.get(userId);
+        
+        request.onsuccess = () => {
+          const result = request.result;
+          if (result) {
+            // Check if cache is still valid (24 hours)
+            const cacheAge = Date.now() - result.cached_at;
+            const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+            
+            if (cacheAge < maxCacheAge) {
+              console.log('Retrieved cached user stats for user:', userId);
+              resolve(result);
+            } else {
+              console.log('Cached user stats expired for user:', userId);
+              resolve(null);
+            }
           } else {
-            console.log('Cached user stats expired for user:', userId);
             resolve(null);
           }
-        } else {
+        };
+        
+        request.onerror = (event) => {
+          console.error('Error retrieving cached user stats:', event.target.error);
           resolve(null);
-        }
-      };
-      
-      request.onerror = (event) => {
-        console.error('Error retrieving cached user stats:', event.target.error);
-        reject(event.target.error);
-      };
+        };
+        
+      } catch (transactionError) {
+        console.error('Transaction error in getCachedUserStats:', transactionError);
+        resolve(null);
+      }
     });
   } catch (error) {
-    console.error('Failed to get cached user stats:', error);
+    console.error('getCachedUserStats error:', error);
     return null;
   }
 };

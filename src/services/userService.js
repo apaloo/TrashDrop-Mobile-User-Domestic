@@ -144,12 +144,16 @@ export const userService = {
 
       const totalBags = pickupBags?.reduce((sum, pickup) => sum + (pickup.bag_count || 0), 0) || 0;
 
+      // Use user_stats.total_bags as primary source, fallback to bag_inventory count
+      const totalBagsFromStats = statsData?.total_bags || statsData?.total_bags_scanned || 0;
+      const batchesFromStats = statsData?.scanned_batches?.length || 0;
+      
       const userStats = {
         points: profileData?.points || 0,
         pickups: pickupCount || 0,
         reports: reportCount || 0,
-        batches: bagCount || 0,
-        totalBags: totalBags,
+        batches: Math.max(batchesFromStats, bagCount), // Use scanned_batches length or bag_inventory as fallback
+        totalBags: Math.max(totalBagsFromStats, totalBags), // Use user_stats.total_bags or calculated total
         level: profileData?.level || 'Eco Starter',
         email: profileData?.email || '',
         firstName: profileData?.first_name || '',

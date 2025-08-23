@@ -849,35 +849,45 @@ export const AuthProvider = ({ children }) => {
       }
       
       console.log('[Auth] Initializing authentication...');
-      isAuthInitialized.current = true;
+      
+      // Set loading state immediately to prevent flicker
+      updateAuthState({
+        status: AUTH_STATES.LOADING,
+        lastAction: 'initializing'
+      });
       
       // Clear any potentially corrupted tokens first
       const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
-      if (storedToken && !storedToken.includes('.') || storedToken === 'undefined' || storedToken === 'null') {
-        console.warn('[Auth] Found corrupted token, clearing auth data');
+      if (!storedToken || !storedToken.includes('.') || storedToken === 'undefined' || storedToken === 'null') {
+        console.warn('[Auth] Invalid or missing token, clearing auth data');
         clearAuthData();
+        updateAuthState({
+          status: AUTH_STATES.UNAUTHENTICATED,
+          user: null,
+          session: null,
+          error: null,
+          lastAction: 'init_no_token'
+        });
+        return;
       }
       
       try {
-        // First, check if we have a stored token in localStorage
-        const hasStoredToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
+        // Check for stored user data
+        const storedUser = getStoredUser();
         
-        if (!hasStoredToken) {
-          console.log('[Auth] No stored token found, skipping session check');
-          // If no token exists, just set state to unauthenticated and skip session check
+        if (storedUser) {
+          // Set initial state with stored user while we validate
           updateAuthState({
-            status: AUTH_STATES.UNAUTHENTICATED,
-            user: null,
-            session: null,
-            error: null,
-            lastAction: 'init',
-            retryCount: 0
+            status: AUTH_STATES.AUTHENTICATED,
+            user: storedUser,
+            session: { access_token: storedToken },
+            lastAction: 'init_stored'
           });
-        } else {
-          console.log('[Auth] Stored token found, checking session...');
-          // Only check session if we have a stored token
-          await checkSession();
         }
+        
+        // Always check session to validate/refresh token
+        console.log('[Auth] Validating session...');
+        await checkSession();
         
         // Set up auth state change listener
         const { data } = supabase.auth.onAuthStateChange(

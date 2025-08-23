@@ -4,6 +4,8 @@
 
 import supabase from '../utils/supabaseClient.js';
 import { toastService } from '../services/toastService.js';
+import { retrySupabaseOperation } from '../utils/retryUtils.js';
+import syncService from './syncService.js';
 
 /**
  * Maps the estimated_volume value from the form to the required size value for the database
@@ -139,12 +141,29 @@ export const dumpingService = {
         }
       };
 
-      // First create the main report in the illegal_dumping_mobile table
-      const { data: dumpingReport, error: reportError } = await supabase
-        .from('illegal_dumping_mobile')
-        .insert(report)
-        .select()
-        .single();
+      let report_data, reportError;
+      try {
+        [report_data, reportError] = await retrySupabaseOperation(
+          async () => {
+            const { data, error } = await supabase
+              .from('illegal_dumping_mobile')
+              .insert([report])
+              .select('*');
+            return [data, error];
+          },
+          {
+            operationName: 'Create dumping report',
+            maxAttempts: 3,
+            onRetry: (attempt, error, delay) => {
+              console.log(`[DumpingService] Retry attempt ${attempt} for report creation in ${delay}ms`);
+            }
+          }
+        );
+      } catch (retryError) {
+        // Convert retry operation error to reportError for local fallback handling
+        reportError = retryError;
+        report_data = null;
+      }
 
       if (reportError) {
         console.error('[DumpingService] Error creating dumping report:', reportError);
@@ -156,11 +175,16 @@ export const dumpingService = {
           hint: reportError.hint
         });
 
-        // Detect FK violation for reported_by (code 23503) and fall back to local-first storage
+        // Detect FK violation or RLS policy violation and fall back to local-first storage
         const msg = `${reportError.message || ''} ${reportError.details || ''}`;
         const isFKViolation = msg.includes('23503') || msg.includes('reported_by_fkey') || msg.includes('not present in table "users"');
-        if (isFKViolation) {
-          console.warn('[DumpingService] Foreign key violation on reported_by. Storing report locally with pending sync.');
+        const isRLSViolation = reportError.code === '42501' || msg.includes('row-level security policy') || msg.includes('42501') || 
+                              (reportError.message && reportError.message.includes('42501')) ||
+                              (reportError.status === 401 && msg.includes('row-level security'));
+        
+        if (isFKViolation || isRLSViolation) {
+          const violationType = isRLSViolation ? 'RLS policy violation' : 'Foreign key violation';
+          console.warn(`[DumpingService] ${violationType} on reported_by. Storing report locally with pending sync.`);
 
           // Local-first fallback: persist report to localStorage with pending_sync status
           const localId = `local_report_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -181,6 +205,10 @@ export const dumpingService = {
             localStorage.setItem(listKey, JSON.stringify(updatedList));
             localStorage.setItem(itemKey, JSON.stringify(localReport));
             console.log('[DumpingService] Stored local dumping report (pending sync):', localId);
+            
+            // Enqueue for background sync
+            syncService.enqueueSyncItem('dumping_report', localId);
+            
             // Also record an immediate local activity entry so Activity History updates instantly
             recordLocalActivity({
               id: `local_activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -208,10 +236,10 @@ export const dumpingService = {
         throw new Error(reportError.message || 'Failed to create report in database');
       }
 
-      // Try to create the additional report details in the dumping_reports_mobile table
+      // Try to create the additional report details in the dumping_reports_mobile table with retry
       try {
         const reportDetails = {
-          dumping_id: dumpingReport.id,
+          dumping_id: report_data[0].id,
           estimated_volume: reportData.estimated_volume || 'unknown',
           hazardous_materials: reportData.hazardous_materials || false,
           accessibility_notes: reportData.description || reportData.accessibility_notes || 'No additional details provided'
@@ -220,21 +248,33 @@ export const dumpingService = {
 
         console.log('[DumpingService] Creating dumping report details:', reportDetails);
 
-        const { error: detailsError } = await supabase
-          .from('dumping_reports_mobile')
-          .insert(reportDetails);
+        await retrySupabaseOperation(
+          async () => {
+            const result = await supabase
+              .from('dumping_reports_mobile')
+              .insert(reportDetails);
+            
+            if (result.error) {
+              throw result.error;
+            }
+            
+            return result;
+          },
+          {
+            operationName: 'Create report details',
+            maxAttempts: 2, // Fewer attempts for secondary operation
+            onRetry: (attempt, error, delay) => {
+              console.log(`[DumpingService] Retry attempt ${attempt} for report details in ${delay}ms`);
+            }
+          }
+        );
 
-        if (detailsError) {
-          console.warn('[DumpingService] Could not create report details entry, but main report created:', detailsError);
-          // Don't throw, just log as this is a secondary step
-        } else {
-          console.log('[DumpingService] Successfully created report details');
-        }
+        console.log('[DumpingService] Successfully created report details');
       } catch (detailsErr) {
         console.warn('[DumpingService] Report details creation failed, continuing without it:', detailsErr);
       }
 
-      console.log('[DumpingService] Successfully created dumping report:', dumpingReport.id);
+      console.log('[DumpingService] Successfully created dumping report:', report_data[0].id);
       // Record an immediate local activity entry for the successful report creation
       recordLocalActivity({
         id: `local_activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -242,12 +282,12 @@ export const dumpingService = {
         activity_type: 'dumping_report',
         status: 'submitted',
         points_impact: 0,
-        related_id: dumpingReport.id,
+        related_id: report_data[0].id,
         created_at: new Date().toISOString(),
         is_local: true,
         sync_status: 'synced'
       });
-      return { data: dumpingReport, error: null };
+      return { data: report_data[0], error: null };
 
     } catch (error) {
       console.error('[DumpingService] Error in createReport:', error);
@@ -394,12 +434,26 @@ export const dumpingService = {
 
       console.log('[DumpingService] Finding reports near:', location);
 
-      // Use PostGIS to find nearby reports
-      const { data, error } = await supabase.rpc('find_nearby_dumping', {
-        p_latitude: location.latitude,
-        p_longitude: location.longitude,
-        p_radius_km: radiusKm
-      });
+      // Use PostGIS to find nearby reports with retry logic
+      const { data, error } = await retrySupabaseOperation(
+        async () => {
+          const result = await supabase.rpc('find_nearby_dumping', {
+            p_latitude: location.latitude,
+            p_longitude: location.longitude,
+            p_radius_km: radiusKm
+          });
+          
+          if (result.error) {
+            throw result.error;
+          }
+          
+          return result;
+        },
+        {
+          operationName: 'Find nearby reports',
+          maxAttempts: 2
+        }
+      );
 
       if (error) {
         console.error('[DumpingService] Error finding nearby reports:', error);

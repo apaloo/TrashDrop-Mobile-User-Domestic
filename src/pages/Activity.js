@@ -60,106 +60,78 @@ const Activity = () => {
     setIsLoading(true);
     setError('');
     
+    // Calculate pagination offset
+    const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    
+    // Define local activity loading function - consistently used throughout
+    const loadLocalActivities = () => {
+      try {
+        const localKey = `userActivity_${user.id}`;
+        const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
+        const localFiltered = Array.isArray(localRaw)
+          ? localRaw.filter(a => (filter === 'all' ? true : a.activity_type === filter))
+          : [];
+        const localActivitiesFormatted = localFiltered.map(a => ({
+          id: a.id,
+          type: a.activity_type,
+          status: a.status || 'submitted',
+          date: new Date(a.created_at).toLocaleDateString(),
+          points: a.points_impact || 0,
+          related_id: a.related_id || null,
+          description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
+          address: a.details?.address || '',
+          isLocal: true,
+          sync_status: a.sync_status || 'pending_sync'
+        }));
+        return localActivitiesFormatted;
+      } catch (le) {
+        console.warn('Failed to load local activities', le);
+        return [];
+      }
+    };
+
+    // Define timeout wrapper for network operations
+    const fetchWithTimeout = async (operation) => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Activity fetch timeout - using cached data instead')), 8000)); // Reduced to 8 seconds
+      return Promise.race([operation(), timeout]);
+    };
+    
+    // STEP 1: IMMEDIATELY LOAD AND DISPLAY LOCAL DATA
     try {
-      console.log(`Attempting to fetch activities (attempt ${retryCount + 1} of ${MAX_RETRIES + 1})`);
+      // Load local activities first for immediate display
+      const localActivities = loadLocalActivities();
+      const localOffset = (pagination.currentPage - 1) * pagination.itemsPerPage;
+      const localTotalPages = Math.ceil(localActivities.length / pagination.itemsPerPage) || 1;
+      setPagination(prev => ({ ...prev, totalPages: localTotalPages }));
       
-      // Always try to refresh the session first
+      // Show local data immediately
+      const localPageSlice = localActivities.slice(localOffset, localOffset + pagination.itemsPerPage);
+      setActivities(localPageSlice);
+      setIsLoading(false);
+      
+      // If offline or sufficient local data, stop here
+      if (isOffline || localActivities.length >= 5) {
+        if (isOffline) {
+          setError('Showing cached activities (offline)');
+        }
+        return;
+      }
+      
+      // STEP 2: ENHANCE WITH NETWORK DATA
+      setIsLoading(true); // Show loading for network enhancement
+      console.log(`Attempting to fetch network activities (attempt ${retryCount + 1} of ${MAX_RETRIES + 1})`);
+      
+      // Try session refresh if not first attempt
       if (retryCount > 0) {
         const refreshResult = await refreshAndValidateSession();
         if (!refreshResult.success) {
           console.warn('Session refresh failed before fetching activities');
-          // We'll continue anyway and let the query itself handle any auth errors
+          // Continue anyway and let query handle any auth errors
         }
-      }
-      
-      // Calculate pagination offset
-      const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
-      
-      // Build query based on filter with timeout safety - increased timeout for slow connections
-      const fetchWithTimeout = async (operation) => {
-        const timeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Activity fetch timeout - please check your internet connection')), 30000));
-        return Promise.race([operation(), timeout]);
-      };
-      
-      // If offline, skip remote count and load local-only activities
-      if (isOffline) {
-        try {
-          const localKey = `userActivity_${user.id}`;
-          const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
-          const localFiltered = Array.isArray(localRaw)
-            ? localRaw.filter(a => (filter === 'all' ? true : a.activity_type === filter))
-            : [];
-          const localActivitiesFormatted = localFiltered.map(a => ({
-            id: a.id,
-            type: a.activity_type,
-            status: a.status || 'submitted',
-            date: new Date(a.created_at).toLocaleDateString(),
-            points: a.points_impact || 0,
-            related_id: a.related_id || null,
-            description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
-            address: a.details?.address || '',
-            isLocal: true,
-            sync_status: a.sync_status || 'pending_sync'
-          }));
-          const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
-          const totalPages = Math.ceil(localActivitiesFormatted.length / pagination.itemsPerPage) || 1;
-          setPagination(prev => ({ ...prev, totalPages }));
-          const pageSlice = localActivitiesFormatted.slice(offset, offset + pagination.itemsPerPage);
-          setActivities(pageSlice);
-          setError('');
-        } catch (le) {
-          console.warn('Failed to load local activities while offline', le);
-          setError('You appear to be offline. Showing cached activities if available.');
-        } finally {
-          setIsLoading(false);
-        }
-        return; // stop here when offline
       }
 
-      // Fetch the count first with its own error handling
-      let filteredCount = 0;
-      try {
-        // Get base count first
-        const countResult = await fetchWithTimeout(async () => {
-          let countQuery = supabase
-            .from('user_activity')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id);
-            
-          // Apply filter if needed
-          if (filter !== 'all') {
-            countQuery = countQuery.eq('activity_type', filter);
-          }
-          
-          return await countQuery;
-        });
-        
-        if (countResult.error) {
-          console.error('Error getting activity count:', countResult.error);
-          
-          // If this is a JWT error, try refreshing and retry immediately
-          if (countResult.error.message && countResult.error.message.includes('JWT')) {
-            await refreshAndValidateSession();
-            throw new Error('Authentication error, retrying after refresh');
-          }
-          
-          throw countResult.error;
-        }
-        
-        filteredCount = countResult.count || 0;
-        console.log(`Found ${filteredCount} activities matching current filter`);
-        
-      } catch (countErr) {
-        console.error('Failed to get activity count:', countErr);
-        // Continue anyway, we'll use a default count
-        filteredCount = 0;
-      }
-      
-      // Now fetch the actual activities
-      console.log('Executing activity query for user:', user.id, 'filter:', filter, 'page:', pagination.currentPage);
-      
-      // Prepare the query
+      // Prepare and execute query with timeout protection
       let query = supabase
         .from('user_activity')
         .select('*')
@@ -180,7 +152,7 @@ const Activity = () => {
       if (activitiesError) {
         console.error('Error fetching activities data:', activitiesError);
         
-        // If this is a JWT error, try refreshing and retry
+        // If JWT error, try refresh and signal retry
         if (activitiesError.message && activitiesError.message.includes('JWT')) {
           await refreshAndValidateSession();
           throw new Error('Authentication error, retrying after refresh');
@@ -189,15 +161,11 @@ const Activity = () => {
         throw activitiesError;
       }
       
-      console.log('Activities data received:', data ? data.length : 0, 'items');
+      // Format network activities
+      const networkActivities = Array.isArray(data) ? data : [];
+      console.log('Network activities received:', networkActivities.length);
       
-      // Format activities for our component
-      // Make sure data exists and is an array before trying to map
-      const activities = Array.isArray(data) ? data : [];
-      console.log('Processing activities:', activities.length);
-      
-      const formattedActivities = activities.map(activity => {
-        // Format based on activity type
+      const formattedNetworkActivities = networkActivities.map(activity => {
         let formattedActivity = {
           id: activity.id,
           type: activity.activity_type,
@@ -209,7 +177,7 @@ const Activity = () => {
           address: ''
         };
         
-        // Customize description and address based on activity type
+        // Add type-specific details
         if (activity.activity_type === 'pickup_request') {
           formattedActivity.description = activity.details?.waste_type || 'Waste Pickup';
           formattedActivity.address = activity.details?.address || '';
@@ -230,108 +198,90 @@ const Activity = () => {
         return formattedActivity;
       });
       
-      // Merge in LOCAL-FIRST activities stored in localStorage
-      let localActivitiesFormatted = [];
-      try {
-        const localKey = `userActivity_${user.id}`;
-        const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
-        const localFiltered = Array.isArray(localRaw)
-          ? localRaw.filter(a => (filter === 'all' ? true : a.activity_type === filter))
-          : [];
-        localActivitiesFormatted = localFiltered.map(a => ({
-          id: a.id,
-          type: a.activity_type,
-          status: a.status || 'submitted',
-          date: new Date(a.created_at).toLocaleDateString(),
-          points: a.points_impact || 0,
-          related_id: a.related_id || null,
-          description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
-          address: a.details?.address || '',
-          isLocal: true,
-          sync_status: a.sync_status || 'pending_sync'
-        }));
-      } catch (le) {
-        console.warn('Failed to load local activities', le);
-      }
-
-      // Combine local-first (on top) + server results
-      // Dedupe priority: prefer local for the same type+related_id; otherwise dedupe by id
+      // STEP 3: MERGE LOCAL AND NETWORK DATA
+      // Reload local activities to ensure we have latest data
+      const refreshedLocalActivities = loadLocalActivities();
+      
+      // Set up deduplication logic
       const localKeys = new Set(
-        localActivitiesFormatted
+        refreshedLocalActivities
           .filter(a => a.type && a.related_id)
           .map(a => `${a.type}::${a.related_id}`)
       );
-      const seenIds = new Set(localActivitiesFormatted.map(a => a.id));
-      const serverFiltered = formattedActivities.filter(item => {
+      const seenIds = new Set(refreshedLocalActivities.map(a => a.id));
+      
+      // Filter network activities to avoid duplicates
+      const serverFiltered = formattedNetworkActivities.filter(item => {
         const key = item.type && item.related_id ? `${item.type}::${item.related_id}` : null;
-        if (key && localKeys.has(key)) return false; // local wins
-        if (seenIds.has(item.id)) return false; // avoid duplicate IDs
+        if (key && localKeys.has(key)) return false; // Local activities take priority
+        if (seenIds.has(item.id)) return false; // Avoid duplicate IDs
         return true;
       });
-      const combined = [...localActivitiesFormatted, ...serverFiltered];
-
-      // Recalculate total count and pages including locals
+      
+      // Combine and update pagination
+      const combined = [...refreshedLocalActivities, ...serverFiltered];
       const combinedCount = combined.length;
       const totalPages = Math.ceil(combinedCount / pagination.itemsPerPage) || 1;
-      console.log('Calculated pagination:', { 
-        count: filteredCount, 
-        perPage: pagination.itemsPerPage, 
-        totalPages 
-      });
       
-      // Update pagination
       setPagination(prev => ({
         ...prev,
         totalPages: Math.max(1, totalPages)
       }));
 
-      // Apply front-end pagination to combined list using the same offset
+      // Apply pagination and update UI
       const pageSlice = combined.slice(offset, offset + pagination.itemsPerPage);
       setActivities(pageSlice);
-      setError(''); // Clear any previous errors on success
+      setError('');
+      
+      console.log('Enhanced with network data:', { 
+        local: refreshedLocalActivities.length,
+        server: serverFiltered.length,
+        combined: combinedCount,
+        totalPages 
+      });
       
     } catch (error) {
-      console.error('Error fetching activity history:', error);
+      console.warn('Error in activities fetch:', error.message);
       
-      // Check if we should retry
-      if (retryCount < MAX_RETRIES) {
-        const delay = RETRY_DELAY * Math.pow(1.5, retryCount); // Exponential backoff
-        console.log(`Will retry in ${delay}ms (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
-        setTimeout(() => {
-          fetchActivities(retryCount + 1);
-        }, delay);
-        return;
-      }
+      // On network failure, make sure we're still showing any local data
+      const fallbackLocalActivities = loadLocalActivities();
       
-      // No more retries, show error to user
-      // More descriptive error message based on the error type
-      if (error?.message?.includes('JWT') || error?.message?.includes('token') || error?.message?.includes('auth')) {
-        setError('Authentication error. Your session may have expired. Please try refreshing the page or sign out and log back in.');
-      } else if (error?.code === 'PGRST301') {
-        setError('Permission denied. You do not have access to this data.');
-      } else if (error?.code?.includes('network') || error?.message?.includes('timeout')) {
-        setError('Network error. Please check your connection and try again.');
+      if (fallbackLocalActivities.length > 0) {
+        // We have local data to show as fallback
+        const localOffset = (pagination.currentPage - 1) * pagination.itemsPerPage;
+        const localPageSlice = fallbackLocalActivities.slice(localOffset, localOffset + pagination.itemsPerPage);
+        setActivities(localPageSlice);
+        setError('Network unavailable - showing cached activities');
       } else {
-        setError('Unable to load activity history. Please try again later.');
+        // No local data - consider retry or show error
+        if (retryCount < MAX_RETRIES) {
+          // Retry with exponential backoff
+          const delay = RETRY_DELAY * Math.pow(1.5, retryCount);
+          console.log(`Retrying in ${delay}ms (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
+          setTimeout(() => {
+            fetchActivities(retryCount + 1);
+          }, delay);
+          return;
+        }
+        
+        // Out of retries - show appropriate error
+        if (error?.message?.includes('timeout')) {
+          setError('Connection is slow. Activity data will load when network improves.');
+        } else {
+          setError('Unable to load activity history. Please check your connection.');
+        }
+        
+        // Show empty state after all retries failed
+        setActivities([]);
       }
-      
-      // Log detailed error for debugging
-      console.log('Error details:', {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint
-      });
     } finally {
-      if (retryCount === MAX_RETRIES || !error) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
-  }, [user, filter, pagination.currentPage, pagination.itemsPerPage]);
+  }, [user, filter, pagination.currentPage, pagination.itemsPerPage, refreshAndValidateSession]);
   
   // Use the fetchActivities function in useEffect
   useEffect(() => {
-    fetchActivities();
+    fetchActivities(0);
   }, [fetchActivities]);
 
   // Listen to storage changes (e.g., other tabs) for userActivity updates

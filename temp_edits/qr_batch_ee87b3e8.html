@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrashDrop Batch QR Code</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: #22c55e;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .logo-text {
+            font-size: 28px;
+            font-weight: bold;
+            color: #22c55e;
+        }
+        #qrcode {
+            margin: 2rem 0;
+            padding: 1rem;
+            background: white;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        .batch-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: monospace;
+        }
+        .input-section {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        .input-section label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 16px;
+        }
+        .batch-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 14px;
+            font-family: monospace;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .batch-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .batch-input:focus {
+            outline: none;
+            border-color: #22c55e;
+            background: rgba(255, 255, 255, 0.15);
+        }
+        .generate-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-left: 0.5rem;
+        }
+        .generate-btn:hover {
+            background: #2563eb;
+        }
+        .download-btn {
+            background: #22c55e;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: background 0.3s;
+        }
+        .download-btn:hover {
+            background: #16a34a;
+        }
+        .instructions {
+            max-width: 400px;
+            text-align: left;
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <div class="logo-icon">🗂</div>
+            <div class="logo-text">TrashDrop</div>
+        </div>
+        
+        <h2>Batch QR Code Generator</h2>
+        
+        <div class="input-section">
+            <label for="batchIdInput"><strong>Enter Batch ID:</strong></label>
+            <input 
+                type="text" 
+                id="batchIdInput" 
+                placeholder="e.g., ee87b3e8-e82b-44a9-8169-99ce53217c28"
+                value="ee87b3e8-e82b-44a9-8169-99ce53217c28"
+                class="batch-input"
+            >
+            <button class="generate-btn" onclick="generateQRCode()">Generate QR Code</button>
+        </div>
+        
+        <div class="batch-info" id="batchInfo" style="display: none;">
+            <strong>Current Batch ID:</strong><br>
+            <span id="currentBatchId">-</span>
+        </div>
+        
+        <div id="qrcode"></div>
+        
+        <button class="download-btn" onclick="downloadQRCode()" id="downloadBtn" style="display: none;">Download QR Code</button>
+        
+        <div class="instructions">
+            <h4>How to Use:</h4>
+            <ol>
+                <li>Print this QR code and attach it to your bag batch</li>
+                <li>Open the TrashDrop mobile app</li>
+                <li>Navigate to "Scan QR" from the menu</li>
+                <li>Point your camera at this QR code</li>
+                <li>The app will activate the batch and add bags to your account</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let currentBatchId = '';
+        
+        // Generate QR code for the given batch ID
+        function generateQRCode() {
+            const input = document.getElementById('batchIdInput');
+            const batchId = input.value.trim();
+            
+            if (!batchId) {
+                alert('Please enter a valid Batch ID');
+                return;
+            }
+            
+            // Validate UUID format (basic check)
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(batchId);
+            if (!isUUID && batchId.length < 8) {
+                if (!confirm('This doesn\'t look like a standard UUID. Continue anyway?')) {
+                    return;
+                }
+            }
+            
+            currentBatchId = batchId;
+            
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // Update batch info
+            document.getElementById('currentBatchId').textContent = batchId;
+            document.getElementById('batchInfo').style.display = 'block';
+            
+            // Generate QR code with the batch ID
+            QRCode.toCanvas(document.getElementById('qrcode'), batchId, {
+                width: 256,
+                height: 256,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                },
+                errorCorrectionLevel: 'M'
+            }, function (error) {
+                if (error) {
+                    console.error('Error generating QR code:', error);
+                    document.getElementById('qrcode').innerHTML = '<p style="color: red;">Error generating QR code</p>';
+                    document.getElementById('downloadBtn').style.display = 'none';
+                } else {
+                    console.log('QR code generated successfully!');
+                    document.getElementById('downloadBtn').style.display = 'inline-block';
+                }
+            });
+        }
+        
+        function downloadQRCode() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (canvas && currentBatchId) {
+                // Create download link
+                const link = document.createElement('a');
+                const shortId = currentBatchId.length > 8 ? currentBatchId.slice(0, 8) : currentBatchId;
+                link.download = `trashdrop-batch-${shortId}.png`;
+                link.href = canvas.toDataURL('image/png');
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert('No QR code to download. Please generate one first.');
+            }
+        }
+        
+        // Allow Enter key to generate QR code
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('batchIdInput');
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    generateQRCode();
+                }
+            });
+            
+            // Auto-generate QR code on page load with default value
+            if (input.value.trim()) {
+                generateQRCode();
+            }
+        });
+    </script>
+</body>
+</html>

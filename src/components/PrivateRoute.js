@@ -15,8 +15,8 @@ const PrivateRoute = ({ children }) => {
   // Special case for test account in development
   const isTestAccount = process.env.NODE_ENV === 'development' && user?.email === 'prince02@mailinator.com';
 
-  // Show loading spinner while checking authentication status
-  if (isLoading) {
+  // Only show loading spinner for initial auth check
+  if (isLoading && !localStorage.getItem('trashdrop_user')) {
     return (
       <div className="flex justify-center items-center h-screen">
         <LoadingSpinner size="lg" />
@@ -24,8 +24,8 @@ const PrivateRoute = ({ children }) => {
     );
   }
 
-  // Allow access for test account in development or if properly authenticated
-  if (isTestAccount || isAuthenticated) {
+  // Allow access if authenticated or has stored user data
+  if (isTestAccount || isAuthenticated || localStorage.getItem('trashdrop_user')) {
     return children;
   }
   

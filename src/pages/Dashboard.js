@@ -513,9 +513,9 @@ const Dashboard = () => {
       });
   }, [user?.id, isOnlineStatus]);
   
-  // Show skeleton loader during initial loading, but only if we have no cached data
-  // This prevents screen flash when we have cached data available
-  if (isLoading && dataSource === 'loading' && !getCachedUserStats(user?.id) && !getCachedUserActivity(user?.id)) {
+  // Show skeleton loader during initial loading
+  // Note: Removed async cache checks to prevent IndexedDB errors in render
+  if (isLoading && dataSource === 'loading') {
     return <DashboardSkeleton />;
   }
 

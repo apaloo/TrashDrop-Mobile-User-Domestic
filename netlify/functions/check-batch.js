@@ -156,13 +156,17 @@ exports.handler = async (event) => {
       }
     }
 
-    // Not found
+    // Not found - return 404 instead of 500
     if (!data) {
-      dlog('Not found');
+      dlog('Batch not found in database');
       return {
         statusCode: 404,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Batch not found', meta }),
+        body: JSON.stringify({ 
+          error: 'Batch not found in batches table for provided identifier', 
+          identifier: id || batch_number,
+          meta 
+        }),
       };
     }
 

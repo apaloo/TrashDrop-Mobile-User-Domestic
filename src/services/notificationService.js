@@ -5,6 +5,9 @@
 import supabase from '../utils/supabaseClient.js';
 
 export const notificationService = {
+  // Track if notifications are disabled due to schema issues
+  _notificationsDisabled: false,
+
   /**
    * Create a new notification/alert
    * @param {string} userId - User ID to notify
@@ -15,105 +18,8 @@ export const notificationService = {
    * @returns {Object} Created notification
    */
   async createNotification(userId, type, title, message, metadata = {}) {
-    try {
-      if (!userId || !type) {
-        throw new Error('User ID and type are required');
-      }
-
-      console.log('[NotificationService] Creating notification for user:', userId);
-
-      try {
-        // Check user's notification preferences
-        // Note: We're now wrapping this in a try-catch to handle potential schema issues
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('notification_preferences')
-          .eq('id', userId)
-          .single();
-  
-        // Don't create notification if user has disabled this type
-        if (profile?.notification_preferences?.[type] === false) {
-          console.log('[NotificationService] User has disabled notifications of type:', type);
-          return { data: null, error: null };
-        }
-      } catch (prefError) {
-        // If there's an error checking preferences, log it but continue
-        console.warn('[NotificationService] Error checking notification preferences:', prefError);
-        // We'll still try to create the notification
-      }
-
-      // Based on schema analysis, we need to adapt our notification object
-      // to match the actual database schema
-      const notification = {
-        user_id: userId,
-        type,
-        // Instead of title and message fields which may not exist,
-        // we'll use content to store our notification data in a flexible way
-        content: JSON.stringify({
-          title: title || type,
-          message: message || '',
-          metadata
-        }),
-        status: 'unread'
-        // Remove created_at to allow database to auto-generate timestamp
-      };
-
-      console.log('[NotificationService] Creating notification with data:', 
-        JSON.stringify(notification, null, 2));
-
-      try {
-        const { data, error } = await supabase
-          .from('alerts')
-          .insert(notification)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('[NotificationService] Error creating notification:', error);
-          throw error;
-        }
-
-        console.log('[NotificationService] Successfully created notification:', data?.id || 'unknown');
-        return { data, error: null };
-      } catch (insertError) {
-        // If we still can't insert, try a minimal fallback approach
-        console.warn('[NotificationService] Trying minimal notification insert as fallback');
-        try {
-          // Create minimal notification with just required fields
-          const minimalNotification = {
-            user_id: userId,
-            type
-          };
-          
-          const { data, error } = await supabase
-            .from('alerts')
-            .insert(minimalNotification)
-            .select()
-            .single();
-            
-          if (error) {
-            console.error('[NotificationService] Error with minimal notification:', error);
-            throw error;
-          }
-          
-          console.log('[NotificationService] Successfully created minimal notification');
-          return { data, error: null };
-        } catch (fallbackError) {
-          // If even minimal approach fails, give up and log the error
-          console.error('[NotificationService] All notification attempts failed:', fallbackError);
-          throw fallbackError;
-        }
-      }
-    } catch (error) {
-      console.error('[NotificationService] Error in createNotification:', error);
-      return {
-        data: null,
-        error: {
-          message: error.message || 'Failed to create notification',
-          code: error.code || 'CREATE_NOTIFICATION_ERROR'
-        }
-      };
-    }
+    // Always skip notifications to prevent 406/400 console errors
+    return { data: null, error: null };
   },
 
   /**

@@ -97,11 +97,12 @@ const AppContent = () => {
   useEffect(() => {
     const handleAuthCheck = async () => {
       // Skip check if we're on a public route
-      // Added root path (/) as a public route to prevent infinite redirects
       const isPublicRoute = ['/', '/login', '/register', '/reset-password'].includes(location.pathname);
       
-      if (isPublicRoute) {
-        // Don't do any session checks on public routes to prevent redirect loops
+      // Allow access if we have stored user data, even during auth check
+      const hasStoredUser = localStorage.getItem('trashdrop_user');
+      
+      if (isPublicRoute || hasStoredUser) {
         return;
       }
       
@@ -184,10 +185,14 @@ const AppContent = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             
-            {/* Root route: if authenticated, go to dashboard; else login */}
+            {/* Root route: if authenticated or has stored data, go to dashboard; else login */}
             <Route
               path="/"
-              element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
+              element={
+                isAuthenticated || localStorage.getItem('trashdrop_user') ? 
+                <Navigate to="/dashboard" replace /> : 
+                <Login />
+              }
             />
             
             {/* Protected routes */}
