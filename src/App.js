@@ -11,6 +11,7 @@ import { OfflineQueueProvider } from './context/OfflineQueueContext.js';
 import Login from './pages/Login.js';
 import Register from './pages/Register.js';
 import ResetPassword from './pages/ResetPassword.js';
+import ResetPasswordConfirm from './pages/ResetPasswordConfirm.js';
 import Profile from './pages/Profile.js';
 import Dashboard from './pages/Dashboard.js';
 import DigitalBin from './pages/DigitalBin.js';
@@ -36,6 +37,7 @@ import InstallPrompt from './components/InstallPrompt.js';
 import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
 import AppPerformanceProvider from './components/AppPerformanceProvider.js';
+import AppPerformanceOptimizer from './components/AppPerformanceOptimizer.js';
 import ToastProvider from './components/ToastProvider.js';
 
 // Styling
@@ -86,7 +88,7 @@ const AppContent = () => {
   useEffect(() => {
     try {
       const lastPath = sessionStorage.getItem('trashdrop_last_path');
-      const isPublic = ['/', '/login', '/register', '/reset-password'].includes(location.pathname);
+      const isPublic = ['/', '/login', '/register', '/reset-password', '/reset-password-confirm'].includes(location.pathname);
       if (isAuthenticated && lastPath && isPublic && lastPath !== location.pathname) {
         navigate(lastPath, { replace: true });
       }
@@ -97,7 +99,7 @@ const AppContent = () => {
   useEffect(() => {
     const handleAuthCheck = async () => {
       // Skip check if we're on a public route
-      const isPublicRoute = ['/', '/login', '/register', '/reset-password'].includes(location.pathname);
+      const isPublicRoute = ['/', '/login', '/register', '/reset-password', '/reset-password-confirm'].includes(location.pathname);
       
       // Allow access if we have stored user data, even during auth check
       const hasStoredUser = localStorage.getItem('trashdrop_user');
@@ -184,6 +186,7 @@ const AppContent = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/reset-password-confirm" element={<ResetPasswordConfirm />} />
             
             {/* Root route: if authenticated or has stored data, go to dashboard; else login */}
             <Route
@@ -317,6 +320,7 @@ const App = () => {
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
             <AuthErrorBoundary>
+              <AppPerformanceOptimizer />
               <Suspense 
                 fallback={
                   <div className="flex justify-center items-center h-screen">

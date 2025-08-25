@@ -679,39 +679,63 @@ export const cacheUserActivity = async (userId, activities) => {
  */
 export const getCachedUserActivity = async (userId, limit = 10) => {
   try {
+    // Validate userId parameter
+    if (!userId || typeof userId !== 'string') {
+      console.warn('getCachedUserActivity: Invalid userId provided:', userId);
+      return [];
+    }
+    
     const db = await initDB();
+    if (!db) {
+      console.warn('getCachedUserActivity: Database not available');
+      return [];
+    }
+    
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([USER_ACTIVITY_STORE], 'readonly');
-      const store = transaction.objectStore(USER_ACTIVITY_STORE);
-      const userIndex = store.index('user_id');
-      
-      const activities = [];
-      const request = userIndex.openCursor(IDBKeyRange.only(userId));
-      
-      request.onsuccess = (event) => {
-        const cursor = event.target.result;
-        if (cursor && activities.length < limit) {
-          const activity = cursor.value;
-          // Check if cache is still valid (24 hours)
-          const cacheAge = Date.now() - activity.cached_at;
-          const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
-          
-          if (cacheAge < maxCacheAge) {
-            activities.push(activity);
-          }
-          cursor.continue();
-        } else {
-          // Sort by created_at descending
-          activities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-          console.log(`Retrieved ${activities.length} cached activities for user:`, userId);
-          resolve(activities);
+      try {
+        const transaction = db.transaction([USER_ACTIVITY_STORE], 'readonly');
+        const store = transaction.objectStore(USER_ACTIVITY_STORE);
+        const userIndex = store.index('user_id');
+        
+        const activities = [];
+        
+        // Safely create IDBKeyRange
+        let request;
+        try {
+          request = userIndex.openCursor(IDBKeyRange.only(userId));
+        } catch (keyRangeError) {
+          console.error('IDBKeyRange error in getCachedUserActivity:', keyRangeError);
+          return resolve([]);
         }
-      };
       
-      request.onerror = (event) => {
-        console.error('Error retrieving cached user activities:', event.target.error);
-        reject(event.target.error);
-      };
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor && activities.length < limit) {
+            const activity = cursor.value;
+            // Check if cache is still valid (24 hours)
+            const cacheAge = Date.now() - activity.cached_at;
+            const maxCacheAge = 24 * 60 * 60 * 1000; // 24 hours
+            
+            if (cacheAge < maxCacheAge) {
+              activities.push(activity);
+            }
+            cursor.continue();
+          } else {
+            // Sort by created_at descending
+            activities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            console.log(`Retrieved ${activities.length} cached activities for user:`, userId);
+            resolve(activities);
+          }
+        };
+        
+        request.onerror = (event) => {
+          console.error('Error retrieving cached user activities:', event.target.error);
+          reject(event.target.error);
+        };
+      } catch (error) {
+        console.error('Unexpected error in getCachedUserActivity:', error);
+        resolve([]);
+      }
     });
   } catch (error) {
     console.error('Failed to get cached user activities:', error);

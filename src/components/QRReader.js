@@ -40,7 +40,8 @@ const QRReader = ({
             {
               onDecodeError: error => {
                 // Don't show errors for normal decode attempts
-                if (error?.name !== 'QRScannerError') {
+                // Skip both QRScannerError and "No QR code found" errors
+                if (error?.name !== 'QRScannerError' && error?.message !== 'No QR code found' && !(error?.toString?.().includes('No QR code found'))) {
                   onError?.(error);
                 }
               },

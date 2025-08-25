@@ -146,13 +146,24 @@ export const userService = {
 
       // Use user_stats.total_bags as primary source, fallback to bag_inventory count
       const totalBagsFromStats = statsData?.total_bags || statsData?.total_bags_scanned || 0;
-      const batchesFromStats = statsData?.scanned_batches?.length || 0;
+      
+      // Get batches count from total_batches field first (prioritize), then try scanned_batches array length as fallback
+      const batchesFromStats = statsData?.total_batches || 
+                              (Array.isArray(statsData?.scanned_batches) ? statsData?.scanned_batches.length : 0) || 0;
+      
+      // Debug output to verify data mapping
+      console.log('[UserService] User stats data fields:', {
+        'user_stats.total_batches': statsData?.total_batches,
+        'user_stats.scanned_batches': statsData?.scanned_batches,
+        'batchesFromStats': batchesFromStats,
+        'bagCount': bagCount
+      });
       
       const userStats = {
         points: profileData?.points || 0,
         pickups: pickupCount || 0,
         reports: reportCount || 0,
-        batches: Math.max(batchesFromStats, bagCount), // Use scanned_batches length or bag_inventory as fallback
+        batches: batchesFromStats > 0 ? batchesFromStats : bagCount, // Prioritize total_batches over bag_inventory count
         totalBags: Math.max(totalBagsFromStats, totalBags), // Use user_stats.total_bags or calculated total
         level: profileData?.level || 'Eco Starter',
         email: profileData?.email || '',

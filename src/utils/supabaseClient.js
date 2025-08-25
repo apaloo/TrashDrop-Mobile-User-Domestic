@@ -119,9 +119,13 @@ const isTokenValid = (token) => {
         return false;
       }
       
-      // If token will expire soon (within next 30 minutes), try to refresh it
-      if (timeToExpiry < 30 * 60 * 1000) {
-        console.log('[Supabase] Token will expire soon, triggering refresh');
+      // Aggressive refresh strategy (refresh when less than 60 minutes left)
+      if (timeToExpiry < 60 * 60 * 1000) {
+        console.log('[Supabase] Token will expire in ' + Math.floor(timeToExpiry / 60000) + ' minutes, triggering refresh');
+        
+        // Set a global flag to notify that token needs refresh
+        window.trashdropTokenNeedsRefresh = true;
+        
         // Schedule token refresh (don't await to avoid blocking)
         setTimeout(() => {
           try {
@@ -131,6 +135,9 @@ const isTokenValid = (token) => {
             console.error('[Supabase] Failed to refresh session:', e);
           }
         }, 0);
+        
+        // Still return true to allow current operation to continue while refresh happens in background
+        return true;
       }
     }
     

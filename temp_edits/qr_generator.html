@@ -49,15 +49,43 @@ function generateQRCodeImage(text, size = 300) {
         .download-btn:hover {
             background: #45a049;
         }
+        .generate-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .generate-btn:hover {
+            background: #45a049;
+        }
     </style>
 </head>
 <body>
     <h1>🗑️ TrashDrops Batch QR Code</h1>
     
-    <div class="batch-info">
-        <h2>Test Batch: SCAN-TEST-001</h2>
-        <p><strong>Batch ID:</strong> e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed</p>
-        <p><strong>Bags:</strong> 5</p>
+    <div class="qr-input-container">
+        <div style="margin-bottom: 15px; padding: 10px; background-color: #e8f4fd; border-radius: 5px;">
+            <label>
+                <input type="checkbox" id="usePreloadedBatch" checked> 
+                <span style="font-weight: bold;">Use pre-loaded batch: 7ef714cb-c00b... (2c6sp6)</span>
+            </label>
+            <button class="generate-btn" onclick="loadPreloadedBatch()" style="margin-left: 10px;">Load Batch 2c6sp6</button>
+        </div>
+        
+        <h3>Or Enter Different Batch ID</h3>
+        <input type="text" id="batchIdInput" placeholder="Paste batch ID here...">
+        <input type="number" id="bagCountInput" value="5" min="1" max="20">
+        <button class="generate-btn" onclick="generateQR()">Generate QR Code</button>
+    </div>
+    
+    <div class="batch-info" id="batchInfo">
+        <h2 id="batchTitle">Enter a Batch ID above</h2>
+        <p><strong>Batch ID:</strong> <span id="batchIdDisplay">-</span></p>
+        <p><strong>Bags:</strong> <span id="bagCountDisplay">-</span></p>
         <p><strong>Status:</strong> Active</p>
     </div>
 
@@ -65,7 +93,7 @@ function generateQRCodeImage(text, size = 300) {
         <h3>Batch ID QR Code</h3>
         <img id="batchQR" style="border: 1px solid #ccc; margin: 10px;" />
         <br>
-        <button class="download-btn" onclick="downloadQRImage('batchQR', 'TrashDrops_Batch_e9dcf72b.png')">
+        <button class="download-btn" id="downloadBatchBtn" onclick="downloadQRImage('batchQR', 'TrashDrops_Batch.png')">
             📱 Download Batch QR Code
         </button>
     </div>
@@ -84,27 +112,99 @@ function generateQRCodeImage(text, size = 300) {
     </div>
 
     <script>
-        // Use a working batch ID from your Supabase batches table
-        const batchId = 'e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed';
-        const batchNumber = 'SCAN-TEST-001';
+        // Pre-loaded batch data
+        const preloadedBatch = {
+            "idx": 24,
+            "id": "7ef714cb-c00b-4e4d-b099-849913e2987e",
+            "batch_number": "2c6sp6",
+            "bag_count": 15,
+            "status": "active",
+            "notes": null,
+            "created_at": "2025-08-15 21:16:00.087051+00",
+            "updated_at": "2025-08-15 21:15:59.643+00",
+            "created_by": null,
+            "batch_name": null
+        };
+        
+        // Current batch data
+        let batchId = '';
+        let bagCount = 5;
+        let batchNumber = '';
 
         // Wait for DOM to load
         window.addEventListener('load', function() {
-            console.log('Page loaded, generating QR codes...');
+            console.log('Page loaded, checking for auto-load option...');
+            // Check if auto-load is selected
+            if (document.getElementById('usePreloadedBatch').checked) {
+                loadPreloadedBatch();
+            } else {
+                // Initialize with empty UI
+                document.getElementById('batchQR').src = '';
+                document.getElementById('bagQRs').innerHTML = '';
+            }
+        });
+        
+        // Function to load the pre-loaded batch
+        function loadPreloadedBatch() {
+            console.log('Loading pre-loaded batch:', preloadedBatch);
+            // Set batch data from preloaded batch
+            batchId = preloadedBatch.id;
+            bagCount = preloadedBatch.bag_count;
+            batchNumber = preloadedBatch.batch_number;
+            
+            // Update input fields to reflect loaded batch
+            document.getElementById('batchIdInput').value = batchId;
+            document.getElementById('bagCountInput').value = bagCount;
+            
+            // Generate QR codes
+            updateBatchInfo();
+        }
+        
+        // Function to update batch info based on user input
+        function updateBatchInfo() {
+            // Get values from inputs
+            batchId = document.getElementById('batchIdInput').value.trim();
+            bagCount = parseInt(document.getElementById('bagCountInput').value) || 5;
+            
+            if (!batchId) {
+                alert('Please enter a valid batch ID');
+                return;
+            }
+            
+            // Use first 8 characters of UUID as the display number
+            batchNumber = 'BATCH-' + batchId.substring(0, 8);
+            
+            // Update display
+            document.getElementById('batchTitle').textContent = `Batch: ${batchNumber}`;
+            document.getElementById('batchIdDisplay').textContent = batchId;
+            document.getElementById('bagCountDisplay').textContent = bagCount;
+            
+            console.log('Generating QR codes for batch ID:', batchId);
             
             // Generate batch QR code using API
             const batchQRImg = document.getElementById('batchQR');
             batchQRImg.src = generateQRCodeImage(batchId, 300);
             batchQRImg.alt = `QR Code for batch ${batchId}`;
+            
+            // Update download button to include batch ID in filename
+            const shortId = batchId.substring(0, 8);
+            const downloadBtn = document.getElementById('downloadBatchBtn');
+            downloadBtn.onclick = function() {
+                downloadQRImage('batchQR', `TrashDrops_Batch_${shortId}.png`);
+            };
+            
             console.log('Batch QR code generated successfully!');
 
             // Generate individual bag QR codes
             generateBagQRCodes();
-        });
+        }
 
         function generateBagQRCodes() {
             const bagQRsContainer = document.getElementById('bagQRs');
-            for (let i = 1; i <= 5; i++) {
+            // Clear previous bag QR codes
+            bagQRsContainer.innerHTML = '';
+            
+            for (let i = 1; i <= bagCount; i++) {
                 const bagQRCode = `${batchNumber}-BAG-${i}`;
                 
                 const bagContainer = document.createElement('div');
@@ -126,7 +226,10 @@ function generateQRCodeImage(text, size = 300) {
                 const bagButton = document.createElement('button');
                 bagButton.className = 'download-btn';
                 bagButton.textContent = `📦 Download Bag ${i}`;
-                bagButton.onclick = () => downloadQRImage(`bagQR${i}`, `TrashDrops_Bag_${i}.png`);
+                
+                // Include short batch ID in bag filename
+                const shortId = batchId.substring(0, 8);
+                bagButton.onclick = () => downloadQRImage(`bagQR${i}`, `TrashDrops_Batch_${shortId}_Bag_${i}.png`);
                 bagContainer.appendChild(bagButton);
                 
                 bagQRsContainer.appendChild(bagContainer);
@@ -137,6 +240,11 @@ function generateQRCodeImage(text, size = 300) {
         // Download function for images
         function downloadQRImage(imgId, filename) {
             const img = document.getElementById(imgId);
+            if (!img.src) {
+                alert('Please generate a QR code first');
+                return;
+            }
+            
             const link = document.createElement('a');
             link.download = filename;
             link.href = img.src;

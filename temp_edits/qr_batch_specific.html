@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrashDrops Batch QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .qr-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .batch-info {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .download-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .download-btn:hover {
+            background-color: #45a049;
+        }
+        .bag-container {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        h1 {
+            color: #2e7d32;
+        }
+        h2, h3 {
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body onload="generateQRCodes()">
+    <h1>TrashDrops Batch QR Code</h1>
+    <p>Generated for specific batch ID: 7ef714cb-c00b-4e4d-b099-849913e2987e</p>
+    
+    <div class="batch-info card">
+        <h2>Batch: 2c6sp6</h2>
+        <p><strong>Batch ID:</strong> 7ef714cb-c00b-4e4d-b099-849913e2987e</p>
+        <p><strong>Bags:</strong> 15</p>
+        <p><strong>Status:</strong> Active</p>
+    </div>
+
+    <div class="qr-container card">
+        <h3>Batch ID QR Code</h3>
+        <img id="batchQR" style="border: 1px solid #ccc; margin: 10px;" />
+        <br>
+        <button class="download-btn" onclick="downloadQRImage('batchQR', 'TrashDrops_Batch_7ef714cb.png')">
+            📱 Download Batch QR Code
+        </button>
+    </div>
+
+    <div class="qr-container card">
+        <h3>Bag QR Codes (for individual bag scanning)</h3>
+        <div id="bagQRs"></div>
+    </div>
+
+    <script>
+        // Batch data from the provided JSON
+        const batchData = {
+            "idx": 24,
+            "id": "7ef714cb-c00b-4e4d-b099-849913e2987e",
+            "batch_number": "2c6sp6",
+            "bag_count": 15,
+            "status": "active",
+            "notes": null,
+            "created_at": "2025-08-15 21:16:00.087051+00",
+            "updated_at": "2025-08-15 21:15:59.643+00",
+            "created_by": null,
+            "batch_name": null
+        };
+
+        // Function to generate QR codes on page load
+        function generateQRCodes() {
+            const batchId = batchData.id;
+            const bagCount = batchData.bag_count;
+            
+            // Generate batch QR code
+            const batchQRImg = document.getElementById('batchQR');
+            batchQRImg.src = generateQRCodeImage(batchId, 300);
+            batchQRImg.alt = `QR Code for batch ${batchId}`;
+            console.log('Batch QR code generated successfully!');
+
+            // Generate individual bag QR codes
+            generateBagQRCodes();
+        }
+
+        function generateQRCodeImage(data, size) {
+            // Use QR Server API to generate QR code
+            return `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(data)}&size=${size}x${size}&margin=10`;
+        }
+
+        function generateBagQRCodes() {
+            const batchId = batchData.id;
+            const batchNumber = batchData.batch_number;
+            const bagCount = batchData.bag_count;
+            const bagQRsContainer = document.getElementById('bagQRs');
+            
+            // Clear previous bag QR codes
+            bagQRsContainer.innerHTML = '';
+
+            // Generate QR codes for each bag
+            for (let i = 1; i <= bagCount; i++) {
+                const bagContainer = document.createElement('div');
+                bagContainer.className = 'bag-container';
+                
+                const bagLabel = document.createElement('p');
+                bagLabel.textContent = `Bag ${i}`;
+                bagLabel.style.fontWeight = 'bold';
+                bagContainer.appendChild(bagLabel);
+                
+                // Generate QR code for each bag with format BATCH-{batchNumber}-BAG-{i}
+                const bagQRCode = `BATCH-${batchNumber}-BAG-${i}`;
+                
+                const bagImg = document.createElement('img');
+                bagImg.id = `bagQR${i}`;
+                bagImg.src = generateQRCodeImage(bagQRCode, 200);
+                bagImg.alt = `QR Code for ${bagQRCode}`;
+                bagImg.style.border = '1px solid #ccc';
+                bagImg.style.margin = '5px';
+                bagContainer.appendChild(bagImg);
+                
+                const bagButton = document.createElement('button');
+                bagButton.className = 'download-btn';
+                bagButton.textContent = `📦 Download Bag ${i}`;
+                
+                const shortId = batchData.id.substring(0, 8);
+                bagButton.onclick = () => downloadQRImage(`bagQR${i}`, `TrashDrops_${batchNumber}_Bag_${i}.png`);
+                bagContainer.appendChild(bagButton);
+                
+                bagQRsContainer.appendChild(bagContainer);
+                
+                // Limit display to first 5 bags with option to show more
+                if (i === 5 && bagCount > 5) {
+                    const showMoreBtn = document.createElement('button');
+                    showMoreBtn.textContent = `Show ${bagCount - 5} more bags`;
+                    showMoreBtn.className = 'download-btn';
+                    showMoreBtn.style.backgroundColor = '#1976d2';
+                    showMoreBtn.onclick = function() {
+                        this.style.display = 'none';
+                        for (let j = 6; j <= bagCount; j++) {
+                            generateBagQR(j);
+                        }
+                    };
+                    bagQRsContainer.appendChild(document.createElement('br'));
+                    bagQRsContainer.appendChild(showMoreBtn);
+                    break;
+                }
+            }
+
+            function generateBagQR(index) {
+                const bagContainer = document.createElement('div');
+                bagContainer.className = 'bag-container';
+                
+                const bagLabel = document.createElement('p');
+                bagLabel.textContent = `Bag ${index}`;
+                bagLabel.style.fontWeight = 'bold';
+                bagContainer.appendChild(bagLabel);
+                
+                const bagQRCode = `BATCH-${batchNumber}-BAG-${index}`;
+                
+                const bagImg = document.createElement('img');
+                bagImg.id = `bagQR${index}`;
+                bagImg.src = generateQRCodeImage(bagQRCode, 200);
+                bagImg.alt = `QR Code for ${bagQRCode}`;
+                bagImg.style.border = '1px solid #ccc';
+                bagImg.style.margin = '5px';
+                bagContainer.appendChild(bagImg);
+                
+                const bagButton = document.createElement('button');
+                bagButton.className = 'download-btn';
+                bagButton.textContent = `📦 Download Bag ${index}`;
+                
+                const shortId = batchData.id.substring(0, 8);
+                bagButton.onclick = () => downloadQRImage(`bagQR${index}`, `TrashDrops_${batchNumber}_Bag_${index}.png`);
+                bagContainer.appendChild(bagButton);
+                
+                bagQRsContainer.appendChild(bagContainer);
+            }
+        }
+
+        // Download function for images
+        function downloadQRImage(imgId, filename) {
+            const img = document.getElementById(imgId);
+            if (!img || !img.src) {
+                console.error('Image not found or has no source');
+                return;
+            }
+
+            // Create a temporary link element
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

@@ -330,7 +330,8 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
       if (window.gc) window.gc();
       
       // Simple draw operation with fixed dimensions
-      const ctx = canvas.getContext('2d');
+      // Using willReadFrequently=true attribute for performance optimization
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
       
       // Very low quality JPEG to minimize memory use

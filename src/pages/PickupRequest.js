@@ -61,14 +61,7 @@ const PickupRequest = () => {
   const [savedLocations, setSavedLocations] = useState([]);
   const [userStats, setUserStats] = useState(() => {
     // Initialize from test override if present to stabilize first render in tests
-    let initialBags = 0;
-    try {
-      if (process.env.NODE_ENV === 'test' && typeof window !== 'undefined') {
-        const override = Number(window.__TD_TEST_INITIAL_BAGS__);
-        if (Number.isFinite(override)) initialBags = Math.max(0, override);
-      }
-    } catch (_) {}
-    return { totalBags: initialBags, batches: 0 };
+    return { totalBags: 0, batches: 0 };
   });
   const [insufficientBags, setInsufficientBags] = useState(false);
   // Keep latest userId in a ref for event handlers registered once
@@ -82,20 +75,6 @@ const PickupRequest = () => {
   useEffect(() => {
     availableBagsRef.current = userStats.totalBags || 0;
   }, [userStats.totalBags]);
-
-  // Test-only: allow overriding initial bags to stabilize unit tests
-  useEffect(() => {
-    try {
-      if (process.env.NODE_ENV === 'test' && typeof window !== 'undefined') {
-        const override = Number(window.__TD_TEST_INITIAL_BAGS__);
-        if (Number.isFinite(override)) {
-          setUserStats(prev => ({ ...prev, totalBags: Math.max(0, override) }));
-          setInsufficientBags(override <= 0);
-          console.log('[PickupRequest] applied test initial bags override', override);
-        }
-      }
-    } catch (_) {}
-  }, []);
 
   // Schema for form validation (constant reference to avoid Formik subtree remounts)
   const validationSchema = useMemo(() => Yup.object().shape({
@@ -280,10 +259,12 @@ const PickupRequest = () => {
               ? statsData.total_batches
               : (scannedLen !== undefined ? scannedLen : 0);
 
+            const mergedTotalBags = (statsData.total_bags !== undefined)
+              ? statsData.total_bags
+              : (scannedLen !== undefined ? scannedLen : 0);
+
             // Avoid clobbering optimistic increases from 'trashdrop:bags-updated'
             setUserStats(prev => {
-              const mergedTotalBags = Math.max(prev?.totalBags ?? 0, totalBagsVal ?? 0);
-              console.log('[PickupRequest] fetchUserStats computed', { totalBagsVal, prevTotal: prev?.totalBags, mergedTotalBags });
               const next = { totalBags: mergedTotalBags, batches: totalBatchesVal };
               setInsufficientBags(mergedTotalBags <= 0);
               return next;
@@ -715,6 +696,7 @@ const PickupRequest = () => {
                       <>
                         <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
                           You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.
+                          {JSON.stringify(userStats)}
                         </div>
                         <div className="mt-2 flex justify-center space-x-4">
                           <button 

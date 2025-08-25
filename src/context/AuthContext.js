@@ -579,81 +579,6 @@ export const AuthProvider = ({ children }) => {
     // For debugging - log the credentials being used
     console.log(`[Auth DEBUG] Using credentials: ${email} / ${password ? '******' : 'no password'}`); 
     
-    // SPECIAL CASE: Use the hardcoded credentials for testing purposes
-    // This will allow us to test the app without needing a working Supabase connection
-    if (email === 'prince02@mailinator.com' && password === 'sChool@123') {
-      console.log('[Auth] Using mock credentials');
-      // Use UUID v4 format for compatibility with Supabase's auth.users table
-      const mockUser = {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        email: 'prince02@mailinator.com',
-        user_metadata: {
-          first_name: 'Prince',
-          last_name: 'Test'
-        },
-        app_metadata: {
-          role: 'authenticated'
-        },
-        aud: 'authenticated',
-        created_at: new Date().toISOString()
-      };
-      
-      // Create a properly structured JWT mock token with three parts
-      // This follows the format: header.payload.signature
-      const createMockJwt = () => {
-        // Create base64 encoded header
-        const header = btoa(JSON.stringify({
-          alg: 'HS256',
-          typ: 'JWT'
-        })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-        
-        // Create base64 encoded payload with standard JWT claims
-        const payload = btoa(JSON.stringify({
-          sub: mockUser.id,
-          email: mockUser.email,
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 86400,
-          aud: 'authenticated',
-          role: 'authenticated'
-        })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-        
-        // Mock signature (not actually verifiable, but correctly formatted)
-        const signature = 'mockSignatureForTestingPurposesOnly123456789';
-        
-        return `${header}.${payload}.${signature}`;
-      };
-
-      const mockSession = {
-        access_token: createMockJwt(),
-        refresh_token: createMockJwt(), // Use the same structure for refresh token
-        expires_in: 86400, // 24 hours
-        expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
-        user: mockUser
-      };
-      
-      try {
-        // Store user data in localStorage for persistence
-        const userKey = appConfig?.storage?.userKey || 'trashdrop_user';
-        const tokenKey = appConfig?.storage?.tokenKey || 'trashdrop_auth_token';
-        localStorage.setItem(userKey, JSON.stringify(mockUser));
-        localStorage.setItem(tokenKey, mockSession.access_token);
-        
-        // Update auth state to authenticated
-        setAuthState({
-          status: AUTH_STATES.AUTHENTICATED,
-          user: mockUser,
-          session: mockSession,
-          error: null,
-          lastAction: 'sign_in',
-          retryCount: 0
-        });
-        
-        return { success: true, user: mockUser, session: mockSession };
-      } catch (e) {
-        console.error('[Auth] Error setting up test account:', e);
-      }
-    }
-    
     // Regular authentication flow for non-test accounts
     // Set loading state directly
     setAuthState(prev => ({ 
@@ -835,11 +760,99 @@ export const AuthProvider = ({ children }) => {
       return handleAuthError(error, 'sign_out');
     }
   }, [resetAuthState, handleAuthError, updateAuthState]);
+
+  const resetPassword = useCallback(async (email) => {
+    console.log('[Auth] Requesting password reset for:', email);
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password-confirm',
+      });
+      
+      if (error) {
+        console.error('[Auth] Password reset error:', error);
+        return { 
+          success: false, 
+          error: error.message || 'Failed to send password reset email' 
+        };
+      }
+      
+      console.log('[Auth] Password reset email sent successfully');
+      return { success: true };
+      
+    } catch (error) {
+      console.error('[Auth] Unexpected error during password reset:', error);
+      return { 
+        success: false, 
+        error: error.message || 'An unexpected error occurred' 
+      };
+    }
+  }, []);
+  
+  // Periodic token validation function
+  const validateToken = useCallback(async () => {
+    // Skip for test accounts
+    const storedUser = getStoredUser();
+    if (storedUser?.email === 'prince02@mailinator.com' && process.env.NODE_ENV === 'development') {
+      return { valid: true };
+    }
+    
+    const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
+    if (!storedToken) {
+      return { valid: false, reason: 'no_token' };
+    }
+
+    try {
+      // Basic structure check
+      const parts = storedToken.split('.');
+      if (parts.length !== 3) {
+        return { valid: false, reason: 'invalid_format' };
+      }
+      
+      // Parse the payload
+      const payloadBase64 = parts[1];
+      let paddedPayload = payloadBase64;
+      while (paddedPayload.length % 4 !== 0) {
+        paddedPayload += '=';
+      }
+      
+      const payloadStr = atob(paddedPayload.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(payloadStr);
+      
+      // Check expiry
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      if (payload.exp) {
+        // Token is expired
+        if (currentTime >= payload.exp) {
+          console.warn('[Auth] Token validation: Token has expired');
+          return { valid: false, reason: 'expired', expiry: payload.exp };
+        }
+        
+        // Token is near expiry (within 15 minutes)
+        const timeToExpiry = payload.exp - currentTime;
+        if (timeToExpiry < 15 * 60) {
+          console.log(`[Auth] Token validation: Token will expire soon (${timeToExpiry} seconds left)`);
+          return { valid: true, nearExpiry: true, expiry: payload.exp };
+        }
+        
+        return { valid: true, expiry: payload.exp };
+      } else {
+        console.warn('[Auth] Token validation: No expiration found in token');
+        return { valid: true, noExpiry: true };
+      }
+    } catch (error) {
+      console.error('[Auth] Token validation error:', error);
+      return { valid: false, reason: 'parse_error', error };
+    }
+  }, []);
   
   // Set up auth on mount
   useEffect(() => {
     console.log('[Auth] Setting up auth context');
     let subscription;
+    let refreshInterval;
+    let tokenValidationInterval;
     
     const initializeAuth = async () => {
       // Skip if already initialized
@@ -912,36 +925,30 @@ export const AuthProvider = ({ children }) => {
                     session,
                     lastAction: 'token_refreshed'
                   });
+                  
+                  // Store refreshed token
+                  if (session.access_token) {
+                    localStorage.setItem(appConfig.storage.tokenKey, session.access_token);
+                    console.log('[Auth] Stored refreshed token');
+                    
+                    // Reset the global refresh flag if it was set
+                    if (window.trashdropTokenNeedsRefresh) {
+                      window.trashdropTokenNeedsRefresh = false;
+                    }
+                  }
                 }
                 break;
-                
-              case 'USER_UPDATED':
-                console.log('[Auth] User updated:', session?.user);
-                if (session?.user) {
-                  updateAuthState({
-                    user: session.user,
-                    session,
-                    lastAction: 'user_updated'
-                  });
-                }
-                break;
-                
-              case 'PASSWORD_RECOVERY':
-                console.log('[Auth] Password recovery requested');
-                // Handle password recovery
-                break;
-                
-              default:
-                console.log('[Auth] Unhandled auth state change:', event);
             }
           }
         );
         
+        // Store subscription for cleanup
         subscription = data.subscription;
         
+        // Mark auth as initialized
+        isAuthInitialized.current = true;
       } catch (error) {
-        console.error('[Auth] Error during auth initialization:', error);
-        // Ensure we're in a defined state even if initialization fails
+        console.error('[Auth] Error during initialization:', error);
         updateAuthState({
           status: AUTH_STATES.ERROR,
           error: {
@@ -958,12 +965,86 @@ export const AuthProvider = ({ children }) => {
     // Call initialization function once
     initializeAuth();
     
+    // Set up periodic session check and token validation
+    const setupRefreshIntervals = () => {
+      // Clear any existing intervals first
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (tokenValidationInterval) clearInterval(tokenValidationInterval);
+      
+      // Set up hourly session refresh for authenticated users
+      refreshInterval = setInterval(async () => {
+        if (authState.status === AUTH_STATES.AUTHENTICATED) {
+          console.log('[Auth] Running scheduled hourly session refresh');
+          await checkSession(true);
+        }
+      }, 60 * 60 * 1000); // Every hour
+      
+      // Set up token validation every 5 minutes
+      tokenValidationInterval = setInterval(async () => {
+        if (authState.status === AUTH_STATES.AUTHENTICATED) {
+          console.log('[Auth] Running scheduled token validation check');
+          const result = await validateToken();
+          
+          if (!result.valid) {
+            console.warn(`[Auth] Token validation failed: ${result.reason}`);
+            await checkSession(true); // Force refresh
+          } else if (result.nearExpiry) {
+            console.log('[Auth] Token near expiry, triggering refresh');
+            await checkSession(true); // Force refresh
+          }
+        }
+      }, 5 * 60 * 1000); // Every 5 minutes
+    };
+    
+    // Set up visibility change event listener to refresh session when app becomes visible
+    const setupVisibilityListener = () => {
+      const handleVisibilityChange = async () => {
+        if (document.visibilityState === 'visible' && authState.status === AUTH_STATES.AUTHENTICATED) {
+          console.log('[Auth] App became visible, checking session');
+          await checkSession();
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    
+    // Set up window focus event listener
+    const setupFocusListener = () => {
+      const handleFocus = async () => {
+        if (authState.status === AUTH_STATES.AUTHENTICATED) {
+          console.log('[Auth] Window focused, checking session');
+          await checkSession();
+        }
+      };
+      
+      window.addEventListener('focus', handleFocus);
+      return () => window.removeEventListener('focus', handleFocus);
+    };
+    
+    // Set up all listeners and intervals after initialization
+    const removeVisibilityListener = setupVisibilityListener();
+    const removeFocusListener = setupFocusListener();
+    setupRefreshIntervals();
+    
+    // Call initialization function once
+    initializeAuth();
+    
     // Cleanup function
     return () => {
       console.log('[Auth] Cleaning up auth context');
       if (subscription) {
         subscription.unsubscribe();
       }
+      
+      // Clear intervals
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (tokenValidationInterval) clearInterval(tokenValidationInterval);
+      
+      // Remove event listeners
+      removeVisibilityListener();
+      removeFocusListener();
+      
       // Reset initialization flag on unmount
       isAuthInitialized.current = false;
     };
@@ -981,6 +1062,7 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signUp,
     signOut,
+    resetPassword,
     checkSession,
     resetAuthState,
     clearAuthData,

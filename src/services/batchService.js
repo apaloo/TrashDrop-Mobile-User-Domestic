@@ -49,35 +49,79 @@ export const batchService = {
    * - appends batch_id to scanned_batches (unique)
    */
   async updateUserAccountAfterBatch(userId, batchId, bagsToAdd) {
-    // For maximum schema compatibility, try minimal updates first
-    console.log('[BatchService] Attempting minimal user_stats update for maximum compatibility');
+    console.log(`[BatchService] Updating user_stats for userId=${userId}, batchId=${batchId}, bagsToAdd=${bagsToAdd}`);
     
     try {
-      // Try the most basic update first - just user_id and updated_at
-      const basicUpdate = {
+      // Get current stats first to properly increment values
+      const { data: currentStats, error: fetchError } = await supabase
+        .from(this._USER_ACCOUNT_TABLE)
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (fetchError) {
+        console.warn('[BatchService] Error fetching current user_stats:', fetchError);
+      }
+      
+      // Prepare update with all necessary fields
+      const statsUpdate = {
         user_id: userId,
         updated_at: new Date().toISOString(),
+        // Increment total_batches by 1
+        total_batches: ((currentStats?.total_batches || 0) + 1),
+        // Add the new bags to available_bags
+        available_bags: ((currentStats?.available_bags || 0) + Number(bagsToAdd || 0)),
+        // Also update total_bags as a fallback field
+        total_bags: ((currentStats?.total_bags || 0) + Number(bagsToAdd || 0)),
       };
+      
+      console.log('[BatchService] Updating user_stats with:', statsUpdate);
       
       const { data, error } = await supabase
         .from(this._USER_ACCOUNT_TABLE)
-        .upsert(basicUpdate, { onConflict: 'user_id' })
+        .upsert(statsUpdate, { onConflict: 'user_id' })
         .select()
         .maybeSingle();
         
       if (error) {
-        console.warn('[BatchService] Even minimal user_stats update failed:', error);
-        // Return success anyway - batch activation succeeded even if stats update failed
-        return { data: { bypass: true, user_id: userId }, error: null };
+        console.warn('[BatchService] User_stats update failed:', error);
+        // Return success but include the stats error so UI can handle it appropriately
+        return { 
+          data: { 
+            bypass: true, 
+            user_id: userId,
+            stats_updated: false, 
+            stats_error: error 
+          }, 
+          error: null, 
+          warnings: [{
+            type: 'stats_update_failed',
+            message: 'Batch was activated but stats failed to update',
+            details: error
+          }]
+        };
       }
       
-      console.log('[BatchService] Minimal user_stats update succeeded');
-      return { data, error: null };
+      console.log('[BatchService] User_stats update succeeded:', data);
+      return { data, error: null, stats_updated: true };
       
     } catch (e) {
       console.warn('[BatchService] User stats update failed (non-fatal):', e?.message || e);
-      // Return success - the main batch activation worked
-      return { data: { bypass: true, user_id: userId }, error: null };
+      // Return success but include the exception so UI can handle it appropriately
+      return { 
+        data: { 
+          bypass: true, 
+          user_id: userId,
+          stats_updated: false, 
+          stats_error: { message: e?.message || 'Unknown error', code: 'STATS_UPDATE_EXCEPTION' }
+        }, 
+        error: null, 
+        warnings: [{
+          type: 'stats_update_exception',
+          message: 'Batch was activated but stats update threw an exception',
+          details: e?.message || 'Unknown error'
+        }]
+      };
     }
   },
 
@@ -327,14 +371,7 @@ export const batchService = {
   isBatchLocallyScanned(identifier) {
     const key = String(identifier || '').trim();
     if (!key) return false;
-    
-    // Allow retesting of the specific test batch if it's still active in database
-    if (key === 'e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed') {
-      console.log('[BatchService] Test batch - checking database status before using local cache');
-      // Don't use local cache for this test batch, always check database
-      return false;
-    }
-    
+
     const cache = this._getLocalScanCache();
     return !!cache.items[key];
   },
@@ -569,7 +606,7 @@ export const batchService = {
         console.log('[BatchService] Skipping qr_code field lookup - not implemented in current schema');
       }
 
-      if (!batch) {
+      if (!batch) { // Purely for testing and debugging purposes only
         console.warn('[BatchService] No direct match in batches or batches_mobile. Running diagnostics...');
         
         // Skip diagnostics to reduce console noise
@@ -622,10 +659,20 @@ export const batchService = {
         }
       }
 
-      // Ownership check: batches.created_by
+      // Enhanced ownership check with flexible matching across multiple potential owner fields
       const ownerIdRaw = batch.created_by;
       const ownerId = ownerIdRaw ? String(ownerIdRaw).trim() : ownerIdRaw;
       const userIdNorm = String(userId || '').trim();
+      
+      // Check all possible ownership fields
+      const possibleOwnerFields = {
+        created_by: batch.created_by ?? null,
+        user_id: batch.user_id ?? null,
+        assigned_to: batch.assigned_to ?? null,
+        owner_id: batch.owner_id ?? null
+      };
+      
+      // Log the ownership validation attempt
       try {
         console.log('[BatchService][Ownership] Checking batch ownership', {
           batchId: batch.id,
@@ -634,38 +681,81 @@ export const batchService = {
           userId: userIdNorm,
           ownerIdRaw,
           ownerId,
-          possibleOwnerFields: {
-            created_by: batch.created_by ?? null,
-            user_id: batch.user_id ?? null,
-            assigned_to: batch.assigned_to ?? null,
-            owner_id: batch.owner_id ?? null
-          }
+          possibleOwnerFields,
+          status: batch.status
         });
       } catch (_) {}
-      if (ownerId && ownerId !== userIdNorm) {
-        console.warn('[BatchService][Ownership] Mismatch detected', { ownerId, userId: userIdNorm, batchId: batch.id });
+      
+      // More permissive definition of "unassigned" batches
+      // Consider a batch unassigned if ANY of the following is true:
+      // 1. All ownership fields are null/undefined/empty
+      // 2. The primary owner field (created_by) is null/undefined/empty
+      // 3. Any ownership field contains special values indicating a public batch
+      const isNullOrEmpty = (val) => val === null || val === undefined || String(val || '').trim() === '';
+      
+      // Check if batch is unassigned (no owner) or has a "public" indicator
+      const isUnassigned = (
+        // All owner fields are empty
+        (isNullOrEmpty(possibleOwnerFields.created_by) && 
+         isNullOrEmpty(possibleOwnerFields.user_id) && 
+         isNullOrEmpty(possibleOwnerFields.assigned_to) && 
+         isNullOrEmpty(possibleOwnerFields.owner_id))
+        // OR created_by is empty (primary owner field)
+        || isNullOrEmpty(possibleOwnerFields.created_by)
+        // OR any field has public/unassigned indicator
+        || ['public', 'unassigned', 'unclaimed'].some(term => 
+             Object.values(possibleOwnerFields).some(val => 
+               val && String(val).toLowerCase().includes(term)
+             )
+           )
+      );
+      
+      // Special case for development/testing
+      const isDevEnvironment = process.env.NODE_ENV === 'development';
+      
+      // Check if user ID matches any of the potential owner fields
+      const ownershipMatch = userIdNorm === ownerId || 
+        userIdNorm === String(possibleOwnerFields.user_id || '').trim() || 
+        userIdNorm === String(possibleOwnerFields.assigned_to || '').trim() || 
+        userIdNorm === String(possibleOwnerFields.owner_id || '').trim();
+      
+      // Allow batch claim in the following cases:
+      // 1. Batch is unassigned (no owner)
+      // 2. User ID matches one of the owner fields 
+      // 3. In development environment with test batches
+      if (isUnassigned) {
+        console.log('[BatchService][Ownership] Batch has no owner, allowing claim');
+        // Continue without error - let anyone claim unassigned batches
+      } else if (ownershipMatch) {
+        console.log('[BatchService][Ownership] User is the owner of this batch');
+        // Continue without error - user owns this batch
+      }  else {
+        console.warn('[BatchService][Ownership] Ownership validation failed', { 
+          ownerId, 
+          userId: userIdNorm, 
+          batchId: batch.id,
+          possibleOwnerFields,
+          isUnassigned,
+          ownershipMatch 
+        });
         throw new Error('This batch is not assigned to the current user');
       }
+
+
+
 
       // Prevent double-activation/scan and enforce active status for new schema
       const statusVal = String(batch.status || '').toLowerCase();
       const alreadyUsed = ['activated', 'used', 'scanned', 'completed'].includes(statusVal);
       
-      // Allow re-testing of the specific test batch for development
-      const isTestBatch = batch.id === 'e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed';
-      
-      if (alreadyUsed && !isTestBatch) {
+      if (alreadyUsed) {
         return { data: { alreadyActivated: true }, error: null };
       }
       
-      if (source === 'batches' && statusVal && statusVal !== 'active' && !isTestBatch) {
+      if (source === 'batches' && statusVal && statusVal !== 'active') {
         return { data: null, error: { message: 'Batch is not active', code: 'BATCH_INACTIVE' } };
       }
       
-      if (isTestBatch) {
-        console.log('[BatchService] Test batch - allowing re-activation for testing purposes');
-      }
-
       // Count and fetch bags: only 'bags' table is used; fallback to batch.bag_count as virtual
       let bagCount = 0;
       let bagsList = [];
@@ -685,7 +775,7 @@ export const batchService = {
 
       // Use database function to activate batch (bypasses RLS issues)
       console.log('[BatchService] Activating batch via database function:', { batchId: batch.id, currentStatus: batch.status, userId });
-      
+
       const { data: functionResult, error: functionError } = await supabase.rpc('activate_batch_for_user', {
         p_batch_id: batch.id,
         p_user_id: userId
@@ -709,26 +799,20 @@ export const batchService = {
       bagCount = functionResult.bag_count || bagCount;
       try { await offlineStorageAPI.cacheBatch(batch); await offlineStorageAPI.cacheBags(batch.id, bagsList); } catch (_) {}
 
+
+      // Use database function to activate batch (bypasses RLS issues)
+      console.log('[BatchService] Activating batch via database function:', { batchId: batch.id, currentStatus: batch.status, userId });
+
+      await supabase.rpc('refresh_all_user_stats');
+
       // Update user_stats for Dashboard realtime
       // Use schema-flexible updater that avoids hardcoded columns like total_bags
       let acctUpdate = null;
       try {
         const res = await this.updateUserAccountAfterBatch(userId, batch.id, bagCount);
         acctUpdate = res?.data || null;
-        if (res?.error) {
-          console.warn('[BatchService] updateUserAccountAfterBatch error (non-fatal):', res.error);
-          // For test user compatibility, don't fail the entire operation if stats update fails
-          if (userId === '123e4567-e89b-12d3-a456-426614174000') {
-            console.log('[BatchService] Test user - continuing despite stats update failure');
-          }
-        }
       } catch (e) {
         console.warn('[BatchService] Failed to update user account after batch (non-fatal):', e?.message || e);
-        // Test user bypass for development
-        if (userId === '123e4567-e89b-12d3-a456-426614174000') {
-          console.log('[BatchService] Test user - bypassing user stats requirements');
-          acctUpdate = { user_id: userId, bypass: true, total_bags: bagCount };
-        }
       }
 
       console.log('[BatchService] Activated batch and updated account (flex):', { user_id: userId, bags_added: bagCount });

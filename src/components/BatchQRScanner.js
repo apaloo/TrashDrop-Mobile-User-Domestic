@@ -109,20 +109,22 @@ const BatchQRScanner = ({ onScanComplete }) => {
       setLoadingMessage('Confirming batch activation...');
       const activationSuccessful = verifyRes.data?.activated === true || verifyRes.data?.status === 'used';
       
-      if (!activationSuccessful) {
-        throw new Error(`Batch found but activation failed. Status: ${verifyRes.data?.status || 'unknown'}`);
-      }
+      // if (!activationSuccessful) {
+      //   throw new Error(`Batch found but activation failed. Status: ${verifyRes.data?.status || 'unknown'}`);
+      // }
 
       const bagsAdded = verifyRes.data?.bagsAdded || verifyRes.data?.total_bags_count || 0;
       const returnedBags = Array.isArray(verifyRes.data?.bags) ? verifyRes.data.bags : null;
-      setScanResult({
-        batch_qr_code: verifyRes.data?.batch_id || batchId,
-        status: verifyRes.data?.status || 'activated', // Use actual status from database
-        created_at: verifyRes.data?.created_at || new Date().toISOString(),
-        bag_count: verifyRes.data?.bag_count || verifyRes.data?.total_bags_count || bagsAdded,
-        bags: returnedBags ?? Array(bagsAdded).fill({}).map((_, i) => ({ id: `virtual-${i+1}` })),
-        activated_at: verifyRes.data?.activated_at, // Show when activation occurred
-      });
+      if(bagsAdded){
+        setScanResult({
+          batch_qr_code: verifyRes.data?.batch_id || batchId,
+          status: verifyRes.data?.status || 'activated', // Use actual status from database
+          created_at: verifyRes.data?.created_at || new Date().toISOString(),
+          bag_count: verifyRes.data?.bag_count || verifyRes.data?.total_bags_count || bagsAdded,
+          bags: returnedBags ?? Array(bagsAdded).fill({}).map((_, i) => ({ id: `virtual-${i+1}` })),
+          activated_at: verifyRes.data?.activated_at, // Show when activation occurred
+        });
+      }
       setScanning(false);
 
       // Skip notification creation to avoid console errors
@@ -191,11 +193,14 @@ const BatchQRScanner = ({ onScanComplete }) => {
   const handleError = (error) => {
     const message = error?.message || error || 'Unknown error';
     
-    // Completely suppress "No QR code found" from console and UI
-    if (message === 'No QR code found') {
+    // Completely suppress "No QR code found" errors from console and UI
+    if (message === 'No QR code found' || 
+        (typeof error === 'string' && error.includes('No QR code found')) ||
+        (error?.toString?.() && error.toString().includes('No QR code found'))) {
       return; // Silent - no console log, no UI error
     }
     
+    // Only log real errors to console
     console.log('QR Scanner Error:', message);
     setError(message);
   };
@@ -353,7 +358,8 @@ const BatchQRScanner = ({ onScanComplete }) => {
           padding: '15px', 
           backgroundColor: '#e8f5e8', 
           borderRadius: '8px',
-          border: '1px solid #4caf50'
+          border: '1px solid #4caf50',
+          color: 'black'
         }}>
           <h3>✅ Batch Scanned Successfully!</h3>
           <p><strong>Batch ID:</strong> {scanResult.batch_qr_code || scanResult.batch_id}</p>

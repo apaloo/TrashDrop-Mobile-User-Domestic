@@ -1,7 +1,7 @@
--- Migration: Batch Activation Function
--- Creates a function that can update batch status bypassing RLS issues
+-- Migration: Fix User Stats Calculation
+-- Updates the activate_batch_for_user function to properly recalculate user stats totals
 
--- Function to activate a batch atomically
+-- Function to activate a batch atomically and recalculate user stats
 CREATE OR REPLACE FUNCTION public.activate_batch_for_user(
   p_batch_id uuid,
   p_user_id uuid
@@ -16,6 +16,7 @@ BEGIN
   -- Get and update batch in one operation
   UPDATE batches 
   SET status = 'used',
+      created_by = p_user_id,
       updated_at = now()
   WHERE id = p_batch_id
     AND status = 'active'
@@ -42,14 +43,22 @@ BEGIN
     END IF;
   END IF;
   
-  -- Update user stats if user_stats table exists
+  -- Recalculate user stats from all user's batches
   BEGIN
-    INSERT INTO user_stats (user_id, total_bags, total_batches, updated_at)
-    VALUES (p_user_id, COALESCE(v_batch.bag_count, 0), 1, now())
+    INSERT INTO user_stats (user_id, total_batches, total_bags, created_at)
+    SELECT 
+      p_user_id as user_id,
+      COUNT(*) as total_batches,
+      SUM(COALESCE(bag_count, 0)) as total_bags,
+      now() as created_at
+    FROM batches
+    WHERE created_by = p_user_id
+      AND status = 'used'
     ON CONFLICT (user_id) DO UPDATE
-    SET total_bags = COALESCE(user_stats.total_bags, 0) + COALESCE(v_batch.bag_count, 0),
-        total_batches = COALESCE(user_stats.total_batches, 0) + 1,
-        updated_at = now();
+    SET 
+      total_batches = EXCLUDED.total_batches,
+      total_bags = EXCLUDED.total_bags,
+      updated_at = now();
   EXCEPTION WHEN OTHERS THEN
     -- Log the error in a way that can be found in database logs
     RAISE WARNING 'Failed to update user_stats for user % and batch %: %', p_user_id, p_batch_id, SQLERRM;
@@ -73,10 +82,50 @@ BEGIN
     'bag_count', v_batch.bag_count,
     'status', 'used',
     'activated_at', v_batch.updated_at,
-    'created_at', v_batch.created_at
+    'created_at', v_batch.created_at,
+    'created_by', v_batch.created_by
   );
 END;
 $$;
 
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION public.activate_batch_for_user(uuid, uuid) TO authenticated;
+
+-- Also create a helper function to refresh user stats for all users
+CREATE OR REPLACE FUNCTION public.refresh_all_user_stats()
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_affected_rows integer;
+BEGIN
+  -- Recalculate stats for all users based on their batches
+  INSERT INTO user_stats (user_id, total_batches, total_bags, created_at)
+  SELECT 
+    created_by as user_id,
+    COUNT(*) as total_batches,
+    SUM(COALESCE(bag_count, 0)) as total_bags,
+    NOW() as created_at
+  FROM batches
+  WHERE created_by IS NOT NULL
+    AND status = 'used'
+  GROUP BY created_by
+  ON CONFLICT (user_id) DO UPDATE
+  SET 
+    total_batches = EXCLUDED.total_batches,
+    total_bags = EXCLUDED.total_bags,
+    updated_at = NOW();
+  
+  GET DIAGNOSTICS v_affected_rows = ROW_COUNT;
+  
+  RETURN json_build_object(
+    'success', true,
+    'affected_users', v_affected_rows,
+    'updated_at', NOW()
+  );
+END;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.refresh_all_user_stats() TO authenticated;

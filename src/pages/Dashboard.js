@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.js';
 import DashboardSkeleton from '../components/SkeletonLoader.js';
 import ActivePickupCard from '../components/ActivePickupCard.js';
 import supabase from '../utils/supabaseClient.js';
+import DashboardOptimizer from '../components/DashboardOptimizer.js';
 import { userService, activityService, pickupService } from '../services/index.js';
 import { 
   cacheUserStats, 
@@ -30,18 +31,20 @@ const Dashboard = () => {
   // reports: COUNT(illegal_dumping) WHERE reported_by = user.id  
   // batches: COUNT(bag_inventory) WHERE user_id = user.id (bag batch count)
   // totalBags: SUM(pickup_requests.bag_count) WHERE collector_id = user.id AND status = 'completed'
-  const [stats, setStats] = useState({
-    points: 0,       // From profiles table
-    pickups: 0,      // From pickup_requests table
-    reports: 0,      // From illegal_dumping table
-    batches: 0,      // From bag_inventory table
-    totalBags: 0,    // Calculated from pickup_requests table
+  const [stats, setStats] = useState(() => {
+    // Initialize with cached data if available to improve LCP
+    try {
+      const cachedStats = getCachedUserStats();
+      return cachedStats || {};
+    } catch (e) {
+      return {};
+    }
   });
-  const [recentActivity, setRecentActivity] = useState([]);
-  const [activePickup, setActivePickup] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]); // Always initialize as empty array
+  const [activePickups, setActivePickups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
-  const [dataSource, setDataSource] = useState('loading'); // 'cache', 'network', 'loading'
+  const [dataSource, setDataSource] = useState(stats.totalBags ? 'cache' : 'loading'); // 'cache', 'network', 'loading'
   const sessionRefreshRef = useRef(null);
   const mountedRef = useRef(true);
   const [bagsPulse, setBagsPulse] = useState(false);
@@ -128,13 +131,38 @@ const Dashboard = () => {
     const subscription = subscribeToStatsUpdates(user.id, (tableType, payload) => {
       if (!mountedRef.current) return;
 
-      console.log(`[Dashboard] Real-time ${tableType} update received`);      
+      console.log(`[Dashboard] Real-time ${tableType} update received`, payload?.new);      
+      
+      // Detailed logging for batch/bag updates
+      if (tableType === 'user_stats' && payload?.new) {
+        const newData = payload.new;
+        console.log(`[Dashboard] Batch/Bag update: total_batches=${newData.total_batches}, available_bags=${newData.available_bags}, total_bags=${newData.total_bags}`);
+      }
+      
       // Update stats based on real-time payload
-      setStats(prevStats => handleStatsUpdate(tableType, payload, prevStats));
+      setStats(prevStats => {
+        const updatedStats = handleStatsUpdate(tableType, payload, prevStats);
+        
+        // Log state changes for debugging
+        if (tableType === 'user_stats') {
+          console.log('[Dashboard] Stats before update:', {
+            batches: prevStats.batches || 0,
+            totalBags: prevStats.totalBags || 0,
+            available_bags: prevStats.available_bags || 0
+          });
+          console.log('[Dashboard] Stats after update:', {
+            batches: updatedStats.batches || 0,
+            totalBags: updatedStats.totalBags || 0,
+            available_bags: updatedStats.available_bags || 0
+          });
+        }
+        
+        return updatedStats;
+      });
       
       // For activity updates, we might need to update the recent activity list
       if (tableType === 'user_activity' && payload.eventType === 'INSERT') {
-        setRecentActivity(prev => {
+        setRecentActivities(prev => {
           const newRecord = payload.new;
           if (!newRecord) return prev;
           return [newRecord, ...prev.slice(0, prev.length > 4 ? 4 : prev.length - 1)];
@@ -223,6 +251,59 @@ const Dashboard = () => {
     }
   }, [user]);
 
+  // Optimized user stats loading with parallel requests and prioritized cache
+  const loadUserStats = useCallback(async () => {
+    try {
+      // Start network request immediately but don't wait for it
+      let networkPromise;
+      if (isOnlineStatus && user?.id) {
+        networkPromise = userService.getUserStats(user.id)
+          .then(statsData => {
+            if (statsData) {
+              // Only update UI if it provides new data vs. cache
+              cacheUserStats(statsData); // Update cache in background
+              setStats(prevStats => {
+                // Only update if there are actual changes to avoid re-renders
+                const hasChanges = JSON.stringify(prevStats) !== JSON.stringify(statsData);
+                if (hasChanges) {
+                  return statsData;
+                }
+                return prevStats;
+              });
+              setDataSource('network');
+              return statsData;
+            }
+          })
+          .catch(err => console.error('Network stats fetch error:', err));
+      }
+      
+      // If we don't already have stats data from initialization
+      if (Object.keys(stats).length === 0) {
+        try {
+          const cachedStats = getCachedUserStats();
+          if (cachedStats && Object.keys(cachedStats).length > 0) {
+            setStats(cachedStats);
+            setDataSource('cache');
+          }
+        } catch (err) {
+          console.warn('Cache read error:', err);
+        }
+      }
+
+      // Wait for network if we're online, but not too long
+      if (networkPromise) {
+        // Set a timeout to ensure we don't wait forever
+        const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2500));
+        await Promise.race([networkPromise, timeoutPromise]);
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+      setIsLoading(false);
+    }
+  }, [user?.id, isOnlineStatus, stats]);
+
   // Optimized Dashboard data loading function with caching and offline support
   const loadDashboardData = useCallback(async () => {
     if (!user?.id) {
@@ -237,7 +318,15 @@ const Dashboard = () => {
       const cachedStats = await getCachedUserStats(user.id);
       const cachedActivity = await getCachedUserActivity(user.id);
       
-      // If we have cached data, use it immediately to speed up initial render
+      // Ensure cachedActivity is an array before setting state
+      if (cachedActivity && Array.isArray(cachedActivity)) {
+        setRecentActivities(cachedActivity);
+        console.log('Loaded cached activities:', cachedActivity.length);
+      } else {
+        console.warn('Cached activities is not an array:', cachedActivity);
+      }
+      
+      // If we have cached stats, use it immediately to speed up initial render
       if (cachedStats) {
         console.log('[Dashboard] Using cached stats data:', cachedStats);
         // Map cached database fields to stats state with proper null safety
@@ -265,7 +354,7 @@ const Dashboard = () => {
           points: activity.points || 0,
           related_id: activity.related_id || null,
         }));
-        setRecentActivity(mergeRecentActivities(serverFormatted, 5));
+        setRecentActivities(mergeRecentActivities(serverFormatted, 5));
         // Only reduce loading state if we already set stats
         if (cachedStats) {
           setIsLoading(false);
@@ -323,7 +412,7 @@ const Dashboard = () => {
             points: activity.points || 0,
             related_id: activity.related_id || null,
           }));
-          setRecentActivity(mergeRecentActivities(serverFormatted, 5));
+          setRecentActivities(mergeRecentActivities(serverFormatted, 5));
           // Cache the new activity data for offline use
           if (activityData.length > 0) cacheUserActivity(user.id, activityData);
           // Clear loading state
@@ -339,7 +428,7 @@ const Dashboard = () => {
         // We're offline and have shown cached data if available
         // Populate from local activities if we don't have cached server activity
         if (!cachedActivity || cachedActivity.length === 0) {
-          setRecentActivity(mergeRecentActivities([], 5));
+          setRecentActivities(mergeRecentActivities([], 5));
         }
         // If we don't have cached stats or activity, clear loading state
         if (!cachedStats || !cachedActivity) {
@@ -377,7 +466,7 @@ const Dashboard = () => {
       const detailUserId = e?.detail?.userId;
       if (detailUserId && detailUserId !== user.id) return;
       // Merge locals with current server-derived items in state
-      setRecentActivity(prev => mergeRecentActivities(prev, 5));
+      setRecentActivities(prev => mergeRecentActivities(prev, 5));
       // If this local activity is a dumping report, optimistically bump the Reports stat
       const activityType = e?.detail?.activity?.activity_type || e?.detail?.activity_type;
       if (activityType === 'dumping_report') {
@@ -418,7 +507,7 @@ const Dashboard = () => {
     const onStorage = (e) => {
       if (!user?.id) return;
       if (e?.key === `userActivity_${user.id}`) {
-        setRecentActivity(prev => mergeRecentActivities(prev, 5));
+        setRecentActivities(prev => mergeRecentActivities(prev, 5));
       }
     };
     window.addEventListener('storage', onStorage);
@@ -492,7 +581,7 @@ const Dashboard = () => {
         // Handle activity update
         if (!activityResult.error && activityResult.data?.length > 0) {
           const activityData = activityResult.data;
-          setRecentActivity(activityData.map(activity => ({
+          setRecentActivities(activityData.map(activity => ({
             id: activity.id,
             type: activity.type,
             message: activity.details || `${activity.type} activity`,
@@ -513,14 +602,81 @@ const Dashboard = () => {
       });
   }, [user?.id, isOnlineStatus]);
   
-  // Show skeleton loader during initial loading
-  // Note: Removed async cache checks to prevent IndexedDB errors in render
-  if (isLoading && dataSource === 'loading') {
-    return <DashboardSkeleton />;
-  }
+  // Performance optimization: Only show skeleton if we truly have no data
+  // Memoize non-critical UI elements to avoid unnecessary re-renders
+  const ActivitySection = useMemo(() => {
+    return (
+      <div className="activity-card bg-gradient-to-br from-purple-800 to-purple-900 rounded-lg shadow-lg p-6 mb-6 relative" loading="lazy">
+        <h2 className="text-xl font-bold text-white mb-4">Recent Activity</h2>
+        <div className="space-y-3">
+          {!recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
+            <div className="text-center py-6 text-purple-300">
+              <p>No recent activities yet</p>
+            </div>
+          ) : (
+            Array.isArray(recentActivities) && recentActivities.map((activity, index) => (
+              <div 
+                key={activity.id || `activity-${index}`}
+                className="bg-purple-900 bg-opacity-50 rounded-lg p-4 mb-3 flex items-center"
+                loading={index > 2 ? "lazy" : "eager"}
+              >
+                <div className="flex-shrink-0 mr-4">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center text-white">
+                    {activity.type === 'pickup' && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" />
+                      </svg>
+                    )}
+                    {activity.type === 'report' && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    {activity.type === 'batch' && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                        <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    {!['pickup', 'report', 'batch'].includes(activity.type) && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-grow">
+                  <p className="text-sm font-medium text-white">{activity.message}</p>
+                  <p className="text-xs text-purple-300">
+                    {new Date(activity.timestamp).toLocaleString()}
+                  </p>
+                </div>
+                {activity.points > 0 && (
+                  <div className="flex-shrink-0 ml-2 bg-green-900 bg-opacity-50 px-2 py-1 rounded text-green-300 text-xs font-semibold">
+                    +{activity.points} pts
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        <div className="absolute bottom-4 right-4">
+          <div 
+            className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white cursor-pointer hover:bg-purple-600"
+            onClick={() => {/* View all activities */}}
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    );
+  }, [recentActivities]); // Only re-render when activities change
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-900 via-blue-900 to-indigo-900">
+      <DashboardOptimizer />
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Horizontal Scrollable Stats Cards */}
@@ -529,7 +685,7 @@ const Dashboard = () => {
             <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
-              <div className="bg-gradient-to-br from-emerald-700 to-green-800 rounded-lg shadow-lg p-6 min-w-[280px] relative overflow-hidden">
+              <div className="dashboard-card bg-gradient-to-br from-emerald-700 to-green-800 rounded-lg shadow-lg p-6 min-w-[280px] relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-20">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -577,7 +733,7 @@ const Dashboard = () => {
               </div>
               
               {/* Pickups Card */}
-              <div className="bg-gradient-to-br from-teal-600 to-cyan-700 rounded-lg shadow-lg p-6 min-w-[280px] relative overflow-hidden">
+              <div className="dashboard-card bg-gradient-to-br from-teal-600 to-cyan-700 rounded-lg shadow-lg p-6 min-w-[280px] relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-20">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -618,7 +774,7 @@ const Dashboard = () => {
               </div>
 
               {/* Reports Card */}
-              <div className="bg-gradient-to-br from-amber-700 to-yellow-800 rounded-lg shadow-lg p-6 min-w-[280px] relative overflow-hidden">
+              <div className="dashboard-card bg-gradient-to-br from-amber-700 to-yellow-800 rounded-lg shadow-lg p-6 min-w-[280px] relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-20">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -700,52 +856,23 @@ const Dashboard = () => {
               View all activity →
             </Link>
           </div>
-          {recentActivity.length > 0 ? (
-            <div className="space-y-4">
-              {recentActivity.map((activity, activityIdx) => (
-                <div key={activity.id} className="flex items-center justify-between bg-purple-900/30 rounded-lg p-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500">
-                      <ActivityIcon type={activity.type} />
-                    </div>
-                    <div>
-                      <p className="text-white text-sm flex items-center">
-                        <span>{activity.message}</span>
-                        {activity.isLocal && activity.sync_status === 'pending_sync' && (
-                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-yellow-400/20 text-yellow-200 border border-yellow-300/30">
-                            Pending Sync
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-green-400 text-sm font-medium">{activity.points > 0 && `+${activity.points} pts`}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-300 text-center">No recent activity</p>
-            </div>
-          )}
+          {ActivitySection}
         </div>
 
         {/* Active Pickup Card */}
-        {activePickup && (
+        {activePickups && activePickups.length > 0 && (
           <div className="bg-gradient-to-r from-purple-800 to-purple-700 rounded-lg shadow-lg p-6 mt-6">
             <h3 className="text-white text-lg font-bold mb-4">Active Pickup</h3>
             <div className="bg-purple-900/30 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-white">Status: <span className="text-green-400">{activePickup.status}</span></p>
-                  <p className="text-sm text-gray-300">Collector: {activePickup.collector_name}</p>
-                  <p className="text-sm text-gray-300">Location: {activePickup.address}</p>
+                  <p className="text-sm font-medium text-white">Status: <span className="text-green-400">{activePickups[0].status}</span></p>
+                  <p className="text-sm text-gray-300">Collector: {activePickups[0].collector_name}</p>
+                  <p className="text-sm text-gray-300">Location: {activePickups[0].address}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-white">{activePickup.number_of_bags} bags</p>
-                  <p className="text-sm text-green-400 font-medium">+{activePickup.points} pts</p>
+                  <p className="text-sm text-white">{activePickups[0].number_of_bags} bags</p>
+                  <p className="text-sm text-green-400 font-medium">+{activePickups[0].points} pts</p>
                 </div>
               </div>
             </div>
