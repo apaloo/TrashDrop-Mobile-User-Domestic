@@ -366,12 +366,56 @@ const PickupRequest = () => {
     }
   };
 
+  // Helper function to record pickup activity
+  const recordPickupActivity = (pickup, serverId = null) => {
+    if (!user?.id) return;
+    
+    try {
+      const activityId = serverId || pickup.id;
+      const activity = {
+        id: `pickup_${activityId}_${Date.now()}`,
+        user_id: user.id,
+        activity_type: 'pickup_request',
+        related_id: serverId || pickup.id,
+        details: {
+          description: `Pickup request for ${pickup.number_of_bags || pickup.numberOfBags || 1} bag(s)`,
+          waste_type: pickup.waste_type || 'general',
+          location: pickup.address || 'Custom location',
+          bags: pickup.number_of_bags || pickup.numberOfBags || 1
+        },
+        points_impact: 0, // Will be updated when pickup is completed
+        created_at: new Date().toISOString(),
+        sync_status: serverId ? 'synced' : 'pending_sync'
+      };
+      
+      // Store in local storage for immediate dashboard display
+      const localKey = `userActivity_${user.id}`;
+      const existingActivities = JSON.parse(localStorage.getItem(localKey) || '[]');
+      existingActivities.unshift(activity);
+      
+      // Keep only last 50 activities to prevent storage bloat
+      const trimmedActivities = existingActivities.slice(0, 50);
+      localStorage.setItem(localKey, JSON.stringify(trimmedActivities));
+      
+      console.log('[PickupRequest] Recorded pickup activity:', activity.id);
+      
+      // Dispatch event to update dashboard immediately
+      try {
+        window.dispatchEvent(new CustomEvent('trashdrop:activity-updated', { 
+          detail: { userId: user.id, activity } 
+        }));
+      } catch (_) {}
+    } catch (error) {
+      console.warn('[PickupRequest] Failed to record pickup activity:', error);
+    }
+  };
+
   const syncSinglePickup = async (pickup) => {
     try {
       // Strip local-only fields
       const { id, synced, server_id, ...dbPayload } = pickup;
       const { data, error } = await supabase
-        .from('pickups')
+        .from('pickup_requests')
         .insert([dbPayload])
         .select('id')
         .single();
@@ -379,35 +423,66 @@ const PickupRequest = () => {
 
       // Decrement available bags on server
       const bagsToRemove = Number(pickup.number_of_bags || pickup.numberOfBags || 0);
-      const { error: statsError } = await supabase.rpc('decrement_user_bags', {
-        user_id_param: pickup.user_id,
-        bags_to_remove: bagsToRemove
-      });
-      if (statsError) {
-        // Fallback: directly update user_stats.available_bags
+      
+      // Try multiple approaches to update user stats
+      let statsUpdated = false;
+      
+      // Approach 1: Try RPC function if it exists
+      try {
+        const { error: rpcError } = await supabase.rpc('decrement_user_bags', {
+          user_id_param: pickup.user_id,
+          bags_to_remove: bagsToRemove
+        });
+        if (!rpcError) {
+          statsUpdated = true;
+          console.log('[PickupRequest] Successfully decremented bags via RPC');
+        }
+      } catch (rpcErr) {
+        console.log('[PickupRequest] RPC function not available, using fallback');
+      }
+      
+      // Approach 2: Direct stats table update if RPC failed
+      if (!statsUpdated) {
         try {
           const { data: statsRow } = await supabase
             .from('user_stats')
-            .select('*')
+            .select('available_bags, total_bags, total_bags_scanned')
             .eq('user_id', pickup.user_id)
             .maybeSingle();
 
-          const currentAvailable = Number(statsRow?.available_bags || 0);
-          const newAvailable = Math.max(0, currentAvailable - bagsToRemove);
+          // Use available_bags first, then total_bags, then total_bags_scanned as fallback
+          const currentBags = Number(statsRow?.available_bags ?? statsRow?.total_bags ?? statsRow?.total_bags_scanned ?? 0);
+          const newBags = Math.max(0, currentBags - bagsToRemove);
+
+          const updateData = {
+            user_id: pickup.user_id,
+            updated_at: new Date().toISOString()
+          };
+          
+          // Update the field that exists
+          if (statsRow?.available_bags !== undefined) {
+            updateData.available_bags = newBags;
+          } else if (statsRow?.total_bags !== undefined) {
+            updateData.total_bags = newBags;
+          } else {
+            updateData.total_bags_scanned = newBags;
+          }
 
           await supabase
             .from('user_stats')
-            .upsert({
-              user_id: pickup.user_id,
-              available_bags: newAvailable,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
+            .upsert(updateData, { onConflict: 'user_id' });
+          
+          console.log(`[PickupRequest] Successfully updated user stats: ${currentBags} -> ${newBags}`);
         } catch (e) {
           console.warn('Fallback stats update failed during background sync', e);
         }
       }
 
       markPickupSynced(id, data?.id);
+      
+      // Record activity for this pickup request
+      recordPickupActivity(pickup, data?.id);
+      
       try {
         window.dispatchEvent(new CustomEvent('trashdrop:pickup-synced', { detail: { localId: id, serverId: data?.id } }));
       } catch (_) {}
@@ -478,6 +553,9 @@ const PickupRequest = () => {
       const localId = `local_${Date.now()}`;
       const localPickup = { id: localId, ...pickupData, synced: false };
       try { queueLocalPickup(localPickup); } catch (_) {}
+
+      // Record activity immediately for dashboard display
+      recordPickupActivity(localPickup);
 
       // Optimistically update user's available bags locally
       const bagsToRemove = Number(values.numberOfBags);

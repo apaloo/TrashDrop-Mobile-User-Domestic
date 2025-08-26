@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
@@ -12,11 +12,10 @@ const Activity = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    itemsPerPage: 10
-  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 10;
+  const mountedRef = useRef(true);
 
   // Enhanced session refresh function with validation
   const refreshAndValidateSession = async () => {
@@ -42,35 +41,45 @@ const Activity = () => {
     }
   };
   
-  // Create fetchActivities as a memoized function with useCallback
-  const fetchActivities = useCallback(async (retryCount = 0) => {
-    const MAX_RETRIES = 3; // Increased maximum number of retries
-    const RETRY_DELAY = 1500; // Increased delay between retries in ms
+  // Create fetchActivities as a regular function to avoid useCallback dependency issues
+  const fetchActivities = async (retryCount = 0) => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1500;
     
-    if (!user) {
-      console.log('No user found, cannot fetch activities');
+    if (!user?.id || !mountedRef.current) {
+      console.log('No user found or component unmounted, cannot fetch activities');
       setIsLoading(false);
       return;
     }
     
-    // If offline, we will still show local activities without server fetch
     const isOffline = !navigator.onLine;
     
     console.log('Fetching activities for user:', user.id);
     setIsLoading(true);
     setError('');
     
-    // Calculate pagination offset
-    const offset = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    // Calculate pagination offset using current state values
+    const offset = (currentPage - 1) * itemsPerPage;
     
     // Define local activity loading function - consistently used throughout
     const loadLocalActivities = () => {
       try {
         const localKey = `userActivity_${user.id}`;
         const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
-        const localFiltered = Array.isArray(localRaw)
-          ? localRaw.filter(a => (filter === 'all' ? true : a.activity_type === filter))
-          : [];
+        console.log('[Activity] Raw local activities:', localRaw);
+        
+        if (!Array.isArray(localRaw)) {
+          console.warn('[Activity] Local activities is not an array:', localRaw);
+          return [];
+        }
+        
+        const localFiltered = localRaw.filter(a => {
+          if (!a || !a.activity_type) return false;
+          return filter === 'all' ? true : a.activity_type === filter;
+        });
+        
+        console.log('[Activity] Filtered local activities:', localFiltered.length);
+        
         const localActivitiesFormatted = localFiltered.map(a => ({
           id: a.id,
           type: a.activity_type,
@@ -79,10 +88,12 @@ const Activity = () => {
           points: a.points_impact || 0,
           related_id: a.related_id || null,
           description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
-          address: a.details?.address || '',
+          address: a.details?.location || a.details?.address || '',
           isLocal: true,
           sync_status: a.sync_status || 'pending_sync'
         }));
+        
+        console.log('[Activity] Formatted local activities:', localActivitiesFormatted);
         return localActivitiesFormatted;
       } catch (le) {
         console.warn('Failed to load local activities', le);
@@ -101,12 +112,12 @@ const Activity = () => {
     try {
       // Load local activities first for immediate display
       const localActivities = loadLocalActivities();
-      const localOffset = (pagination.currentPage - 1) * pagination.itemsPerPage;
-      const localTotalPages = Math.ceil(localActivities.length / pagination.itemsPerPage) || 1;
-      setPagination(prev => ({ ...prev, totalPages: localTotalPages }));
+      const localOffset = (currentPage - 1) * itemsPerPage;
+      const localTotalPages = Math.ceil(localActivities.length / itemsPerPage) || 1;
+      setTotalPages(localTotalPages);
       
       // Show local data immediately
-      const localPageSlice = localActivities.slice(localOffset, localOffset + pagination.itemsPerPage);
+      const localPageSlice = localActivities.slice(localOffset, localOffset + itemsPerPage);
       setActivities(localPageSlice);
       setIsLoading(false);
       
@@ -144,7 +155,7 @@ const Activity = () => {
       }
       
       // Apply pagination
-      query = query.range(offset, offset + pagination.itemsPerPage - 1);
+      query = query.range(offset, offset + itemsPerPage - 1);
       
       // Execute with timeout
       const { data, error: activitiesError } = await fetchWithTimeout(async () => query);
@@ -221,23 +232,19 @@ const Activity = () => {
       // Combine and update pagination
       const combined = [...refreshedLocalActivities, ...serverFiltered];
       const combinedCount = combined.length;
-      const totalPages = Math.ceil(combinedCount / pagination.itemsPerPage) || 1;
+      const calculatedTotalPages = Math.ceil(combinedCount / itemsPerPage) || 1;
       
-      setPagination(prev => ({
-        ...prev,
-        totalPages: Math.max(1, totalPages)
-      }));
+      setTotalPages(Math.max(1, calculatedTotalPages));
 
       // Apply pagination and update UI
-      const pageSlice = combined.slice(offset, offset + pagination.itemsPerPage);
+      const pageSlice = combined.slice(offset, offset + itemsPerPage);
       setActivities(pageSlice);
       setError('');
-      
-      console.log('Enhanced with network data:', { 
+            console.log('Enhanced with network data:', { 
         local: refreshedLocalActivities.length,
         server: serverFiltered.length,
         combined: combinedCount,
-        totalPages 
+        totalPages: calculatedTotalPages 
       });
       
     } catch (error) {
@@ -248,8 +255,8 @@ const Activity = () => {
       
       if (fallbackLocalActivities.length > 0) {
         // We have local data to show as fallback
-        const localOffset = (pagination.currentPage - 1) * pagination.itemsPerPage;
-        const localPageSlice = fallbackLocalActivities.slice(localOffset, localOffset + pagination.itemsPerPage);
+        const localOffset = (currentPage - 1) * itemsPerPage;
+        const localPageSlice = fallbackLocalActivities.slice(localOffset, localOffset + itemsPerPage);
         setActivities(localPageSlice);
         setError('Network unavailable - showing cached activities');
       } else {
@@ -277,12 +284,12 @@ const Activity = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, filter, pagination.currentPage, pagination.itemsPerPage, refreshAndValidateSession]);
+  };
   
   // Use the fetchActivities function in useEffect
   useEffect(() => {
     fetchActivities(0);
-  }, [fetchActivities]);
+  }, [user?.id, filter, currentPage]);
 
   // Listen to storage changes (e.g., other tabs) for userActivity updates
   useEffect(() => {
@@ -295,7 +302,7 @@ const Activity = () => {
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [user, fetchActivities]);
+  }, [user?.id]);
   // Listen for local activity events to refresh immediately
   useEffect(() => {
     const onLocalActivity = (e) => {
@@ -307,7 +314,7 @@ const Activity = () => {
     };
     window.addEventListener('local-activity', onLocalActivity);
     return () => window.removeEventListener('local-activity', onLocalActivity);
-  }, [user, fetchActivities]);
+  }, [user?.id]);
 
   // Manual refresh handler
   const handleRefresh = () => {
@@ -321,22 +328,15 @@ const Activity = () => {
   // Handle filter change
   const handleFilterChange = (newFilter) => {
     console.log('Filter changed to:', newFilter);
-    // Change the filter and reset pagination to first page
     setFilter(newFilter);
-    setPagination(prev => ({
-      ...prev,
-      currentPage: 1
-    }));
+    setCurrentPage(1);
   };
 
   // Handle page change
   const handlePageChange = (newPage) => {
-    console.log('Page changed to:', newPage, 'of', pagination.totalPages);
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination(prev => ({
-        ...prev,
-        currentPage: newPage
-      }));
+    console.log('Page changed to:', newPage, 'of', totalPages);
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
     }
   };
 
@@ -563,11 +563,11 @@ const Activity = () => {
           )}
           
           {/* Pagination */}
-          {activities.length > 0 && pagination.totalPages > 1 && (
+          {activities.length > 0 && totalPages > 1 && (
             <div className="mt-6">
               <Pagination 
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
+                currentPage={currentPage}
+                totalPages={totalPages}
                 onPageChange={handlePageChange}
               />
             </div>

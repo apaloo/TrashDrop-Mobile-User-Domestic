@@ -628,6 +628,12 @@ export const getCachedUserStats = async (userId) => {
  */
 export const cacheUserActivity = async (userId, activities) => {
   try {
+    // Validate that activities is an array
+    if (!Array.isArray(activities)) {
+      console.warn('cacheUserActivity: activities is not an array:', activities);
+      return Promise.resolve();
+    }
+
     const db = await initDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([USER_ACTIVITY_STORE], 'readwrite');

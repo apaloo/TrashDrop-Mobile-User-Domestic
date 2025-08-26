@@ -123,12 +123,102 @@ const Dashboard = () => {
     return () => window.removeEventListener('trashdrop:bags-updated', onBagsUpdated);
   }, [user?.id]);
 
+  // Optimized Dashboard data loading function with caching and offline support
+  const loadDashboardData = useCallback(async () => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // First check for cached data and display it immediately if available
+      const cachedStats = await getCachedUserStats(user.id);
+      const cachedActivity = await getCachedUserActivity(user.id);
+      
+      // Ensure cachedActivity is an array before setting state
+      if (cachedActivity && Array.isArray(cachedActivity)) {
+        setRecentActivities(cachedActivity);
+        console.log('Loaded cached activities:', cachedActivity.length);
+      } else {
+        console.log('No cached activities found or invalid format');
+        setRecentActivities([]);
+      }
+      
+      if (cachedStats && Object.keys(cachedStats).length > 0) {
+        setStats(cachedStats);
+        setDataSource('cache');
+        console.log('Loaded cached stats:', cachedStats);
+      }
+      
+      // If we're online, fetch fresh data in parallel
+      if (isOnlineStatus) {
+        setDataSource('network');
+        
+        try {
+          // Parallel data fetching for better performance
+          const [statsResult, activityResult, pickupsResult] = await Promise.allSettled([
+            userService.getUserStats(user.id),
+            activityService.getUserActivity(user.id, 5),
+            pickupService.getActivePickup(user.id)
+          ]);
+          
+          // Handle stats result
+          if (statsResult.status === 'fulfilled' && statsResult.value?.data) {
+            const freshStats = statsResult.value.data;
+            setStats(freshStats);
+            // Cache the fresh stats
+            try {
+              await cacheUserStats(user.id, freshStats);
+            } catch (cacheError) {
+              console.warn('Failed to cache fresh stats:', cacheError);
+            }
+          } else {
+            console.warn('Failed to fetch fresh stats:', statsResult.reason);
+          }
+          
+          // Handle activity result
+          if (activityResult.status === 'fulfilled' && activityResult.value?.data) {
+            const freshActivity = activityResult.value.data;
+            const mergedActivity = mergeRecentActivities(freshActivity, 5);
+            setRecentActivities(mergedActivity);
+            // Cache the fresh activity
+            try {
+              await cacheUserActivity(user.id, freshActivity);
+            } catch (cacheError) {
+              console.warn('Failed to cache fresh activity:', cacheError);
+            }
+          } else {
+            console.warn('Failed to fetch fresh activity:', activityResult.reason);
+          }
+          
+          // Handle active pickups result
+          if (pickupsResult.status === 'fulfilled' && pickupsResult.value?.data) {
+            setActivePickups([pickupsResult.value.data]);
+          } else {
+            setActivePickups([]);
+          }
+          
+        } catch (networkError) {
+          console.error('Network error during data fetch:', networkError);
+          // Keep using cached data if network fails
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error in loadDashboardData:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, isOnlineStatus, mergeRecentActivities]);
+
   // Set up real-time subscriptions for stats updates
   useEffect(() => {
     if (!user?.id) return;
 
     console.log('[Dashboard] Setting up real-time stats subscription');
-    const subscription = subscribeToStatsUpdates(user.id, (tableType, payload) => {
+    const statsSubscription = subscribeToStatsUpdates(user.id, (tableType, payload) => {
       if (!mountedRef.current) return;
 
       console.log(`[Dashboard] Real-time ${tableType} update received`, payload?.new);      
@@ -170,22 +260,10 @@ const Dashboard = () => {
       }
     });
 
-    return () => {
-      console.log('[Dashboard] Cleaning up real-time stats subscription');
-      subscription.unsubscribe();
-    };
-  }, [user?.id]);
-
-  // Set up real-time subscription for dumping reports to trigger stats refresh
-  useEffect(() => {
-    if (!user?.id) return;
-
-    console.log('[Dashboard] Setting up dumping reports subscription for stats refresh');
+    // Subscribe to dumping reports for real-time stats updates
     const dumpingSubscription = subscribeToDumpingReports(user.id, (payload) => {
       if (!mountedRef.current) return;
-
-      console.log('[Dashboard] Dumping report update received, refreshing stats');
-      // Use the handler to trigger stats refresh
+      
       handleDumpingReportUpdate(payload, () => {
         // Reload dashboard data to get updated stats
         if (mountedRef.current) {
@@ -194,11 +272,47 @@ const Dashboard = () => {
       });
     });
 
+    // Subscribe to pickup requests for real-time activity updates
+    const pickupSubscription = supabase
+      .channel(`pickup_requests_${user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'pickup_requests',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        if (!mountedRef.current) return;
+        
+        console.log('[Dashboard] New pickup request detected:', payload);
+        
+        // Refresh recent activities to include the new pickup request
+        const refreshActivities = async () => {
+          try {
+            const localActivities = getLocalActivities(5);
+            const mergedActivities = mergeRecentActivities([], 5);
+            setRecentActivities(mergedActivities);
+            
+            // Also refresh stats to reflect bag count changes
+            loadDashboardData();
+          } catch (error) {
+            console.warn('[Dashboard] Error refreshing activities after pickup request:', error);
+          }
+        };
+        
+        refreshActivities();
+      })
+      .subscribe();
+
     return () => {
-      console.log('[Dashboard] Cleaning up dumping reports subscription');
-      dumpingSubscription.unsubscribe();
+      try {
+        statsSubscription?.unsubscribe?.();
+        dumpingSubscription?.unsubscribe?.();
+        supabase.removeChannel(pickupSubscription);
+      } catch (error) {
+        console.warn('[Dashboard] Error unsubscribing from real-time updates:', error);
+      }
     };
-  }, [user?.id]);
+  }, [user?.id, stats, getLocalActivities, mergeRecentActivities, loadDashboardData]);
 
   // Online status listener
   useEffect(() => {
@@ -304,142 +418,6 @@ const Dashboard = () => {
     }
   }, [user?.id, isOnlineStatus, stats]);
 
-  // Optimized Dashboard data loading function with caching and offline support
-  const loadDashboardData = useCallback(async () => {
-    if (!user?.id) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      
-      // First check for cached data and display it immediately if available
-      const cachedStats = await getCachedUserStats(user.id);
-      const cachedActivity = await getCachedUserActivity(user.id);
-      
-      // Ensure cachedActivity is an array before setting state
-      if (cachedActivity && Array.isArray(cachedActivity)) {
-        setRecentActivities(cachedActivity);
-        console.log('Loaded cached activities:', cachedActivity.length);
-      } else {
-        console.warn('Cached activities is not an array:', cachedActivity);
-      }
-      
-      // If we have cached stats, use it immediately to speed up initial render
-      if (cachedStats) {
-        console.log('[Dashboard] Using cached stats data:', cachedStats);
-        // Map cached database fields to stats state with proper null safety
-        setStats({
-          points: Number(cachedStats?.points) || 0,           // profiles.points
-          pickups: Number(cachedStats?.pickups) || 0,         // COUNT(pickup_requests)
-          reports: Number(cachedStats?.reports) || 0,         // COUNT(illegal_dumping)
-          batches: Number(cachedStats?.batches) || 0,         // COUNT(bag_inventory)
-          totalBags: Number(cachedStats?.totalBags) || 0,     // SUM(pickup_requests.bag_count)
-        });
-        setDataSource('cache');
-        // Only reduce loading state if we have both stats and activity
-        if (cachedActivity?.length > 0) {
-          setIsLoading(false);
-        }
-      }
-      
-      if (cachedActivity?.length > 0) {
-        console.log('Using cached activity data');
-        const serverFormatted = cachedActivity.map(activity => ({
-          id: activity.id,
-          type: activity.type,
-          message: activity.details || `${activity.type} activity`,
-          timestamp: activity.created_at,
-          points: activity.points || 0,
-          related_id: activity.related_id || null,
-        }));
-        setRecentActivities(mergeRecentActivities(serverFormatted, 5));
-        // Only reduce loading state if we already set stats
-        if (cachedStats) {
-          setIsLoading(false);
-        }
-      }
-      
-      // Check if online before making network requests
-      if (isOnlineStatus) {
-        // Load fresh dashboard data in parallel - don't await, let it load in background
-        const statsPromise = userService.getUserStats(user.id);
-        const activityPromise = activityService.getUserActivity(user.id, 5);
-        
-        // Process stats when it completes
-        statsPromise.then(result => {
-          if (!result.error && mountedRef.current) {
-            const statsData = result.data;
-            // Map database fields to stats state with proper null safety
-            setStats({
-              points: Number(statsData?.points) || 0,           // profiles.points
-              pickups: Number(statsData?.pickups) || 0,         // COUNT(pickup_requests)
-              reports: Number(statsData?.reports) || 0,         // COUNT(illegal_dumping)
-              batches: Number(statsData?.batches) || 0,         // COUNT(bag_inventory)
-              totalBags: Number(statsData?.totalBags) || 0,     // SUM(pickup_requests.bag_count)
-            });
-            setDataSource('network');
-            
-            // Cache the new stats for offline use
-            cacheUserStats(user.id, statsData);
-            console.log('[Dashboard] Updated stats from database:', {
-              points: statsData?.points,
-              pickups: statsData?.pickups,
-              reports: statsData?.reports,
-              batches: statsData?.batches,
-              totalBags: statsData?.totalBags
-            });
-          }
-        }).catch(error => {
-          console.error('[Dashboard] Error fetching stats from database:', error);
-          // If we don't have cached data and the network request failed,
-          // we should clear loading state
-          if (!cachedStats && mountedRef.current) {
-            setIsLoading(false);
-          }
-        });
-        
-        // Process activity when it completes
-        activityPromise.then(result => {
-          if (!mountedRef.current) return;
-          const activityData = (!result.error && Array.isArray(result.data)) ? result.data : [];
-          const serverFormatted = activityData.map(activity => ({
-            id: activity.id,
-            type: activity.type,
-            message: activity.details || `${activity.type} activity`,
-            timestamp: activity.created_at,
-            points: activity.points || 0,
-            related_id: activity.related_id || null,
-          }));
-          setRecentActivities(mergeRecentActivities(serverFormatted, 5));
-          // Cache the new activity data for offline use
-          if (activityData.length > 0) cacheUserActivity(user.id, activityData);
-          // Clear loading state
-          setIsLoading(false);
-        }).catch(error => {
-          console.error('Error fetching activity:', error);
-          // Clear loading state
-          if (mountedRef.current) {
-            setIsLoading(false);
-          }
-        });
-      } else {
-        // We're offline and have shown cached data if available
-        // Populate from local activities if we don't have cached server activity
-        if (!cachedActivity || cachedActivity.length === 0) {
-          setRecentActivities(mergeRecentActivities([], 5));
-        }
-        // If we don't have cached stats or activity, clear loading state
-        if (!cachedStats || !cachedActivity) {
-          setIsLoading(false);
-        }
-      }
-    } catch (error) {
-      console.error('Error in dashboard data loading:', error);
-      setIsLoading(false);
-    }
-  }, [user?.id, isOnlineStatus]);
 
   // Call loadDashboardData when dependencies change and setup auto-refresh
   useEffect(() => {
@@ -461,24 +439,28 @@ const Dashboard = () => {
 
   // Refresh recent activity immediately when a local activity is recorded
   useEffect(() => {
-    const onLocalActivity = (e) => {
-      if (!user?.id) return;
-      const detailUserId = e?.detail?.userId;
-      if (detailUserId && detailUserId !== user.id) return;
-      // Merge locals with current server-derived items in state
-      setRecentActivities(prev => mergeRecentActivities(prev, 5));
-      // If this local activity is a dumping report, optimistically bump the Reports stat
-      const activityType = e?.detail?.activity?.activity_type || e?.detail?.activity_type;
-      if (activityType === 'dumping_report') {
-        setStats(prev => ({
-          ...prev,
-          reports: Number(prev.reports || 0) + 1,
-        }));
+    const handleActivityUpdate = (event) => {
+      const { userId, activity } = event.detail || {};
+      if (userId === user.id && activity) {
+        console.log('[Dashboard] Local activity detected, refreshing recent activities');
+        const localActivities = getLocalActivities(5);
+        const mergedActivities = mergeRecentActivities([], 5);
+        setRecentActivities(mergedActivities);
+        
+        // If it's a pickup request, also refresh stats to show updated bag count
+        if (activity.activity_type === 'pickup_request') {
+          console.log('[Dashboard] Pickup request activity detected, refreshing stats');
+          loadDashboardData();
+        }
       }
     };
-    window.addEventListener('local-activity', onLocalActivity);
-    return () => window.removeEventListener('local-activity', onLocalActivity)
-  }, [user?.id, mergeRecentActivities]);
+    
+    window.addEventListener('trashdrop:activity-updated', handleActivityUpdate);
+    
+    return () => {
+      window.removeEventListener('trashdrop:activity-updated', handleActivityUpdate);
+    };
+  }, [user?.id, getLocalActivities, mergeRecentActivities, loadDashboardData]);
 
   // Cypress test hook to simulate realtime stats updates (test-only)
   useEffect(() => {
@@ -589,7 +571,9 @@ const Dashboard = () => {
             points: activity.points || 0
           })));
           // Cache the refreshed activity
-          cacheUserActivity(user.id, activityData);
+          if (Array.isArray(activityData)) {
+            cacheUserActivity(user.id, activityData);
+          }
         }
       })
       .catch(error => {
