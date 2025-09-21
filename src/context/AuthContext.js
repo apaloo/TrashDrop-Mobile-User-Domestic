@@ -50,20 +50,52 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // Auth state
-  const [authState, setAuthState] = useState({
-    status: AUTH_STATES.INITIAL,
-    user: null,
-    error: null,
-    retryCount: 0,
-    lastAction: null,
-    session: null
+  // Auth state - Initialize with stored user if available to prevent race conditions
+  const [authState, setAuthState] = useState(() => {
+    // Check for stored user during initialization
+    const storedUser = getStoredUser();
+    const storedToken = localStorage.getItem('trashdrop_auth_token');
+    
+    if (storedUser && storedToken) {
+      console.log('[AuthContext] Initializing with stored user to prevent race conditions');
+      return {
+        status: AUTH_STATES.AUTHENTICATED,
+        user: storedUser,
+        error: null,
+        retryCount: 0,
+        lastAction: 'init_with_stored_user',
+        session: { access_token: storedToken }
+      };
+    }
+    
+    return {
+      status: AUTH_STATES.INITIAL,
+      user: null,
+      error: null,
+      retryCount: 0,
+      lastAction: null,
+      session: null
+    };
   });
   
   // Derived state for convenience
   const isAuthenticated = authState.status === AUTH_STATES.AUTHENTICATED;
   const isLoading = authState.status === AUTH_STATES.LOADING;
   const error = authState.error;
+  
+  // Debug logging for auth state changes (only in development)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[AuthContext] Auth state changed:', {
+        status: authState.status,
+        isAuthenticated,
+        isLoading,
+        hasUser: !!authState.user,
+        userEmail: authState.user?.email,
+        lastAction: authState.lastAction
+      });
+    }
+  }, [authState.status, isAuthenticated, isLoading, authState.user, authState.lastAction]);
   
   // Function to clear all auth-related storage
   const clearAuthData = useCallback(() => {
@@ -453,7 +485,21 @@ export const AuthProvider = ({ children }) => {
       
       // Skip refresh if no token exists to avoid unnecessary API calls
       if (!storedToken) {
-        console.log('[Auth] No token found in localStorage, skipping refresh');
+        console.log('[Auth] No token found in localStorage');
+        
+        // In development, if we have stored user, allow access without token
+        if (process.env.NODE_ENV === 'development' && storedUser) {
+          console.log('[Auth] Development mode - allowing access without token');
+          updateAuthState({
+            status: AUTH_STATES.AUTHENTICATED,
+            user: storedUser,
+            session: { access_token: 'dev_session' },
+            lastAction: 'dev_no_token_access',
+            error: null
+          });
+          return { success: true, user: storedUser };
+        }
+        
         updateAuthState({
           status: AUTH_STATES.UNAUTHENTICATED,
           lastAction: 'session_check',
@@ -869,8 +915,23 @@ export const AuthProvider = ({ children }) => {
         lastAction: 'initializing'
       });
       
-      // Clear any potentially corrupted tokens first
+      // Clear any potentially corrupted tokens first - but be more lenient in development
       const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
+      const storedUser = getStoredUser();
+      
+      // In development, allow access even with invalid tokens if user data exists
+      if (process.env.NODE_ENV === 'development' && storedUser) {
+        console.log('[Auth] Development mode - allowing access with stored user despite token issues');
+        updateAuthState({
+          status: AUTH_STATES.AUTHENTICATED,
+          user: storedUser,
+          session: { access_token: storedToken || 'dev_token' },
+          error: null,
+          lastAction: 'init_dev_mode'
+        });
+        return;
+      }
+      
       if (!storedToken || !storedToken.includes('.') || storedToken === 'undefined' || storedToken === 'null') {
         console.warn('[Auth] Invalid or missing token, clearing auth data');
         clearAuthData();
@@ -1057,6 +1118,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isLoading,
     error,
+    status: authState.status, // Explicitly export status for PrivateRoute
     
     // Methods
     signIn,

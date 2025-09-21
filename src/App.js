@@ -98,13 +98,24 @@ const AppContent = () => {
   // Check session on mount and when pathname changes
   useEffect(() => {
     const handleAuthCheck = async () => {
+      console.log('[App] Auth check triggered for path:', location.pathname);
+      
       // Skip check if we're on a public route
       const isPublicRoute = ['/', '/login', '/register', '/reset-password', '/reset-password-confirm'].includes(location.pathname);
       
       // Allow access if we have stored user data, even during auth check
       const hasStoredUser = localStorage.getItem('trashdrop_user');
       
+      console.log('[App] Auth check conditions:', {
+        isPublicRoute,
+        hasStoredUser: !!hasStoredUser,
+        isAuthenticated,
+        isLoading,
+        pathname: location.pathname
+      });
+      
       if (isPublicRoute || hasStoredUser) {
+        console.log('[App] Skipping auth check - public route or stored user');
         return;
       }
       
@@ -120,6 +131,12 @@ const AppContent = () => {
         return;
       }
       
+      // Additional safety: don't run auth checks if we're still loading
+      if (isLoading) {
+        console.log('[App] Auth still loading - skipping auth check');
+        return;
+      }
+      
       // Check for development mode with mocks
       const appConfig = window.appConfig || {};
       const useDevelopmentMocks = appConfig.features && appConfig.features.enableMocks;
@@ -127,6 +144,8 @@ const AppContent = () => {
         console.log('[App] Development mode with mocks - skipping strict auth check');
         return;
       }
+      
+      console.log('[App] Proceeding with auth check - not in development mode');
       
       // Only do strict auth checks in production
       try {

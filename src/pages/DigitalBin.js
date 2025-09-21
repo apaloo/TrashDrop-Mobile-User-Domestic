@@ -8,6 +8,7 @@ import { storeQRCode, getQRCode } from '../utils/qrStorage.js';
 import { subscribeToBinUpdates, handleBinUpdate } from '../utils/binRealtime.js';
 import { syncBinsWithServer, setupNetworkSyncListener } from '../utils/binSyncService.js';
 import GeolocationService from '../utils/geolocationService.js';
+import { clearDigitalBinCache, getDigitalBinCacheSummary } from '../utils/clearDigitalBinCache.js';
 import LocationStep from '../components/digitalBin/LocationStep.js';
 import ScheduleDetailsStep from '../components/digitalBin/ScheduleDetailsStep.js';
 import WasteDetailsStep from '../components/digitalBin/WasteDetailsStep.js';
@@ -38,7 +39,7 @@ const TabButton = ({ active, onClick, children, icon: Icon }) => (
  * Multi-step form for getting a digital bin
  */
 function DigitalBin() {
-  const { user, session } = useAuth();
+  const { user, session, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   
   // Tab state
@@ -47,6 +48,22 @@ function DigitalBin() {
   // Current step of the form
   const [currentStep, setCurrentStep] = useState(1);
   const [refreshTrigger, setRefreshTrigger] = useState(false);
+  
+  // Cache management function
+  const handleClearCache = () => {
+    if (window.confirm('Are you sure you want to clear all digital bin cache? This will remove all locally stored digital bin data.')) {
+      const summary = clearDigitalBinCache();
+      console.log('Cache cleared:', summary);
+      
+      if (summary.errors.length === 0) {
+        toastService.success(`Cleared ${summary.digitalBinsCleared} digital bins from cache`);
+        // Refresh the component to reload data from server
+        setRefreshTrigger(prev => !prev);
+      } else {
+        toastService.error('Some errors occurred while clearing cache. Check console for details.');
+      }
+    }
+  };
   
   // Digital bins state
   const [scheduledPickups, setScheduledPickups] = useState([]);
@@ -148,6 +165,15 @@ function DigitalBin() {
   
   // Fetch data function 
   const fetchData = async (showLoading = true) => {
+    // Check if user is available before proceeding
+    if (!user?.id) {
+      console.log('[DigitalBin] User not available, skipping data fetch');
+      if (showLoading) {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     if (showLoading) {
       setIsLoading(true);
     }
@@ -431,16 +457,43 @@ function DigitalBin() {
   
   // Initial data load
   useEffect(() => {
-    if (!user) {
+    // Don't redirect if auth is still loading
+    if (authLoading) {
+      console.log('[DigitalBin] Auth is loading, waiting...');
+      return;
+    }
+    
+    // In development, be more lenient about user checks
+    if (process.env.NODE_ENV === 'development') {
+      const hasStoredUser = localStorage.getItem('trashdrop_user');
+      if (hasStoredUser && !user) {
+        console.log('[DigitalBin] Development mode - has stored user, waiting for auth to catch up');
+        return; // Don't redirect, let auth context catch up
+      }
+    }
+    
+    // Only redirect if auth is done loading and definitely no user
+    if (!user && !authLoading) {
+      console.log('[DigitalBin] No user found after auth loading, redirecting to login');
       navigate('/login');
       return;
     }
     
-    loadData();
-  }, [user]);
+    // Only load data if we have a user
+    if (user) {
+      loadData();
+    }
+  }, [user, authLoading, navigate]);
   
   // Load data with offline support
   const loadData = async () => {
+    // Check if user is available before proceeding
+    if (!user?.id) {
+      console.log('[DigitalBin] User not available, skipping loadData');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     
@@ -483,8 +536,10 @@ function DigitalBin() {
 
   // Set up visibility change listener
   useEffect(() => {
-    // Load initial data
-    loadData();
+    // Load initial data only if user is available
+    if (user?.id) {
+      loadData();
+    }
     
     // Set up visibility change handler
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -492,7 +547,7 @@ function DigitalBin() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [user?.id]); // Add user.id as dependency to re-run when user changes
 
   // Handle data refresh when triggered
   useEffect(() => {
@@ -1125,6 +1180,18 @@ function DigitalBin() {
       setIsLoading(false);
     }
   };
+
+  // Show loading spinner while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

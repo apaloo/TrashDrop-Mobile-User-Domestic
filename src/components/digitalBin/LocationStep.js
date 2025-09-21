@@ -15,6 +15,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
 
+// Component to update map view when position changes
+const MapUpdater = ({ position }) => {
+  const map = useMapEvents({});
+  
+  useEffect(() => {
+    if (position) {
+      map.setView(position, map.getZoom());
+    }
+  }, [position, map]);
+  
+  return null;
+};
+
 // Draggable marker component
 const DraggableMarker = ({ position, setPosition }) => {
   const map = useMapEvents({
@@ -372,6 +385,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
+            <MapUpdater position={position} />
             <DraggableMarker position={position} setPosition={handlePositionChange} />
           </MapContainer>
         </div>
