@@ -13,10 +13,9 @@ const FUNCTIONS_BASE = process.env.NODE_ENV === 'development'
   : (process.env.REACT_APP_FUNCTIONS_URL || '/.netlify/functions').replace(/\/$/, '');
 
 export const batchService = {
-  // ---- Runtime helpers (timeout/retry + local cache for scanned batches) ----
+  // ---- Runtime helpers (timeout/retry) ----
   _DEFAULT_TIMEOUT_MS: 30000,
   _DEFAULT_MAX_RETRIES: 3,
-  _LOCAL_CACHE_KEY: 'td_scanned_batches',
   _USER_ACCOUNT_TABLE: 'user_stats',
   _BATCH_TABLE: 'batches',
   _BAGS_TABLE: 'bags',
@@ -180,35 +179,10 @@ export const batchService = {
     const timeoutMs = options.timeoutMs ?? this._DEFAULT_TIMEOUT_MS;
     const maxRetries = options.maxRetries ?? this._DEFAULT_MAX_RETRIES;
 
-    // Local-first duplicate prevention, with special handling for queued offline activations
-    if (this.isBatchLocallyScanned(batchIdRaw)) {
-      try {
-        // If we're online and this batch exists in the sync_queue as a queued activation,
-        // try to process it immediately instead of blocking with a duplicate error.
-        if (isOnline()) {
-          const queued = await getSyncQueueByOperation('batch_activation');
-          const match = (queued || []).find((q) => {
-            const qid = q?.data?.batchIdentifier;
-            return qid && String(qid).trim() === String(batchIdRaw || '').trim();
-          });
-          if (match) {
-            console.log('[BatchService] Duplicate detected but queued; attempting immediate activation for', batchIdRaw);
-            const res = await this.activateBatchForUserWithRetry(batchIdRaw, userId, { timeoutMs, maxRetries, ignoreLocalDuplicate: true });
-            if (!res.error) {
-              try { await removeFromSyncQueue(match.id); } catch (_) {}
-              return { data: { ...res.data, bagsAdded: res.data?.bags_added || 0 }, error: null, attempts: res.attempts };
-            }
-            // If it still fails, fall through to duplicate message but indicate it's queued
-            return { data: null, error: { message: 'Batch already scanned (queued and awaiting sync)', code: 'BATCH_DUPLICATE_QUEUED', cause: res.error } };
-          }
-        }
-      } catch (e) {
-        console.warn('[BatchService] Immediate activation on duplicate check failed:', e?.message || e);
-      }
-      return { data: null, error: { message: 'Batch already scanned', code: 'BATCH_DUPLICATE' } };
-    }
+    console.log('[BatchService] Direct database verification for batch:', batchIdRaw);
 
-    // Delegate to main activation flow which already updates user_stats and handles retries/timeouts
+    // Direct database verification - no local caching or duplicate prevention
+    // Let the database handle duplicate detection through constraints
     const res = await this.activateBatchForUserWithRetry(batchIdRaw, userId, { timeoutMs, maxRetries });
     if (res.error) {
       return { data: null, error: res.error, attempts: res.attempts, timedOut: res.timedOut };
@@ -274,127 +248,11 @@ export const batchService = {
     return { data: { batch, bags }, error: null };
   },
 
-  /**
-   * Enqueue a batch activation to be processed when online.
-   */
-  async enqueueBatchActivation(batchIdentifier, userId) {
-    const op = {
-      operation: 'batch_activation',
-      storeName: 'sync_queue',
-      data: { batchIdentifier, userId },
-      createdAt: new Date().toISOString()
-    };
-    try {
-      await addToSyncQueue(op);
-      this.markBatchLocallyScanned(batchIdentifier, { userId, queued: true });
-      this._ensureOnlineSyncListener();
-      return { data: { queued: true }, error: null };
-    } catch (e) {
-      return { data: null, error: { message: e?.message || 'Failed to enqueue activation' } };
-    }
-  },
-
-  _onlineListenerAttached: false,
-  _ensureOnlineSyncListener() {
-    if (this._onlineListenerAttached || typeof window === 'undefined') return;
-    window.addEventListener('online', () => {
-      this.processActivationQueue();
-    });
-    this._onlineListenerAttached = true;
-    // If already online when attaching (e.g., app reload), process immediately
-    try {
-      if (isOnline()) {
-        // Defer to next tick to avoid blocking initialization
-        setTimeout(() => { this.processActivationQueue(); }, 0);
-      }
-    } catch (_) {}
-  },
-
-  /**
-   * Process queued batch activations (called when coming online or manually).
-   */
-  async processActivationQueue(limit = 10) {
-    if (!isOnline()) return { processed: 0 };
-    // Use offlineStorage helpers to fetch queued activations
-    let processed = 0;
-    try {
-      console.log('[BatchService] processActivationQueue: starting...');
-      const entries = await getSyncQueueByOperation('batch_activation');
-      const queue = (Array.isArray(entries) ? entries : []).slice(0, limit);
-      console.log(`[BatchService] processActivationQueue: ${entries?.length || 0} total queued, processing up to ${queue.length}`);
-
-      for (const item of queue) {
-        const { batchIdentifier, userId } = item.data || {};
-        console.log('[BatchService] Processing queued activation:', { id: item.id, batchIdentifier, userId });
-        const result = await this.activateBatchForUserWithRetry(batchIdentifier, userId, { ignoreLocalDuplicate: true });
-        if (!result.error) {
-          await removeFromSyncQueue(item.id);
-          processed += 1;
-          console.log('[BatchService] Activation succeeded, removed from queue:', { id: item.id, processed });
-          // Broadcast realtime UI update similar to scanner success flow
-          try {
-            const bagsAdded = Number(result?.data?.bags_added || 0);
-            if (bagsAdded && typeof window !== 'undefined') {
-              const evt = new CustomEvent('trashdrop:bags-updated', {
-                detail: { userId, deltaBags: bagsAdded, source: 'batch-scan-sync' }
-              });
-              window.dispatchEvent(evt);
-            }
-          } catch (_) {}
-        } else {
-          console.warn('[BatchService] Activation failed for queued item (will remain queued):', { id: item.id, error: result.error });
-        }
-      }
-      console.log('[BatchService] processActivationQueue: done. processed =', processed);
-      return { processed };
-    } catch (e) {
-      console.warn('[BatchService] processActivationQueue failed:', e);
-      return { processed };
-    }
-  },
+  // Queue processing removed - direct database integration only
 
   _sleep(ms) { return new Promise((r) => setTimeout(r, ms)); },
 
-  _getLocalScanCache() {
-    try {
-      const raw = localStorage.getItem(this._LOCAL_CACHE_KEY);
-      return raw ? JSON.parse(raw) : { items: {}, updatedAt: Date.now() };
-    } catch (_) {
-      return { items: {}, updatedAt: Date.now() };
-    }
-  },
-
-  _setLocalScanCache(cache) {
-    try { localStorage.setItem(this._LOCAL_CACHE_KEY, JSON.stringify(cache)); } catch (_) {}
-  },
-
-  isBatchLocallyScanned(identifier) {
-    const key = String(identifier || '').trim();
-    if (!key) return false;
-
-    const cache = this._getLocalScanCache();
-    return !!cache.items[key];
-  },
-
-  markBatchLocallyScanned(identifier, meta = {}) {
-    const key = String(identifier || '').trim();
-    if (!key) return;
-    const cache = this._getLocalScanCache();
-    cache.items[key] = { scannedAt: Date.now(), ...meta };
-    cache.updatedAt = Date.now();
-    this._setLocalScanCache(cache);
-  },
-
-  clearLocalScan(identifier) {
-    const key = String(identifier || '').trim();
-    if (!key) return;
-    const cache = this._getLocalScanCache();
-    if (cache.items[key]) {
-      delete cache.items[key];
-      cache.updatedAt = Date.now();
-      this._setLocalScanCache(cache);
-    }
-  },
+  // Cache functions removed - direct database integration only
 
   /**
    * Create a new batch of bags
@@ -850,19 +708,16 @@ export const batchService = {
     const timeoutMs = options.timeoutMs ?? this._DEFAULT_TIMEOUT_MS;
     const maxRetries = options.maxRetries ?? this._DEFAULT_MAX_RETRIES;
 
-    // Local duplicate prevention (can be bypassed for queued processing)
-    if (!options.ignoreLocalDuplicate && this.isBatchLocallyScanned(batchIdentifier)) {
-      return { data: { alreadyActivated: true, local: true }, error: null, attempts: 0 };
-    }
+    console.log('[BatchService] Direct database activation for batch:', batchIdentifier);
 
+    // Direct database activation - no local caching or duplicate prevention
     let lastErr = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         if (typeof options.onAttempt === 'function') options.onAttempt(attempt);
         const res = await this._withTimeout(this.activateBatchForUser(batchIdentifier, userId), timeoutMs);
         if (!res?.error) {
-          // Mark locally to prevent re-scan spam; attach small meta
-          this.markBatchLocallyScanned(batchIdentifier, { userId, success: true });
+          console.log('[BatchService] Batch activated successfully:', batchIdentifier);
           return { ...res, attempts: attempt };
         }
         lastErr = res.error;
@@ -877,7 +732,8 @@ export const batchService = {
       }
     }
 
-    // Final failure; do not mark cache as success but remember attempt
+    // Final failure
+    console.error('[BatchService] Failed to activate batch after retries:', batchIdentifier, lastErr);
     return {
       data: null,
       error: lastErr || { message: 'Failed to activate batch after retries', code: 'ACTIVATE_RETRY_FAILED' },

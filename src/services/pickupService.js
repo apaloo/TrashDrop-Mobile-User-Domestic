@@ -20,7 +20,7 @@ export const pickupService = {
       console.log('[PickupService] Fetching active pickup for user:', userId);
 
       // Check both one-time and scheduled pickups
-      const activeStatuses = ['pending', 'accepted', 'in_transit', 'waiting_for_collector'];
+      const activeStatuses = ['accepted', 'in_transit', 'available'];
       
       // Check one-time pickups
       const { data: oneTimeData, error: oneTimeError } = await supabase
@@ -31,7 +31,7 @@ export const pickupService = {
           waste_type, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
         `)
-        .eq('collector_id', userId)
+        .eq('user_id', userId)
         .in('status', activeStatuses)
         .order('created_at', { ascending: false })
         .limit(1);
@@ -153,7 +153,7 @@ export const pickupService = {
           waste_type, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
         `)
-        .eq('collector_id', userId)
+        .eq('user_id', userId)
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(limit);

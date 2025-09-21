@@ -122,24 +122,7 @@ export const dumpingService = {
       
       console.log('[DumpingService] Mapped size value:', report.size);
 
-      // Helper to record a local user activity entry immediately (local-first)
-      const recordLocalActivity = (activity) => {
-        try {
-          const listKey = `userActivity_${userId}`;
-          const existing = JSON.parse(localStorage.getItem(listKey) || '[]');
-          const deduped = [activity, ...existing.filter(a => a.id !== activity.id && a.related_id !== activity.related_id)];
-          localStorage.setItem(listKey, JSON.stringify(deduped));
-          console.log('[DumpingService] Added local activity entry:', activity);
-          // Notify any listeners that a local activity was recorded
-          try {
-            window.dispatchEvent(new CustomEvent('local-activity', { detail: { userId, activity } }));
-          } catch (evtErr) {
-            // In non-browser/test envs window/custom events may fail silently
-          }
-        } catch (e) {
-          console.warn('[DumpingService] Failed to store local activity entry', e);
-        }
-      };
+      // Removed localStorage activity caching - using direct database operations only
 
       let report_data, reportError;
       try {
@@ -184,49 +167,8 @@ export const dumpingService = {
         
         if (isFKViolation || isRLSViolation) {
           const violationType = isRLSViolation ? 'RLS policy violation' : 'Foreign key violation';
-          console.warn(`[DumpingService] ${violationType} on reported_by. Storing report locally with pending sync.`);
-
-          // Local-first fallback: persist report to localStorage with pending_sync status
-          const localId = `local_report_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-          const localReport = {
-            ...report,
-            id: localId,
-            status: 'pending',
-            sync_status: 'pending_sync',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-
-          try {
-            const listKey = 'illegalDumpingList';
-            const itemKey = `illegalDumping_${localId}`;
-            const existingList = JSON.parse(localStorage.getItem(listKey) || '[]');
-            const updatedList = [localId, ...existingList.filter(id => id !== localId)];
-            localStorage.setItem(listKey, JSON.stringify(updatedList));
-            localStorage.setItem(itemKey, JSON.stringify(localReport));
-            console.log('[DumpingService] Stored local dumping report (pending sync):', localId);
-            
-            // Enqueue for background sync
-            syncService.enqueueSyncItem('dumping_report', localId);
-            
-            // Also record an immediate local activity entry so Activity History updates instantly
-            recordLocalActivity({
-              id: `local_activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-              user_id: userId,
-              activity_type: 'dumping_report',
-              status: 'submitted',
-              points_impact: 0,
-              related_id: localId,
-              created_at: new Date().toISOString(),
-              is_local: true,
-              sync_status: 'pending_sync'
-            });
-          } catch (lsErr) {
-            console.warn('[DumpingService] Failed to persist local report. Proceeding with in-memory return only.', lsErr);
-          }
-
-          // Return the local report so UI can proceed without blocking
-          return { data: localReport, error: null };
+          console.error(`[DumpingService] ${violationType} on reported_by. Cannot submit report.`);
+          throw new Error('Failed to submit report due to user validation issues. Please try logging out and back in.');
         }
 
         // Provide more specific error messages for other issues
@@ -275,18 +217,8 @@ export const dumpingService = {
       }
 
       console.log('[DumpingService] Successfully created dumping report:', report_data[0].id);
-      // Record an immediate local activity entry for the successful report creation
-      recordLocalActivity({
-        id: `local_activity_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        user_id: userId,
-        activity_type: 'dumping_report',
-        status: 'submitted',
-        points_impact: 0,
-        related_id: report_data[0].id,
-        created_at: new Date().toISOString(),
-        is_local: true,
-        sync_status: 'synced'
-      });
+      
+      // Activity will be shown directly from illegal_dumping_mobile table
       return { data: report_data[0], error: null };
 
     } catch (error) {

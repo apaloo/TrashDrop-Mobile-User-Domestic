@@ -45,12 +45,7 @@ const BatchQRScanner = ({ onScanComplete }) => {
     setAttempt(0);
     cancelRef.current.canceled = false;
 
-    // Debug mode: Allow re-scanning if URL contains debug parameter
-    const isDebugMode = window.location.search.includes('debug=true');
-    if (isDebugMode) {
-      console.log('[BatchQRScanner] Debug mode enabled - clearing local cache for testing');
-      localStorage.removeItem('td_scanned_batches');
-    }
+    // Direct database verification - no local caching
 
     // Skip slow table inspection - go direct to batch lookup for better performance
     setLoadingMessage('Looking up batch...');
@@ -62,29 +57,9 @@ const BatchQRScanner = ({ onScanComplete }) => {
         throw new Error('Missing user context. Please sign in again.');
       }
 
-      // If offline: local-first -> queue activation for later sync, prevent duplicate
+      // Require online connection for direct database verification
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        // Prevent re-queueing the same batch locally
-        if (batchService.isBatchLocallyScanned(batchId)) {
-          setError('This batch is already queued or scanned.');
-          setLoading(false);
-          return;
-        }
-        setLoadingMessage('Offline — saving scan and queuing sync...');
-        const queued = await batchService.enqueueBatchActivation(batchId, user.id);
-        if (queued?.error) {
-          setError(queued.error.message || 'Failed to queue scan while offline. Please try again.');
-          setLoading(false);
-          return;
-        }
-        setScanResult({
-          batch_qr_code: batchId,
-          status: 'queued',
-          created_at: new Date().toISOString(),
-          bags: [],
-        });
-        setScanning(false);
-        if (onScanComplete) onScanComplete({ batch_id: batchId, status: 'queued' });
+        setError('Internet connection required for batch verification. Please connect and try again.');
         setLoading(false);
         return;
       }
@@ -369,44 +344,27 @@ const BatchQRScanner = ({ onScanComplete }) => {
         </div>
       )}
       
-      {/* Debug/Testing Controls */}
-      <div style={{ marginTop: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
-        <h4>🔧 Testing Tools</h4>
-        <button 
-          onClick={() => {
-            localStorage.removeItem('td_scanned_batches');
-            console.log('[BatchQRScanner] Local scan cache cleared');
-            alert('Scan cache cleared! You can now re-scan batches.');
-          }}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#ff9800',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            marginRight: '10px'
-          }}
-        >
-          Clear Scan Cache
-        </button>
-        <button 
-          onClick={() => {
-            setError(null);
-            setScanResult(null);
-          }}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#2196f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Clear Results
-        </button>
-      </div>
+      {/* Clear Results Only - No Cache Controls */}
+      {scanResult && (
+        <div style={{ marginTop: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
+          <button 
+            onClick={() => {
+              setError(null);
+              setScanResult(null);
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#2196f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Clear Results
+          </button>
+        </div>
+      )}
     </div>
   );
 };

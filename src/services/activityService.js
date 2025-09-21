@@ -7,6 +7,52 @@ import supabase from '../utils/supabaseClient.js';
 
 export const activityService = {
   /**
+   * Create a new activity record in the database
+   * @param {Object} activity - Activity data
+   * @returns {Object} Created activity or error
+   */
+  async createActivity(activity) {
+    try {
+      if (!activity.user_id || !activity.activity_type) {
+        throw new Error('user_id and activity_type are required');
+      }
+
+      console.log('[ActivityService] Creating activity:', activity);
+
+      const activityData = {
+        user_id: activity.user_id,
+        activity_type: activity.activity_type,
+        description: activity.description || `${activity.activity_type} activity`,
+        related_id: activity.related_id || null,
+        points_impact: activity.points_impact || 0,
+        created_at: activity.created_at || new Date().toISOString()
+      };
+
+      console.log('[ActivityService] Inserting activity data:', activityData);
+
+      const { data, error } = await supabase
+        .from('user_activity')
+        .insert([activityData])
+        .select()
+        .single();
+
+      console.log('[ActivityService] Insert result:', { data, error });
+
+      if (error) {
+        console.error('[ActivityService] Error creating activity:', error);
+        return { data: null, error };
+      }
+
+      console.log('[ActivityService] Activity created successfully:', data);
+      return { data, error: null };
+
+    } catch (error) {
+      console.error('[ActivityService] Error in createActivity:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
    * Get recent activity for a user
    * @param {string} userId - User ID
    * @param {number} limit - Number of activities to fetch
@@ -25,12 +71,16 @@ export const activityService = {
       
       try {
         // Only use verified working columns (id, user_id)
+        console.log('[ActivityService] Querying user_activity table for user:', userId);
         const result = await supabase
           .from('user_activity')
           .select('id, user_id, activity_type, points_impact, related_id, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(limit);
+        
+        console.log('[ActivityService] Database query result:', result);
+        console.log('[ActivityService] Raw activity data from database:', result.data);
         data = result.data;
         error = result.error;
       } catch (queryError) {
@@ -48,7 +98,7 @@ export const activityService = {
         user_id: activity.user_id,
         type: activity.activity_type,
         status: 'completed', // Assuming logged activities are completed
-        details: this.formatActivityDetails(activity),
+        description: `${activity.activity_type} activity`, // Simple description since no details column
         points: activity.points_impact || 0,
         related_id: activity.related_id,
         created_at: activity.created_at,
@@ -70,37 +120,7 @@ export const activityService = {
     }
   },
 
-  /**
-   * Format activity details based on activity type
-   * @param {Object} activity - Activity record
-   * @returns {string} Formatted activity description
-   */
-  formatActivityDetails(activity) {
-    const activityType = activity.activity_type;
-    
-    switch (activityType) {
-      case 'pickup_completed':
-        return `Completed pickup request - ${activity.points_impact || 0} points earned`;
-      case 'pickup_created':
-        return `Created new pickup request`;
-      case 'report_created':
-        return `Reported illegal dumping - ${activity.points_impact || 0} points earned`;
-      case 'bag_scanned':
-        return `Scanned trash bag - ${activity.points_impact || 0} points earned`;
-      case 'reward_redeemed':
-        return `Redeemed reward - ${Math.abs(activity.points_impact) || 0} points used`;
-      case 'batch_processed':
-        return `Processed trash batch - ${activity.points_impact || 0} points earned`;
-      case 'points_earned':
-        return `Earned ${activity.points_impact || 0} points`;
-      case 'points_deducted':
-        return `Used ${Math.abs(activity.points_impact) || 0} points`;
-      case 'level_up':
-        return `Leveled up! Welcome to the next tier`;
-      default:
-        return `Activity: ${activityType}`;
-    }
-  },
+  // formatActivityDetails removed - database doesn't have details column
 
   /**
    * Log a new user activity
@@ -280,7 +300,7 @@ export const activityService = {
       const formattedHistory = data?.map(activity => ({
         id: activity.id,
         activity_type: activity.activity_type,
-        description: this.formatActivityDetails(activity),
+        description: `${activity.activity_type} activity`,
         points: activity.points_impact,
         date: activity.created_at,
         related_id: activity.related_id

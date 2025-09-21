@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
@@ -10,12 +10,20 @@ const Activity = () => {
   const { user } = useAuth();
   const [activities, setActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
+  const [hasMoreData, setHasMoreData] = useState(true);
+  const [cursors, setCursors] = useState({
+    user_activity: null,
+    illegal_dumping_mobile: null,
+    pickup_requests: null
+  });
+  const itemsPerPage = 20; // Increased for better infinite scroll experience
   const mountedRef = useRef(true);
+  const observerRef = useRef(null);
+  const loadingRef = useRef(null);
+  const cursorsRef = useRef({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null });
 
   // Enhanced session refresh function with validation
   const refreshAndValidateSession = async () => {
@@ -41,8 +49,8 @@ const Activity = () => {
     }
   };
   
-  // Create fetchActivities as a regular function to avoid useCallback dependency issues
-  const fetchActivities = async (retryCount = 0) => {
+  // Infinite scroll fetch function with cursor-based pagination
+  const fetchActivities = useCallback(async (isLoadMore = false, retryCount = 0) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1500;
     
@@ -54,26 +62,31 @@ const Activity = () => {
     
     const isOffline = !navigator.onLine;
     
-    console.log('Fetching activities for user:', user.id);
-    setIsLoading(true);
+    console.log('Fetching activities for user:', user.id, 'isLoadMore:', isLoadMore);
+    
+    if (!isLoadMore) {
+      setIsLoading(true);
+      setActivities([]);
+      setCursors({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null });
+      cursorsRef.current = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null };
+      setHasMoreData(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+    
     setError('');
-    
-    // Calculate pagination offset using current state values
-    const offset = (currentPage - 1) * itemsPerPage;
-    
-    // Direct database loading - no localStorage caching
 
     // Define timeout wrapper for network operations
     const fetchWithTimeout = async (operation) => {
       const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Activity fetch timeout - using cached data instead')), 8000)); // Reduced to 8 seconds
+        setTimeout(() => reject(new Error('Activity fetch timeout')), 8000));
       return Promise.race([operation(), timeout]);
     };
     
-    // Direct database query - no localStorage caching
     if (isOffline) {
       setError('Internet connection required to load activities. Please connect and try again.');
       setIsLoading(false);
+      setIsLoadingMore(false);
       return;
     }
     
@@ -84,22 +97,26 @@ const Activity = () => {
       const refreshResult = await refreshAndValidateSession();
       if (!refreshResult.success) {
         console.warn('Session refresh failed before fetching activities');
-        // Continue anyway and let query handle any auth errors
       }
     }
 
     try {
-      // Prepare and execute query with timeout protection
-      let data = [];
+      let newActivities = [];
+      let newCursors = { ...cursorsRef.current };
+      let hasMore = false;
       
       if (filter === 'dumping_report') {
-        // Query illegal_dumping_mobile directly for dumping reports
-        const query = supabase
+        // Single table query for dumping reports
+        let query = supabase
           .from('illegal_dumping_mobile')
           .select('*')
           .eq('reported_by', user.id)
           .order('created_at', { ascending: false })
-          .range(offset, offset + itemsPerPage - 1);
+          .limit(itemsPerPage);
+          
+        if (cursorsRef.current.illegal_dumping_mobile) {
+          query = query.lt('created_at', cursorsRef.current.illegal_dumping_mobile);
+        }
           
         const { data: dumpingData, error: dumpingError } = await fetchWithTimeout(async () => query);
         
@@ -108,140 +125,175 @@ const Activity = () => {
           throw dumpingError;
         }
         
-        data = dumpingData || [];
+        newActivities = (dumpingData || []).map(item => ({ ...item, _source: 'illegal_dumping_mobile' }));
+        hasMore = newActivities.length === itemsPerPage;
+        
+        if (newActivities.length > 0) {
+          newCursors.illegal_dumping_mobile = newActivities[newActivities.length - 1].created_at;
+        }
+        
       } else if (filter === 'all') {
-        // For 'all' tab, query all three tables and merge results
+        // Fetch from all three tables with cursor-based pagination
+        const itemsPerTable = Math.ceil(itemsPerPage / 3);
+        
         const [activityResult, dumpingResult, pickupResult] = await Promise.allSettled([
-          // Query user_activity table (exclude pickup_request since we get those from pickup_requests table)
-          fetchWithTimeout(async () => 
-            supabase
+          // User activity query
+          fetchWithTimeout(async () => {
+            let query = supabase
               .from('user_activity')
               .select('*')
               .eq('user_id', user.id)
-              .neq('activity_type', 'pickup_request') // Exclude pickup activities to avoid duplicates
+              .neq('activity_type', 'pickup_request')
               .order('created_at', { ascending: false })
-              .range(0, Math.floor(itemsPerPage / 3) - 1) // Split pagination between tables
-          ),
-          // Query illegal_dumping_mobile table
-          fetchWithTimeout(async () =>
-            supabase
+              .limit(itemsPerTable);
+              
+            if (cursorsRef.current.user_activity) {
+              query = query.lt('created_at', cursorsRef.current.user_activity);
+            }
+            
+            return query;
+          }),
+          // Dumping reports query
+          fetchWithTimeout(async () => {
+            let query = supabase
               .from('illegal_dumping_mobile')
               .select('*')
               .eq('reported_by', user.id)
               .order('created_at', { ascending: false })
-              .range(0, Math.floor(itemsPerPage / 3) - 1) // Split pagination between tables
-          ),
-          // Query pickup_requests table
-          fetchWithTimeout(async () =>
-            supabase
+              .limit(itemsPerTable);
+              
+            if (cursorsRef.current.illegal_dumping_mobile) {
+              query = query.lt('created_at', cursorsRef.current.illegal_dumping_mobile);
+            }
+            
+            return query;
+          }),
+          // Pickup requests query
+          fetchWithTimeout(async () => {
+            let query = supabase
               .from('pickup_requests')
               .select('*')
               .eq('user_id', user.id)
               .order('created_at', { ascending: false })
-              .range(0, Math.floor(itemsPerPage / 3) - 1) // Split pagination between tables
-          )
+              .limit(itemsPerTable);
+              
+            if (cursorsRef.current.pickup_requests) {
+              query = query.lt('created_at', cursorsRef.current.pickup_requests);
+            }
+            
+            return query;
+          })
         ]);
         
-        let allActivities = [];
+        let allTableActivities = [];
         
-        // Handle user_activity results
+        // Process user_activity results
         if (activityResult.status === 'fulfilled' && activityResult.value?.data) {
-          allActivities = [...allActivities, ...activityResult.value.data.map(item => ({ ...item, _source: 'user_activity' }))];
-        } else if (activityResult.status === 'rejected') {
-          console.warn('Failed to fetch user activities:', activityResult.reason);
+          const activities = activityResult.value.data.map(item => ({ ...item, _source: 'user_activity' }));
+          allTableActivities = [...allTableActivities, ...activities];
+          if (activities.length > 0) {
+            newCursors.user_activity = activities[activities.length - 1].created_at;
+            hasMore = hasMore || activities.length === itemsPerTable;
+          }
         }
         
-        // Handle dumping reports results
+        // Process dumping reports results
         if (dumpingResult.status === 'fulfilled' && dumpingResult.value?.data) {
-          allActivities = [...allActivities, ...dumpingResult.value.data.map(item => ({ ...item, _source: 'illegal_dumping_mobile' }))];
-        } else if (dumpingResult.status === 'rejected') {
-          console.warn('Failed to fetch dumping reports:', dumpingResult.reason);
+          const activities = dumpingResult.value.data.map(item => ({ ...item, _source: 'illegal_dumping_mobile' }));
+          allTableActivities = [...allTableActivities, ...activities];
+          if (activities.length > 0) {
+            newCursors.illegal_dumping_mobile = activities[activities.length - 1].created_at;
+            hasMore = hasMore || activities.length === itemsPerTable;
+          }
         }
         
-        // Handle pickup requests results
+        // Process pickup requests results
         if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
-          allActivities = [...allActivities, ...pickupResult.value.data.map(item => ({ ...item, _source: 'pickup_requests' }))];
-        } else if (pickupResult.status === 'rejected') {
-          console.warn('Failed to fetch pickup requests:', pickupResult.reason);
+          const activities = pickupResult.value.data.map(item => ({ ...item, _source: 'pickup_requests' }));
+          allTableActivities = [...allTableActivities, ...activities];
+          if (activities.length > 0) {
+            newCursors.pickup_requests = activities[activities.length - 1].created_at;
+            hasMore = hasMore || activities.length === itemsPerTable;
+          }
         }
         
-        // Sort all activities by created_at and apply pagination
-        allActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        data = allActivities.slice(offset, offset + itemsPerPage);
+        // Sort all activities by created_at
+        allTableActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        newActivities = allTableActivities.slice(0, itemsPerPage);
+        
       } else if (filter === 'pickup_request') {
-        // Query pickup_requests table directly for pickup activities
+        // Single table query for pickup requests
         let query = supabase
           .from('pickup_requests')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .range(offset, offset + itemsPerPage - 1);
+          .limit(itemsPerPage);
+          
+        if (cursorsRef.current.pickup_requests) {
+          query = query.lt('created_at', cursorsRef.current.pickup_requests);
+        }
         
         const { data: pickupData, error: pickupError } = await fetchWithTimeout(async () => query);
         
         if (pickupError) {
           console.error('Error fetching pickup requests:', pickupError);
-          
-          // If JWT error, try refresh and signal retry
-          if (pickupError.message && pickupError.message.includes('JWT')) {
-            await refreshAndValidateSession();
-            throw new Error('Authentication error, retrying after refresh');
-          }
-          
           throw pickupError;
         }
         
-        data = pickupData || [];
+        newActivities = (pickupData || []).map(item => ({ ...item, _source: 'pickup_requests' }));
+        hasMore = newActivities.length === itemsPerPage;
+        
+        if (newActivities.length > 0) {
+          newCursors.pickup_requests = newActivities[newActivities.length - 1].created_at;
+        }
+        
       } else {
-        // Query user_activity for other activity types (qr_scan, reward_redemption, etc.)
+        // Single table query for specific activity types
         let query = supabase
           .from('user_activity')
           .select('*')
           .eq('user_id', user.id)
           .eq('activity_type', filter)
           .order('created_at', { ascending: false })
-          .range(offset, offset + itemsPerPage - 1);
+          .limit(itemsPerPage);
+          
+        if (cursorsRef.current.user_activity) {
+          query = query.lt('created_at', cursorsRef.current.user_activity);
+        }
         
         const { data: activityData, error: activitiesError } = await fetchWithTimeout(async () => query);
         
         if (activitiesError) {
           console.error('Error fetching activities data:', activitiesError);
-          
-          // If JWT error, try refresh and signal retry
-          if (activitiesError.message && activitiesError.message.includes('JWT')) {
-            await refreshAndValidateSession();
-            throw new Error('Authentication error, retrying after refresh');
-          }
-          
           throw activitiesError;
         }
         
-        data = activityData || [];
+        newActivities = (activityData || []).map(item => ({ ...item, _source: 'user_activity' }));
+        hasMore = newActivities.length === itemsPerPage;
+        
+        if (newActivities.length > 0) {
+          newCursors.user_activity = newActivities[newActivities.length - 1].created_at;
+        }
       }
       
-      // Format network activities
-      const networkActivities = Array.isArray(data) ? data : [];
-      console.log('Network activities received:', networkActivities.length);
-      console.log('Filter applied:', filter);
-      console.log('Raw activities data:', networkActivities);
-      
-      const formattedNetworkActivities = networkActivities.map(activity => {
+      // Format activities
+      const formattedActivities = newActivities.map(activity => {
         let formattedActivity;
         
         if (filter === 'dumping_report' || activity._source === 'illegal_dumping_mobile') {
-          // Format dumping reports from illegal_dumping_mobile table
           formattedActivity = {
             id: activity.id,
             type: 'dumping_report',
             status: activity.status || 'submitted',
             date: new Date(activity.created_at).toLocaleDateString(),
-            points: 10, // Points for dumping reports
+            points: 10,
             related_id: activity.id,
             description: `Reported ${activity.waste_type || 'illegal dumping'} (${activity.severity || 'medium'} severity)`,
-            address: activity.location || 'Unknown location'
+            address: activity.location || 'Unknown location',
+            created_at: activity.created_at
           };
         } else if (filter === 'pickup_request' || activity._source === 'pickup_requests') {
-          // Format pickup requests from pickup_requests table
           formattedActivity = {
             id: activity.id,
             type: 'pickup_request',
@@ -250,10 +302,10 @@ const Activity = () => {
             points: activity.points_earned || 0,
             related_id: activity.id,
             description: `${activity.waste_type || 'Waste'} Pickup - ${activity.bag_count || 1} bag(s)`,
-            address: activity.location || 'Custom location'
+            address: activity.location || 'Custom location',
+            created_at: activity.created_at
           };
         } else {
-          // Format activities from user_activity table
           formattedActivity = {
             id: activity.id,
             type: activity.activity_type,
@@ -262,23 +314,14 @@ const Activity = () => {
             points: activity.points || activity.points_impact || 0,
             related_id: activity.related_id || null,
             description: '',
-            address: ''
+            address: '',
+            created_at: activity.created_at
           };
           
-          // Add type-specific details for user_activity records
-          if (activity.activity_type === 'pickup_request') {
-            formattedActivity.description = activity.details?.waste_type || 'Waste Pickup';
-            formattedActivity.address = activity.details?.address || '';
-          } 
-          else if (activity.activity_type === 'dumping_report') {
-            formattedActivity.description = activity.details?.description || activity.details?.waste_type || 'Reported illegal dumping';
-            formattedActivity.address = activity.details?.address || activity.details?.location || '';
-          }
-          else if (activity.activity_type === 'qr_scan') {
+          if (activity.activity_type === 'qr_scan') {
             formattedActivity.description = 'QR Code Scan';
             formattedActivity.address = activity.details?.location_name || 'Public Bin';
-          }
-          else if (activity.activity_type === 'reward_redemption') {
+          } else if (activity.activity_type === 'reward_redemption') {
             formattedActivity.description = activity.details?.reward_name || 'Reward Redeemed';
             formattedActivity.address = '';
           }
@@ -287,56 +330,79 @@ const Activity = () => {
         return formattedActivity;
       });
       
-      // STEP 3: PROCESS NETWORK DATA ONLY
-      // Direct database data - no localStorage merging or deduplication needed
+      // Update state
+      setCursors(newCursors);
+      cursorsRef.current = newCursors;
+      setHasMoreData(hasMore);
       
-      // Use network activities directly
-      const combinedCount = formattedNetworkActivities.length;
-      const calculatedTotalPages = Math.ceil(combinedCount / itemsPerPage) || 1;
+      if (isLoadMore) {
+        setActivities(prev => [...prev, ...formattedActivities]);
+      } else {
+        setActivities(formattedActivities);
+      }
       
-      setTotalPages(Math.max(1, calculatedTotalPages));
-
-      // Apply pagination and update UI
-      const pageSlice = formattedNetworkActivities.slice(offset, offset + itemsPerPage);
-      setActivities(pageSlice);
       setError('');
-      console.log('Loaded activities from database:', {
-        total: combinedCount,
-        totalPages: calculatedTotalPages 
+      console.log('Loaded activities:', {
+        new: formattedActivities.length,
+        total: isLoadMore ? activities.length + formattedActivities.length : formattedActivities.length,
+        hasMore
       });
       
     } catch (error) {
       console.warn('Error in activities fetch:', error.message);
       
-      // Direct database only - no localStorage fallback
       if (retryCount < MAX_RETRIES) {
-        // Retry with exponential backoff
         const delay = RETRY_DELAY * Math.pow(1.5, retryCount);
         console.log(`Retrying database fetch in ${delay}ms (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
         setTimeout(() => {
-          fetchActivities(retryCount + 1);
+          fetchActivities(isLoadMore, retryCount + 1);
         }, delay);
         return;
       }
       
-      // Out of retries - show database connection error
-        if (error?.message?.includes('timeout')) {
-          setError('Connection is slow. Activity data will load when network improves.');
-        } else {
-          setError('Unable to load activity history. Please check your connection.');
-        }
-        
-        // Show empty state after all retries failed
+      if (error?.message?.includes('timeout')) {
+        setError('Connection is slow. Activity data will load when network improves.');
+      } else {
+        setError('Unable to load activity history. Please check your connection.');
+      }
+      
+      if (!isLoadMore) {
         setActivities([]);
+      }
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  };
+  }, [user?.id, filter]);
   
-  // Use the fetchActivities function in useEffect
+  // Initial load and filter changes
   useEffect(() => {
-    fetchActivities(0);
-  }, [user?.id, filter, currentPage]);
+    fetchActivities(false);
+  }, [user?.id, filter]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (!loadingRef.current || !hasMoreData || isLoading || isLoadingMore) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreData && !isLoading && !isLoadingMore) {
+          console.log('Loading more activities...');
+          fetchActivities(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    observer.observe(loadingRef.current);
+    observerRef.current = observer;
+    
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMoreData, isLoading, isLoadingMore, fetchActivities]);
 
   // Listen to storage changes (e.g., other tabs) for userActivity updates
   useEffect(() => {
@@ -344,47 +410,44 @@ const Activity = () => {
       if (!e) return;
       if (!user) return;
       if (e.key === `userActivity_${user.id}`) {
-        fetchActivities(0);
+        fetchActivities(false);
       }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [user?.id]);
+  }, [user?.id, fetchActivities]);
+  
   // Listen for local activity events to refresh immediately
   useEffect(() => {
     const onLocalActivity = (e) => {
       try {
         const detailUserId = e?.detail?.userId;
         if (!user || (detailUserId && detailUserId !== user.id)) return;
-        fetchActivities(0);
+        fetchActivities(false);
       } catch (_) {}
     };
     window.addEventListener('local-activity', onLocalActivity);
     return () => window.removeEventListener('local-activity', onLocalActivity);
-  }, [user?.id]);
+  }, [user?.id, fetchActivities]);
 
   // Manual refresh handler
   const handleRefresh = () => {
     console.log('Manual refresh triggered');
     setIsLoading(true);
     setError('');
-    // Directly call fetchActivities instead of relying on the useEffect
-    fetchActivities();
+    fetchActivities(false);
   };
 
   // Handle filter change
   const handleFilterChange = (newFilter) => {
     console.log('Filter changed to:', newFilter);
     setFilter(newFilter);
-    setCurrentPage(1);
-  };
-
-  // Handle page change
-  const handlePageChange = (newPage) => {
-    console.log('Page changed to:', newPage, 'of', totalPages);
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
+    // Reset cursors and activities when filter changes
+    const resetCursors = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null };
+    setCursors(resetCursors);
+    cursorsRef.current = resetCursors;
+    setActivities([]);
+    setHasMoreData(true);
   };
 
   // Activity card component
@@ -487,31 +550,28 @@ const Activity = () => {
     );
   };
   
-  // Simple pagination component
-  const Pagination = ({ currentPage, totalPages, onPageChange }) => {
-    if (totalPages <= 1) return null;
+  // Loading indicator for infinite scroll
+  const InfiniteScrollLoader = () => {
+    if (!hasMoreData) {
+      return (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <p>No more activities to load</p>
+        </div>
+      );
+    }
+    
+    if (isLoadingMore) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <LoadingSpinner />
+          <span className="ml-2 text-gray-600 dark:text-gray-400">Loading more activities...</span>
+        </div>
+      );
+    }
     
     return (
-      <div className="flex justify-center items-center space-x-2">
-        <button 
-          className="p-2 rounded-md bg-gray-100 dark:bg-gray-700 disabled:opacity-50"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-        >
-          &laquo;
-        </button>
-        
-        <span className="text-gray-700 dark:text-gray-300">
-          Page {currentPage} of {totalPages}
-        </span>
-        
-        <button 
-          className="p-2 rounded-md bg-gray-100 dark:bg-gray-700 disabled:opacity-50"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-        >
-          &raquo;
-        </button>
+      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+        <p>Scroll down to load more activities</p>
       </div>
     );
   };
@@ -588,9 +648,16 @@ const Activity = () => {
       {!isLoading && !error && (
         <div className="space-y-4">
           {activities.length > 0 ? (
-            activities.map(activity => (
-              <ActivityCard key={activity.id} activity={activity} />
-            ))
+            <>
+              {activities.map(activity => (
+                <ActivityCard key={`${activity.id}-${activity.created_at}`} activity={activity} />
+              ))}
+              
+              {/* Infinite scroll loading indicator */}
+              <div ref={loadingRef}>
+                <InfiniteScrollLoader />
+              </div>
+            </>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center border border-gray-200 dark:border-gray-700">
               <div className="text-gray-500 dark:text-gray-400 mb-4">
@@ -606,17 +673,6 @@ const Activity = () => {
                 <a href="/dumping-report" className="text-blue-600 hover:underline">Report illegal dumping</a>
                 <a href="/scan" className="text-blue-600 hover:underline">Scan a QR code at a public bin</a>
               </div>
-            </div>
-          )}
-          
-          {/* Pagination */}
-          {activities.length > 0 && totalPages > 1 && (
-            <div className="mt-6">
-              <Pagination 
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
             </div>
           )}
         </div>
