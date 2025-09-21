@@ -61,45 +61,7 @@ const Activity = () => {
     // Calculate pagination offset using current state values
     const offset = (currentPage - 1) * itemsPerPage;
     
-    // Define local activity loading function - consistently used throughout
-    const loadLocalActivities = () => {
-      try {
-        const localKey = `userActivity_${user.id}`;
-        const localRaw = JSON.parse(localStorage.getItem(localKey) || '[]');
-        console.log('[Activity] Raw local activities:', localRaw);
-        
-        if (!Array.isArray(localRaw)) {
-          console.warn('[Activity] Local activities is not an array:', localRaw);
-          return [];
-        }
-        
-        const localFiltered = localRaw.filter(a => {
-          if (!a || !a.activity_type) return false;
-          return filter === 'all' ? true : a.activity_type === filter;
-        });
-        
-        console.log('[Activity] Filtered local activities:', localFiltered.length);
-        
-        const localActivitiesFormatted = localFiltered.map(a => ({
-          id: a.id,
-          type: a.activity_type,
-          status: a.status || 'submitted',
-          date: new Date(a.created_at).toLocaleDateString(),
-          points: a.points_impact || 0,
-          related_id: a.related_id || null,
-          description: a.details?.description || (a.activity_type === 'dumping_report' ? 'Dumping Report' : 'Activity'),
-          address: a.details?.location || a.details?.address || '',
-          isLocal: true,
-          sync_status: a.sync_status || 'pending_sync'
-        }));
-        
-        console.log('[Activity] Formatted local activities:', localActivitiesFormatted);
-        return localActivitiesFormatted;
-      } catch (le) {
-        console.warn('Failed to load local activities', le);
-        return [];
-      }
-    };
+    // Direct database loading - no localStorage caching
 
     // Define timeout wrapper for network operations
     const fetchWithTimeout = async (operation) => {
@@ -108,170 +70,256 @@ const Activity = () => {
       return Promise.race([operation(), timeout]);
     };
     
-    // STEP 1: IMMEDIATELY LOAD AND DISPLAY LOCAL DATA
-    try {
-      // Load local activities first for immediate display
-      const localActivities = loadLocalActivities();
-      const localOffset = (currentPage - 1) * itemsPerPage;
-      const localTotalPages = Math.ceil(localActivities.length / itemsPerPage) || 1;
-      setTotalPages(localTotalPages);
-      
-      // Show local data immediately
-      const localPageSlice = localActivities.slice(localOffset, localOffset + itemsPerPage);
-      setActivities(localPageSlice);
+    // Direct database query - no localStorage caching
+    if (isOffline) {
+      setError('Internet connection required to load activities. Please connect and try again.');
       setIsLoading(false);
-      
-      // If offline or sufficient local data, stop here
-      if (isOffline || localActivities.length >= 5) {
-        if (isOffline) {
-          setError('Showing cached activities (offline)');
-        }
-        return;
+      return;
+    }
+    
+    console.log(`Fetching activities from database (attempt ${retryCount + 1} of ${MAX_RETRIES + 1})`);
+    
+    // Try session refresh if not first attempt
+    if (retryCount > 0) {
+      const refreshResult = await refreshAndValidateSession();
+      if (!refreshResult.success) {
+        console.warn('Session refresh failed before fetching activities');
+        // Continue anyway and let query handle any auth errors
       }
-      
-      // STEP 2: ENHANCE WITH NETWORK DATA
-      setIsLoading(true); // Show loading for network enhancement
-      console.log(`Attempting to fetch network activities (attempt ${retryCount + 1} of ${MAX_RETRIES + 1})`);
-      
-      // Try session refresh if not first attempt
-      if (retryCount > 0) {
-        const refreshResult = await refreshAndValidateSession();
-        if (!refreshResult.success) {
-          console.warn('Session refresh failed before fetching activities');
-          // Continue anyway and let query handle any auth errors
-        }
-      }
+    }
 
+    try {
       // Prepare and execute query with timeout protection
-      let query = supabase
-        .from('user_activity')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      let data = [];
       
-      // Apply filters if not on 'all' tab
-      if (filter !== 'all') {
-        query = query.eq('activity_type', filter);
-      }
-      
-      // Apply pagination
-      query = query.range(offset, offset + itemsPerPage - 1);
-      
-      // Execute with timeout
-      const { data, error: activitiesError } = await fetchWithTimeout(async () => query);
-      
-      if (activitiesError) {
-        console.error('Error fetching activities data:', activitiesError);
+      if (filter === 'dumping_report') {
+        // Query illegal_dumping_mobile directly for dumping reports
+        const query = supabase
+          .from('illegal_dumping_mobile')
+          .select('*')
+          .eq('reported_by', user.id)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + itemsPerPage - 1);
+          
+        const { data: dumpingData, error: dumpingError } = await fetchWithTimeout(async () => query);
         
-        // If JWT error, try refresh and signal retry
-        if (activitiesError.message && activitiesError.message.includes('JWT')) {
-          await refreshAndValidateSession();
-          throw new Error('Authentication error, retrying after refresh');
+        if (dumpingError) {
+          console.error('Error fetching dumping reports:', dumpingError);
+          throw dumpingError;
         }
         
-        throw activitiesError;
+        data = dumpingData || [];
+      } else if (filter === 'all') {
+        // For 'all' tab, query all three tables and merge results
+        const [activityResult, dumpingResult, pickupResult] = await Promise.allSettled([
+          // Query user_activity table (exclude pickup_request since we get those from pickup_requests table)
+          fetchWithTimeout(async () => 
+            supabase
+              .from('user_activity')
+              .select('*')
+              .eq('user_id', user.id)
+              .neq('activity_type', 'pickup_request') // Exclude pickup activities to avoid duplicates
+              .order('created_at', { ascending: false })
+              .range(0, Math.floor(itemsPerPage / 3) - 1) // Split pagination between tables
+          ),
+          // Query illegal_dumping_mobile table
+          fetchWithTimeout(async () =>
+            supabase
+              .from('illegal_dumping_mobile')
+              .select('*')
+              .eq('reported_by', user.id)
+              .order('created_at', { ascending: false })
+              .range(0, Math.floor(itemsPerPage / 3) - 1) // Split pagination between tables
+          ),
+          // Query pickup_requests table
+          fetchWithTimeout(async () =>
+            supabase
+              .from('pickup_requests')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .range(0, Math.floor(itemsPerPage / 3) - 1) // Split pagination between tables
+          )
+        ]);
+        
+        let allActivities = [];
+        
+        // Handle user_activity results
+        if (activityResult.status === 'fulfilled' && activityResult.value?.data) {
+          allActivities = [...allActivities, ...activityResult.value.data.map(item => ({ ...item, _source: 'user_activity' }))];
+        } else if (activityResult.status === 'rejected') {
+          console.warn('Failed to fetch user activities:', activityResult.reason);
+        }
+        
+        // Handle dumping reports results
+        if (dumpingResult.status === 'fulfilled' && dumpingResult.value?.data) {
+          allActivities = [...allActivities, ...dumpingResult.value.data.map(item => ({ ...item, _source: 'illegal_dumping_mobile' }))];
+        } else if (dumpingResult.status === 'rejected') {
+          console.warn('Failed to fetch dumping reports:', dumpingResult.reason);
+        }
+        
+        // Handle pickup requests results
+        if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
+          allActivities = [...allActivities, ...pickupResult.value.data.map(item => ({ ...item, _source: 'pickup_requests' }))];
+        } else if (pickupResult.status === 'rejected') {
+          console.warn('Failed to fetch pickup requests:', pickupResult.reason);
+        }
+        
+        // Sort all activities by created_at and apply pagination
+        allActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        data = allActivities.slice(offset, offset + itemsPerPage);
+      } else if (filter === 'pickup_request') {
+        // Query pickup_requests table directly for pickup activities
+        let query = supabase
+          .from('pickup_requests')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + itemsPerPage - 1);
+        
+        const { data: pickupData, error: pickupError } = await fetchWithTimeout(async () => query);
+        
+        if (pickupError) {
+          console.error('Error fetching pickup requests:', pickupError);
+          
+          // If JWT error, try refresh and signal retry
+          if (pickupError.message && pickupError.message.includes('JWT')) {
+            await refreshAndValidateSession();
+            throw new Error('Authentication error, retrying after refresh');
+          }
+          
+          throw pickupError;
+        }
+        
+        data = pickupData || [];
+      } else {
+        // Query user_activity for other activity types (qr_scan, reward_redemption, etc.)
+        let query = supabase
+          .from('user_activity')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('activity_type', filter)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + itemsPerPage - 1);
+        
+        const { data: activityData, error: activitiesError } = await fetchWithTimeout(async () => query);
+        
+        if (activitiesError) {
+          console.error('Error fetching activities data:', activitiesError);
+          
+          // If JWT error, try refresh and signal retry
+          if (activitiesError.message && activitiesError.message.includes('JWT')) {
+            await refreshAndValidateSession();
+            throw new Error('Authentication error, retrying after refresh');
+          }
+          
+          throw activitiesError;
+        }
+        
+        data = activityData || [];
       }
       
       // Format network activities
       const networkActivities = Array.isArray(data) ? data : [];
       console.log('Network activities received:', networkActivities.length);
+      console.log('Filter applied:', filter);
+      console.log('Raw activities data:', networkActivities);
       
       const formattedNetworkActivities = networkActivities.map(activity => {
-        let formattedActivity = {
-          id: activity.id,
-          type: activity.activity_type,
-          status: activity.status || 'submitted',
-          date: new Date(activity.created_at).toLocaleDateString(),
-          points: activity.points || activity.points_impact || 0,
-          related_id: activity.related_id || null,
-          description: '',
-          address: ''
-        };
+        let formattedActivity;
         
-        // Add type-specific details
-        if (activity.activity_type === 'pickup_request') {
-          formattedActivity.description = activity.details?.waste_type || 'Waste Pickup';
-          formattedActivity.address = activity.details?.address || '';
-        } 
-        else if (activity.activity_type === 'dumping_report') {
-          formattedActivity.description = activity.details?.waste_type || 'Dumping Report';
-          formattedActivity.address = activity.details?.address || '';
-        }
-        else if (activity.activity_type === 'qr_scan') {
-          formattedActivity.description = 'QR Code Scan';
-          formattedActivity.address = activity.details?.location_name || 'Public Bin';
-        }
-        else if (activity.activity_type === 'reward_redemption') {
-          formattedActivity.description = activity.details?.reward_name || 'Reward Redeemed';
-          formattedActivity.address = '';
+        if (filter === 'dumping_report' || activity._source === 'illegal_dumping_mobile') {
+          // Format dumping reports from illegal_dumping_mobile table
+          formattedActivity = {
+            id: activity.id,
+            type: 'dumping_report',
+            status: activity.status || 'submitted',
+            date: new Date(activity.created_at).toLocaleDateString(),
+            points: 10, // Points for dumping reports
+            related_id: activity.id,
+            description: `Reported ${activity.waste_type || 'illegal dumping'} (${activity.severity || 'medium'} severity)`,
+            address: activity.location || 'Unknown location'
+          };
+        } else if (filter === 'pickup_request' || activity._source === 'pickup_requests') {
+          // Format pickup requests from pickup_requests table
+          formattedActivity = {
+            id: activity.id,
+            type: 'pickup_request',
+            status: activity.status || 'submitted',
+            date: new Date(activity.created_at).toLocaleDateString(),
+            points: activity.points_earned || 0,
+            related_id: activity.id,
+            description: `${activity.waste_type || 'Waste'} Pickup - ${activity.bag_count || 1} bag(s)`,
+            address: activity.location || 'Custom location'
+          };
+        } else {
+          // Format activities from user_activity table
+          formattedActivity = {
+            id: activity.id,
+            type: activity.activity_type,
+            status: activity.status || 'submitted',
+            date: new Date(activity.created_at).toLocaleDateString(),
+            points: activity.points || activity.points_impact || 0,
+            related_id: activity.related_id || null,
+            description: '',
+            address: ''
+          };
+          
+          // Add type-specific details for user_activity records
+          if (activity.activity_type === 'pickup_request') {
+            formattedActivity.description = activity.details?.waste_type || 'Waste Pickup';
+            formattedActivity.address = activity.details?.address || '';
+          } 
+          else if (activity.activity_type === 'dumping_report') {
+            formattedActivity.description = activity.details?.description || activity.details?.waste_type || 'Reported illegal dumping';
+            formattedActivity.address = activity.details?.address || activity.details?.location || '';
+          }
+          else if (activity.activity_type === 'qr_scan') {
+            formattedActivity.description = 'QR Code Scan';
+            formattedActivity.address = activity.details?.location_name || 'Public Bin';
+          }
+          else if (activity.activity_type === 'reward_redemption') {
+            formattedActivity.description = activity.details?.reward_name || 'Reward Redeemed';
+            formattedActivity.address = '';
+          }
         }
         
         return formattedActivity;
       });
       
-      // STEP 3: MERGE LOCAL AND NETWORK DATA
-      // Reload local activities to ensure we have latest data
-      const refreshedLocalActivities = loadLocalActivities();
+      // STEP 3: PROCESS NETWORK DATA ONLY
+      // Direct database data - no localStorage merging or deduplication needed
       
-      // Set up deduplication logic
-      const localKeys = new Set(
-        refreshedLocalActivities
-          .filter(a => a.type && a.related_id)
-          .map(a => `${a.type}::${a.related_id}`)
-      );
-      const seenIds = new Set(refreshedLocalActivities.map(a => a.id));
-      
-      // Filter network activities to avoid duplicates
-      const serverFiltered = formattedNetworkActivities.filter(item => {
-        const key = item.type && item.related_id ? `${item.type}::${item.related_id}` : null;
-        if (key && localKeys.has(key)) return false; // Local activities take priority
-        if (seenIds.has(item.id)) return false; // Avoid duplicate IDs
-        return true;
-      });
-      
-      // Combine and update pagination
-      const combined = [...refreshedLocalActivities, ...serverFiltered];
-      const combinedCount = combined.length;
+      // Use network activities directly
+      const combinedCount = formattedNetworkActivities.length;
       const calculatedTotalPages = Math.ceil(combinedCount / itemsPerPage) || 1;
       
       setTotalPages(Math.max(1, calculatedTotalPages));
 
       // Apply pagination and update UI
-      const pageSlice = combined.slice(offset, offset + itemsPerPage);
+      const pageSlice = formattedNetworkActivities.slice(offset, offset + itemsPerPage);
       setActivities(pageSlice);
       setError('');
-            console.log('Enhanced with network data:', { 
-        local: refreshedLocalActivities.length,
-        server: serverFiltered.length,
-        combined: combinedCount,
+      console.log('Loaded activities from database:', {
+        total: combinedCount,
         totalPages: calculatedTotalPages 
       });
       
     } catch (error) {
       console.warn('Error in activities fetch:', error.message);
       
-      // On network failure, make sure we're still showing any local data
-      const fallbackLocalActivities = loadLocalActivities();
+      // Direct database only - no localStorage fallback
+      if (retryCount < MAX_RETRIES) {
+        // Retry with exponential backoff
+        const delay = RETRY_DELAY * Math.pow(1.5, retryCount);
+        console.log(`Retrying database fetch in ${delay}ms (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
+        setTimeout(() => {
+          fetchActivities(retryCount + 1);
+        }, delay);
+        return;
+      }
       
-      if (fallbackLocalActivities.length > 0) {
-        // We have local data to show as fallback
-        const localOffset = (currentPage - 1) * itemsPerPage;
-        const localPageSlice = fallbackLocalActivities.slice(localOffset, localOffset + itemsPerPage);
-        setActivities(localPageSlice);
-        setError('Network unavailable - showing cached activities');
-      } else {
-        // No local data - consider retry or show error
-        if (retryCount < MAX_RETRIES) {
-          // Retry with exponential backoff
-          const delay = RETRY_DELAY * Math.pow(1.5, retryCount);
-          console.log(`Retrying in ${delay}ms (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
-          setTimeout(() => {
-            fetchActivities(retryCount + 1);
-          }, delay);
-          return;
-        }
-        
-        // Out of retries - show appropriate error
+      // Out of retries - show database connection error
         if (error?.message?.includes('timeout')) {
           setError('Connection is slow. Activity data will load when network improves.');
         } else {
@@ -280,7 +328,6 @@ const Activity = () => {
         
         // Show empty state after all retries failed
         setActivities([]);
-      }
     } finally {
       setIsLoading(false);
     }
