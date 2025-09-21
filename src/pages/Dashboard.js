@@ -76,46 +76,109 @@ const Dashboard = () => {
   const [bagsPulse, setBagsPulse] = useState(false);
   const bagsPulseTimerRef = useRef(null);
   
-  // Load recent activities directly from pickup_requests table - NO user_activity dependency
+  // Load recent activities from all activity sources (pickup_requests, illegal_dumping_mobile, user_activity)
   const getDatabaseActivities = useCallback(async (limit = 5) => {
     if (!user?.id) return [];
     
     try {
-      console.log('[Dashboard] ✅ READING FROM pickup_requests table for user:', user.id);
+      console.log('[Dashboard] ✅ READING FROM all activity tables for user:', user.id);
       
-      // Query ALL pickup requests for this user (no status filtering)
-      const { data, error } = await supabase
-        .from('pickup_requests')
-        .select('id, created_at, bag_count, waste_type, status, location')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      // Fetch from all three activity sources in parallel
+      const itemsPerTable = Math.ceil(limit / 3);
       
-      if (error) {
-        console.error('[Dashboard] ❌ Error fetching from pickup_requests:', error);
-        return [];
-      }
-      
-      if (data && Array.isArray(data)) {
-        console.log(`[Dashboard] ✅ Found ${data.length} pickup requests:`, data);
+      const [pickupResult, dumpingResult, activityResult] = await Promise.allSettled([
+        // Pickup requests
+        supabase
+          .from('pickup_requests')
+          .select('id, created_at, bag_count, waste_type, status, location, points_earned')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(itemsPerTable),
         
-        const formattedActivities = data.map(pickup => ({
+        // Dumping reports
+        supabase
+          .from('illegal_dumping_mobile')
+          .select('id, created_at, waste_type, status, location, severity')
+          .eq('reported_by', user.id)
+          .order('created_at', { ascending: false })
+          .limit(itemsPerTable),
+        
+        // User activities (excluding pickup_request to avoid duplicates)
+        supabase
+          .from('user_activity')
+          .select('id, created_at, activity_type, details, points')
+          .eq('user_id', user.id)
+          .neq('activity_type', 'pickup_request')
+          .order('created_at', { ascending: false })
+          .limit(itemsPerTable)
+      ]);
+      
+      let allActivities = [];
+      
+      // Process pickup requests
+      if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
+        const pickups = pickupResult.value.data.map(pickup => ({
           id: pickup.id,
           type: 'pickup_request',
           description: `Pickup request for ${pickup.bag_count || 1} bag(s) - ${pickup.status}`,
           timestamp: pickup.created_at,
           related_id: pickup.id,
-          points: 0
+          points: pickup.points_earned || 10, // Show actual earned points or default to 10
+          _source: 'pickup_requests'
         }));
-        
-        console.log(`[Dashboard] ✅ Returning ${formattedActivities.length} formatted activities`);
-        return formattedActivities;
+        allActivities = [...allActivities, ...pickups];
+        console.log(`[Dashboard] ✅ Found ${pickups.length} pickup requests`);
       }
       
-      console.log('[Dashboard] ⚠️ No pickup requests found in database');
-      return [];
+      // Process dumping reports
+      if (dumpingResult.status === 'fulfilled' && dumpingResult.value?.data) {
+        const reports = dumpingResult.value.data.map(report => {
+          // Calculate points based on severity: high=20, medium=15, low=10
+          const severity = report.severity || 'medium';
+          let points = 15; // default for medium
+          if (severity === 'high') points = 20;
+          else if (severity === 'low') points = 10;
+          
+          return {
+            id: report.id,
+            type: 'dumping_report',
+            description: `Reported ${report.waste_type || 'illegal dumping'} (${severity} severity)`,
+            timestamp: report.created_at,
+            related_id: report.id,
+            points: points,
+            _source: 'illegal_dumping_mobile'
+          };
+        });
+        allActivities = [...allActivities, ...reports];
+        console.log(`[Dashboard] ✅ Found ${reports.length} dumping reports`);
+      }
+      
+      // Process user activities
+      if (activityResult.status === 'fulfilled' && activityResult.value?.data) {
+        const activities = activityResult.value.data.map(activity => ({
+          id: activity.id,
+          type: activity.activity_type,
+          description: activity.activity_type === 'qr_scan' ? 'QR Code Scan' : 
+                      activity.activity_type === 'reward_redemption' ? 'Reward Redeemed' :
+                      activity.details?.description || `${activity.activity_type} activity`,
+          timestamp: activity.created_at,
+          related_id: activity.id,
+          points: activity.points || 0,
+          _source: 'user_activity'
+        }));
+        allActivities = [...allActivities, ...activities];
+        console.log(`[Dashboard] ✅ Found ${activities.length} user activities`);
+      }
+      
+      // Sort all activities by timestamp (newest first) and limit results
+      allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const limitedActivities = allActivities.slice(0, limit);
+      
+      console.log(`[Dashboard] ✅ Returning ${limitedActivities.length} total activities from all sources`);
+      return limitedActivities;
+      
     } catch (error) {
-      console.error('[Dashboard] ❌ Error loading from pickup_requests:', error);
+      console.error('[Dashboard] ❌ Error loading activities from all sources:', error);
       return [];
     }
   }, [user?.id]);
@@ -750,7 +813,7 @@ const Dashboard = () => {
             </div>
           ) : (
             (() => {
-              console.log(`[Dashboard] 🎨 RENDERING ${recentActivities.length} activities from pickup_requests`);
+              console.log(`[Dashboard] 🎨 RENDERING ${recentActivities.length} activities from all sources`);
               return Array.isArray(recentActivities) && recentActivities.map((activity, index) => (
               <div 
                 key={activity.id || `activity-${index}`}
@@ -764,18 +827,22 @@ const Dashboard = () => {
                         <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" />
                       </svg>
                     )}
-                    {activity.type === 'report' && (
+                    {(activity.type === 'report' || activity.type === 'dumping_report') && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     )}
-                    {activity.type === 'batch' && (
+                    {(activity.type === 'batch' || activity.type === 'qr_scan') && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
-                        <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                       </svg>
                     )}
-                    {!['pickup', 'pickup_request', 'report', 'batch'].includes(activity.type) && (
+                    {activity.type === 'reward_redemption' && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    {!['pickup', 'pickup_request', 'report', 'dumping_report', 'batch', 'qr_scan', 'reward_redemption'].includes(activity.type) && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                       </svg>

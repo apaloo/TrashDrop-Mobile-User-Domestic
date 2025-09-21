@@ -438,6 +438,24 @@ const PickupRequest = () => {
 
       console.log('XXXXXXXXXXXXXXXXXXXXXX [PickupRequest] Successfully created pickup:', data.id);
 
+      // Set points_earned in pickup_requests table only
+      const PICKUP_POINTS = 5;
+      try {
+        console.log('[PickupRequest] Setting points for pickup request');
+        
+        // Update pickup_requests table with points_earned (single source of truth)
+        await supabase
+          .from('pickup_requests')
+          .update({ points_earned: PICKUP_POINTS })
+          .eq('id', data.id);
+          
+        console.log(`[PickupRequest] Successfully set ${PICKUP_POINTS} points for pickup request`);
+        
+      } catch (pointsError) {
+        console.warn('[PickupRequest] Failed to set points (non-fatal):', pointsError);
+        // Don't throw error - pickup was successful even if points failed
+      }
+
       // Update bag count on server - direct update instead of RPC
       const bagsToRemove = Number(values.numberOfBags);
       try {

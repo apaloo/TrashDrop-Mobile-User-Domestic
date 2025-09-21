@@ -60,8 +60,9 @@ export const userService = {
         console.error('[UserService] Error fetching stats:', statsError);
       }
 
-      // Count user's pickup requests - handle potential schema issues
+      // Count user's pickup requests and calculate total points from them
       let pickupCount = 0;
+      let totalPointsFromPickups = 0;
       let pickupError = null;
       
       try {
@@ -71,12 +72,19 @@ export const userService = {
         
         const result = await supabase
           .from('pickup_requests')
-          .select('id', { count: 'exact' })
-          .eq('user_id', userId)  // Only filter by user_id (pickup requester)
-          .in('status', ['scheduled', 'accepted', 'available']);
+          .select('id, points_earned', { count: 'exact' })
+          .eq('user_id', userId);  // Get ALL pickup requests for points calculation
         console.log('[UserService] Pickup requests query result:', result);
         pickupCount = result.count;
         pickupError = result.error;
+        
+        // Calculate total points from pickup requests (single source of truth)
+        if (result.data && Array.isArray(result.data)) {
+          totalPointsFromPickups = result.data.reduce((sum, pickup) => {
+            return sum + (pickup.points_earned || 0);
+          }, 0);
+          console.log(`[UserService] Calculated total points from pickup_requests: ${totalPointsFromPickups}`);
+        }
       } catch (error) {
         console.warn('[UserService] pickup_requests table query failed:', error.message);
         pickupError = error;
@@ -86,17 +94,31 @@ export const userService = {
         console.error('[UserService] Error counting pickups:', pickupError);
       }
 
-      // Count user's dumping reports - handle potential schema issues
+      // Count user's dumping reports and calculate points from them
       let reportCount = 0;
+      let totalPointsFromReports = 0;
       let reportError = null;
       
       try {
         const result = await supabase
           .from('illegal_dumping_mobile')
-          .select('id', { count: 'exact' })
+          .select('id, severity', { count: 'exact' })
           .eq('reported_by', userId);
         reportCount = result.count;
         reportError = result.error;
+        
+        // Calculate points from dumping reports based on severity
+        if (result.data && Array.isArray(result.data)) {
+          totalPointsFromReports = result.data.reduce((sum, report) => {
+            // Award points based on severity: high=20, medium=15, low=10
+            const severity = report.severity || 'medium';
+            let points = 15; // default for medium
+            if (severity === 'high') points = 20;
+            else if (severity === 'low') points = 10;
+            return sum + points;
+          }, 0);
+          console.log(`[UserService] Calculated total points from dumping reports: ${totalPointsFromReports}`);
+        }
       } catch (error) {
         console.warn('[UserService] illegal_dumping_mobile table query failed:', error.message);
         reportError = error;
@@ -184,8 +206,68 @@ export const userService = {
       const totalBagsFromStats = totalBagsFromBatches;
       const batchesFromStats = batchesCount;
       
+      // Count user's reward redemptions and calculate points spent
+      let totalPointsSpent = 0;
+      let redemptionError = null;
+      
+      try {
+        const result = await supabase
+          .from('rewards_redemption')
+          .select('points_spent', { count: 'exact' })
+          .eq('user_id', userId);
+        
+        if (result.data && Array.isArray(result.data)) {
+          totalPointsSpent = result.data.reduce((sum, redemption) => {
+            return sum + (redemption.points_spent || 0);
+          }, 0);
+          console.log(`[UserService] Calculated total points spent on rewards: ${totalPointsSpent}`);
+        }
+      } catch (error) {
+        console.warn('[UserService] rewards_redemption table query failed:', error.message);
+        redemptionError = error;
+      }
+
+      if (redemptionError) {
+        console.error('[UserService] Error counting redemptions:', redemptionError);
+      }
+
+      // Count user's QR scans and calculate points from them
+      let totalPointsFromScans = 0;
+      let scanError = null;
+      
+      try {
+        const result = await supabase
+          .from('user_activity')
+          .select('id, points_impact', { count: 'exact' })
+          .eq('user_id', userId)
+          .eq('activity_type', 'qr_scan');
+        
+        if (result.data && Array.isArray(result.data)) {
+          totalPointsFromScans = result.data.reduce((sum, scan) => {
+            // QR scans typically earn 5 points each
+            return sum + (scan.points_impact || 5);
+          }, 0);
+          console.log(`[UserService] Calculated total points from QR scans: ${totalPointsFromScans}`);
+        }
+      } catch (error) {
+        console.warn('[UserService] user_activity table query failed:', error.message);
+        scanError = error;
+      }
+
+      if (scanError) {
+        console.error('[UserService] Error counting QR scans:', scanError);
+      }
+
+      // Calculate total points from all sources (earned - spent)
+      const totalPoints = totalPointsFromPickups + totalPointsFromReports + totalPointsFromScans - totalPointsSpent;
+      
       // Debug output to verify data mapping
       console.log('[UserService] User stats calculation:', {
+        'pickup_requests.points': totalPointsFromPickups,
+        'dumping_reports.points': totalPointsFromReports,
+        'qr_scans.points': totalPointsFromScans,
+        'rewards_redemption.points_spent': totalPointsSpent,
+        'total_points': totalPoints,
         'batches_table.count': batchesCount,
         'batches_table.total_bags': totalBagsFromBatches,
         'user_stats.total_batches': statsData?.total_batches,
@@ -198,7 +280,7 @@ export const userService = {
       });
       
       const userStats = {
-        points: profileData?.points || 0,
+        points: totalPoints, // Points from pickup_requests + illegal_dumping_mobile tables
         pickups: pickupCount || 0,
         reports: reportCount || 0,
         batches: batchesFromStats, // Direct from batches table only

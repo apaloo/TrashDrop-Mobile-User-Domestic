@@ -4,6 +4,7 @@ import LoadingSpinner from '../components/LoadingSpinner.js';
 import supabase from '../utils/supabaseClient.js';
 import { Link } from 'react-router-dom';
 import { subscribeToRewardsUpdates, handleRewardsUpdate } from '../utils/realtime.js';
+import { userService } from '../services/userService.js';
 
 /**
  * Rewards page component for viewing and redeeming rewards
@@ -13,46 +14,183 @@ const Rewards = () => {
   const [userPoints, setUserPoints] = useState(0);
   const [rewards, setRewards] = useState([]);
   const [pointsHistory, setPointsHistory] = useState([]);
+  const [recentRedemptions, setRecentRedemptions] = useState([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [isRedemptionsLoading, setIsRedemptionsLoading] = useState(true);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const mountedRef = useRef(true);
+  const isLoadingRef = useRef(false);
 
-  const fetchPointsHistory = async (limit = 3) => {
+  const fetchPointsHistory = async (limit = 10) => {
     if (!user) return;
     
     setIsHistoryLoading(true);
     try {
-      // Fetch user activity with points changes from Supabase
-      const { data, error } = await supabase
-        .from('user_activity')
-        .select('*')
+      console.log('[Rewards] Fetching points history from source tables');
+      
+      // Fetch from actual source tables (same as userService architecture)
+      const [pickupResult, dumpingResult, scanResult] = await Promise.allSettled([
+        // Pickup requests with points_earned
+        supabase
+          .from('pickup_requests')
+          .select('id, created_at, waste_type, bag_count, status, points_earned')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        
+        // Dumping reports with severity for points calculation
+        supabase
+          .from('illegal_dumping_mobile')
+          .select('id, created_at, waste_type, severity')
+          .eq('reported_by', user.id)
+          .order('created_at', { ascending: false }),
+        
+        // QR scans from user_activity
+        supabase
+          .from('user_activity')
+          .select('id, created_at, activity_type, points_impact')
+          .eq('user_id', user.id)
+          .eq('activity_type', 'qr_scan')
+          .order('created_at', { ascending: false })
+      ]);
+      
+      let allActivities = [];
+      
+      // Process pickup requests
+      if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
+        const pickups = pickupResult.value.data.map(pickup => ({
+          id: pickup.id,
+          activity: 'Pickup Request',
+          date: new Date(pickup.created_at).toLocaleDateString(),
+          points: pickup.points_earned || 10,
+          details: `${pickup.waste_type || 'Waste'} - ${pickup.bag_count || 1} bag(s)`,
+          timestamp: pickup.created_at,
+          type: 'pickup_request'
+        }));
+        allActivities = [...allActivities, ...pickups];
+      }
+      
+      // Process dumping reports
+      if (dumpingResult.status === 'fulfilled' && dumpingResult.value?.data) {
+        const reports = dumpingResult.value.data.map(report => {
+          // Calculate points based on severity (same as userService)
+          const severity = report.severity || 'medium';
+          let points = 15; // default for medium
+          if (severity === 'high') points = 20;
+          else if (severity === 'low') points = 10;
+          
+          return {
+            id: report.id,
+            activity: 'Dumping Report',
+            date: new Date(report.created_at).toLocaleDateString(),
+            points: points,
+            details: `${report.waste_type || 'Illegal dumping'} (${severity} severity)`,
+            timestamp: report.created_at,
+            type: 'dumping_report'
+          };
+        });
+        allActivities = [...allActivities, ...reports];
+      }
+      
+      // Process QR scans
+      if (scanResult.status === 'fulfilled' && scanResult.value?.data) {
+        const scans = scanResult.value.data.map(scan => ({
+          id: scan.id,
+          activity: 'QR Code Scan',
+          date: new Date(scan.created_at).toLocaleDateString(),
+          points: scan.points_impact || 5,
+          details: 'QR code scanned for points',
+          timestamp: scan.created_at,
+          type: 'qr_scan'
+        }));
+        allActivities = [...allActivities, ...scans];
+      }
+      
+      // Sort all activities by timestamp (newest first) and limit
+      const sortedActivities = allActivities
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, limit);
+      
+      console.log(`[Rewards] Found ${sortedActivities.length} point-earning activities`);
+      setPointsHistory(sortedActivities);
+      
+    } catch (error) {
+      console.error('Error fetching points history:', error);
+      setPointsHistory([]);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const fetchRecentRedemptions = async (limit = 5) => {
+    if (!user) return;
+    
+    setIsRedemptionsLoading(true);
+    try {
+      console.log('[Rewards] Fetching recent redemptions');
+      
+      // Fetch redemptions with reward details
+      const { data: redemptions, error } = await supabase
+        .from('rewards_redemption')
+        .select(`
+          id,
+          created_at,
+          points_spent,
+          status,
+          rewards (
+            id,
+            name,
+            description,
+            image_url
+          )
+        `)
         .eq('user_id', user.id)
-        .not('points', 'is', null)
         .order('created_at', { ascending: false })
         .limit(limit);
       
-      if (error) throw error;
+      if (error) {
+        console.warn('Error fetching redemptions:', error);
+        setRecentRedemptions([]);
+        return;
+      }
       
-      if (data) {
-        // Format activity data for display
-        const formattedHistory = data.map(activity => ({
-          id: activity.id,
-          activity: activity.activity_type.replace(/_/g, ' '),
-          date: new Date(activity.created_at).toLocaleDateString(),
-          points: activity.points,
-          details: activity.details
+      if (redemptions && redemptions.length > 0) {
+        const formattedRedemptions = redemptions.map(redemption => ({
+          id: redemption.id,
+          rewardName: redemption.rewards?.name || 'Unknown Reward',
+          rewardDescription: redemption.rewards?.description || '',
+          rewardImage: redemption.rewards?.image_url || '',
+          pointsSpent: redemption.points_spent,
+          status: redemption.status,
+          redeemedAt: new Date(redemption.created_at).toLocaleDateString(),
+          timestamp: redemption.created_at
         }));
         
-        setPointsHistory(formattedHistory);
+        setRecentRedemptions(formattedRedemptions);
+        console.log(`[Rewards] Found ${formattedRedemptions.length} recent redemptions`);
+      } else {
+        setRecentRedemptions([]);
       }
     } catch (error) {
-      console.error('Error fetching points history:', error);
+      console.error('Error fetching recent redemptions:', error);
+      setRecentRedemptions([]);
     } finally {
-      setIsHistoryLoading(false);
+      setIsRedemptionsLoading(false);
+    }
+  };
+
+  // Helper function to assign points based on activity type
+  const getPointsForActivity = (activityType) => {
+    switch (activityType) {
+      case 'pickup_request': return 10;
+      case 'dumping_report': return 15; // Default medium severity
+      case 'qr_scan': return 5;
+      case 'reward_redemption': return 0; // No points gained for redemption
+      case 'batch_scan': return 8;
+      default: return 5;
     }
   };
 
@@ -63,6 +201,25 @@ const Rewards = () => {
       mountedRef.current = false;
     };
   }, []);
+
+  // Handle page visibility changes to prevent unnecessary reloads
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && mountedRef.current) {
+        console.log('[Rewards] Page became visible - checking if data refresh needed');
+        // Only refresh if we don't have data or it's been a while
+        if (rewards.length === 0 || userPoints === 0) {
+          console.log('[Rewards] Refreshing data after visibility change');
+          // Don't reload everything, just refresh if needed
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [rewards.length, userPoints]);
   
   // Set up real-time subscriptions for rewards updates
   useEffect(() => {
@@ -74,23 +231,50 @@ const Rewards = () => {
 
       console.log(`[Rewards] Real-time ${tableType} update received`);      
       
-      // Create current data state object for the handler
-      const currentData = {
-        userPoints,
-        availableRewards: rewards,
-        redemptionHistory: []  // Currently not loaded in this component but handler supports it
-      };
-      
-      // Update data based on real-time payload
-      const updatedData = handleRewardsUpdate(tableType, payload, currentData);
-      
-      // Apply updates to component state
-      if (updatedData.userPoints !== userPoints) {
-        setUserPoints(updatedData.userPoints);
+      // Handle real-time updates without depending on current state
+      if (tableType === 'rewards') {
+        // Refresh rewards data when rewards table changes
+        const fetchUpdatedRewards = async () => {
+          try {
+            const { data: rewardsData, error } = await supabase
+              .from('rewards')
+              .select('*')
+              .eq('active', true)
+              .order('points_cost', { ascending: true });
+            
+            if (!error && rewardsData) {
+              const formattedRewards = rewardsData.map(reward => ({
+                id: reward.id,
+                name: reward.name,
+                description: reward.description,
+                pointsCost: reward.points_cost,
+                image: reward.image_url || `https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop`,
+                expiresAt: reward.expires_at,
+                partnerId: reward.partner_id,
+                category: reward.category
+              }));
+              setRewards(formattedRewards);
+            }
+          } catch (error) {
+            console.warn('[Rewards] Error refreshing rewards:', error);
+          }
+        };
+        fetchUpdatedRewards();
       }
       
-      if (updatedData.availableRewards !== rewards) {
-        setRewards(updatedData.availableRewards);
+      if (tableType === 'pickup_requests') {
+        // Refresh user points when pickup requests change
+        const refreshUserPoints = async () => {
+          try {
+            const statsResult = await userService.getUserStats(user.id);
+            if (!statsResult.error) {
+              setUserPoints(statsResult.data.points || 0);
+            }
+          } catch (error) {
+            console.warn('[Rewards] Error refreshing points:', error);
+          }
+        };
+        refreshUserPoints();
       }
       
       // For user_activity updates, refresh points history
@@ -103,32 +287,34 @@ const Rewards = () => {
       console.log('[Rewards] Cleaning up real-time rewards subscription');
       subscription.unsubscribe();
     };
-  }, [user?.id, userPoints, rewards, showAllHistory]);
+  }, [user?.id, showAllHistory]);
   
   useEffect(() => {
     // Fetch user points and available rewards from Supabase
     const fetchRewardsData = async () => {
       if (!user) return;
       
+      // Prevent concurrent loads
+      if (isLoadingRef.current) {
+        console.log('[Rewards] Already loading, skipping duplicate fetch');
+        return;
+      }
+      
+      isLoadingRef.current = true;
       setIsLoading(true);
       setErrorMessage('');
       
       try {
-        // Fetch user stats to get current points
-        const { data: userStats, error: userStatsError } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        // Fetch user points from pickup_requests table via userService (single source of truth)
+        const statsResult = await userService.getUserStats(user.id);
         
-        if (userStatsError && userStatsError.code !== 'PGRST116') {
-          console.warn('Error fetching user stats:', userStatsError);
-        }
-        
-        if (userStats) {
-          // Calculate points from available stats or use a default
-          const calculatedPoints = (userStats.total_pickups || 0) * 10 + (userStats.total_reports || 0) * 5;
-          setUserPoints(calculatedPoints);
+        if (statsResult.error) {
+          console.warn('Error fetching user stats:', statsResult.error);
+          setUserPoints(0);
+        } else {
+          // Use points calculated from pickup_requests table
+          setUserPoints(statsResult.data.points || 0);
+          console.log('[Rewards] Loaded user points from pickup_requests table:', statsResult.data.points || 0);
         }
         
         // Fetch available rewards from Supabase
@@ -138,29 +324,40 @@ const Rewards = () => {
           .eq('active', true)
           .order('points_cost', { ascending: true });
         
-        if (rewardsError) throw rewardsError;
-        
-        if (rewardsData) {
+        if (rewardsError) {
+          console.warn('Error fetching rewards:', rewardsError);
+          setRewards([]);
+        } else if (rewardsData && rewardsData.length > 0) {
           // Format rewards data to match our component's expected structure
           const formattedRewards = rewardsData.map(reward => ({
             id: reward.id,
             name: reward.name,
             description: reward.description,
             pointsCost: reward.points_cost,
-            image: reward.image_url || `https://source.unsplash.com/random/300x200/?${reward.name.toLowerCase().replace(/\s/g, '')}`,
+            image: reward.image_url || `https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop`,
             expiresAt: reward.expires_at,
-            partnerId: reward.partner_id
+            partnerId: reward.partner_id,
+            category: reward.category
           }));
           
           setRewards(formattedRewards);
+          console.log('[Rewards] Loaded rewards from database:', formattedRewards.length);
+        } else {
+          // No rewards found in database
+          console.log('[Rewards] No rewards found in database');
+          setRewards([]);
         }
         
-        // Fetch initial points history (limited to 3 entries)
+        // Fetch initial points history (limited to 10 entries)
         await fetchPointsHistory();
+        
+        // Fetch recent redemptions
+        await fetchRecentRedemptions();
       } catch (error) {
         console.error('Error fetching rewards data:', error);
         setErrorMessage('Failed to load rewards. Please try again later.');
       } finally {
+        isLoadingRef.current = false;
         setIsLoading(false);
       }
     };
@@ -191,28 +388,20 @@ const Rewards = () => {
       
       // Insert redemption record in Supabase
       const { data: redemptionData, error: redemptionError } = await supabase
-        .from('redemptions')
+        .from('rewards_redemption')
         .insert([
           {
             user_id: user.id,
             reward_id: reward.id,
-            points_cost: reward.pointsCost,
-            redemption_code: redemptionCode,
-            status: 'redeemed',
-            redeemed_at: new Date().toISOString()
+            points_spent: reward.pointsCost,
+            status: 'pending'
           }
         ])
         .select();
       
       if (redemptionError) throw redemptionError;
       
-      // Update user points in the database (deduct cost)
-      const { error: pointsError } = await supabase.rpc('decrement_user_points', { 
-        user_id_param: user.id, 
-        points_to_subtract: reward.pointsCost 
-      });
-      
-      if (pointsError) throw pointsError;
+      console.log('[Rewards] Successfully recorded reward redemption:', redemptionData);
       
       // Record activity
       await supabase.from('user_activity').insert([
@@ -364,15 +553,55 @@ const Rewards = () => {
         )}
       </div>
       
-      {/* Reward history */}
+      {/* Recent Redemptions */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Recent Redemptions</h2>
         
-        {/* In a real app, this would be populated from API data */}
-        <div className="text-center py-8">
-          <p className="text-gray-500 dark:text-gray-400">You haven't redeemed any rewards yet.</p>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Redeem a reward to see it here.</p>
-        </div>
+        {isRedemptionsLoading ? (
+          <div className="py-8 text-center">
+            <LoadingSpinner size="md" />
+          </div>
+        ) : recentRedemptions.length > 0 ? (
+          <div className="space-y-4">
+            {recentRedemptions.map(redemption => (
+              <div key={redemption.id} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                {redemption.rewardImage && (
+                  <img 
+                    src={redemption.rewardImage} 
+                    alt={redemption.rewardName}
+                    className="w-16 h-16 object-cover rounded-lg mr-4"
+                  />
+                )}
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-800 dark:text-white">{redemption.rewardName}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{redemption.rewardDescription}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Redeemed on {redemption.redeemedAt}
+                    </span>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                        -{redemption.pointsSpent} points
+                      </span>
+                      <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                        redemption.status === 'pending' 
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {redemption.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">You haven't redeemed any rewards yet.</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Redeem a reward to see it here.</p>
+          </div>
+        )}
       </div>
       
       {/* Points history */}
@@ -383,11 +612,11 @@ const Rewards = () => {
             className="text-sm text-primary dark:text-primary-light hover:underline focus:outline-none"
             onClick={() => {
               if (showAllHistory) {
-                // If already showing all, revert to just 3
-                fetchPointsHistory();
+                // If already showing all, revert to just 10
+                fetchPointsHistory(10);
               } else {
-                // Show all history (limit set to 50, can be adjusted)
-                fetchPointsHistory(50);
+                // Show all history (limit set to 100, can be adjusted)
+                fetchPointsHistory(100);
               }
               setShowAllHistory(!showAllHistory);
             }}
@@ -419,10 +648,13 @@ const Rewards = () => {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {pointsHistory.map(item => (
                   <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
-                      {item.activity.replace(/_/g, ' ').split(' ').map(word => 
-                        word.charAt(0).toUpperCase() + word.slice(1)
-                      ).join(' ')}
+                    <td className="px-6 py-4 text-sm text-gray-800 dark:text-white">
+                      <div className="font-medium">{item.activity}</div>
+                      {item.details && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {item.details}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {item.date}
