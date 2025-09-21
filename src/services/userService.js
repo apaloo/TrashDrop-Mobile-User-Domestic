@@ -65,11 +65,16 @@ export const userService = {
       let pickupError = null;
       
       try {
+        // Filter pickup requests by user_id (the person who created the request)
+        // NOT collector_id (the person who will collect it)
+        console.log('XXXXXXXXXXXXXXXXXXXXXX [UserService] Querying pickup_requests by user_id only (requester)');
+        
         const result = await supabase
           .from('pickup_requests')
           .select('id', { count: 'exact' })
-          .eq('collector_id', userId)
-          .eq('status', 'completed');
+          .eq('user_id', userId)  // Only filter by user_id (pickup requester)
+          .in('status', ['scheduled', 'accepted', 'available']);
+        console.log('[UserService] Pickup requests query result:', result);
         pickupCount = result.count;
         pickupError = result.error;
       } catch (error) {
@@ -87,13 +92,13 @@ export const userService = {
       
       try {
         const result = await supabase
-          .from('illegal_dumping')
+          .from('illegal_dumping_mobile')
           .select('id', { count: 'exact' })
           .eq('reported_by', userId);
         reportCount = result.count;
         reportError = result.error;
       } catch (error) {
-        console.warn('[UserService] illegal_dumping table query failed:', error.message);
+        console.warn('[UserService] illegal_dumping_mobile table query failed:', error.message);
         reportError = error;
       }
 
@@ -121,50 +126,84 @@ export const userService = {
         console.error('[UserService] Error counting bags:', bagError);
       }
 
-      // Calculate total bags from pickup requests - handle schema issues
-      let pickupBags = [];
-      let pickupBagsError = null;
+      // Total bags come from user_stats table only (bags obtained from batch scans)
+      // Pickup requests represent bags being used/collected, not bags owned
+
+      // Query batches table directly to get accurate bag counts
+      let totalBagsFromBatches = 0;
+      let batchesCount = 0;
       
       try {
-        const result = await supabase
-          .from('pickup_requests')
-          .select('id, bag_count')
-          .eq('collector_id', userId)
-          .eq('status', 'completed');
-        pickupBags = result.data;
-        pickupBagsError = result.error;
+        console.log('[UserService] 🔍 Querying batches table for user:', userId);
+        console.log('[UserService] 🔍 User ID type:', typeof userId);
+        console.log('[UserService] 🔍 User ID length:', userId?.length);
+        console.log('[UserService] 🔍 Using created_by filter (correct field for batches)...');
+        const { data: batchesData, error: batchesError } = await supabase
+          .from('batches')
+          .select('bag_count, created_by')
+          .eq('created_by', userId);
+        
+        if (batchesError) {
+          console.error('[UserService] ❌ Error querying batches table:', batchesError);
+          console.error('[UserService] ❌ Error details:', {
+            code: batchesError.code,
+            message: batchesError.message,
+            details: batchesError.details
+          });
+        } else {
+          console.log('[UserService] ✅ Batches query successful');
+          console.log('[UserService] 📊 Raw batches data:', batchesData);
+          console.log('[UserService] 📊 Batches data type:', typeof batchesData);
+          console.log('[UserService] 📊 Batches data length:', batchesData?.length);
+          console.log('[UserService] 📊 Is array?', Array.isArray(batchesData));
+          
+          if (batchesData && Array.isArray(batchesData)) {
+            console.log('[UserService] ✅ Found batches:', batchesData.length);
+            batchesCount = batchesData.length;
+            
+            if (batchesData.length > 0) {
+              console.log('[UserService] 🔢 Calculating bags from batches:', batchesData);
+              totalBagsFromBatches = batchesData.reduce((sum, batch, index) => {
+                const batchBags = batch?.bag_count || 0;
+                console.log(`[UserService] 📦 Batch ${index}: ${batchBags} bags (from bag_count column)`);
+                return sum + batchBags;
+              }, 0);
+              console.log('[UserService] 🎯 Total bags calculated:', totalBagsFromBatches);
+            } else {
+              console.log('[UserService] ⚠️ No batches found for user');
+            }
+          } else {
+            console.log('[UserService] ⚠️ Batches data is not an array:', typeof batchesData, batchesData);
+          }
+        }
       } catch (error) {
-        console.warn('[UserService] pickup bag count query failed:', error.message);
-        pickupBagsError = error;
+        console.error('[UserService] ❌ Exception fetching batches:', error);
       }
-
-      if (pickupBagsError) {
-        console.error('[UserService] Error fetching pickup bag counts:', pickupBagsError);
-      }
-
-      const totalBags = pickupBags?.reduce((sum, pickup) => sum + (pickup.bag_count || 0), 0) || 0;
-
-      // Use user_stats.total_bags as primary source, fallback to bag_inventory count
-      const totalBagsFromStats = statsData?.total_bags || statsData?.total_bags_scanned || 0;
       
-      // Get batches count from total_batches field first (prioritize), then try scanned_batches array length as fallback
-      const batchesFromStats = statsData?.total_batches || 
-                              (Array.isArray(statsData?.scanned_batches) ? statsData?.scanned_batches.length : 0) || 0;
+      // Use ONLY batches table data - no fallback to user_stats
+      const totalBagsFromStats = totalBagsFromBatches;
+      const batchesFromStats = batchesCount;
       
       // Debug output to verify data mapping
-      console.log('[UserService] User stats data fields:', {
+      console.log('[UserService] User stats calculation:', {
+        'batches_table.count': batchesCount,
+        'batches_table.total_bags': totalBagsFromBatches,
         'user_stats.total_batches': statsData?.total_batches,
         'user_stats.scanned_batches': statsData?.scanned_batches,
-        'batchesFromStats': batchesFromStats,
-        'bagCount': bagCount
+        'user_stats.available_bags': statsData?.available_bags,
+        'user_stats.total_bags': statsData?.total_bags,
+        'final_batches_count': batchesFromStats,
+        'final_bags_count': totalBagsFromStats,
+        'bag_inventory_count': bagCount
       });
       
       const userStats = {
         points: profileData?.points || 0,
         pickups: pickupCount || 0,
         reports: reportCount || 0,
-        batches: batchesFromStats > 0 ? batchesFromStats : bagCount, // Prioritize total_batches over bag_inventory count
-        totalBags: Math.max(totalBagsFromStats, totalBags), // Use user_stats.total_bags or calculated total
+        batches: batchesFromStats, // Direct from batches table only
+        totalBags: totalBagsFromStats, // Direct from batches table only
+        available_bags: statsData?.available_bags || 0, // Available bags from user_stats
         level: profileData?.level || 'Eco Starter',
         email: profileData?.email || '',
         firstName: profileData?.first_name || '',
