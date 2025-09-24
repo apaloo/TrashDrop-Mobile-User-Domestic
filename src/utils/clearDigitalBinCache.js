@@ -7,34 +7,49 @@
  * @returns {Object} Summary of cleared data
  */
 export const clearDigitalBinCache = () => {
-  console.log('[Cache] Starting digital bin cache cleanup...');
+  console.log('[Cache] Starting comprehensive digital bin cache cleanup...');
   
   const summary = {
     digitalBinsCleared: 0,
+    newDigitalBinsCleared: false,
     locationsCleared: false,
     binListCleared: false,
+    qrCodesCleared: 0,
     errors: []
   };
 
   try {
-    // 1. Get the list of digital bin IDs
-    const binsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
-    console.log(`[Cache] Found ${binsList.length} digital bins to clear`);
+    // 1. Clear NEW storage pattern - single digitalBins key
+    try {
+      const digitalBins = localStorage.getItem('digitalBins');
+      if (digitalBins) {
+        const binsArray = JSON.parse(digitalBins);
+        localStorage.removeItem('digitalBins');
+        summary.newDigitalBinsCleared = true;
+        console.log(`[Cache] Cleared new digitalBins storage (${binsArray.length} bins)`);
+      }
+    } catch (error) {
+      console.error('[Cache] Error clearing new digitalBins storage:', error);
+      summary.errors.push(`Failed to clear digitalBins: ${error.message}`);
+    }
 
-    // 2. Remove individual digital bin cache entries
+    // 2. Clear OLD storage pattern - individual bin entries
+    const binsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
+    console.log(`[Cache] Found ${binsList.length} old digital bins to clear`);
+
     binsList.forEach(locationId => {
       try {
         const binKey = `digitalBin_${locationId}`;
         localStorage.removeItem(binKey);
         summary.digitalBinsCleared++;
-        console.log(`[Cache] Cleared digital bin: ${binKey}`);
+        console.log(`[Cache] Cleared old digital bin: ${binKey}`);
       } catch (error) {
         console.error(`[Cache] Error clearing digital bin ${locationId}:`, error);
         summary.errors.push(`Failed to clear digitalBin_${locationId}: ${error.message}`);
       }
     });
 
-    // 3. Clear the digital bins list
+    // 3. Clear the old digital bins list
     try {
       localStorage.removeItem('digitalBinsList');
       summary.binListCleared = true;
@@ -44,28 +59,33 @@ export const clearDigitalBinCache = () => {
       summary.errors.push(`Failed to clear digitalBinsList: ${error.message}`);
     }
 
-    // 4. Optionally clear locations cache (since it's shared with pickup requests)
-    // Uncomment the next lines if you want to clear locations too
-    // try {
-    //   localStorage.removeItem('trashdrop_locations');
-    //   summary.locationsCleared = true;
-    //   console.log('[Cache] Cleared trashdrop_locations');
-    // } catch (error) {
-    //   console.error('[Cache] Error clearing locations:', error);
-    //   summary.errors.push(`Failed to clear trashdrop_locations: ${error.message}`);
-    // }
+    // 4. Clear locations cache
+    try {
+      localStorage.removeItem('trashdrop_locations');
+      summary.locationsCleared = true;
+      console.log('[Cache] Cleared trashdrop_locations');
+    } catch (error) {
+      console.error('[Cache] Error clearing locations:', error);
+      summary.errors.push(`Failed to clear trashdrop_locations: ${error.message}`);
+    }
 
-    // 5. Clear any other digital bin related keys (scan for them)
+    // 5. Scan and clear ALL digital bin related keys
     const allKeys = Object.keys(localStorage);
     const digitalBinKeys = allKeys.filter(key => 
       key.startsWith('digitalBin_') || 
       key.includes('digital_bin') ||
-      key.includes('qr_code')
+      key.includes('qr_code') ||
+      key.startsWith('qr_') ||
+      key === 'digitalBins' ||
+      key === 'digitalBinsList'
     );
 
     digitalBinKeys.forEach(key => {
       try {
         localStorage.removeItem(key);
+        if (key.includes('qr')) {
+          summary.qrCodesCleared++;
+        }
         console.log(`[Cache] Cleared additional key: ${key}`);
       } catch (error) {
         console.error(`[Cache] Error clearing key ${key}:`, error);
@@ -117,13 +137,23 @@ export const clearAllCache = () => {
  */
 export const getDigitalBinCacheSummary = () => {
   try {
+    // Check new storage pattern
+    const newDigitalBins = JSON.parse(localStorage.getItem('digitalBins') || '[]');
+    
+    // Check old storage pattern
     const binsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
     const locations = JSON.parse(localStorage.getItem('trashdrop_locations') || '[]');
     
     const summary = {
-      totalBins: binsList.length,
-      binIds: binsList,
-      totalLocations: locations.length,
+      newStoragePattern: {
+        totalBins: newDigitalBins.length,
+        bins: newDigitalBins
+      },
+      oldStoragePattern: {
+        totalBins: binsList.length,
+        binIds: binsList,
+        totalLocations: locations.length
+      },
       cacheKeys: []
     };
 
@@ -132,7 +162,10 @@ export const getDigitalBinCacheSummary = () => {
     summary.cacheKeys = allKeys.filter(key => 
       key.startsWith('digitalBin_') || 
       key === 'digitalBinsList' ||
-      key === 'trashdrop_locations'
+      key === 'digitalBins' ||
+      key === 'trashdrop_locations' ||
+      key.includes('qr_code') ||
+      key.startsWith('qr_')
     );
 
     return summary;

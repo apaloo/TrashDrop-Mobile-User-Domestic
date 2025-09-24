@@ -97,14 +97,14 @@ export function subscribeToBinUpdates(userId, onUpdate) {
 }
 
 /**
- * Handle real-time updates for digital bins
+ * Handle real-time updates for digital bins - SERVER-FIRST APPROACH
  * @param {object} payload - The update payload from Supabase
- * @param {Array} currentBins - Current list of digital bins
- * @param {Function} setCurrentBins - Function to update the bins list
+ * @param {Array} currentBins - Current list of digital bins (unused in server-first)
+ * @param {Function} setCurrentBins - Function to update the bins list (unused in server-first)
  */
 export function handleBinUpdate(payload, currentBins, setCurrentBins) {
-  if (!payload || !currentBins || !setCurrentBins) {
-    console.error('[Realtime] Missing required parameters for handling bin update');
+  if (!payload) {
+    console.error('[Realtime] Missing payload for handling bin update');
     return;
   }
 
@@ -117,24 +117,19 @@ export function handleBinUpdate(payload, currentBins, setCurrentBins) {
   try {
     const { eventType, new: newBin, old: oldBin } = payload;
     
-    switch (eventType) {
-      case 'INSERT':
-        setCurrentBins([...currentBins, newBin]);
-        break;
-        
-      case 'UPDATE':
-        setCurrentBins(currentBins.map(bin => 
-          bin.location_id === newBin.location_id ? { ...bin, ...newBin } : bin
-        ));
-        break;
-        
-      case 'DELETE':
-        setCurrentBins(currentBins.filter(bin => bin.location_id !== oldBin.location_id));
-        break;
-        
-      default:
-        console.warn('[Realtime] Unknown event type:', eventType);
-    }
+    console.log(`[Realtime] Received ${eventType} event for digital bin`);
+    
+    // SERVER-FIRST: Trigger refresh from server instead of local state manipulation
+    // This ensures consistency and shows all bins, not just the updated one
+    window.dispatchEvent(new CustomEvent('refreshDigitalBins', {
+      detail: {
+        eventType,
+        binId: newBin?.id || oldBin?.id,
+        locationId: newBin?.location_id || oldBin?.location_id,
+        timestamp: new Date().toISOString()
+      }
+    }));
+    
   } catch (error) {
     console.error('[Realtime] Error handling bin update:', error);
   }

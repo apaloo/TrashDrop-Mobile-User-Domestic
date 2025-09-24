@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Digital Bin Cache</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; font-size: 16px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Digital Bin Cache Cleaner</h1>
+    <p>This tool will remove all digital bin related cache data from localStorage.</p>
+    
+    <button onclick="clearAllDigitalBinCache()">Clear All Digital Bin Cache</button>
+    <button onclick="showCacheSummary()">Show Cache Summary</button>
+    <button onclick="clearAllLocalStorage()">Clear ALL localStorage (DANGER)</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+            console.log(message);
+        }
+
+        function clearAllDigitalBinCache() {
+            log('Starting comprehensive digital bin cache cleanup...', 'info');
+            
+            const summary = {
+                digitalBinsCleared: 0,
+                newDigitalBinsCleared: false,
+                locationsCleared: false,
+                binListCleared: false,
+                qrCodesCleared: 0,
+                keysRemoved: []
+            };
+
+            try {
+                // 1. Clear NEW storage pattern - single digitalBins key
+                if (localStorage.getItem('digitalBins')) {
+                    const digitalBins = JSON.parse(localStorage.getItem('digitalBins') || '[]');
+                    localStorage.removeItem('digitalBins');
+                    summary.newDigitalBinsCleared = true;
+                    summary.keysRemoved.push('digitalBins');
+                    log(`Cleared new digitalBins storage (${digitalBins.length} bins)`, 'success');
+                }
+
+                // 2. Clear OLD storage pattern - individual bin entries
+                const binsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
+                log(`Found ${binsList.length} old digital bins to clear`);
+
+                binsList.forEach(locationId => {
+                    const binKey = `digitalBin_${locationId}`;
+                    if (localStorage.getItem(binKey)) {
+                        localStorage.removeItem(binKey);
+                        summary.digitalBinsCleared++;
+                        summary.keysRemoved.push(binKey);
+                        log(`Cleared old digital bin: ${binKey}`, 'success');
+                    }
+                });
+
+                // 3. Clear the old digital bins list
+                if (localStorage.getItem('digitalBinsList')) {
+                    localStorage.removeItem('digitalBinsList');
+                    summary.binListCleared = true;
+                    summary.keysRemoved.push('digitalBinsList');
+                    log('Cleared digitalBinsList', 'success');
+                }
+
+                // 4. Clear locations cache
+                if (localStorage.getItem('trashdrop_locations')) {
+                    localStorage.removeItem('trashdrop_locations');
+                    summary.locationsCleared = true;
+                    summary.keysRemoved.push('trashdrop_locations');
+                    log('Cleared trashdrop_locations', 'success');
+                }
+
+                // 5. Scan and clear ALL digital bin related keys
+                const allKeys = Object.keys(localStorage);
+                const digitalBinKeys = allKeys.filter(key => 
+                    key.startsWith('digitalBin_') || 
+                    key.includes('digital_bin') ||
+                    key.includes('qr_code') ||
+                    key.startsWith('qr_') ||
+                    key === 'digitalBins' ||
+                    key === 'digitalBinsList'
+                );
+
+                digitalBinKeys.forEach(key => {
+                    localStorage.removeItem(key);
+                    if (key.includes('qr')) {
+                        summary.qrCodesCleared++;
+                    }
+                    if (!summary.keysRemoved.includes(key)) {
+                        summary.keysRemoved.push(key);
+                    }
+                    log(`Cleared additional key: ${key}`, 'success');
+                });
+
+                log(`Digital bin cache cleanup completed! Removed ${summary.keysRemoved.length} keys total.`, 'success');
+                log(`Summary: ${JSON.stringify(summary, null, 2)}`, 'info');
+
+            } catch (error) {
+                log(`Error during cache cleanup: ${error.message}`, 'error');
+            }
+        }
+
+        function showCacheSummary() {
+            try {
+                // Check new storage pattern
+                const newDigitalBins = JSON.parse(localStorage.getItem('digitalBins') || '[]');
+                
+                // Check old storage pattern
+                const binsList = JSON.parse(localStorage.getItem('digitalBinsList') || '[]');
+                const locations = JSON.parse(localStorage.getItem('trashdrop_locations') || '[]');
+                
+                const summary = {
+                    newStoragePattern: {
+                        totalBins: newDigitalBins.length,
+                        bins: newDigitalBins
+                    },
+                    oldStoragePattern: {
+                        totalBins: binsList.length,
+                        binIds: binsList,
+                        totalLocations: locations.length
+                    },
+                    cacheKeys: []
+                };
+
+                // Find all digital bin related keys
+                const allKeys = Object.keys(localStorage);
+                summary.cacheKeys = allKeys.filter(key => 
+                    key.startsWith('digitalBin_') || 
+                    key === 'digitalBinsList' ||
+                    key === 'digitalBins' ||
+                    key === 'trashdrop_locations' ||
+                    key.includes('qr_code') ||
+                    key.startsWith('qr_')
+                );
+
+                log('Current cache summary:', 'info');
+                log(JSON.stringify(summary, null, 2), 'info');
+
+            } catch (error) {
+                log(`Error getting cache summary: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAllLocalStorage() {
+            if (confirm('This will clear ALL localStorage data. Are you sure?')) {
+                const keyCount = localStorage.length;
+                localStorage.clear();
+                log(`Cleared ALL localStorage (${keyCount} keys removed)`, 'success');
+            }
+        }
+
+        // Auto-run cache summary on load
+        window.onload = function() {
+            log('Digital Bin Cache Cleaner loaded. Showing current cache status:', 'info');
+            showCacheSummary();
+        };
+    </script>
+</body>
+</html>

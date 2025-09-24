@@ -122,67 +122,31 @@ export async function syncBinsWithServer(userId) {
       };
     }
     
-    // Get current bins from local storage
-    const localBinsStr = localStorage.getItem('digitalBins');
-    let localBins = [];
-    
-    if (localBinsStr) {
-      try {
-        localBins = JSON.parse(localBinsStr);
-      } catch (parseError) {
-        console.error('Error parsing local bins:', parseError);
-        // If local data is corrupted, we'll use server data only
-      }
-    }
-    
-    // Create a map for faster lookups
-    const localBinsMap = new Map();
-    localBins.forEach(bin => {
-      localBinsMap.set(bin.location_id, bin);
-    });
-    
-    // Merge server changes with local bins
-    let hasChanges = false;
-    
+    // SERVER-FIRST: Transform and store server data directly
     if (serverBins && serverBins.length > 0) {
-      serverBins.forEach(serverBin => {
-        const localBin = localBinsMap.get(serverBin.location_id);
-        
-        // If we have the bin locally
-        if (localBin) {
-          // Keep local changes for completed/cancelled bins
-          if ((localBin.status === 'completed' || localBin.status === 'cancelled') && 
-              serverBin.status === 'scheduled') {
-            // Local status takes precedence - we'll need to sync this back to server later
-          } else {
-            // Server status takes precedence for other cases
-            localBinsMap.set(serverBin.location_id, {
-              ...localBin,
-              ...serverBin
-            });
-            hasChanges = true;
-          }
-        } else {
-          // New bin from server - add it
-          localBinsMap.set(serverBin.location_id, serverBin);
-          hasChanges = true;
-        }
-      });
-    }
-    
-    // If we have changes, update localStorage
-    if (hasChanges) {
-      const mergedBins = Array.from(localBinsMap.values());
-      localStorage.setItem('digitalBins', JSON.stringify(mergedBins));
+      // Transform server data to consistent format
+      const transformedBins = serverBins.map(bin => ({
+        ...bin,
+        status: bin.is_active ? 'active' : 'cancelled'
+      }));
+      
+      // Store server data as single source of truth
+      localStorage.setItem('digitalBins', JSON.stringify(transformedBins));
       
       const timestamp = new Date().toISOString();
       localStorage.setItem('digitalBinsLastUpdated', timestamp);
       localStorage.setItem('digitalBinsLastSyncTime', timestamp);
+      
+      console.log(`[BinSync] Updated storage with ${transformedBins.length} bins from server`);
+    } else {
+      // No server data - clear local storage
+      localStorage.setItem('digitalBins', JSON.stringify([]));
+      console.log('[BinSync] No server data - cleared local storage');
     }
     
     return {
       success: true,
-      changes: hasChanges,
+      changes: serverBins && serverBins.length > 0,
       cancellationResults
     };
   } catch (error) {

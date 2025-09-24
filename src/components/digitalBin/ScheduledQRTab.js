@@ -16,17 +16,24 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
   useEffect(() => {
     const loadPersistedPickups = () => {
       try {
+        console.log('[ScheduledQRTab] Loading persisted pickups from localStorage');
         const storedPickups = localStorage.getItem('digitalBins');
+        console.log('[ScheduledQRTab] Raw localStorage data:', storedPickups);
+        
         if (storedPickups) {
           const parsedPickups = JSON.parse(storedPickups);
+          console.log('[ScheduledQRTab] Parsed pickups:', parsedPickups);
+          
           if (Array.isArray(parsedPickups)) {
             setLocalPickups(parsedPickups);
-            console.log('Loaded', parsedPickups.length, 'digital bins from localStorage');
+            console.log('[ScheduledQRTab] Loaded', parsedPickups.length, 'digital bins from localStorage');
             
             // Auto-select tab with most items or active tab by default
             const activeCount = parsedPickups.filter(p => p && (p.status === 'active' || p.status === 'in_service')).length;
             const completedCount = parsedPickups.filter(p => p && p.status === 'completed').length;
             const cancelledCount = parsedPickups.filter(p => p && p.status === 'cancelled').length;
+            
+            console.log('[ScheduledQRTab] Counts - Active:', activeCount, 'Completed:', completedCount, 'Cancelled:', cancelledCount);
             
             // If there's a remembered tab in localStorage, use that
             const rememberedTab = localStorage.getItem('digitalBinActiveTab');
@@ -38,10 +45,14 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
               setActiveTab('cancelled');
             }
             // else stay on active tab
+          } else {
+            console.warn('[ScheduledQRTab] Parsed data is not an array:', parsedPickups);
           }
+        } else {
+          console.log('[ScheduledQRTab] No stored pickups found in localStorage');
         }
       } catch (error) {
-        console.error('Error loading persisted digital bins:', error);
+        console.error('[ScheduledQRTab] Error loading persisted digital bins:', error);
       }
     };
     
@@ -90,69 +101,24 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
     });
   }, [scheduledPickups]);
 
-  // Sync merged data from props and local storage
+  // SERVER-FIRST: Use server data directly without complex merging
   useEffect(() => {
-    if (!validPickups || validPickups.length === 0) return;
+    console.log('[ScheduledQRTab] Received scheduledPickups:', scheduledPickups);
+    console.log('[ScheduledQRTab] Valid pickups:', validPickups);
     
-    // Merge remote digital bins with local persisted data
-    const mergeBins = () => {
-      if (!validPickups || !Array.isArray(validPickups)) {
-        console.error('Invalid scheduledPickups:', validPickups);
-        return;
-      }
-
-      // Create a map of existing local bins by ID for quick lookup
-      const localBinsMap = new Map(
-        localPickups.map(bin => [bin.id, bin])
-      );
-      
-      // Create merged array, prioritizing server data but keeping local-only items
-      const mergedBins = validPickups.map(remoteBin => {
-        const localBin = localBinsMap.get(remoteBin.id);
-        // Remove this ID from the map so we know what's left is local-only
-        localBinsMap.delete(remoteBin.id);
-        
-        // Special handling for status changes to ensure we don't overwrite completed/cancelled status
-        // with older server data if the change happened offline
-        if (localBin && 
-            (localBin.status === 'completed' || localBin.status === 'cancelled') && 
-            remoteBin.status === 'active') {
-          return localBin;
-        }
-        
-        return {
-          ...remoteBin,
-          // Keep any local QR code data
-          qrCode: localBin?.qrCode || remoteBin.qrCode,
-          // Keep local timestamp if newer
-          lastUpdated: Math.max(
-            new Date(localBin?.lastUpdated || 0).getTime(),
-            new Date(remoteBin.lastUpdated || 0).getTime()
-          )
-        };
-      });
-      
-      // Add any remaining local-only items
-      const localOnlyBins = Array.from(localBinsMap.values());
-      const allBins = [...mergedBins, ...localOnlyBins];
-      
+    if (validPickups && validPickups.length >= 0) {
       // Sort by creation date, newest first
-      allBins.sort((a, b) => 
+      const sortedBins = [...validPickups].sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       
-      // Only update if the data has actually changed to prevent unnecessary re-renders
-      const currentDataString = JSON.stringify(localPickups);
-      const newDataString = JSON.stringify(allBins);
+      console.log('[ScheduledQRTab] Setting localPickups to:', sortedBins);
+      setLocalPickups(sortedBins);
       
-      if (currentDataString !== newDataString) {
-        localStorage.setItem('digitalBins', JSON.stringify(allBins));
-        setLocalPickups(allBins);
-      }
-    };
-    
-    mergeBins();
-  }, [validPickups, localPickups]);
+      // Update localStorage to match (server-first approach)
+      localStorage.setItem('digitalBins', JSON.stringify(sortedBins));
+    }
+  }, [validPickups]);
   
   // Handle real-time updates
   const handleBinStatusChange = useCallback((updatedBin) => {
