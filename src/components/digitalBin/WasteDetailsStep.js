@@ -1,11 +1,19 @@
 import React from 'react';
+import { BIN_SIZES, getBinSizeLabel } from '../../utils/costCalculator';
 
 const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
+  // Validation: Bin size is required
+  const isValid = () => {
+    return formData.numberOfBags && 
+           formData.wasteType && 
+           formData.bin_size_liters;
+  };
+  
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4 text-gray-900">Digital Bin Details</h2>
       
-      {/* Number of Bins */}
+      {/* Number of Bins - EXISTING */}
       <div className="mb-5">
         <label htmlFor="numberOfBags" className="block text-sm font-medium text-gray-900 mb-1">
           Number of Digital Bins Needed
@@ -28,7 +36,31 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
         </p>
       </div>
       
-      {/* Waste Type */}
+      {/* Bin Size - NEW (MANDATORY) */}
+      <div className="mb-5">
+        <label htmlFor="binSize" className="block text-sm font-medium text-gray-900 mb-1">
+          Bin Size (Liters) <span className="text-red-500">*</span>
+        </label>
+        <select
+          id="binSize"
+          value={formData.bin_size_liters}
+          onChange={(e) => updateFormData({ bin_size_liters: parseInt(e.target.value) })}
+          className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          style={{color: '#333'}}
+          required
+        >
+          {BIN_SIZES.map(size => (
+            <option key={size} value={size}>
+              {getBinSizeLabel(size)}
+            </option>
+          ))}
+        </select>
+        <p className="text-sm text-gray-500 mt-1">
+          Larger bins cost more but accommodate more waste. Collection cost is calculated based on bin size.
+        </p>
+      </div>
+      
+      {/* Waste Type - EXISTING */}
       <div className="mb-5">
         <label className="block text-sm font-medium text-gray-900 mb-2">
           Bin Type
@@ -85,6 +117,27 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
         </p>
       </div>
       
+      {/* Urgent Priority - NEW (OPTIONAL) */}
+      <div className="mb-5 bg-yellow-50 p-4 rounded-md border border-yellow-200">
+        <div className="flex items-start">
+          <input
+            id="isUrgent"
+            type="checkbox"
+            checked={formData.is_urgent}
+            onChange={(e) => updateFormData({ is_urgent: e.target.checked })}
+            className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5"
+          />
+          <div className="ml-3 flex-1">
+            <label htmlFor="isUrgent" className="block text-sm font-medium text-gray-900">
+              ⚡ Mark as Urgent
+            </label>
+            <p className="text-sm text-gray-600 mt-1">
+              Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+10%).
+            </p>
+          </div>
+        </div>
+      </div>
+      
       <div className="flex justify-between mt-6">
         <button
           type="button"
@@ -96,7 +149,12 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
         <button
           type="button"
           onClick={nextStep}
-          className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-md transition-colors"
+          disabled={!isValid()}
+          className={`px-6 py-2 rounded-md transition-colors ${
+            isValid()
+              ? 'bg-primary hover:bg-primary-dark text-white'
+              : 'bg-gray-300 cursor-not-allowed text-gray-500'
+          }`}
         >
           Continue
         </button>

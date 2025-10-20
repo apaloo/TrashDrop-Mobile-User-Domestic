@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
-import { FaQrcode, FaPlus, FaSpinner, FaSync } from 'react-icons/fa';
+import { FaQrcode, FaPlus, FaSpinner, FaSync, FaTimes } from 'react-icons/fa';
 import toastService from '../services/toastService.js';
 // QR storage removed - using server-first approach
 // Real-time and sync utilities removed - server-first approach only
@@ -77,6 +77,12 @@ function DigitalBin() {
     // Waste details
     bag_count: 1,
     waste_type: 'general',
+    bin_size_liters: 120,        // NEW: Default to 120L (standard size)
+    is_urgent: false,             // NEW: Default not urgent
+    
+    // Additional info
+    notes: '',
+    photos: [],
     
     // Internal state
     savedLocations: [],
@@ -561,19 +567,15 @@ function DigitalBin() {
               latitude = defaultCoords.latitude;
               longitude = defaultCoords.longitude;
             } catch (error) {
-              console.warn('Error accessing GeolocationService.DEFAULT_LOCATION:', error);
-              // Hardcoded fallback coordinates for Accra, Ghana
-              latitude = 5.614736;
-              longitude = -0.208811;
-              console.log('Using hardcoded fallback coordinates');
+              console.error('Error accessing GeolocationService.DEFAULT_LOCATION:', error);
+              throw new Error('Location coordinates are required. Please enable location services and try again.');
             }
             
             // Final validation - ensure we have valid numbers
             if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
                 isNaN(latitude) || isNaN(longitude)) {
-              console.error('Invalid coordinates detected, using hardcoded Accra coordinates'); 
-              latitude = 5.614736;
-              longitude = -0.208811;
+              console.error('Invalid coordinates detected'); 
+              throw new Error('Invalid location coordinates. Please enable location services and try again.');
             }
           }
           
@@ -710,19 +712,15 @@ function DigitalBin() {
             latitude = defaultCoords.latitude;
             longitude = defaultCoords.longitude;
           } catch (error) {
-            console.warn('Error accessing GeolocationService.DEFAULT_LOCATION (update):', error);
-            // Hardcoded fallback coordinates for Accra, Ghana
-            latitude = 5.614736;
-            longitude = -0.208811;
-            console.log('Using hardcoded fallback coordinates for update');
+            console.error('Error accessing GeolocationService.DEFAULT_LOCATION (update):', error);
+            throw new Error('Location coordinates are required for update. Please enable location services and try again.');
           }
           
           // Final validation - ensure we have valid numbers
           if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
               isNaN(latitude) || isNaN(longitude)) {
-            console.error('Invalid coordinates detected in update, using hardcoded Accra coordinates'); 
-            latitude = 5.614736;
-            longitude = -0.208811;
+            console.error('Invalid coordinates detected in update'); 
+            throw new Error('Invalid location coordinates for update. Please enable location services and try again.');
           }
         }
         
@@ -779,6 +777,8 @@ function DigitalBin() {
           frequency: formData.frequency,
           waste_type: formData.waste_type,
           bag_count: formData.bag_count,
+          bin_size_liters: formData.bin_size_liters,
+          is_urgent: formData.is_urgent,
           is_active: true,
           expires_at: expiryDate.toISOString(),
           created_at: new Date().toISOString(),
@@ -798,6 +798,8 @@ function DigitalBin() {
             frequency: formData.frequency,
             waste_type: formData.waste_type,
             bag_count: formData.bag_count,
+            bin_size_liters: formData.bin_size_liters,
+            is_urgent: formData.is_urgent,
             expires_at: expiryDate.toISOString(),
             is_active: true
           });
@@ -811,6 +813,8 @@ function DigitalBin() {
               frequency: formData.frequency,
               waste_type: formData.waste_type,
               bag_count: formData.bag_count,
+              bin_size_liters: formData.bin_size_liters,
+              is_urgent: formData.is_urgent,
               expires_at: expiryDate.toISOString(),
               is_active: true
             })
@@ -948,11 +952,20 @@ function DigitalBin() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+    <div className="fixed inset-0 bg-black bg-opacity-30 z-[100] flex items-center justify-center p-4">
+      <div className="bg-white shadow-2xl rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative">
+        {/* Close button */}
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+          aria-label="Close modal"
+        >
+          <FaTimes className="text-gray-600 text-xl" />
+        </button>
+        
+        <div className="overflow-y-auto max-h-[90vh]">
           {/* Tab navigation */}
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10 shadow-sm">
             <TabButton 
               active={activeTab === 'new'}
               onClick={() => setActiveTab('new')}

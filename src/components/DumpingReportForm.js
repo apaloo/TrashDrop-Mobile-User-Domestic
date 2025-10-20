@@ -34,7 +34,7 @@ const DumpingReportForm = ({ onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [mapPosition, setMapPosition] = useState([5.614736, -0.208811]);
+  const [mapPosition, setMapPosition] = useState(null); // No default - require actual GPS
   const [showCamera, setShowCamera] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
   const [formData, setFormData] = useState({
@@ -64,8 +64,7 @@ const DumpingReportForm = ({ onSuccess }) => {
     setTimeout(() => toastService.warning(message), 0);
   }, []);
 
-  // Default coordinates for Accra, Ghana (fallback location)
-  const DEFAULT_COORDINATES = [5.614736, -0.208811];
+  // No default coordinates - require actual GPS location
   
   // Camera modal state management - simplified approach
   useEffect(() => {
@@ -105,17 +104,7 @@ const DumpingReportForm = ({ onSuccess }) => {
 
   // Get user's current location on component mount
   useEffect(() => {
-    // Default to Accra, Ghana coordinates first
-    setMapPosition(DEFAULT_COORDINATES);
-    setFormData(prev => ({
-      ...prev,
-      coordinates: {
-        latitude: DEFAULT_COORDINATES[0],
-        longitude: DEFAULT_COORDINATES[1]
-      }
-    }));
-    
-    // Then try to get current location
+    // Try to get current location immediately - no default
     handleUseMyLocation(false);
   }, []);
 
@@ -151,26 +140,14 @@ const DumpingReportForm = ({ onSuccess }) => {
 
   // Helper to handle geolocation fallback
   const handleGeolocationFallback = useCallback((errorMessage) => {
-    // Set default coordinates
-    const defaultCoordinates = {
-      latitude: DEFAULT_COORDINATES[0],
-      longitude: DEFAULT_COORDINATES[1]
-    };
+    // No default coordinates - show error
+    setError(errorMessage || 'Location not available. Please click on the map to set your location.');
     
-    // Update form data with default coordinates
-    setFormData(prev => ({
-      ...prev,
-      coordinates: defaultCoordinates
-    }));
-    
-    // Update map position
-    setMapPosition(DEFAULT_COORDINATES);
-    
-    // Show non-blocking toast notification instead of error
+    // Show warning toast
     if (errorMessage) {
-      showWarningToast(errorMessage + ' Using approximate location.');
+      showWarningToast(errorMessage);
     }
-  }, [DEFAULT_COORDINATES, showWarningToast]);
+  }, [showWarningToast]);
 
   const handleUseMyLocation = useCallback((showFeedback = true) => {
     // Clear any previous errors
@@ -622,8 +599,8 @@ const DumpingReportForm = ({ onSuccess }) => {
             {/* Location coordinates */}
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm text-gray-400">
-                <div>Lat: {formData?.coordinates?.latitude?.toFixed(6) || '5.614736'}</div>
-                <div>Lng: {formData?.coordinates?.longitude?.toFixed(6) || '-0.208811'}</div>
+                <div>Lat: {formData?.coordinates?.latitude?.toFixed(6) || 'N/A'}</div>
+                <div>Lng: {formData?.coordinates?.longitude?.toFixed(6) || 'N/A'}</div>
               </div>
               <button
                 type="button"

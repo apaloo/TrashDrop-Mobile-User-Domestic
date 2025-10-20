@@ -5,6 +5,7 @@ import { FaChevronDown, FaChevronUp, FaQrcode, FaCalendarAlt, FaMapMarkerAlt,
 import supabase from '../../utils/supabaseClient.js';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { getQRCode, storeQRCode } from '../../utils/qrStorage.js';
+import { getBinSizeLabelShort } from '../../utils/costCalculator.js';
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -194,9 +195,24 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
       >
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            <div className="flex items-center mb-1">
+            <div className="flex items-center flex-wrap gap-2 mb-1">
               <StatusBadge status={pickup.status} />
-              <span className="text-sm text-gray-500 ml-2">
+              
+              {/* Bin Size Badge */}
+              {pickup.bin_size_liters && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-semibold">
+                  {getBinSizeLabelShort(pickup.bin_size_liters)}
+                </span>
+              )}
+              
+              {/* Urgent Badge */}
+              {pickup.is_urgent && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 text-xs font-semibold">
+                  ⚡ Urgent
+                </span>
+              )}
+              
+              <span className="text-sm text-gray-500">
                 {formatRelativeTime(pickup.created_at)}
               </span>
             </div>
@@ -319,9 +335,24 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
               <div className="flex items-start">
                 <FaInfoCircle className="mt-1 mr-2 text-gray-400 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500">Bin Type</h4>
-                  <p className="text-gray-900 capitalize">
-                    {pickup.waste_type?.toLowerCase() || 'general'} • {pickup.bag_count} bin{pickup.bag_count !== 1 ? 's' : ''}
+                  <h4 className="text-sm font-medium text-gray-500">Bin Details</h4>
+                  <p className="text-gray-900">
+                    <span className="capitalize">{pickup.waste_type?.toLowerCase() || 'general'}</span>
+                    {' • '}
+                    {pickup.bag_count} bin{pickup.bag_count !== 1 ? 's' : ''}
+                    {pickup.bin_size_liters && (
+                      <span>
+                        {' • '}
+                        <span className="font-semibold">{getBinSizeLabelShort(pickup.bin_size_liters)}</span>
+                      </span>
+                    )}
+                    {pickup.is_urgent && (
+                      <span className="ml-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                          ⚡ Urgent
+                        </span>
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

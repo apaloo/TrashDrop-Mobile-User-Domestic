@@ -8,12 +8,10 @@ import appConfig from './app-config.js';
 
 class GeolocationService {
   /**
-   * Default coordinates (Accra, Ghana) to use when geolocation fails
+   * NO DEFAULT LOCATION - Always require actual GPS data
+   * geolocation failures will return null coordinates
    */
-  static DEFAULT_LOCATION = {
-    latitude: appConfig.maps.defaultCenter.lat || 5.614736,
-    longitude: appConfig.maps.defaultCenter.lng || -0.208811
-  };
+  static DEFAULT_LOCATION = null;
 
   /**
    * Get current user location with improved error handling and fallbacks
@@ -63,15 +61,15 @@ class GeolocationService {
       };
     }
 
-    // If geolocation is not supported, return default location
+    // If geolocation is not supported, return error
     if (!navigator.geolocation) {
-      console.warn('Geolocation is not supported by this browser');
+      console.error('Geolocation is not supported by this browser');
       return {
-        coords: this.DEFAULT_LOCATION,
+        coords: { latitude: null, longitude: null },
         timestamp: Date.now(),
-        source: 'default',
+        source: 'error',
         success: false,
-        error: { code: 'NOT_SUPPORTED', message: 'Geolocation not supported by browser' }
+        error: { code: 'NOT_SUPPORTED', message: 'Geolocation not supported by browser. Please use a modern browser or manually set your location.' }
       };
     }
 
@@ -122,18 +120,18 @@ class GeolocationService {
     }
     
     // If we reach here, all attempts including Google Maps API failed
-    console.warn('All geolocation attempts failed. Using default location.');
+    console.error('All geolocation attempts failed. No default location available.');
     
     // If options.silentFallback is false, we'll log specific error info
     if (!options.silentFallback) {
       console.error('Geolocation error:', lastError);
     }
     
-    // Return default location when all geolocation methods fail, with error info
+    // Return null coordinates when all geolocation methods fail
     return {
-      coords: this.DEFAULT_LOCATION,
+      coords: { latitude: null, longitude: null },
       timestamp: Date.now(),
-      source: 'default',
+      source: 'error',
       success: false,
       error: {
         code: lastError?.code || 'UNKNOWN_ERROR',
@@ -282,9 +280,9 @@ class GeolocationService {
     } catch (error) {
       console.error('Google Maps Geolocation API error:', error);
       return {
-        coords: this.DEFAULT_LOCATION,
+        coords: { latitude: null, longitude: null },
         timestamp: Date.now(),
-        source: 'default',
+        source: 'error',
         success: false,
         error: {
           code: 'GOOGLE_API_ERROR',

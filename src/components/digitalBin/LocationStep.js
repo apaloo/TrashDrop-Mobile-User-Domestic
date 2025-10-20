@@ -264,18 +264,16 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     } catch (error) {
       console.error('GeolocationService error:', error);
       
-      // Final fallback to hardcoded Accra coordinates
-      const defaultLat = 5.614736;
-      const defaultLng = -0.208811;
+      // No hardcoded fallback - show error to user via toast
+      toastService.warning('Unable to get your location. Please enable location services or manually click on the map to set your position.');
       
-      setPosition([defaultLat, defaultLng]);
+      // Don't set any coordinates - require user to manually set location
       updateFormData({
-        latitude: defaultLat,
-        longitude: defaultLng,
+        latitude: null,
+        longitude: null,
         useCurrentLocation: false
       });
       
-      toastService.warning('Location service unavailable. Using default location (Accra, Ghana). You can adjust it on the map.');
       setLoadingLocation(false);
     }
   };
