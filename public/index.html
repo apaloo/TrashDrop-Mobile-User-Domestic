@@ -6,12 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="TrashDrop - Waste Management App" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo-02.png" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="white" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
     <!-- Preload splash screen image for instant display -->
-    <link rel="preload" href="%PUBLIC_URL%/logo-02.png" as="image" />
+    <link rel="preload" href="/logo-02.png" as="image" />
     <script src="%PUBLIC_URL%/unregister-sw.js"></script>
     <title>TrashDrop</title>
     <style>
@@ -45,7 +45,7 @@
 
     <!-- Optimized splash screen -->
     <div id="splash-screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; margin: 0; padding: 0;">
-      <img src="%PUBLIC_URL%/logo-02.png" alt="TrashDrop" style="width: 260px; max-width: 70%; height: auto; display: block;" loading="eager" decoding="async" />
+      <img src="/logo-02.png" alt="TrashDrop" onerror="this.src='/logo.svg'" style="width: 260px; max-width: 70%; height: auto; display: block;" loading="eager" decoding="async" />
     </div>
     
     <div id="root"></div>
