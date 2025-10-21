@@ -114,7 +114,7 @@ const Dashboard = () => {
         // User activities (excluding pickup_request to avoid duplicates)
         supabase
           .from('user_activity')
-          .select('id, created_at, activity_type, points')
+          .select('id, created_at, activity_type')
           .eq('user_id', user.id)
           .neq('activity_type', 'pickup_request')
           .order('created_at', { ascending: false })
@@ -208,7 +208,7 @@ const Dashboard = () => {
             description: description,
             timestamp: activity.created_at,
             related_id: activity.id,
-            points: activity.points || 0,
+            points: 0, // user_activity table doesn't have points column
             _source: 'user_activity'
           };
         });
