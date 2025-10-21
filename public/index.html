@@ -49,35 +49,36 @@
         z-index: 5 !important;
       }
 
-      /* Splash Screen Styles */
+      /* Splash Screen Styles - IMPORTANT */
       #splash-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: #FFFFFF;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 99999;
-        opacity: 1;
-        transition: opacity 0.5s ease-in-out;
-        pointer-events: all;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background-color: #FFFFFF !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        z-index: 2147483647 !important; /* Maximum z-index */
+        opacity: 1 !important;
+        transition: opacity 0.3s ease-in-out !important;
+        pointer-events: all !important;
+        visibility: visible !important;
       }
 
       #splash-screen.hidden {
-        opacity: 0;
-        pointer-events: none;
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
 
       #splash-screen img {
-        width: 260px;
-        max-width: 70vw;
-        height: auto;
-        object-fit: contain;
+        width: 260px !important;
+        max-width: 70vw !important;
+        height: auto !important;
+        object-fit: contain !important;
       }
     </style>
   </head>
@@ -85,8 +86,8 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     
     <!-- Splash Screen -->
-    <div id="splash-screen">
-      <img src="%PUBLIC_URL%/logo-02.jpg" alt="TrashDrop Logo" />
+    <div id="splash-screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background-color: #FFFFFF; display: flex; justify-content: center; align-items: center; z-index: 2147483647; opacity: 1;">
+      <img src="./logo-02.png" alt="TrashDrop Logo" style="width: 260px; height: auto;" />
     </div>
     
     <div id="root"></div>
@@ -95,26 +96,38 @@
     <script>
       (function() {
         function hideSplash() {
+          console.log('[Splash] Hiding splash screen...');
           var splash = document.getElementById('splash-screen');
           if (splash) {
+            // Force unhide in case it was hidden by CSS
+            splash.style.display = 'flex';
+            // Then add hidden class
             splash.classList.add('hidden');
+            console.log('[Splash] Added hidden class');
             setTimeout(function() {
+              console.log('[Splash] Removing splash from DOM');
               splash.remove();
             }, 500);
+          } else {
+            console.log('[Splash] Could not find splash screen element');
           }
         }
 
-        // Hide on load
+        // Hide on page load
         if (document.readyState === 'complete') {
-          setTimeout(hideSplash, 1200);
+          console.log('[Splash] Document already loaded, hiding splash in 800ms');
+          setTimeout(hideSplash, 800);
         } else {
+          console.log('[Splash] Waiting for document load');
           window.addEventListener('load', function() {
-            setTimeout(hideSplash, 1200);
+            console.log('[Splash] Document loaded, hiding splash in 800ms');
+            setTimeout(hideSplash, 800);
           });
         }
 
-        // Fallback: force hide after 3 seconds max to prevent blocking
-        setTimeout(hideSplash, 3000);
+        // Failsafe: always hide after 2 seconds max to prevent blocking
+        console.log('[Splash] Setting failsafe timer for 2000ms');
+        setTimeout(hideSplash, 2000);
       })();
     </script>
     <!--
