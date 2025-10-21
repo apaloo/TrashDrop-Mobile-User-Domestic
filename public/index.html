@@ -8,6 +8,8 @@
     <meta name="description" content="TrashDrop - Waste Management App" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
+    <!-- Preload splash screen image for instant display -->
+    <link rel="preload" href="logo-02.png" as="image" />
     <script src="%PUBLIC_URL%/unregister-sw.js"></script>
     <title>TrashDrop</title>
     <style>
@@ -29,39 +31,51 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
-    <!-- Simple splash screen with inline styles only -->
-    <div id="splash-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; justify-content: center; align-items: center; z-index: 99999;">
-      <img src="logo-02.jpg" alt="TrashDrop" style="width: 280px; max-width: 80%;" />
+    <!-- Optimized splash screen -->
+    <div id="splash-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999;">
+      <img src="logo-02.png" alt="TrashDrop" style="width: 260px; max-width: 70%; height: auto;" loading="eager" decoding="async" />
     </div>
     
     <div id="root"></div>
     
     <script>
-      // Ultra-simple splash screen handler
-      window.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-          var splash = document.getElementById('splash-screen');
-          if (splash) {
-            splash.style.opacity = '0';
-            splash.style.transition = 'opacity 0.3s';
-            setTimeout(function() { 
-              if (splash && splash.parentNode) {
-                splash.parentNode.removeChild(splash);
-              }
-            }, 300);
-          }
-        }, 1000);
-      });
-    </script>
-    
-    <!-- Failsafe: remove splash after 3 seconds no matter what -->
-    <script>
-      setTimeout(function() {
+      // Optimized splash screen handler
+      (function() {
         var splash = document.getElementById('splash-screen');
-        if (splash && splash.parentNode) {
-          splash.parentNode.removeChild(splash);
+        var hidden = false;
+        
+        function hideSplash() {
+          if (hidden || !splash) return;
+          hidden = true;
+          splash.style.opacity = '0';
+          splash.style.transition = 'opacity 0.25s ease-out';
+          setTimeout(function() {
+            if (splash && splash.parentNode) {
+              splash.parentNode.removeChild(splash);
+            }
+          }, 250);
         }
-      }, 3000);
+        
+        // Hide when React app mounts (check for root content)
+        var checkInterval = setInterval(function() {
+          var root = document.getElementById('root');
+          if (root && root.children.length > 0) {
+            clearInterval(checkInterval);
+            setTimeout(hideSplash, 200);
+          }
+        }, 50);
+        
+        // Fallback: hide after DOM loads + minimum time
+        window.addEventListener('DOMContentLoaded', function() {
+          setTimeout(hideSplash, 800);
+        });
+        
+        // Safety: force hide after 2.5 seconds max
+        setTimeout(function() {
+          clearInterval(checkInterval);
+          hideSplash();
+        }, 2500);
+      })();
     </script>
     <!--
       This HTML file is a template.
