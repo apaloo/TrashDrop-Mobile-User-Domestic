@@ -4,21 +4,22 @@
   "description": "Report illegal dumping and schedule trash pickups in your community",
   "icons": [
     {
-      "src": "logo.svg",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "logo.svg",
-      "type": "image/svg+xml",
+      "src": "logo192.png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "logo.svg",
-      "type": "image/svg+xml",
+      "src": "logo512.png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo-02.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/?source=pwa",

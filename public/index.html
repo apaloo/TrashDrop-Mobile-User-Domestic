@@ -3,16 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="TrashDrop - Waste Management App" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo-02.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="white" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
     <!-- Preload splash screen image for instant display -->
-    <link rel="preload" href="logo-02.png" as="image" />
+    <link rel="preload" href="%PUBLIC_URL%/logo-02.png" as="image" />
     <script src="%PUBLIC_URL%/unregister-sw.js"></script>
     <title>TrashDrop</title>
     <style>
+      /* Prevent black bars on mobile */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow-x: hidden;
+        background-color: #ffffff;
+      }
+      
       /* Fix for map floating over bottom navigation */
       .leaflet-map-pane, .leaflet-tile, .leaflet-marker-icon,
       .leaflet-marker-shadow, .leaflet-tile-pane,
@@ -32,8 +44,8 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
     <!-- Optimized splash screen -->
-    <div id="splash-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999;">
-      <img src="logo-02.png" alt="TrashDrop" style="width: 260px; max-width: 70%; height: auto;" loading="eager" decoding="async" />
+    <div id="splash-screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; margin: 0; padding: 0;">
+      <img src="%PUBLIC_URL%/logo-02.png" alt="TrashDrop" style="width: 260px; max-width: 70%; height: auto; display: block;" loading="eager" decoding="async" />
     </div>
     
     <div id="root"></div>
