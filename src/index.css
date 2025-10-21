@@ -94,3 +94,17 @@ select option {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
 }
+
+/* Fix Leaflet map controls z-index to prevent floating above navbar */
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10 !important;
+}
+
+.leaflet-control-zoom {
+  z-index: 10 !important;
+}
+
+.leaflet-pane {
+  z-index: 1 !important;
+}

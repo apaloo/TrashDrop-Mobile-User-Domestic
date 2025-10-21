@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
@@ -10,6 +10,23 @@ import LoadingSpinner from '../components/LoadingSpinner.js';
 import appConfig from '../utils/app-config.js';
 import GeolocationService from '../utils/geolocationService.js';
 import { subscribeToStatsUpdates } from '../utils/realtime.js';
+
+// Component to handle map view updates when position changes
+const MapViewController = ({ position }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (position && position.length === 2) {
+      // Fly to the new position with smooth animation
+      map.flyTo(position, 15, {
+        duration: 1.5, // Animation duration in seconds
+        easeLinearity: 0.25
+      });
+    }
+  }, [position, map]);
+  
+  return null;
+};
 
 // Location marker component with draggable functionality
 const LocationMarker = ({ position, setPosition }) => {
@@ -63,7 +80,17 @@ const PickupRequest = () => {
     // Initialize from test override if present to stabilize first render in tests
     return { totalBags: 0, batches: 0 };
   });
+  const [requestedBags, setRequestedBags] = useState(0); // Bags already in active pickups
   const [insufficientBags, setInsufficientBags] = useState(false);
+  
+  // Calculate available bags: total bags - requested bags (never below 0)
+  const availableBags = Math.max(0, (userStats.totalBags || 0) - (requestedBags || 0));
+  
+  // Update insufficientBags based on availableBags
+  useEffect(() => {
+    setInsufficientBags(availableBags <= 0);
+  }, [availableBags]);
+  
   // Keep latest userId in a ref for event handlers registered once
   const userIdRef = useRef(user?.id ?? null);
   useEffect(() => {
@@ -71,10 +98,10 @@ const PickupRequest = () => {
   }, [user?.id]);
   
   // Keep latest available bags in a ref so validation schema can read it without remounting Formik
-  const availableBagsRef = useRef(userStats.totalBags || 0);
+  const availableBagsRef = useRef(availableBags);
   useEffect(() => {
-    availableBagsRef.current = userStats.totalBags || 0;
-  }, [userStats.totalBags]);
+    availableBagsRef.current = availableBags;
+  }, [availableBags]);
 
   // Schema for form validation (constant reference to avoid Formik subtree remounts)
   const validationSchema = useMemo(() => Yup.object().shape({
@@ -101,14 +128,18 @@ const PickupRequest = () => {
   // Debug: log userStats changes during tests
   useEffect(() => {
     console.log('[PickupRequest] userStats.totalBags now', userStats.totalBags);
-  }, [userStats.totalBags]);
+    console.log('[PickupRequest] requestedBags now', requestedBags);
+    console.log('[PickupRequest] availableBags now', availableBags);
+  }, [userStats.totalBags, requestedBags, availableBags]);
 
   // Compute submit disabled state once per render
-  const submitDisabled = isSubmitting || userStats.totalBags <= 0;
+  const submitDisabled = isSubmitting || availableBags <= 0;
   if (typeof window !== 'undefined') {
     console.log('[PickupRequest] computed submitDisabled', submitDisabled);
     console.log('[PickupRequest] render state', {
       totalBags: userStats.totalBags,
+      requestedBags,
+      availableBags,
       insufficientBags,
       submitDisabled,
     });
@@ -279,6 +310,53 @@ const PickupRequest = () => {
     fetchUserStats();
   }, [user]);
 
+  // Fetch active pickup requests to calculate already-requested bags
+  useEffect(() => {
+    const fetchRequestedBags = async () => {
+      if (!user || !user.id) return;
+      
+      try {
+        // Fetch all active pickup requests (available, pending, scheduled, accepted, in_transit)
+        // Exclude: completed, cancelled, disposed
+        const { data: pickupsData, error: pickupsError } = await supabase
+          .from('pickup_requests')
+          .select('bag_count')
+          .eq('user_id', user.id)
+          .in('status', ['available', 'pending', 'scheduled', 'accepted', 'in_transit']);
+        
+        if (pickupsError) throw pickupsError;
+        
+        // Calculate total bags in active pickups
+        const totalRequestedBags = pickupsData?.reduce((sum, pickup) => {
+          return sum + (pickup.bag_count || 0);
+        }, 0) || 0;
+        
+        console.log('[PickupRequest] Requested bags in active pickups:', totalRequestedBags);
+        setRequestedBags(totalRequestedBags);
+      } catch (error) {
+        console.error('Error fetching requested bags:', error);
+        setRequestedBags(0); // Default to 0 on error
+      }
+    };
+    
+    fetchRequestedBags();
+    
+    // Setup real-time subscription for pickup_requests changes
+    const subscription = supabase
+      .channel('pickup_requests_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'pickup_requests', filter: `user_id=eq.${user?.id}` },
+        () => {
+          fetchRequestedBags(); // Refetch when pickup requests change
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      try { subscription.unsubscribe(); } catch (_) {}
+    };
+  }, [user?.id]);
+
   // Subscribe to real-time stats updates so bag counts stay in sync after scans
   useEffect(() => {
     if (!user?.id) return;
@@ -404,9 +482,9 @@ const PickupRequest = () => {
         throw new Error('User profile validation failed');
       }
       
-      // Check if the user has enough bags for this request
-      if (userStats.totalBags < Number(values.numberOfBags)) {
-        throw new Error(`You don't have enough bags. You have ${userStats.totalBags} bag(s), but requested ${values.numberOfBags}.`);
+      // Check if the user has enough available bags for this request
+      if (availableBags < Number(values.numberOfBags)) {
+        throw new Error(`You don't have enough bags available. You have ${availableBags} bag(s) available (${userStats.totalBags} total, ${requestedBags} already requested), but you're trying to request ${values.numberOfBags}.`);
       }
       
       // Format the pickup data - generate UUID for id
@@ -456,33 +534,11 @@ const PickupRequest = () => {
         // Don't throw error - pickup was successful even if points failed
       }
 
-      // Update bag count on server - direct update instead of RPC
-      const bagsToRemove = Number(values.numberOfBags);
-      try {
-        console.log('[PickupRequest] Updating user bag count directly');
-        // Direct update to user_stats table
-        const { data: currentStats } = await supabase
-          .from('user_stats')
-          .select('available_bags')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (currentStats) {
-          const newBags = Math.max(0, (currentStats.available_bags || 0) - bagsToRemove);
-          await supabase
-            .from('user_stats')
-            .update({ available_bags: newBags })
-            .eq('user_id', user.id);
-        }
-      } catch (statsError) {
-        console.warn('[PickupRequest] Failed to update bag count:', statsError);
-      }
-
-      // Update local UI state
-      setUserStats(prev => ({
-        ...prev,
-        totalBags: Math.max(0, (prev.totalBags || 0) - bagsToRemove)
-      }));
+      // NOTE: We do NOT update total_bags in the database
+      // - total_bags reflects cumulative bags from batches and never reduces
+      // - availableBags is dynamically calculated as: total_bags - requestedBags
+      // - The pickup_requests subscription will automatically update requestedBags
+      // - This will automatically reduce availableBags through the calculation
 
       // Success - show confirmation and clear form
       setSuccess(true);
@@ -560,8 +616,13 @@ const PickupRequest = () => {
         {/* Display bag availability information */}
         <div className="mb-4">
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            You have <span className="font-bold">{userStats.totalBags}</span> bag(s) available for pickup.
+            You have <span className="font-bold">{availableBags}</span> bag(s) available for pickup.
           </p>
+          {requestedBags > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              ({userStats.totalBags} total bags - {requestedBags} already requested = {availableBags} available)
+            </p>
+          )}
         </div>
         
         {insufficientBags && (
@@ -649,6 +710,7 @@ const PickupRequest = () => {
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         />
+                        <MapViewController position={position} />
                         <LocationMarker position={position} setPosition={handlePositionChange} />
                       </MapContainer>
                     </div>
@@ -663,11 +725,11 @@ const PickupRequest = () => {
                   
                   {/* Number of Bags - Dynamic based on available bags */}
                   <div className="mb-4">
-                    <label htmlFor="numberOfBags" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="numberOfBags" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Number of Bags <span className="text-red-600">*</span>
-                      {userStats.totalBags > 0 && (
+                      {availableBags > 0 && (
                         <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                          (You have {userStats.totalBags} bag{userStats.totalBags !== 1 ? 's' : ''} available)
+                          (You have {availableBags} bag{availableBags !== 1 ? 's' : ''} available)
                         </span>
                       )}
                     </label>
@@ -676,10 +738,10 @@ const PickupRequest = () => {
                       id="numberOfBags"
                       name="numberOfBags"
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
-                      disabled={userStats.totalBags <= 0}
+                      disabled={availableBags <= 0}
                     >
                       {/* Dynamically generate options based on available bags, up to 10 maximum */}
-                      {[...Array(Math.min(userStats.totalBags, 10))].map((_, index) => {
+                      {[...Array(Math.min(availableBags, 10))].map((_, index) => {
                         const bagNumber = index + 1;
                         return (
                           <option key={bagNumber} value={String(bagNumber)}>
@@ -687,14 +749,14 @@ const PickupRequest = () => {
                           </option>
                         );
                       })}
-                      {userStats.totalBags <= 0 && (
+                      {availableBags <= 0 && (
                         <option value="1">No bags available</option>
                       )}
                     </Field>
                     {touched.numberOfBags && errors.numberOfBags && (
                       <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.numberOfBags}</div>
                     )}
-                    {userStats.totalBags <= 0 && (
+                    {availableBags <= 0 && (
                       <>
                         <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
                           You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.

@@ -114,7 +114,7 @@ const Dashboard = () => {
         // User activities (excluding pickup_request to avoid duplicates)
         supabase
           .from('user_activity')
-          .select('id, created_at, activity_type, details, points')
+          .select('id, created_at, activity_type, points')
           .eq('user_id', user.id)
           .neq('activity_type', 'pickup_request')
           .order('created_at', { ascending: false })
@@ -185,17 +185,33 @@ const Dashboard = () => {
       
       // Process user activities
       if (activityResult.status === 'fulfilled' && activityResult.value?.data) {
-        const activities = activityResult.value.data.map(activity => ({
-          id: activity.id,
-          type: activity.activity_type,
-          description: activity.activity_type === 'qr_scan' ? 'QR Code Scan' : 
-                      activity.activity_type === 'reward_redemption' ? 'Reward Redeemed' :
-                      activity.details?.description || `${activity.activity_type} activity`,
-          timestamp: activity.created_at,
-          related_id: activity.id,
-          points: activity.points || 0,
-          _source: 'user_activity'
-        }));
+        const activities = activityResult.value.data.map(activity => {
+          // Generate description based on activity_type
+          let description = '';
+          switch (activity.activity_type) {
+            case 'qr_scan':
+              description = 'QR Code Scan';
+              break;
+            case 'reward_redemption':
+              description = 'Reward Redeemed';
+              break;
+            case 'batch_activation':
+              description = 'Batch Activated';
+              break;
+            default:
+              description = `${activity.activity_type.replace(/_/g, ' ')} activity`;
+          }
+          
+          return {
+            id: activity.id,
+            type: activity.activity_type,
+            description: description,
+            timestamp: activity.created_at,
+            related_id: activity.id,
+            points: activity.points || 0,
+            _source: 'user_activity'
+          };
+        });
         allActivities = [...allActivities, ...activities];
         console.log(`[Dashboard] ✅ Found ${activities.length} user activities`);
       }

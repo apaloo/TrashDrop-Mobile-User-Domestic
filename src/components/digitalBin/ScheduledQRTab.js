@@ -182,12 +182,12 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
       setLocalPickups(updatedBins);
       localStorage.setItem('digitalBins', JSON.stringify(updatedBins));
       
-      // Then update server
+      // Then update server - digital bins table
       const { error } = await supabase
-        .from('scheduled_pickups')
+        .from('digital_bins')
         .update({ 
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString()
+          is_active: false,
+          updated_at: new Date().toISOString()
         })
         .eq('id', binId);
       

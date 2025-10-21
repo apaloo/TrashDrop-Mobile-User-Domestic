@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext.js';
@@ -16,6 +16,23 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// Component to handle map view updates when position changes
+const MapViewController = ({ position }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (position && position.length === 2) {
+      // Fly to the new position with smooth animation
+      map.flyTo(position, 15, {
+        duration: 1.5, // Animation duration in seconds
+        easeLinearity: 0.25
+      });
+    }
+  }, [position, map]);
+  
+  return null;
+};
 
 // Component for handling map clicks
 const LocationMarker = ({ position, setPosition, disabled }) => {
@@ -34,7 +51,8 @@ const DumpingReportForm = ({ onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [mapPosition, setMapPosition] = useState(null); // No default - require actual GPS
+  // Default to Accra, Ghana coordinates so map can render immediately
+  const [mapPosition, setMapPosition] = useState([5.614736, -0.208811]);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
   const [formData, setFormData] = useState({
@@ -140,7 +158,8 @@ const DumpingReportForm = ({ onSuccess }) => {
 
   // Helper to handle geolocation fallback
   const handleGeolocationFallback = useCallback((errorMessage) => {
-    // No default coordinates - show error
+    // Keep the default Accra coordinates that map is already showing
+    // User can click on map to adjust location
     setError(errorMessage || 'Location not available. Please click on the map to set your location.');
     
     // Show warning toast
@@ -589,6 +608,7 @@ const DumpingReportForm = ({ onSuccess }) => {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   />
+                  <MapViewController position={mapPosition} />
                   <LocationMarker position={mapPosition} setPosition={setMapPosition} disabled={showCamera} />
                   {mapPosition && <Marker position={mapPosition} />}
                 </MapContainer>
