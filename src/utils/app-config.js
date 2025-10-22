@@ -82,7 +82,7 @@ const appConfig = {
     googleApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
   },
   features: {
-    enableMocks: process.env.REACT_APP_ENABLE_MOCKS === 'true',
+    enableMocks: false, // Always use real data - no mocks
     offlineMode: true, // Enable offline capabilities
   },
   pwa: {

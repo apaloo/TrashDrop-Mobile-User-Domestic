@@ -6,8 +6,6 @@ import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { ThemeProvider } from './context/ThemeContext.js';
 import { NetworkProvider } from './utils/networkMonitor.js';
 import { OfflineQueueProvider } from './context/OfflineQueueContext.js';
-import performanceTracker from './utils/performanceTracker.js';
-import PerformanceMonitor from './components/PerformanceMonitor.js';
 
 // Pages
 import Login from './pages/Login.js';
@@ -73,50 +71,10 @@ const CollectionFlowTest = process.env.NODE_ENV === 'development'
  * Application content with auth state handling
  */
 const AppContent = () => {
-  const navigate = useNavigate();
+  const { isLoading, isAuthenticated, checkSession, authState, user } = useAuth();
   const location = useLocation();
-  const { 
-    isAuthenticated, 
-    isLoading, 
-    user, 
-    authState,
-    checkSession 
-  } = useAuth();
-
-  // Start tracking app initialization on component mount
-  useEffect(() => {
-    // Track app content initialization
-    performanceTracker.trackStartup.appInitialization();
-    
-    return () => {
-      // End the app initialization tracking when component unmounts
-      performanceTracker.trackStartup.appInitialized();
-    };
-  }, []);
+  const navigate = useNavigate();
   
-  // Track screen transitions
-  useEffect(() => {
-    const currentPath = location.pathname;
-    const pathSegment = currentPath.split('/')[1] || 'root';
-    
-    performanceTracker.trackScreenTransition('previous', pathSegment);
-    
-    // Track auth state changes for performance monitoring
-    if (pathSegment === 'login' || pathSegment === 'register') {
-      performanceTracker.trackAuth.startLogin();
-    } else if (isAuthenticated && (pathSegment === 'dashboard' || pathSegment === 'root')) {
-      // Check if this is a stored credentials auth flow
-      if (!performanceTracker.getMarks()['auth_login'] && authState === 'AUTHENTICATED') {
-        performanceTracker.startMark('auth_stored_credentials');
-        performanceTracker.endMark('auth_stored_credentials');
-      } else {
-        performanceTracker.trackAuth.endLogin();
-      }
-      performanceTracker.trackStartup.firstContentfulPaint();
-    }
-    
-  }, [location.pathname, isAuthenticated, authState]);
-
   // Persist last visited path for bookmark/refresh restore
   useEffect(() => {
     try {
@@ -147,51 +105,39 @@ const AppContent = () => {
       
       // Allow access if we have stored user data, even during auth check
       const hasStoredUser = localStorage.getItem('trashdrop_user');
-      const hasStoredToken = localStorage.getItem('trashdrop_auth_token');
       
       console.log('[App] Auth check conditions:', {
         isPublicRoute,
         hasStoredUser: !!hasStoredUser,
-        hasStoredToken: !!hasStoredToken,
         isAuthenticated,
         isLoading,
-        pathname: location.pathname,
-        authStatus: authState?.status
+        pathname: location.pathname
       });
       
-      // If we're on a public route, always allow access
       if (isPublicRoute) {
-        console.log('[App] Public route - skipping auth check');
+        console.log('[App] Skipping auth check - public route');
         return;
       }
       
-      // If we have stored credentials, trust them (handled by AuthContext)
-      if (hasStoredUser && hasStoredToken) {
-        console.log('[App] Has stored credentials - trusting AuthContext, skipping additional check');
-        return;
-      }
-      
-      // Special case for test account - skip auth checks for development
-      if (user && user.email === 'prince02@mailinator.com') {
-        console.log('[App] Using test account - skipping auth check');
-        return;
-      }
-      
-      // In development mode, be permissive
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[App] Development mode - skipping strict auth check');
-        return;
-      }
-      
-      // Don't run checks if we're loading
+      // Additional safety: don't run auth checks if we're still loading
       if (isLoading) {
-        console.log('[App] Auth still loading - waiting');
+        console.log('[App] Auth still loading - skipping auth check');
         return;
       }
-      
-      // If explicitly unauthenticated and on protected route, redirect
-      if (authState?.status === 'UNAUTHENTICATED' && !isPublicRoute) {
-        console.log('[App] Unauthenticated on protected route, redirecting to login');
+      try {
+        const { error } = await checkSession();
+        
+        // If not authenticated and not on a public route, redirect to login
+        if (error && !isAuthenticated) {
+          console.log('[App] Not authenticated, redirecting to login:', error);
+          navigate('/login', { 
+            state: { from: location },
+            replace: true 
+          });
+        }
+      } catch (err) {
+        console.error('[App] Auth check failed:', err);
+        // Redirect to login on auth errors
         navigate('/login', { 
           state: { from: location },
           replace: true 
@@ -199,25 +145,19 @@ const AppContent = () => {
       }
     };
     
-    // No delay - handle immediately
-    handleAuthCheck();
-  }, [location.pathname, isAuthenticated, isLoading, authState?.status, user, navigate, location]);
+    // Add a small delay to prevent auth check race conditions
+    const timeoutId = setTimeout(handleAuthCheck, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [location.pathname, checkSession, isAuthenticated, navigate, location]);
   
-  // Never show loading spinner for any users with stored credentials
-  // This prevents ANY intermediate screens between splash and homepage
-  const hasStoredCreds = localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token');
-  
-  // Skip ALL loading for returning users, regardless of auth state
-  if (isLoading && !hasStoredCreds) {
-    console.log('[App] No stored credentials, showing loading spinner');
+  // Show loading spinner during initial load, but with a maximum time limit
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-white">
         <LoadingSpinner size="lg" />
       </div>
     );
-  } else if (hasStoredCreds && isLoading) {
-    console.log('[App] Has stored credentials, skipping loading spinner entirely');
-    // Continue to render app content even during loading
   }
   
   // Show auth fallback UI when there's an authentication error
@@ -228,7 +168,7 @@ const AppContent = () => {
   // Render normal app routes when authenticated
   return (
     <Suspense fallback={
-      <div className="flex justify-center items-center h-screen bg-white">
+      <div className="flex justify-center items-center h-screen">
         <LoadingSpinner size="lg" />
       </div>
     }>
@@ -367,8 +307,6 @@ const AppContent = () => {
  * Main application component with routing and context providers
  */
 const App = () => {
-  const [showPerfMonitor, setShowPerfMonitor] = React.useState(false);
-  
   return (
     <AppPerformanceProvider>
       <ThemeProvider>
@@ -378,7 +316,7 @@ const App = () => {
               <AppPerformanceOptimizer />
               <Suspense 
                 fallback={
-                  <div className="flex justify-center items-center h-screen bg-white">
+                  <div className="flex justify-center items-center h-screen">
                     <LoadingSpinner size="lg" />
                   </div>
                 }
@@ -387,29 +325,6 @@ const App = () => {
               </Suspense>
             </AuthErrorBoundary>
             <InstallPrompt />
-            
-            {/* Performance monitoring tools - only in development */}
-            {process.env.NODE_ENV === 'development' && (
-              <>
-                <button 
-                  className="fixed bottom-4 right-4 z-50 bg-primary text-white p-2 rounded-full shadow-lg"
-                  onClick={() => setShowPerfMonitor(!showPerfMonitor)}
-                  title="Performance Monitor"
-                  aria-label="Toggle Performance Monitor"
-                >
-                  <span className="sr-only">Toggle Performance Monitor</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 20v-6"></path>
-                    <path d="M6 20v-6"></path>
-                    <path d="M18 20v-6"></path>
-                    <path d="M6 14v-4"></path>
-                    <path d="M18 14v-4"></path>
-                    <path d="M12 14v-4"></path>
-                  </svg>
-                </button>
-                <PerformanceMonitor visible={showPerfMonitor} />
-              </>
-            )}
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

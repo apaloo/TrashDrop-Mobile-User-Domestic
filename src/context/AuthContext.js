@@ -56,14 +56,8 @@ export const AuthProvider = ({ children }) => {
     const storedUser = getStoredUser();
     const storedToken = localStorage.getItem('trashdrop_auth_token');
     
-    console.log('[AuthContext INIT] Checking for stored credentials:', {
-      hasStoredUser: !!storedUser,
-      hasStoredToken: !!storedToken,
-      userEmail: storedUser?.email
-    });
-    
     if (storedUser && storedToken) {
-      console.log('[AuthContext INIT] ✅ Found stored credentials, initializing as AUTHENTICATED');
+      console.log('[AuthContext] Initializing with stored user to prevent race conditions');
       return {
         status: AUTH_STATES.AUTHENTICATED,
         user: storedUser,
@@ -74,7 +68,6 @@ export const AuthProvider = ({ children }) => {
       };
     }
     
-    console.log('[AuthContext INIT] ❌ No stored credentials, initializing as INITIAL');
     return {
       status: AUTH_STATES.INITIAL,
       user: null,
@@ -87,8 +80,6 @@ export const AuthProvider = ({ children }) => {
   
   // Derived state for convenience
   const isAuthenticated = authState.status === AUTH_STATES.AUTHENTICATED;
-  // Only show loading for explicit LOADING state, not INITIAL
-  // INITIAL with stored credentials goes directly to AUTHENTICATED (no loading)
   const isLoading = authState.status === AUTH_STATES.LOADING;
   const error = authState.error;
   
@@ -397,49 +388,7 @@ export const AuthProvider = ({ children }) => {
 
   // Check and refresh the current session
   const checkSession = useCallback(async (force = false) => {
-    // First, check for test account before any other logic
-    const storedUser = getStoredUser();
-    if (storedUser?.email === 'prince02@mailinator.com' && process.env.NODE_ENV === 'development') {
-      console.log('[Auth] Test account detected - bypassing session check');
-      
-      // Ensure mock data mode is enabled for test account
-      if (window.appConfig && window.appConfig.features) {
-        window.appConfig.features.enableMocks = true;
-      }
-      
-      // Create a persistent test session
-      const testUser = {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        email: 'prince02@mailinator.com',
-        user_metadata: { name: 'Test User' },
-        last_authenticated: new Date().toISOString()
-      };
-      
-      // Store test user data
-      const userKey = 'trashdrop_user'; // Use direct fallback to avoid initialization issues
-      localStorage.setItem(userKey, JSON.stringify(testUser));
-      
-      // Update auth state for test account
-      updateAuthState({
-        status: AUTH_STATES.AUTHENTICATED,
-        user: testUser,
-        session: { access_token: 'test_session_token' },
-        lastAction: 'test_account_login'
-      });
-      
-      return { 
-        success: true, 
-        user: testUser,
-        isTestAccount: true
-      };
-    }
-    
-    // Check for development mode with mocks
-    const runtimeConfig = window.appConfig || {};
-    const useDevelopmentMocks = runtimeConfig?.features?.enableMocks || false;
-    if (useDevelopmentMocks) {
-      console.log('[Auth] Development mode with mocks detected in checkSession');
-    }
+    console.log('[Auth] Starting session check (real authentication only)...');
     
     // Prevent multiple concurrent session checks
     if (isCheckingSession.current) {
@@ -466,21 +415,6 @@ export const AuthProvider = ({ children }) => {
     startLoadingTimeout();
     
     try {
-      // Skip real auth checks if in testing mode
-      const isTesting = () => {
-        return typeof localStorage !== 'undefined' && 
-               localStorage.getItem('trashdrop_testing_mode') === 'true';
-      };
-
-      if (isTesting()) {
-        console.log('[Auth] Testing mode detected, bypassing JWT validation');
-        const storedUser = localStorage.getItem(appConfig?.storage?.userKey || 'trashdrop_user');
-        if (storedUser) {
-          return handleAuthSuccess(JSON.parse(storedUser), null);
-        }
-        return { success: false, error: { message: 'No test user found' } };
-      }
-      
       // First check if the stored token is valid before attempting to use it
       const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
       if (storedToken && !isTokenValid(storedToken)) {
@@ -495,19 +429,6 @@ export const AuthProvider = ({ children }) => {
       // Skip refresh if no token exists to avoid unnecessary API calls
       if (!storedToken) {
         console.log('[Auth] No token found in localStorage');
-        
-        // In development, if we have stored user, allow access without token
-        if (process.env.NODE_ENV === 'development' && storedUser) {
-          console.log('[Auth] Development mode - allowing access without token');
-          updateAuthState({
-            status: AUTH_STATES.AUTHENTICATED,
-            user: storedUser,
-            session: { access_token: 'dev_session' },
-            lastAction: 'dev_no_token_access',
-            error: null
-          });
-          return { success: true, user: storedUser };
-        }
         
         updateAuthState({
           status: AUTH_STATES.UNAUTHENTICATED,
@@ -537,21 +458,6 @@ export const AuthProvider = ({ children }) => {
       
       if (refreshError) {
         console.warn('[Auth] Session refresh failed:', refreshError.message);
-        
-        // Check for test account first
-        const storedUser = getStoredUser();
-        if (storedUser && storedUser.email === 'prince02@mailinator.com') {
-          console.log('[Auth] Test account detected - preserving session despite refresh error');
-          return { success: true }; // Allow continued access
-        }
-        
-        // Check for development mode with mocks
-        const runtimeConfig2 = window.appConfig || {};
-        const useDevelopmentMocks = runtimeConfig2?.features?.enableMocks || false;
-        if (useDevelopmentMocks) {
-          console.log('[Auth] Development mode with mocks - preserving session despite refresh error');
-          return { success: true }; // Allow continued access
-        }
         
         // Handle auth session missing specifically to prevent infinite loading
         if (refreshError.message.includes('Auth session missing')) {
@@ -796,52 +702,25 @@ export const AuthProvider = ({ children }) => {
   
   const signOut = useCallback(async () => {
     console.log('[Auth] Signing out...');
+    updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_out' });
     
     try {
-      // First, clear all local data immediately
-      clearAuthData();
-      
-      // Update state to unauthenticated immediately
-      setAuthState({
-        status: AUTH_STATES.UNAUTHENTICATED,
-        user: null,
-        session: null,
-        error: null,
-        lastAction: 'signed_out',
-        retryCount: 0
-      });
-      
-      // Then try to sign out from Supabase (non-blocking)
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-        console.log('[Auth] Supabase sign out successful');
-      } catch (supabaseError) {
-        console.warn('[Auth] Supabase sign out failed, but local data cleared:', supabaseError);
-        // Continue anyway - local data is already cleared
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[Auth] Sign out error:', error);
+        return handleAuthError(error, 'sign_out');
       }
       
-      // Clear session storage
-      if (typeof window !== 'undefined') {
-        sessionStorage.clear();
-        sessionStorage.removeItem('trashdrop_last_path');
-      }
-      
-      console.log('[Auth] Sign out complete - user logged out');
+      // Clear all auth data
+      await resetAuthState();
+      console.log('[Auth] Sign out successful');
       return { success: true };
       
     } catch (error) {
       console.error('[Auth] Unexpected error during sign out:', error);
-      // Even if error occurs, ensure we're logged out locally
-      setAuthState({
-        status: AUTH_STATES.UNAUTHENTICATED,
-        user: null,
-        session: null,
-        error: null,
-        lastAction: 'force_signed_out'
-      });
-      return { success: true }; // Return success since local logout succeeded
+      return handleAuthError(error, 'sign_out');
     }
-  }, [clearAuthData]);
+  }, [resetAuthState, handleAuthError, updateAuthState]);
 
   const resetPassword = useCallback(async (email) => {
     console.log('[Auth] Requesting password reset for:', email);
@@ -873,11 +752,7 @@ export const AuthProvider = ({ children }) => {
   
   // Periodic token validation function
   const validateToken = useCallback(async () => {
-    // Skip for test accounts
-    const storedUser = getStoredUser();
-    if (storedUser?.email === 'prince02@mailinator.com' && process.env.NODE_ENV === 'development') {
-      return { valid: true };
-    }
+    console.log('[Auth] Validating token with Supabase...');
     
     const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
     if (!storedToken) {
@@ -929,39 +804,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
   
-  // Debug reporting function for auth context
-  const debugAuth = useCallback((message, data) => {
-    // Log to console
-    console.log(`[Auth] ${message}`, data || '');
-    
-    // Log to debug console if available
-    if (window.debugReport) {
-      window.debugReport('Auth: ' + message, data);
-    }
-    
-    // Update app state if available
-    if (window.appState) {
-      window.appState.authLastMessage = message;
-      window.appState.authLastData = data;
-      window.appState.authLastTimestamp = new Date().toISOString();
-    }
-  }, []);
-  
   // Set up auth on mount
   useEffect(() => {
-    debugAuth('Setting up auth context');
-    
-    // Track initialization in global state
-    if (window.appState) {
-      window.appState.authInitializing = true;
-    }
-    
+    console.log('[Auth] Setting up auth context');
     let subscription;
     let refreshInterval;
     let tokenValidationInterval;
-    
-    // Add error boundary for auth initialization
-    try {
     
     const initializeAuth = async () => {
       // Skip if already initialized
@@ -970,48 +818,21 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
-      console.log('[Auth useEffect] Initializing authentication...');
-      console.log('[Auth useEffect] Current auth state:', {
-        status: authState.status,
-        hasUser: !!authState.user,
-        lastAction: authState.lastAction
-      });
+      console.log('[Auth] Initializing authentication...');
       
       // Check if we already have valid user data - don't show loading if we do
       const storedUser = getStoredUser();
       const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
       
-      console.log('[Auth useEffect] Checking stored credentials:', {
-        hasStoredUser: !!storedUser,
-        hasStoredToken: !!storedToken,
-        userEmail: storedUser?.email,
-        currentStatus: authState.status
-      });
-      
       // If we have stored user and token, keep current AUTHENTICATED state instead of going to LOADING
       if (!(storedUser && storedToken)) {
-        console.log('[Auth useEffect] ❌ No stored credentials, setting LOADING state');
         // Only set loading state if we don't have stored credentials
         updateAuthState({
           status: AUTH_STATES.LOADING,
           lastAction: 'initializing'
         });
       } else {
-        console.log('[Auth useEffect] ✅ Found stored credentials, maintaining AUTHENTICATED state during validation');
-      }
-      
-      // In development, allow access with stored user - skip validation
-      if (process.env.NODE_ENV === 'development' && storedUser) {
-        console.log('[Auth] Development mode - granting access with stored user, skipping validation');
-        updateAuthState({
-          status: AUTH_STATES.AUTHENTICATED,
-          user: storedUser,
-          session: { access_token: storedToken || 'dev_token' },
-          error: null,
-          lastAction: 'init_dev_mode'
-        });
-        isAuthInitialized.current = true;
-        return;
+        console.log('[Auth] Found stored credentials, maintaining AUTHENTICATED state during validation');
       }
       
       if (!storedToken || !storedToken.includes('.') || storedToken === 'undefined' || storedToken === 'null') {
@@ -1024,43 +845,23 @@ export const AuthProvider = ({ children }) => {
           error: null,
           lastAction: 'init_no_token'
         });
-        isAuthInitialized.current = true;
         return;
       }
       
       try {
-        // Always trust stored credentials initially to prevent black screen
-        if (storedUser && storedToken) {
-          console.log('[Auth] Found stored credentials - granting immediate access');
-          // Grant immediate access with stored credentials
+        // If we have stored user, set initial state with it while we validate
+        if (storedUser) {
+          // Set initial state with stored user while we validate
           updateAuthState({
             status: AUTH_STATES.AUTHENTICATED,
             user: storedUser,
             session: { access_token: storedToken },
-            lastAction: 'init_stored_trusted'
+            lastAction: 'init_stored'
           });
-          isAuthInitialized.current = true;
-
-          // Validate in background without affecting UI
-          setTimeout(async () => {
-            try {
-              // Attempt quiet token refresh
-              const { data: { session }, error } = await supabase.auth.refreshSession();
-              if (session?.access_token) {
-                console.log('[Auth] Background token refresh successful');
-                localStorage.setItem('trashdrop_auth_token', session.access_token);
-              }
-            } catch (error) {
-              console.warn('[Auth] Background validation failed:', error);
-              // Don't disrupt user experience even if refresh fails
-            }
-          }, 1000);
-
-          return; // Skip immediate session validation
         }
         
-        // For old sessions, validate with Supabase
-        console.log('[Auth] Old session detected, validating with Supabase...');
+        // Always check session to validate/refresh token
+        console.log('[Auth] Validating session...');
         await checkSession();
         
         // Set up auth state change listener
@@ -1123,6 +924,9 @@ export const AuthProvider = ({ children }) => {
       }
     };
     
+    // Call initialization function once
+    initializeAuth();
+    
     // Set up periodic session check and token validation
     const setupRefreshIntervals = () => {
       // Clear any existing intervals first
@@ -1137,50 +941,29 @@ export const AuthProvider = ({ children }) => {
         }
       }, 60 * 60 * 1000); // Every hour
       
-      // Set up background token refresh every 30 minutes
-      // This is a non-blocking refresh that won't affect the UI
+      // Set up token validation every 5 minutes
       tokenValidationInterval = setInterval(async () => {
         if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Running background token refresh');
-          try {
-            const { data: { session }, error } = await supabase.auth.refreshSession();
-            if (session?.access_token) {
-              console.log('[Auth] Background token refresh successful');
-              localStorage.setItem('trashdrop_auth_token', session.access_token);
-              // Update session quietly without changing auth state
-              updateAuthState({
-                session,
-                lastAction: 'background_refresh'
-              });
-            }
-          } catch (error) {
-            console.warn('[Auth] Background refresh failed:', error);
-            // Don't disrupt user experience even if refresh fails
+          console.log('[Auth] Running scheduled token validation check');
+          const result = await validateToken();
+          
+          if (!result.valid) {
+            console.warn(`[Auth] Token validation failed: ${result.reason}`);
+            await checkSession(true); // Force refresh
+          } else if (result.nearExpiry) {
+            console.log('[Auth] Token near expiry, triggering refresh');
+            await checkSession(true); // Force refresh
           }
         }
-      }, 30 * 60 * 1000); // Every 30 minutes
+      }, 5 * 60 * 1000); // Every 5 minutes
     };
     
-    // Set up visibility change event listener for background refresh
+    // Set up visibility change event listener to refresh session when app becomes visible
     const setupVisibilityListener = () => {
       const handleVisibilityChange = async () => {
         if (document.visibilityState === 'visible' && authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] App became visible, attempting background refresh');
-          try {
-            const { data: { session }, error } = await supabase.auth.refreshSession();
-            if (session?.access_token) {
-              console.log('[Auth] Background refresh on visibility change successful');
-              localStorage.setItem('trashdrop_auth_token', session.access_token);
-              // Update session quietly
-              updateAuthState({
-                session,
-                lastAction: 'visibility_refresh'
-              });
-            }
-          } catch (error) {
-            console.warn('[Auth] Background refresh on visibility change failed:', error);
-            // Continue without disrupting user
-          }
+          console.log('[Auth] App became visible, checking session');
+          await checkSession();
         }
       };
       
@@ -1188,26 +971,12 @@ export const AuthProvider = ({ children }) => {
       return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
     
-    // Set up window focus event listener for background refresh
+    // Set up window focus event listener
     const setupFocusListener = () => {
       const handleFocus = async () => {
         if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Window focused, attempting background refresh');
-          try {
-            const { data: { session }, error } = await supabase.auth.refreshSession();
-            if (session?.access_token) {
-              console.log('[Auth] Background refresh on focus successful');
-              localStorage.setItem('trashdrop_auth_token', session.access_token);
-              // Update session quietly
-              updateAuthState({
-                session,
-                lastAction: 'focus_refresh'
-              });
-            }
-          } catch (error) {
-            console.warn('[Auth] Background refresh on focus failed:', error);
-            // Continue without disrupting user
-          }
+          console.log('[Auth] Window focused, checking session');
+          await checkSession();
         }
       };
       
@@ -1225,14 +994,7 @@ export const AuthProvider = ({ children }) => {
     
     // Cleanup function
     return () => {
-      debugAuth('Cleaning up auth context');
-      
-      // Update app state if available
-      if (window.appState) {
-        window.appState.authInitializing = false;
-        window.appState.authCleaning = true;
-      }
-      
+      console.log('[Auth] Cleaning up auth context');
       if (subscription) {
         subscription.unsubscribe();
       }
@@ -1247,41 +1009,7 @@ export const AuthProvider = ({ children }) => {
       
       // Reset initialization flag on unmount
       isAuthInitialized.current = false;
-      
-      // Update app state if available
-      if (window.appState) {
-        window.appState.authCleaning = false;
-        window.appState.authCleanupComplete = true;
-      }
     };
-  } catch (error) {
-    // Catch any errors in auth initialization
-    debugAuth('Error in auth initialization', { message: error.message, stack: error.stack });
-    
-    // Update app state if available
-    if (window.appState) {
-      window.appState.authInitError = {
-        message: error.message,
-        stack: error.stack,
-        timestamp: new Date().toISOString()
-      };
-    }
-    
-    // Update auth state to error
-    setAuthState({
-      status: AUTH_STATES.ERROR,
-      user: null,
-      session: null,
-      error: {
-        message: 'Authentication initialization failed: ' + error.message,
-        code: 'AUTH_INIT_ERROR'
-      },
-      lastAction: 'init_error'
-    });
-    
-    // Return empty cleanup
-    return () => {};
-  }
   }, []); // Empty dependency array - only run on mount/unmount
 
   // Context value

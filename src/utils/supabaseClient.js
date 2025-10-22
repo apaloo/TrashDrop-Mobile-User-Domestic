@@ -349,13 +349,6 @@ try {
   supabase.auth.onAuthStateChange((event, session) => {
     console.log('[Supabase] Auth state changed:', event);
     
-    // Special handling for test user in dev mode
-    if (process.env.NODE_ENV === 'development' && 
-        session?.user?.email === 'prince02@mailinator.com') {
-      console.log('[Dev] Test user detected - bypassing session check');
-      return;
-    }
-    
     if (event === 'SIGNED_OUT') {
       // Clear any potentially corrupted data on sign out
       clearAuthData();
