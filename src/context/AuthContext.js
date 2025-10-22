@@ -909,15 +909,20 @@ export const AuthProvider = ({ children }) => {
       
       console.log('[Auth] Initializing authentication...');
       
-      // Set loading state immediately to prevent flicker
-      updateAuthState({
-        status: AUTH_STATES.LOADING,
-        lastAction: 'initializing'
-      });
-      
-      // Clear any potentially corrupted tokens first - but be more lenient in development
-      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
+      // Check if we already have valid user data - don't show loading if we do
       const storedUser = getStoredUser();
+      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
+      
+      // If we have stored user and token, keep current AUTHENTICATED state instead of going to LOADING
+      if (!(storedUser && storedToken)) {
+        // Only set loading state if we don't have stored credentials
+        updateAuthState({
+          status: AUTH_STATES.LOADING,
+          lastAction: 'initializing'
+        });
+      } else {
+        console.log('[Auth] Found stored credentials, maintaining AUTHENTICATED state during validation');
+      }
       
       // In development, allow access even with invalid tokens if user data exists
       if (process.env.NODE_ENV === 'development' && storedUser) {
@@ -946,9 +951,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       try {
-        // Check for stored user data
-        const storedUser = getStoredUser();
-        
+        // If we have stored user, set initial state with it while we validate
         if (storedUser) {
           // Set initial state with stored user while we validate
           updateAuthState({

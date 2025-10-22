@@ -180,7 +180,7 @@ const AppContent = () => {
   // Show loading spinner during initial load, but with a maximum time limit
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen bg-white">
         <LoadingSpinner size="lg" />
       </div>
     );
