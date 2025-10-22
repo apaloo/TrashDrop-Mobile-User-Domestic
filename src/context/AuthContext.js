@@ -87,7 +87,9 @@ export const AuthProvider = ({ children }) => {
   
   // Derived state for convenience
   const isAuthenticated = authState.status === AUTH_STATES.AUTHENTICATED;
-  const isLoading = authState.status === AUTH_STATES.LOADING || authState.status === AUTH_STATES.INITIAL;
+  // Only show loading for explicit LOADING state, not INITIAL
+  // INITIAL with stored credentials goes directly to AUTHENTICATED (no loading)
+  const isLoading = authState.status === AUTH_STATES.LOADING;
   const error = authState.error;
   
   // Debug logging for auth state changes (only in development)
@@ -794,25 +796,52 @@ export const AuthProvider = ({ children }) => {
   
   const signOut = useCallback(async () => {
     console.log('[Auth] Signing out...');
-    updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_out' });
     
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[Auth] Sign out error:', error);
-        return handleAuthError(error, 'sign_out');
+      // First, clear all local data immediately
+      clearAuthData();
+      
+      // Update state to unauthenticated immediately
+      setAuthState({
+        status: AUTH_STATES.UNAUTHENTICATED,
+        user: null,
+        session: null,
+        error: null,
+        lastAction: 'signed_out',
+        retryCount: 0
+      });
+      
+      // Then try to sign out from Supabase (non-blocking)
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+        console.log('[Auth] Supabase sign out successful');
+      } catch (supabaseError) {
+        console.warn('[Auth] Supabase sign out failed, but local data cleared:', supabaseError);
+        // Continue anyway - local data is already cleared
       }
       
-      // Clear all auth data
-      await resetAuthState();
-      console.log('[Auth] Sign out successful');
+      // Clear session storage
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear();
+        sessionStorage.removeItem('trashdrop_last_path');
+      }
+      
+      console.log('[Auth] Sign out complete - user logged out');
       return { success: true };
       
     } catch (error) {
       console.error('[Auth] Unexpected error during sign out:', error);
-      return handleAuthError(error, 'sign_out');
+      // Even if error occurs, ensure we're logged out locally
+      setAuthState({
+        status: AUTH_STATES.UNAUTHENTICATED,
+        user: null,
+        session: null,
+        error: null,
+        lastAction: 'force_signed_out'
+      });
+      return { success: true }; // Return success since local logout succeeded
     }
-  }, [resetAuthState, handleAuthError, updateAuthState]);
+  }, [clearAuthData]);
 
   const resetPassword = useCallback(async (email) => {
     console.log('[Auth] Requesting password reset for:', email);
@@ -944,9 +973,9 @@ export const AuthProvider = ({ children }) => {
         console.log('[Auth useEffect] ✅ Found stored credentials, maintaining AUTHENTICATED state during validation');
       }
       
-      // In development, allow access even with invalid tokens if user data exists
+      // In development, allow access with stored user - skip validation
       if (process.env.NODE_ENV === 'development' && storedUser) {
-        console.log('[Auth] Development mode - allowing access with stored user despite token issues');
+        console.log('[Auth] Development mode - granting access with stored user, skipping validation');
         updateAuthState({
           status: AUTH_STATES.AUTHENTICATED,
           user: storedUser,
@@ -954,6 +983,7 @@ export const AuthProvider = ({ children }) => {
           error: null,
           lastAction: 'init_dev_mode'
         });
+        isAuthInitialized.current = true;
         return;
       }
       
@@ -967,23 +997,32 @@ export const AuthProvider = ({ children }) => {
           error: null,
           lastAction: 'init_no_token'
         });
+        isAuthInitialized.current = true;
         return;
       }
       
       try {
-        // If we have stored user, set initial state with it while we validate
-        if (storedUser) {
-          // Set initial state with stored user while we validate
-          updateAuthState({
-            status: AUTH_STATES.AUTHENTICATED,
-            user: storedUser,
-            session: { access_token: storedToken },
-            lastAction: 'init_stored'
-          });
+        // If we have stored user and were recently authenticated, trust it without re-validation
+        if (storedUser && storedToken) {
+          const lastAuth = storedUser.last_authenticated;
+          const timeSinceAuth = lastAuth ? (Date.now() - new Date(lastAuth).getTime()) : Infinity;
+          
+          // If authenticated within last 24 hours, trust stored credentials
+          if (timeSinceAuth < 24 * 60 * 60 * 1000) {
+            console.log('[Auth] Recent authentication found, using stored credentials without re-validation');
+            updateAuthState({
+              status: AUTH_STATES.AUTHENTICATED,
+              user: storedUser,
+              session: { access_token: storedToken },
+              lastAction: 'init_stored_trusted'
+            });
+            isAuthInitialized.current = true;
+            return; // Skip session validation - trust stored credentials
+          }
         }
         
-        // Always check session to validate/refresh token
-        console.log('[Auth] Validating session...');
+        // For old sessions, validate with Supabase
+        console.log('[Auth] Old session detected, validating with Supabase...');
         await checkSession();
         
         // Set up auth state change listener
@@ -1045,9 +1084,6 @@ export const AuthProvider = ({ children }) => {
         isAuthInitialized.current = false;
       }
     };
-    
-    // Call initialization function once
-    initializeAuth();
     
     // Set up periodic session check and token validation
     const setupRefreshIntervals = () => {

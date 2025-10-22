@@ -105,80 +105,66 @@ const AppContent = () => {
       
       // Allow access if we have stored user data, even during auth check
       const hasStoredUser = localStorage.getItem('trashdrop_user');
+      const hasStoredToken = localStorage.getItem('trashdrop_auth_token');
       
       console.log('[App] Auth check conditions:', {
         isPublicRoute,
         hasStoredUser: !!hasStoredUser,
+        hasStoredToken: !!hasStoredToken,
         isAuthenticated,
         isLoading,
-        pathname: location.pathname
+        pathname: location.pathname,
+        authStatus: authState?.status
       });
       
-      if (isPublicRoute || hasStoredUser) {
-        console.log('[App] Skipping auth check - public route or stored user');
+      // If we're on a public route, always allow access
+      if (isPublicRoute) {
+        console.log('[App] Public route - skipping auth check');
+        return;
+      }
+      
+      // If we have stored credentials, trust them (handled by AuthContext)
+      if (hasStoredUser && hasStoredToken) {
+        console.log('[App] Has stored credentials - trusting AuthContext, skipping additional check');
         return;
       }
       
       // Special case for test account - skip auth checks for development
       if (user && user.email === 'prince02@mailinator.com') {
         console.log('[App] Using test account - skipping auth check');
-        return; // Allow navigation without redirect
+        return;
       }
       
-      // Skip auth checks in development mode completely
+      // In development mode, be permissive
       if (process.env.NODE_ENV === 'development') {
-        console.log('[App] Development mode - skipping auth session check');
+        console.log('[App] Development mode - skipping strict auth check');
         return;
       }
       
-      // Additional safety: don't run auth checks if we're still loading
+      // Don't run checks if we're loading
       if (isLoading) {
-        console.log('[App] Auth still loading - skipping auth check');
+        console.log('[App] Auth still loading - waiting');
         return;
       }
       
-      // Check for development mode with mocks
-      const appConfig = window.appConfig || {};
-      const useDevelopmentMocks = appConfig.features && appConfig.features.enableMocks;
-      if (useDevelopmentMocks) {
-        console.log('[App] Development mode with mocks - skipping strict auth check');
-        return;
-      }
-      
-      console.log('[App] Proceeding with auth check - not in development mode');
-      
-      // Only do strict auth checks in production
-      try {
-        const { error } = await checkSession();
-        
-        // If not authenticated and not on a public route, redirect to login
-        if (error && !isAuthenticated) {
-          console.log('[App] Not authenticated, redirecting to login:', error);
-          navigate('/login', { 
-            state: { from: location },
-            replace: true 
-          });
-        }
-      } catch (err) {
-        console.error('[App] Auth check failed:', err);
-        // In development, don't redirect on auth errors
-        if (process.env.NODE_ENV === 'production') {
-          navigate('/login', { 
-            state: { from: location },
-            replace: true 
-          });
-        }
+      // If explicitly unauthenticated and on protected route, redirect
+      if (authState?.status === 'UNAUTHENTICATED' && !isPublicRoute) {
+        console.log('[App] Unauthenticated on protected route, redirecting to login');
+        navigate('/login', { 
+          state: { from: location },
+          replace: true 
+        });
       }
     };
     
-    // Add a small delay to prevent auth check race conditions
-    const timeoutId = setTimeout(handleAuthCheck, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, [location.pathname, checkSession, isAuthenticated, navigate, location]);
+    // No delay - handle immediately
+    handleAuthCheck();
+  }, [location.pathname, isAuthenticated, isLoading, authState?.status, user, navigate, location]);
   
-  // Show loading spinner during initial load, but with a maximum time limit
-  if (isLoading) {
+  // Show loading spinner ONLY during explicit LOADING state
+  // Skip loading if we have stored credentials (instant access)
+  const hasStoredCreds = localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token');
+  if (isLoading && !hasStoredCreds) {
     return (
       <div className="flex justify-center items-center h-screen bg-white">
         <LoadingSpinner size="lg" />

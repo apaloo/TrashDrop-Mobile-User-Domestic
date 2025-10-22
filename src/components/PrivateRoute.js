@@ -33,10 +33,11 @@ const PrivateRoute = ({ children }) => {
     });
   }
 
-  // Show loading spinner while auth is loading OR during initial state with stored data
-  if (isLoading || (status === 'INITIAL' && hasStoredUser)) {
+  // Show loading spinner ONLY during explicit LOADING state
+  // Don't show loading for INITIAL state (it resolves immediately with stored credentials)
+  if (isLoading && status === 'LOADING') {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[PrivateRoute] Showing loading spinner - auth loading or initial with stored user');
+      console.log('[PrivateRoute] Showing loading spinner - auth loading');
     }
     return (
       <div className="flex justify-center items-center h-screen">
@@ -61,16 +62,13 @@ const PrivateRoute = ({ children }) => {
     return children;
   }
   
-  // Final check: if we have stored user data but auth state is not yet updated, wait a bit more
-  if (hasStoredUser && status !== 'UNAUTHENTICATED') {
+  // If we have stored user and not explicitly unauthenticated, grant access
+  // This prevents loading screens when credentials exist
+  if (hasStoredUser && hasStoredToken && status !== 'UNAUTHENTICATED') {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[PrivateRoute] Has stored user but auth not finalized, showing loading');
+      console.log('[PrivateRoute] Has stored credentials - granting immediate access');
     }
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return children;
   }
   
   // Redirect to login only after all checks fail

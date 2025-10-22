@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import { useTheme } from '../context/ThemeContext.js';
 
@@ -10,10 +10,23 @@ import { useTheme } from '../context/ThemeContext.js';
 const NavBar = () => {
   const { isAuthenticated, signOut, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
+    console.log('[NavBar] Sign out initiated');
+    try {
+      const result = await signOut();
+      if (result?.success) {
+        console.log('[NavBar] Sign out successful, redirecting to login');
+        // Force navigation to login page
+        navigate('/login', { replace: true });
+      }
+    } catch (error) {
+      console.error('[NavBar] Sign out error:', error);
+      // Force navigation anyway
+      navigate('/login', { replace: true });
+    }
   };
 
   // Active link style
