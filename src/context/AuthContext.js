@@ -56,8 +56,14 @@ export const AuthProvider = ({ children }) => {
     const storedUser = getStoredUser();
     const storedToken = localStorage.getItem('trashdrop_auth_token');
     
+    console.log('[AuthContext INIT] Checking for stored credentials:', {
+      hasStoredUser: !!storedUser,
+      hasStoredToken: !!storedToken,
+      userEmail: storedUser?.email
+    });
+    
     if (storedUser && storedToken) {
-      console.log('[AuthContext] Initializing with stored user to prevent race conditions');
+      console.log('[AuthContext INIT] ✅ Found stored credentials, initializing as AUTHENTICATED');
       return {
         status: AUTH_STATES.AUTHENTICATED,
         user: storedUser,
@@ -68,6 +74,7 @@ export const AuthProvider = ({ children }) => {
       };
     }
     
+    console.log('[AuthContext INIT] ❌ No stored credentials, initializing as INITIAL');
     return {
       status: AUTH_STATES.INITIAL,
       user: null,
@@ -80,7 +87,7 @@ export const AuthProvider = ({ children }) => {
   
   // Derived state for convenience
   const isAuthenticated = authState.status === AUTH_STATES.AUTHENTICATED;
-  const isLoading = authState.status === AUTH_STATES.LOADING;
+  const isLoading = authState.status === AUTH_STATES.LOADING || authState.status === AUTH_STATES.INITIAL;
   const error = authState.error;
   
   // Debug logging for auth state changes (only in development)
@@ -907,21 +914,34 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
-      console.log('[Auth] Initializing authentication...');
+      console.log('[Auth useEffect] Initializing authentication...');
+      console.log('[Auth useEffect] Current auth state:', {
+        status: authState.status,
+        hasUser: !!authState.user,
+        lastAction: authState.lastAction
+      });
       
       // Check if we already have valid user data - don't show loading if we do
       const storedUser = getStoredUser();
       const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
       
+      console.log('[Auth useEffect] Checking stored credentials:', {
+        hasStoredUser: !!storedUser,
+        hasStoredToken: !!storedToken,
+        userEmail: storedUser?.email,
+        currentStatus: authState.status
+      });
+      
       // If we have stored user and token, keep current AUTHENTICATED state instead of going to LOADING
       if (!(storedUser && storedToken)) {
+        console.log('[Auth useEffect] ❌ No stored credentials, setting LOADING state');
         // Only set loading state if we don't have stored credentials
         updateAuthState({
           status: AUTH_STATES.LOADING,
           lastAction: 'initializing'
         });
       } else {
-        console.log('[Auth] Found stored credentials, maintaining AUTHENTICATED state during validation');
+        console.log('[Auth useEffect] ✅ Found stored credentials, maintaining AUTHENTICATED state during validation');
       }
       
       // In development, allow access even with invalid tokens if user data exists

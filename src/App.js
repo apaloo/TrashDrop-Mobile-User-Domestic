@@ -194,7 +194,7 @@ const AppContent = () => {
   // Render normal app routes when authenticated
   return (
     <Suspense fallback={
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen bg-white">
         <LoadingSpinner size="lg" />
       </div>
     }>
@@ -342,7 +342,7 @@ const App = () => {
               <AppPerformanceOptimizer />
               <Suspense 
                 fallback={
-                  <div className="flex justify-center items-center h-screen">
+                  <div className="flex justify-center items-center h-screen bg-white">
                     <LoadingSpinner size="lg" />
                   </div>
                 }
