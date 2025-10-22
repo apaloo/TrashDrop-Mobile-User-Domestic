@@ -4,7 +4,18 @@ import { BrowserRouter } from 'react-router-dom';
 import './index.css';
 import App from './App.js';
 import ErrorBoundary from './components/ErrorBoundary';
+import performanceTracker from './utils/performanceTracker';
 import reportWebVitals from './reportWebVitals';
+
+// Make performance tracker available for splash screen
+if (typeof window !== 'undefined') {
+  window.performanceTracker = performanceTracker;
+  
+  // Start tracking splash screen if it's visible
+  if (document.getElementById('splash-screen')) {
+    performanceTracker.trackStartup.splashScreen();
+  }
+}
 
 // Debug initialization tracking
 function logAppDebug(message, data) {

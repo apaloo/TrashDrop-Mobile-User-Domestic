@@ -271,6 +271,11 @@
             if (splash && splash.parentNode) {
               splash.parentNode.removeChild(splash);
               updateSplashState('removed');
+              
+              // End splash screen timing if performance tracker available
+              if (window.performanceTracker && typeof window.performanceTracker.trackStartup === 'function') {
+                window.performanceTracker.trackStartup.splashToContent();
+              }
             }
           }, 250);
         }
@@ -320,7 +325,19 @@
             if (window.appState.splashShown) {
               updateSplashState('first-run-safety-timeout');
               clearInterval(contentCheckInterval);
-              hideSplash();
+              // Initialize performance tracking if available
+              if (window.performanceTracker && typeof window.performanceTracker.trackStartup === 'function') {
+                window.performanceTracker.trackStartup.splashScreen();
+              }
+
+              // Hide splash immediately for returning users with stored credentials
+              if (localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token')) {
+                // User has stored credentials - hide splash immediately
+                console.log('[Splash] Found stored credentials - hiding splash immediately');
+                hideSplash();
+              } else {  
+                hideSplash();
+              }
             }
           }, 4000);
           

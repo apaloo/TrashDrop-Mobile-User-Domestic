@@ -6,6 +6,8 @@ import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { ThemeProvider } from './context/ThemeContext.js';
 import { NetworkProvider } from './utils/networkMonitor.js';
 import { OfflineQueueProvider } from './context/OfflineQueueContext.js';
+import performanceTracker from './utils/performanceTracker.js';
+import PerformanceMonitor from './components/PerformanceMonitor.js';
 
 // Pages
 import Login from './pages/Login.js';
@@ -71,10 +73,44 @@ const CollectionFlowTest = process.env.NODE_ENV === 'development'
  * Application content with auth state handling
  */
 const AppContent = () => {
-  const { isLoading, isAuthenticated, checkSession, authState, user } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { 
+    isAuthenticated, 
+    isLoading, 
+    user, 
+    authState,
+    checkSession 
+  } = useAuth();
+
+  // Start tracking app initialization on component mount
+  useEffect(() => {
+    // Track app content initialization
+    performanceTracker.trackStartup.appInitialization();
+    
+    return () => {
+      // End the app initialization tracking when component unmounts
+      performanceTracker.trackStartup.appInitialized();
+    };
+  }, []);
   
+  // Track screen transitions
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const pathSegment = currentPath.split('/')[1] || 'root';
+    
+    performanceTracker.trackScreenTransition('previous', pathSegment);
+    
+    // Track auth state changes for performance monitoring
+    if (pathSegment === 'login' || pathSegment === 'register') {
+      performanceTracker.trackAuth.startLogin();
+    } else if (isAuthenticated && (pathSegment === 'dashboard' || pathSegment === 'root')) {
+      performanceTracker.trackAuth.endLogin();
+      performanceTracker.trackStartup.firstContentfulPaint();
+    }
+    
+  }, [location.pathname, isAuthenticated]);
+
   // Persist last visited path for bookmark/refresh restore
   useEffect(() => {
     try {
@@ -325,6 +361,8 @@ const AppContent = () => {
  * Main application component with routing and context providers
  */
 const App = () => {
+  const [showPerfMonitor, setShowPerfMonitor] = React.useState(false);
+  
   return (
     <AppPerformanceProvider>
       <ThemeProvider>
@@ -343,6 +381,27 @@ const App = () => {
               </Suspense>
             </AuthErrorBoundary>
             <InstallPrompt />
+            
+            {/* Performance monitoring tools - only in development */}
+            {process.env.NODE_ENV === 'development' && (
+              <>
+                <button 
+                  className="fixed bottom-4 right-4 z-50 bg-primary text-white p-2 rounded-full shadow-lg"
+                  onClick={() => setShowPerfMonitor(!showPerfMonitor)}
+                >
+                  <span className="sr-only">Toggle Performance Monitor</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20v-6"></path>
+                    <path d="M6 20v-6"></path>
+                    <path d="M18 20v-6"></path>
+                    <path d="M6 14v-4"></path>
+                    <path d="M18 14v-4"></path>
+                    <path d="M12 14v-4"></path>
+                  </svg>
+                </button>
+                <PerformanceMonitor visible={showPerfMonitor} />
+              </>
+            )}
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
