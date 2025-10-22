@@ -66,25 +66,77 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
-    <!-- Debug Console for installation issues -->
-    <div id="debug-console" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; max-height: 40vh; overflow-y: auto; background: rgba(0,0,0,0.8); color: #00ff00; font-family: monospace; font-size: 12px; padding: 10px; z-index: 9999999;">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-        <strong>TrashDrop Debug Console</strong>
-        <button onclick="document.getElementById('debug-console').style.display='none'" style="background: #444; color: white; border: none; padding: 2px 8px;">Close</button>
-      </div>
-      <div id="debug-log"></div>
-    </div>
+    <!-- Debug Console for installation issues - only shown in development -->
+    <script>
+      // Only create the debug console in debug mode
+      if (window.location.hostname === 'localhost' || window.location.search.includes('debug=true') || window.location.hostname === '127.0.0.1') {
+        // Create and append the debug console
+        const debugConsole = document.createElement('div');
+        debugConsole.id = 'debug-console';
+        debugConsole.style.display = 'none';
+        debugConsole.style.position = 'fixed';
+        debugConsole.style.bottom = '0';
+        debugConsole.style.left = '0';
+        debugConsole.style.right = '0';
+        debugConsole.style.maxHeight = '40vh';
+        debugConsole.style.overflowY = 'auto';
+        debugConsole.style.background = 'rgba(0,0,0,0.8)';
+        debugConsole.style.color = '#00ff00';
+        debugConsole.style.fontFamily = 'monospace';
+        debugConsole.style.fontSize = '12px';
+        debugConsole.style.padding = '10px';
+        debugConsole.style.zIndex = '9999999';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.marginBottom = '5px';
+
+        const title = document.createElement('strong');
+        title.textContent = 'TrashDrop Debug Console';
+        header.appendChild(title);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.style.background = '#444';
+        closeBtn.style.color = 'white';
+        closeBtn.style.border = 'none';
+        closeBtn.style.padding = '2px 8px';
+        closeBtn.onclick = function() { document.getElementById('debug-console').style.display = 'none'; };
+        header.appendChild(closeBtn);
+
+        const debugLog = document.createElement('div');
+        debugLog.id = 'debug-log';
+
+        debugConsole.appendChild(header);
+        debugConsole.appendChild(debugLog);
+
+        document.body.appendChild(debugConsole);
+      }
+    </script>
 
     <!-- Error Detection and Reporting -->
     <script>
-      // Enable debug mode
-      window.TRASHDROP_DEBUG = true;
+      // Only enable debug mode based on hostname or URL params
+      window.TRASHDROP_DEBUG = window.location.hostname === 'localhost' || 
+                             window.location.search.includes('debug=true') || 
+                             window.location.hostname === '127.0.0.1' || 
+                             false;
       
       // Initialize debug log
       var debugLog = [];
       
       // Log to both console and debug panel
       function debugReport(message, data) {
+        // Skip detailed logging in production
+        if (!window.TRASHDROP_DEBUG) {
+          // In production, only log critical errors to console
+          if (message.includes('ERROR') || (data && data.error)) {
+            console.log('[App] ' + message);
+          }
+          return;
+        }
+        
         var logItem = {
           timestamp: new Date().toISOString(),
           message: message,
@@ -106,18 +158,19 @@
         // Log to console
         console.log('[DEBUG] ' + logText);
         
-        // Add to debug panel
+        // Add to debug panel if it exists
         var logElement = document.getElementById('debug-log');
         if (logElement) {
           var entry = document.createElement('div');
           entry.textContent = logText;
           logElement.appendChild(entry);
           logElement.scrollTop = logElement.scrollHeight;
-        }
-        
-        // Show debug console in debug mode
-        if (window.TRASHDROP_DEBUG) {
-          document.getElementById('debug-console').style.display = 'block';
+          
+          // Show debug console in debug mode
+          var debugConsole = document.getElementById('debug-console');
+          if (debugConsole) {
+            debugConsole.style.display = 'block';
+          }
         }
       }
       
@@ -159,11 +212,20 @@
         errorDiv.style.maxHeight = '80vh';
         errorDiv.style.overflowY = 'auto';
         
-        errorDiv.innerHTML = '<h3>App Initialization Error</h3>' +
-          '<p><strong>Error:</strong> ' + message + '</p>' +
-          '<p><strong>Location:</strong> ' + source + ' (line ' + lineno + ', col ' + colno + ')</p>' +
-          '<button onclick="document.getElementById(\'debug-console\').style.display=\'block\'" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px;">Show Debug Log</button>' +
-          '<button onclick="this.parentNode.style.display=\'none\'" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; margin-left: 10px; border-radius: 4px;">Dismiss</button>';
+        if (window.TRASHDROP_DEBUG) {
+          // Detailed error for developers
+          errorDiv.innerHTML = '<h3>App Initialization Error</h3>' +
+            '<p><strong>Error:</strong> ' + message + '</p>' +
+            '<p><strong>Location:</strong> ' + source + ' (line ' + lineno + ', col ' + colno + ')</p>' +
+            '<button onclick="document.getElementById(\'debug-console\').style.display=\'block\'" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px;">Show Debug Log</button>' +
+            '<button onclick="this.parentNode.style.display=\'none\'" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; margin-left: 10px; border-radius: 4px;">Dismiss</button>';
+        } else {
+          // User-friendly error for production
+          errorDiv.innerHTML = '<h3>Something went wrong</h3>' +
+            '<p>We encountered an issue starting the application. Please try refreshing the page.</p>' +
+            '<button onclick="window.location.reload()" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px;">Refresh Page</button>' +
+            '<button onclick="this.parentNode.style.display=\'none\'" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; margin-left: 10px; border-radius: 4px;">Dismiss</button>';
+        }
         
         document.body.appendChild(errorDiv);
         

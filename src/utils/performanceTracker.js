@@ -44,6 +44,12 @@ const captureNavigationTiming = () => {
 // Performance marks for tracking app-specific events
 const marks = {};
 
+// Determine if we should track performance details
+const shouldTrackPerformance = () => {
+  return process.env.NODE_ENV === 'development' || 
+         window.location.search.includes('perf=true');
+};
+
 // Start timing for an event
 const startMark = (name) => {
   try {
@@ -53,7 +59,9 @@ const startMark = (name) => {
       name
     };
   } catch (error) {
-    console.error(`[PerformanceTracker] Error starting mark "${name}":`, error);
+    if (shouldTrackPerformance()) {
+      console.error(`[PerformanceTracker] Error starting mark "${name}":`, error);
+    }
   }
 };
 
@@ -72,8 +80,8 @@ const endMark = (name) => {
     marks[name].end = end;
     marks[name].duration = duration;
     
-    // Log for development
-    if (process.env.NODE_ENV === 'development') {
+    // Log only in development or when performance tracking is explicitly enabled
+    if (shouldTrackPerformance()) {
       console.log(`[PerformanceTracker] ${name}: ${duration.toFixed(2)}ms`);
     }
     
@@ -130,9 +138,11 @@ const trackStartup = {
 // Report critical metrics to analytics (mock implementation)
 const reportMetrics = (metrics) => {
   // This would typically send data to an analytics service
-  console.log('[PerformanceTracker] Reporting metrics:', metrics);
+  if (shouldTrackPerformance()) {
+    console.log('[PerformanceTracker] Reporting metrics:', metrics);
+  }
   
-  // Mock implementation - in a real app, this would send to an analytics service
+  // Always send to analytics service if available, regardless of environment
   if (window.analyticsService && typeof window.analyticsService.trackPerformance === 'function') {
     window.analyticsService.trackPerformance(metrics);
   }
@@ -143,15 +153,16 @@ if (typeof window !== 'undefined' && window.performance) {
   window.addEventListener('load', () => {
     setTimeout(() => {
       const metrics = captureNavigationTiming();
-      console.log('[PerformanceTracker] Initial page load metrics:', metrics);
-      
-      // Report to analytics in production
-      if (process.env.NODE_ENV === 'production') {
-        reportMetrics({
-          type: 'initial_load',
-          data: metrics
-        });
+      // Only log in development
+      if (shouldTrackPerformance()) {
+        console.log('[PerformanceTracker] Initial page load metrics:', metrics);
       }
+      
+      // Always report to analytics
+      reportMetrics({
+        type: 'initial_load',
+        data: metrics
+      });
     }, 0);
   });
 }

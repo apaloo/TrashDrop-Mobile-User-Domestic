@@ -388,6 +388,8 @@ const App = () => {
                 <button 
                   className="fixed bottom-4 right-4 z-50 bg-primary text-white p-2 rounded-full shadow-lg"
                   onClick={() => setShowPerfMonitor(!showPerfMonitor)}
+                  title="Performance Monitor"
+                  aria-label="Toggle Performance Monitor"
                 >
                   <span className="sr-only">Toggle Performance Monitor</span>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
