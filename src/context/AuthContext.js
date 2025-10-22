@@ -1002,23 +1002,34 @@ export const AuthProvider = ({ children }) => {
       }
       
       try {
-        // If we have stored user and were recently authenticated, trust it without re-validation
+        // Always trust stored credentials initially to prevent black screen
         if (storedUser && storedToken) {
-          const lastAuth = storedUser.last_authenticated;
-          const timeSinceAuth = lastAuth ? (Date.now() - new Date(lastAuth).getTime()) : Infinity;
-          
-          // If authenticated within last 24 hours, trust stored credentials
-          if (timeSinceAuth < 24 * 60 * 60 * 1000) {
-            console.log('[Auth] Recent authentication found, using stored credentials without re-validation');
-            updateAuthState({
-              status: AUTH_STATES.AUTHENTICATED,
-              user: storedUser,
-              session: { access_token: storedToken },
-              lastAction: 'init_stored_trusted'
-            });
-            isAuthInitialized.current = true;
-            return; // Skip session validation - trust stored credentials
-          }
+          console.log('[Auth] Found stored credentials - granting immediate access');
+          // Grant immediate access with stored credentials
+          updateAuthState({
+            status: AUTH_STATES.AUTHENTICATED,
+            user: storedUser,
+            session: { access_token: storedToken },
+            lastAction: 'init_stored_trusted'
+          });
+          isAuthInitialized.current = true;
+
+          // Validate in background without affecting UI
+          setTimeout(async () => {
+            try {
+              // Attempt quiet token refresh
+              const { data: { session }, error } = await supabase.auth.refreshSession();
+              if (session?.access_token) {
+                console.log('[Auth] Background token refresh successful');
+                localStorage.setItem('trashdrop_auth_token', session.access_token);
+              }
+            } catch (error) {
+              console.warn('[Auth] Background validation failed:', error);
+              // Don't disrupt user experience even if refresh fails
+            }
+          }, 1000);
+
+          return; // Skip immediate session validation
         }
         
         // For old sessions, validate with Supabase
@@ -1099,29 +1110,50 @@ export const AuthProvider = ({ children }) => {
         }
       }, 60 * 60 * 1000); // Every hour
       
-      // Set up token validation every 5 minutes
+      // Set up background token refresh every 30 minutes
+      // This is a non-blocking refresh that won't affect the UI
       tokenValidationInterval = setInterval(async () => {
         if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Running scheduled token validation check');
-          const result = await validateToken();
-          
-          if (!result.valid) {
-            console.warn(`[Auth] Token validation failed: ${result.reason}`);
-            await checkSession(true); // Force refresh
-          } else if (result.nearExpiry) {
-            console.log('[Auth] Token near expiry, triggering refresh');
-            await checkSession(true); // Force refresh
+          console.log('[Auth] Running background token refresh');
+          try {
+            const { data: { session }, error } = await supabase.auth.refreshSession();
+            if (session?.access_token) {
+              console.log('[Auth] Background token refresh successful');
+              localStorage.setItem('trashdrop_auth_token', session.access_token);
+              // Update session quietly without changing auth state
+              updateAuthState({
+                session,
+                lastAction: 'background_refresh'
+              });
+            }
+          } catch (error) {
+            console.warn('[Auth] Background refresh failed:', error);
+            // Don't disrupt user experience even if refresh fails
           }
         }
-      }, 5 * 60 * 1000); // Every 5 minutes
+      }, 30 * 60 * 1000); // Every 30 minutes
     };
     
-    // Set up visibility change event listener to refresh session when app becomes visible
+    // Set up visibility change event listener for background refresh
     const setupVisibilityListener = () => {
       const handleVisibilityChange = async () => {
         if (document.visibilityState === 'visible' && authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] App became visible, checking session');
-          await checkSession();
+          console.log('[Auth] App became visible, attempting background refresh');
+          try {
+            const { data: { session }, error } = await supabase.auth.refreshSession();
+            if (session?.access_token) {
+              console.log('[Auth] Background refresh on visibility change successful');
+              localStorage.setItem('trashdrop_auth_token', session.access_token);
+              // Update session quietly
+              updateAuthState({
+                session,
+                lastAction: 'visibility_refresh'
+              });
+            }
+          } catch (error) {
+            console.warn('[Auth] Background refresh on visibility change failed:', error);
+            // Continue without disrupting user
+          }
         }
       };
       
@@ -1129,12 +1161,26 @@ export const AuthProvider = ({ children }) => {
       return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
     
-    // Set up window focus event listener
+    // Set up window focus event listener for background refresh
     const setupFocusListener = () => {
       const handleFocus = async () => {
         if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Window focused, checking session');
-          await checkSession();
+          console.log('[Auth] Window focused, attempting background refresh');
+          try {
+            const { data: { session }, error } = await supabase.auth.refreshSession();
+            if (session?.access_token) {
+              console.log('[Auth] Background refresh on focus successful');
+              localStorage.setItem('trashdrop_auth_token', session.access_token);
+              // Update session quietly
+              updateAuthState({
+                session,
+                lastAction: 'focus_refresh'
+              });
+            }
+          } catch (error) {
+            console.warn('[Auth] Background refresh on focus failed:', error);
+            // Continue without disrupting user
+          }
         }
       };
       
