@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
 import App from './App.js';
+import ErrorBoundary from './components/ErrorBoundary';
 import reportWebVitals from './reportWebVitals';
 
 // Debug initialization tracking
@@ -26,58 +27,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Error boundary component to catch errors in React tree
-// IMPORTANT: Must be defined BEFORE it's used in the render call
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    logAppDebug('React error caught in boundary', {
-      error: error.message,
-      componentStack: errorInfo.componentStack
-    });
-    
-    if (window.appState) {
-      window.appState.reactErrorBoundary = {
-        message: error.message,
-        componentStack: errorInfo.componentStack
-      };
-    }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '20px', margin: '20px', border: '2px solid #f0ad4e', borderRadius: '8px', backgroundColor: '#fcf8e3' }}>
-          <h3>Application Error</h3>
-          <p>Something went wrong while loading the application.</p>
-          <p><strong>Error:</strong> {this.state.error && this.state.error.toString()}</p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{ padding: '8px 16px', margin: '10px 0', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Reload Application
-          </button>
-          <button
-            onClick={() => document.getElementById('debug-console').style.display = 'block'}
-            style={{ padding: '8px 16px', margin: '10px 0 10px 10px', backgroundColor: '#f1f1f1', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Show Debug Info
-          </button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+// Using the ErrorBoundary component imported from ./components/ErrorBoundary
 
 // Error handling for React initialization
 try {
