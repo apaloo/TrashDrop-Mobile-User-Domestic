@@ -69,7 +69,10 @@ const startMark = (name) => {
 const endMark = (name) => {
   try {
     if (!marks[name]) {
-      console.warn(`[PerformanceTracker] No start mark found for "${name}"`);
+      // Only show warning in development or when explicitly tracking
+      if (shouldTrackPerformance()) {
+        console.warn(`[PerformanceTracker] No start mark found for "${name}"`);
+      }
       return null;
     }
     

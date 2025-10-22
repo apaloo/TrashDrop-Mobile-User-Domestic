@@ -75,6 +75,12 @@ const PerformanceMonitor = ({ visible = false }) => {
                 <span className="font-mono">{marks['auth_login'].duration?.toFixed(2)}ms</span>
               </div>
             )}
+            {marks['auth_stored_credentials'] && (
+              <div className="flex justify-between bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                <span>Stored Auth:</span>
+                <span className="font-mono">{marks['auth_stored_credentials'].duration?.toFixed(2)}ms</span>
+              </div>
+            )}
             {marks['auth_validation'] && (
               <div className="flex justify-between bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                 <span>Validation:</span>

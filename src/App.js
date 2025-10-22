@@ -105,11 +105,17 @@ const AppContent = () => {
     if (pathSegment === 'login' || pathSegment === 'register') {
       performanceTracker.trackAuth.startLogin();
     } else if (isAuthenticated && (pathSegment === 'dashboard' || pathSegment === 'root')) {
-      performanceTracker.trackAuth.endLogin();
+      // Check if this is a stored credentials auth flow
+      if (!performanceTracker.getMarks()['auth_login'] && authState === 'AUTHENTICATED') {
+        performanceTracker.startMark('auth_stored_credentials');
+        performanceTracker.endMark('auth_stored_credentials');
+      } else {
+        performanceTracker.trackAuth.endLogin();
+      }
       performanceTracker.trackStartup.firstContentfulPaint();
     }
     
-  }, [location.pathname, isAuthenticated]);
+  }, [location.pathname, isAuthenticated, authState]);
 
   // Persist last visited path for bookmark/refresh restore
   useEffect(() => {
