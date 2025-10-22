@@ -44,27 +44,10 @@ const PrivateRoute = ({ children }) => {
         <LoadingSpinner size="lg" />
       </div>
     );
-  } else if (isLoading && hasStoredUser) {
-    // Skip loading entirely for users with stored credentials
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PrivateRoute] Has stored user - SKIPPING loading spinner, rendering content immediately');
-    }
-    // Continue rendering children even during loading
   }
 
-  // In development mode, be more permissive with stored user data
-  if (process.env.NODE_ENV === 'development' && hasStoredUser) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PrivateRoute] Development mode - granting access with stored user');
-    }
-    return children;
-  }
-
-  // Allow access if authenticated or test account
-  if (isTestAccount || isAuthenticated) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PrivateRoute] Access granted - authenticated or test account');
-    }
+  // Allow access if authenticated
+  if (isAuthenticated) {
     return children;
   }
   

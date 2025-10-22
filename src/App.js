@@ -124,20 +124,11 @@ const AppContent = () => {
         console.log('[App] Auth still loading - skipping auth check');
         return;
       }
-      try {
-        const { error } = await checkSession();
-        
-        // If not authenticated and not on a public route, redirect to login
-        if (error && !isAuthenticated) {
-          console.log('[App] Not authenticated, redirecting to login:', error);
-          navigate('/login', { 
-            state: { from: location },
-            replace: true 
-          });
-        }
-      } catch (err) {
-        console.error('[App] Auth check failed:', err);
-        // Redirect to login on auth errors
+      
+      // If not authenticated and not on a public route, redirect to login
+      // AuthContext already handles session management, we just check the state
+      if (!isAuthenticated && !hasStoredUser) {
+        console.log('[App] Not authenticated, redirecting to login');
         navigate('/login', { 
           state: { from: location },
           replace: true 

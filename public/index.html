@@ -2,61 +2,46 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/icon-192x192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#0073e6" />
-    <meta name="description" content="TrashDrop - Waste Management App" />
-    
-    <!-- iOS Web App Configuration -->
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192x192.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="%PUBLIC_URL%/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/icon-192x192.png" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="TrashDrop" />
-    
-    <!-- iOS Splash Screens -->
-    <link rel="apple-touch-startup-image" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
-    <link rel="apple-touch-startup-image" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
-    <link rel="apple-touch-startup-image" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
-    <link rel="apple-touch-startup-image" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
-    <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
-    <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
-    
-    <!-- Android/Chrome -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    
+    <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
-    <!-- Preload splash screen image for instant display -->
-    <link rel="preload" href="/logo-02.png" as="image" />
+    <!-- Unregister stale service workers -->
     <script src="%PUBLIC_URL%/unregister-sw.js"></script>
-    <!-- Clear cache script - uncomment to clear all cached data -->
-    <!-- <script src="%PUBLIC_URL%/clear-cache.js"></script> -->
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
     <title>TrashDrop</title>
     <style>
-      /* Prevent black bars on mobile */
-      html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow-x: hidden;
-        background-color: #ffffff !important;
-      }
-      
-      /* Ensure root element has white background */
-      #root {
-        min-height: 100vh;
-        background-color: #ffffff;
-      }
-      
       /* Fix for map floating over bottom navigation */
-      .leaflet-map-pane, .leaflet-tile, .leaflet-marker-icon,
-      .leaflet-marker-shadow, .leaflet-tile-pane,
-      .leaflet-overlay-pane, .leaflet-shadow-pane,
-      .leaflet-marker-pane, .leaflet-popup-pane,
-      .leaflet-overlay-pane svg, .leaflet-zoom-box,
-      .leaflet-image-layer, .leaflet-layer {
+      .leaflet-map-pane,
+      .leaflet-tile,
+      .leaflet-marker-icon,
+      .leaflet-marker-shadow,
+      .leaflet-tile-pane,
+      .leaflet-overlay-pane,
+      .leaflet-shadow-pane,
+      .leaflet-marker-pane,
+      .leaflet-popup-pane,
+      .leaflet-overlay-pane svg,
+      .leaflet-zoom-box,
+      .leaflet-image-layer,
+      .leaflet-layer {
         z-index: 1 !important;
       }
       
@@ -67,381 +52,7 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-
-    <!-- Debug Console for installation issues - only shown in development -->
-    <script>
-      // Only create the debug console in debug mode
-      if (window.location.hostname === 'localhost' || window.location.search.includes('debug=true') || window.location.hostname === '127.0.0.1') {
-        // Create and append the debug console
-        const debugConsole = document.createElement('div');
-        debugConsole.id = 'debug-console';
-        debugConsole.style.display = 'none';
-        debugConsole.style.position = 'fixed';
-        debugConsole.style.bottom = '0';
-        debugConsole.style.left = '0';
-        debugConsole.style.right = '0';
-        debugConsole.style.maxHeight = '40vh';
-        debugConsole.style.overflowY = 'auto';
-        debugConsole.style.background = 'rgba(0,0,0,0.8)';
-        debugConsole.style.color = '#00ff00';
-        debugConsole.style.fontFamily = 'monospace';
-        debugConsole.style.fontSize = '12px';
-        debugConsole.style.padding = '10px';
-        debugConsole.style.zIndex = '9999999';
-
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.marginBottom = '5px';
-
-        const title = document.createElement('strong');
-        title.textContent = 'TrashDrop Debug Console';
-        header.appendChild(title);
-
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Close';
-        closeBtn.style.background = '#444';
-        closeBtn.style.color = 'white';
-        closeBtn.style.border = 'none';
-        closeBtn.style.padding = '2px 8px';
-        closeBtn.onclick = function() { document.getElementById('debug-console').style.display = 'none'; };
-        header.appendChild(closeBtn);
-
-        const debugLog = document.createElement('div');
-        debugLog.id = 'debug-log';
-
-        debugConsole.appendChild(header);
-        debugConsole.appendChild(debugLog);
-
-        document.body.appendChild(debugConsole);
-      }
-    </script>
-
-    <!-- Error Detection and Reporting -->
-    <script>
-      // Only enable debug mode based on hostname or URL params
-      window.TRASHDROP_DEBUG = window.location.hostname === 'localhost' || 
-                             window.location.search.includes('debug=true') || 
-                             window.location.hostname === '127.0.0.1' || 
-                             false;
-      
-      // Initialize debug log
-      var debugLog = [];
-      
-      // Log to both console and debug panel
-      function debugReport(message, data) {
-        // Skip detailed logging in production
-        if (!window.TRASHDROP_DEBUG) {
-          // In production, only log critical errors to console
-          if (message.includes('ERROR') || (data && data.error)) {
-            console.log('[App] ' + message);
-          }
-          return;
-        }
-        
-        var logItem = {
-          timestamp: new Date().toISOString(),
-          message: message,
-          data: data || {}
-        };
-        
-        debugLog.push(logItem);
-        
-        // Format message for display
-        var logText = logItem.timestamp.split('T')[1].split('.')[0] + ' - ' + message;
-        if (data) {
-          try {
-            logText += ': ' + JSON.stringify(data);
-          } catch(e) {
-            logText += ': [Object]';
-          }
-        }
-        
-        // Log to console
-        console.log('[DEBUG] ' + logText);
-        
-        // Add to debug panel if it exists
-        var logElement = document.getElementById('debug-log');
-        if (logElement) {
-          var entry = document.createElement('div');
-          entry.textContent = logText;
-          logElement.appendChild(entry);
-          logElement.scrollTop = logElement.scrollHeight;
-          
-          // Show debug console in debug mode
-          var debugConsole = document.getElementById('debug-console');
-          if (debugConsole) {
-            debugConsole.style.display = 'block';
-          }
-        }
-      }
-      
-      // Track app initialization state
-      window.appState = {
-        splashShown: true,
-        reactMounted: false,
-        authInitialized: false,
-        routeResolved: false,
-        errors: []
-      };
-      
-      // Error handler
-      window.onerror = function(message, source, lineno, colno, error) {
-        // Track error
-        window.appState.errors.push({
-          message: message,
-          source: source,
-          lineno: lineno,
-          colno: colno,
-          stack: error && error.stack
-        });
-        
-        // Log error
-        debugReport('ERROR DETECTED', {message, source, lineno}); 
-        
-        // Create visible error display
-        var errorDiv = document.createElement('div');
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.top = '50px';
-        errorDiv.style.left = '20px';
-        errorDiv.style.right = '20px';
-        errorDiv.style.padding = '20px';
-        errorDiv.style.backgroundColor = '#ffdddd';
-        errorDiv.style.border = '2px solid red';
-        errorDiv.style.borderRadius = '8px';
-        errorDiv.style.color = 'black';
-        errorDiv.style.zIndex = '9999999';
-        errorDiv.style.maxHeight = '80vh';
-        errorDiv.style.overflowY = 'auto';
-        
-        if (window.TRASHDROP_DEBUG) {
-          // Detailed error for developers
-          errorDiv.innerHTML = '<h3>App Initialization Error</h3>' +
-            '<p><strong>Error:</strong> ' + message + '</p>' +
-            '<p><strong>Location:</strong> ' + source + ' (line ' + lineno + ', col ' + colno + ')</p>' +
-            '<button onclick="document.getElementById(\'debug-console\').style.display=\'block\'" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px;">Show Debug Log</button>' +
-            '<button onclick="this.parentNode.style.display=\'none\'" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; margin-left: 10px; border-radius: 4px;">Dismiss</button>';
-        } else {
-          // User-friendly error for production
-          errorDiv.innerHTML = '<h3>Something went wrong</h3>' +
-            '<p>We encountered an issue starting the application. Please try refreshing the page.</p>' +
-            '<button onclick="window.location.reload()" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px;">Refresh Page</button>' +
-            '<button onclick="this.parentNode.style.display=\'none\'" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; margin-left: 10px; border-radius: 4px;">Dismiss</button>';
-        }
-        
-        document.body.appendChild(errorDiv);
-        
-        // Hide splash screen if it exists to show error
-        var splash = document.getElementById('splash-screen');
-        if (splash) {
-          splash.style.display = 'none';
-        }
-        
-        return true; // Prevents default error handling
-      };
-      
-      // Initialize tracking
-      debugReport('App initialization started');
-      
-      // Detect React mount
-      function checkReactMount() {
-        var root = document.getElementById('root');
-        if (root && root.children && root.children.length > 0) {
-          window.appState.reactMounted = true;
-          debugReport('React content mounted', {elementCount: root.children.length});
-          clearInterval(reactCheckInterval);
-        }
-      }
-      
-      // Check every 200ms for React mounting
-      var reactCheckInterval = setInterval(checkReactMount, 200);
-      
-      // Fallback UI if React fails to mount
-      setTimeout(function() {
-        if (!window.appState.reactMounted) {
-          debugReport('WARNING: React not mounted after 8 seconds', window.appState);
-          
-          // Hide splash
-          var splash = document.getElementById('splash-screen');
-          if (splash && splash.parentNode) {
-            splash.parentNode.removeChild(splash);
-          }
-          
-          // Show fallback UI
-          var fallbackUI = document.createElement('div');
-          fallbackUI.style.position = 'fixed';
-          fallbackUI.style.top = '0';
-          fallbackUI.style.left = '0';
-          fallbackUI.style.right = '0';
-          fallbackUI.style.bottom = '0';
-          fallbackUI.style.backgroundColor = 'white';
-          fallbackUI.style.display = 'flex';
-          fallbackUI.style.flexDirection = 'column';
-          fallbackUI.style.justifyContent = 'center';
-          fallbackUI.style.alignItems = 'center';
-          fallbackUI.style.textAlign = 'center';
-          fallbackUI.style.padding = '20px';
-          fallbackUI.style.zIndex = '999998';
-          
-          fallbackUI.innerHTML = 
-            '<img src="/logo-02.png" alt="TrashDrop" style="width: 150px; height: auto; margin-bottom: 20px;">' +
-            '<h2 style="color: #333;">App is taking longer than expected to load</h2>' +
-            '<p style="color: #666; margin-bottom: 20px;">We\'re having trouble initializing the app.</p>' +
-            '<div style="display: flex; flex-direction: column; gap: 10px;">' +
-              '<button onclick="window.location.reload()" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; margin-bottom: 10px;">Reload App</button>' +
-              '<button onclick="document.getElementById(\'debug-console\').style.display=\'block\'" style="background: #f1f1f1; color: #333; border: none; padding: 10px 20px; border-radius: 4px;">Show Debug Info</button>' +
-            '</div>';
-          
-          document.body.appendChild(fallbackUI);
-        }
-      }, 8000);
-    </script>
-
-    <!-- Optimized splash screen -->
-    <div id="splash-screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; margin: 0; padding: 0;">
-      <img src="/logo-02.png" alt="TrashDrop" onerror="this.src='/logo.svg'" style="width: 260px; max-width: 70%; height: auto; display: block;" loading="eager" decoding="async" />
-    </div>
-    
     <div id="root"></div>
-    
-    <script>
-      // Enhanced splash screen handler with debugging
-      (function() {
-        var splash = document.getElementById('splash-screen');
-        var hidden = false;
-        
-        // Track splash state
-        function updateSplashState(action, details) {
-          window.appState.splashAction = action;
-          debugReport('Splash: ' + action, details || {});
-        }
-        
-        updateSplashState('initialized');
-        
-        function hideSplash() {
-          if (hidden || !splash) {
-            updateSplashState('already-hidden');
-            return;
-          }
-          
-          updateSplashState('hiding');
-          hidden = true;
-          window.appState.splashShown = false;
-          
-          splash.style.opacity = '0';
-          splash.style.transition = 'opacity 0.25s ease-out';
-          
-          setTimeout(function() {
-            if (splash && splash.parentNode) {
-              splash.parentNode.removeChild(splash);
-              updateSplashState('removed');
-              
-              // End splash screen timing if performance tracker available
-              if (window.performanceTracker && typeof window.performanceTracker.trackStartup === 'function') {
-                window.performanceTracker.trackStartup.splashToContent();
-              }
-            }
-          }, 250);
-        }
-        
-        // Check for first run vs returning user
-        var isFirstRun = true;
-        try {
-          isFirstRun = !localStorage.getItem('trashdrop_installed');
-          if (isFirstRun) {
-            localStorage.setItem('trashdrop_installed', 'true');
-            updateSplashState('first-installation', {isFirstRun: true});
-          } else {
-            updateSplashState('returning-user', {isFirstRun: false});
-          }
-        } catch (e) {
-          updateSplashState('storage-error', {error: e.message});
-        }
-
-        // Check for stored credentials
-        var hasStoredUser = false;
-        var hasStoredToken = false;
-        try {
-          hasStoredUser = !!localStorage.getItem('trashdrop_user');
-          hasStoredToken = !!localStorage.getItem('trashdrop_auth_token');
-          updateSplashState('checking-credentials', {hasStoredUser, hasStoredToken});
-        } catch (e) {
-          updateSplashState('credentials-check-error', {error: e.message});
-        }
-        
-        // Strategy for first run: show splash longer to ensure app loads
-        if (isFirstRun) {
-          updateSplashState('first-run-splash-strategy');
-          
-          // Check for React content
-          var contentCheckInterval = setInterval(function() {
-            var root = document.getElementById('root');
-            if (root && root.children && root.children.length > 0) {
-              updateSplashState('content-detected', {childCount: root.children.length});
-              clearInterval(contentCheckInterval);
-              // Show splash slightly longer on first run to ensure JS loads
-              setTimeout(hideSplash, 500);
-            }
-          }, 100);
-          
-          // Safety: hide splash after 4s max for first run
-          setTimeout(function() {
-            if (window.appState.splashShown) {
-              updateSplashState('first-run-safety-timeout');
-              clearInterval(contentCheckInterval);
-              // Initialize performance tracking if available
-              if (window.performanceTracker && typeof window.performanceTracker.trackStartup === 'function') {
-                window.performanceTracker.trackStartup.splashScreen();
-              }
-
-              // Hide splash immediately for returning users with stored credentials
-              if (localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token')) {
-                // User has stored credentials - hide splash immediately
-                console.log('[Splash] Found stored credentials - hiding splash immediately');
-                hideSplash();
-              } else {  
-                hideSplash();
-              }
-            }
-          }, 4000);
-          
-        } else if (hasStoredUser && hasStoredToken) {
-          // Returning user with credentials - hide splash quickly
-          updateSplashState('returning-user-with-credentials');
-          hideSplash();
-          
-        } else {
-          // Returning user without credentials - standard behavior
-          updateSplashState('standard-splash-behavior');
-          
-          var checkInterval = setInterval(function() {
-            var root = document.getElementById('root');
-            if (root && root.children && root.children.length > 0) {
-              updateSplashState('content-ready', {childCount: root.children.length});
-              clearInterval(checkInterval);
-              hideSplash();
-            }
-          }, 50);
-          
-          // Medium timeout for returning users
-          setTimeout(function() {
-            if (window.appState.splashShown) {
-              updateSplashState('standard-safety-timeout');
-              clearInterval(checkInterval);
-              hideSplash();
-            }
-          }, 2500);
-        }
-        
-        // Ultimate fallback - always hide splash after 5s
-        setTimeout(function() {
-          if (window.appState.splashShown) {
-            updateSplashState('ultimate-fallback-timeout');
-            hideSplash();
-          }
-        }, 5000);
-      })();
-    </script>
     <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.
@@ -452,5 +63,14 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
+    <!-- Force correct MIME type for module scripts -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0"
+      }
+    }
+    </script>
   </body>
 </html>

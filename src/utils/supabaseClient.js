@@ -119,8 +119,8 @@ const isTokenValid = (token) => {
         return false;
       }
       
-      // Aggressive refresh strategy (refresh when less than 60 minutes left)
-      if (timeToExpiry < 60 * 60 * 1000) {
+      // Only refresh when token is close to expiry (less than 5 minutes left)
+      if (timeToExpiry < 5 * 60 * 1000) {
         console.log('[Supabase] Token will expire in ' + Math.floor(timeToExpiry / 60000) + ' minutes, triggering refresh');
         
         // Set a global flag to notify that token needs refresh
