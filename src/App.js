@@ -161,15 +161,21 @@ const AppContent = () => {
     handleAuthCheck();
   }, [location.pathname, isAuthenticated, isLoading, authState?.status, user, navigate, location]);
   
-  // Show loading spinner ONLY during explicit LOADING state
-  // Skip loading if we have stored credentials (instant access)
+  // Never show loading spinner for any users with stored credentials
+  // This prevents ANY intermediate screens between splash and homepage
   const hasStoredCreds = localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token');
+  
+  // Skip ALL loading for returning users, regardless of auth state
   if (isLoading && !hasStoredCreds) {
+    console.log('[App] No stored credentials, showing loading spinner');
     return (
       <div className="flex justify-center items-center h-screen bg-white">
         <LoadingSpinner size="lg" />
       </div>
     );
+  } else if (hasStoredCreds && isLoading) {
+    console.log('[App] Has stored credentials, skipping loading spinner entirely');
+    // Continue to render app content even during loading
   }
   
   // Show auth fallback UI when there's an authentication error

@@ -91,26 +91,32 @@
           }, 250);
         }
         
-        // Hide when React app mounts (check for root content)
+        // Hide splash immediately for returning users with stored credentials
+      if (localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token')) {
+        // User has stored credentials - hide splash immediately
+        console.log('[Splash] Found stored credentials - hiding splash immediately');
+        hideSplash();
+      } else {
+        // First time user - normal splash behavior
         var checkInterval = setInterval(function() {
           var root = document.getElementById('root');
           if (root && root.children.length > 0) {
             clearInterval(checkInterval);
-            // Wait longer to ensure React has fully rendered
-            setTimeout(hideSplash, 500);
+            hideSplash(); // No delay for new users - hide as soon as content is ready
           }
         }, 50);
         
-        // Fallback: hide after DOM loads + minimum time
+        // Shorter fallback time for all users
         window.addEventListener('DOMContentLoaded', function() {
-          setTimeout(hideSplash, 1200);
+          setTimeout(hideSplash, 800); // Reduced from 1200ms to 800ms
         });
         
-        // Safety: force hide after 3 seconds max
+        // Safety: force hide after 2 seconds max (reduced from 3 seconds)
         setTimeout(function() {
           clearInterval(checkInterval);
           hideSplash();
-        }, 3000);
+        }, 2000);
+      }
       })();
     </script>
     <!--

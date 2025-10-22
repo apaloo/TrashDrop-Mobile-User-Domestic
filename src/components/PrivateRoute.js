@@ -33,17 +33,23 @@ const PrivateRoute = ({ children }) => {
     });
   }
 
-  // Show loading spinner ONLY during explicit LOADING state
-  // Don't show loading for INITIAL state (it resolves immediately with stored credentials)
-  if (isLoading && status === 'LOADING') {
+  // NEVER show loading spinner if user has stored credentials
+  // Even during explicit LOADING state - this prevents intermediate screens
+  if (isLoading && status === 'LOADING' && !hasStoredUser) {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[PrivateRoute] Showing loading spinner - auth loading');
+      console.log('[PrivateRoute] No stored user - showing loading spinner during auth');
     }
     return (
       <div className="flex justify-center items-center h-screen">
         <LoadingSpinner size="lg" />
       </div>
     );
+  } else if (isLoading && hasStoredUser) {
+    // Skip loading entirely for users with stored credentials
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PrivateRoute] Has stored user - SKIPPING loading spinner, rendering content immediately');
+    }
+    // Continue rendering children even during loading
   }
 
   // In development mode, be more permissive with stored user data
