@@ -20,7 +20,8 @@ const MapUpdater = ({ position }) => {
   const map = useMapEvents({});
   
   useEffect(() => {
-    if (position) {
+    // Only update map if we have a valid position with both coordinates
+    if (position && Array.isArray(position) && position[0] != null && position[1] != null) {
       map.setView(position, map.getZoom());
     }
   }, [position, map]);
@@ -36,15 +37,18 @@ const DraggableMarker = ({ position, setPosition }) => {
     },
   });
 
-  return position ? 
+  // Only render marker if we have a valid position with both coordinates
+  const hasValidPosition = position && Array.isArray(position) && position[0] != null && position[1] != null;
+  
+  return hasValidPosition ? 
     <Marker 
       position={position} 
       draggable={true}
       eventHandlers={{
         dragend: (e) => {
           const marker = e.target;
-          const position = marker.getLatLng();
-          setPosition([position.lat, position.lng]);
+          const markerPos = marker.getLatLng();
+          setPosition([markerPos.lat, markerPos.lng]);
         },
       }}
     /> : null;
@@ -52,10 +56,14 @@ const DraggableMarker = ({ position, setPosition }) => {
 
 const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const { user } = useAuth();
+  
+  // Default location: Accra, Ghana (consistent with geolocationService)
+  const DEFAULT_LOCATION = [5.614736, -0.208811];
+  
   const [position, setPosition] = useState(
     formData.latitude && formData.longitude 
       ? [formData.latitude, formData.longitude] 
-      : [40.7128, -74.0060] // Default to NYC
+      : DEFAULT_LOCATION
   );
   const [savedLocations, setSavedLocations] = useState([]);
   const [addressInput, setAddressInput] = useState(formData.address || '');
@@ -145,7 +153,8 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   
   // Handler for setting position from map
   const handlePositionChange = (newPosition) => {
-    if (!newPosition || newPosition.length !== 2) return;
+    if (!newPosition || !Array.isArray(newPosition) || newPosition.length !== 2) return;
+    if (newPosition[0] == null || newPosition[1] == null) return;
     
     const [latitude, longitude] = newPosition;
     setPosition(newPosition);
@@ -264,15 +273,17 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     } catch (error) {
       console.error('GeolocationService error:', error);
       
-      // No hardcoded fallback - show error to user via toast
-      toastService.warning('Unable to get your location. Please enable location services or manually click on the map to set your position.');
+      // Use default location (Accra, Ghana) as fallback
+      const [defaultLat, defaultLng] = DEFAULT_LOCATION;
       
-      // Don't set any coordinates - require user to manually set location
+      setPosition(DEFAULT_LOCATION);
       updateFormData({
-        latitude: null,
-        longitude: null,
+        latitude: defaultLat,
+        longitude: defaultLng,
         useCurrentLocation: false
       });
+      
+      toastService.info('Using default location (Accra, Ghana). Please adjust the marker on the map to your actual location.');
       
       setLoadingLocation(false);
     }
@@ -364,11 +375,11 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </div>
       </div>
       
-      <div className="mb-6">
+      <div className="mb-4">
         <label className="block text-sm font-medium text-gray-900 mb-1">
           Confirm on Map
         </label>
-        <div className="h-64 rounded-lg overflow-hidden border border-gray-300">
+        <div className="h-48 rounded-lg overflow-hidden border border-gray-300">
           <MapContainer 
             center={position} 
             zoom={13} 
@@ -389,7 +400,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </div>
       </div>
       
-      {position && (
+      {position && position[0] != null && position[1] != null && (
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-1">
@@ -397,7 +408,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             </label>
             <input
               type="text"
-              value={position[0]}
+              value={position[0]?.toFixed(6) || ''}
               disabled
               className="w-full p-2 bg-gray-100 border border-gray-300 rounded-md"
             />
@@ -408,7 +419,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             </label>
             <input
               type="text"
-              value={position[1]}
+              value={position[1]?.toFixed(6) || ''}
               disabled
               className="w-full p-2 bg-gray-100 border border-gray-300 rounded-md"
             />
@@ -416,11 +427,11 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </div>
       )}
       
-      <div className="flex justify-end mt-6">
+      <div className="flex justify-end mt-6 pb-4">
         <button
           type="button"
           onClick={handleContinue}
-          className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-md transition-colors"
+          className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-md transition-colors font-medium"
         >
           Continue
         </button>

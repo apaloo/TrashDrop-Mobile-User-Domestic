@@ -953,7 +953,7 @@ function DigitalBin() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 z-[100] flex items-center justify-center p-4">
-      <div className="bg-white shadow-2xl rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative">
+      <div className="bg-white shadow-2xl rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative flex flex-col">
         {/* Close button */}
         <button
           onClick={() => navigate('/dashboard')}
@@ -963,26 +963,26 @@ function DigitalBin() {
           <FaTimes className="text-gray-600 text-xl" />
         </button>
         
-        <div className="overflow-y-auto max-h-[90vh]">
-          {/* Tab navigation */}
-          <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10 shadow-sm">
-            <TabButton 
-              active={activeTab === 'new'}
-              onClick={() => setActiveTab('new')}
-              icon={FaPlus}
-            >
-              Get Digital Bin
-            </TabButton>
-            <TabButton 
-              active={activeTab === 'scheduled'}
-              onClick={() => setActiveTab('scheduled')}
-              icon={FaQrcode}
-            >
-              Bin QR Code
-            </TabButton>
-          </div>
-          
-          {/* Tab content */}
+        {/* Tab navigation */}
+        <div className="flex border-b border-gray-200 bg-white z-10 shadow-sm flex-shrink-0 pr-16">
+          <TabButton 
+            active={activeTab === 'new'}
+            onClick={() => setActiveTab('new')}
+            icon={FaPlus}
+          >
+            Get Digital Bin
+          </TabButton>
+          <TabButton 
+            active={activeTab === 'scheduled'}
+            onClick={() => setActiveTab('scheduled')}
+            icon={FaQrcode}
+          >
+            Bin QR Code
+          </TabButton>
+        </div>
+        
+        {/* Tab content - scrollable area */}
+        <div className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6">
             {activeTab === 'new' ? (
               <div>

@@ -2,13 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="%PUBLIC_URL%/icon-192x192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0073e6" />
     <meta name="description" content="TrashDrop - Waste Management App" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
+    
+    <!-- iOS Web App Configuration -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="%PUBLIC_URL%/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/icon-192x192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="white" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="TrashDrop" />
+    
+    <!-- iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
+    <link rel="apple-touch-startup-image" media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
+    <link rel="apple-touch-startup-image" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
+    <link rel="apple-touch-startup-image" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
+    <link rel="apple-touch-startup-image" media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
+    <link rel="apple-touch-startup-image" media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%PUBLIC_URL%/icon-512x512.png" />
+    
+    <!-- Android/Chrome -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
     <!-- Preload splash screen image for instant display -->
     <link rel="preload" href="/logo-02.png" as="image" />
@@ -99,14 +116,5 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
-    <!-- Force correct MIME type for module scripts -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom": "https://esm.sh/react-dom@18.2.0"
-      }
-    }
-    </script>
   </body>
 </html>
