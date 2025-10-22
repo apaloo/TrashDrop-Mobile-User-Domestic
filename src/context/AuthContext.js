@@ -929,12 +929,39 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
   
+  // Debug reporting function for auth context
+  const debugAuth = useCallback((message, data) => {
+    // Log to console
+    console.log(`[Auth] ${message}`, data || '');
+    
+    // Log to debug console if available
+    if (window.debugReport) {
+      window.debugReport('Auth: ' + message, data);
+    }
+    
+    // Update app state if available
+    if (window.appState) {
+      window.appState.authLastMessage = message;
+      window.appState.authLastData = data;
+      window.appState.authLastTimestamp = new Date().toISOString();
+    }
+  }, []);
+  
   // Set up auth on mount
   useEffect(() => {
-    console.log('[Auth] Setting up auth context');
+    debugAuth('Setting up auth context');
+    
+    // Track initialization in global state
+    if (window.appState) {
+      window.appState.authInitializing = true;
+    }
+    
     let subscription;
     let refreshInterval;
     let tokenValidationInterval;
+    
+    // Add error boundary for auth initialization
+    try {
     
     const initializeAuth = async () => {
       // Skip if already initialized
@@ -1198,7 +1225,14 @@ export const AuthProvider = ({ children }) => {
     
     // Cleanup function
     return () => {
-      console.log('[Auth] Cleaning up auth context');
+      debugAuth('Cleaning up auth context');
+      
+      // Update app state if available
+      if (window.appState) {
+        window.appState.authInitializing = false;
+        window.appState.authCleaning = true;
+      }
+      
       if (subscription) {
         subscription.unsubscribe();
       }
@@ -1213,7 +1247,41 @@ export const AuthProvider = ({ children }) => {
       
       // Reset initialization flag on unmount
       isAuthInitialized.current = false;
+      
+      // Update app state if available
+      if (window.appState) {
+        window.appState.authCleaning = false;
+        window.appState.authCleanupComplete = true;
+      }
     };
+  } catch (error) {
+    // Catch any errors in auth initialization
+    debugAuth('Error in auth initialization', { message: error.message, stack: error.stack });
+    
+    // Update app state if available
+    if (window.appState) {
+      window.appState.authInitError = {
+        message: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      };
+    }
+    
+    // Update auth state to error
+    setAuthState({
+      status: AUTH_STATES.ERROR,
+      user: null,
+      session: null,
+      error: {
+        message: 'Authentication initialization failed: ' + error.message,
+        code: 'AUTH_INIT_ERROR'
+      },
+      lastAction: 'init_error'
+    });
+    
+    // Return empty cleanup
+    return () => {};
+  }
   }, []); // Empty dependency array - only run on mount/unmount
 
   // Context value

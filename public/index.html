@@ -66,6 +66,173 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
+    <!-- Debug Console for installation issues -->
+    <div id="debug-console" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; max-height: 40vh; overflow-y: auto; background: rgba(0,0,0,0.8); color: #00ff00; font-family: monospace; font-size: 12px; padding: 10px; z-index: 9999999;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <strong>TrashDrop Debug Console</strong>
+        <button onclick="document.getElementById('debug-console').style.display='none'" style="background: #444; color: white; border: none; padding: 2px 8px;">Close</button>
+      </div>
+      <div id="debug-log"></div>
+    </div>
+
+    <!-- Error Detection and Reporting -->
+    <script>
+      // Enable debug mode
+      window.TRASHDROP_DEBUG = true;
+      
+      // Initialize debug log
+      var debugLog = [];
+      
+      // Log to both console and debug panel
+      function debugReport(message, data) {
+        var logItem = {
+          timestamp: new Date().toISOString(),
+          message: message,
+          data: data || {}
+        };
+        
+        debugLog.push(logItem);
+        
+        // Format message for display
+        var logText = logItem.timestamp.split('T')[1].split('.')[0] + ' - ' + message;
+        if (data) {
+          try {
+            logText += ': ' + JSON.stringify(data);
+          } catch(e) {
+            logText += ': [Object]';
+          }
+        }
+        
+        // Log to console
+        console.log('[DEBUG] ' + logText);
+        
+        // Add to debug panel
+        var logElement = document.getElementById('debug-log');
+        if (logElement) {
+          var entry = document.createElement('div');
+          entry.textContent = logText;
+          logElement.appendChild(entry);
+          logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // Show debug console in debug mode
+        if (window.TRASHDROP_DEBUG) {
+          document.getElementById('debug-console').style.display = 'block';
+        }
+      }
+      
+      // Track app initialization state
+      window.appState = {
+        splashShown: true,
+        reactMounted: false,
+        authInitialized: false,
+        routeResolved: false,
+        errors: []
+      };
+      
+      // Error handler
+      window.onerror = function(message, source, lineno, colno, error) {
+        // Track error
+        window.appState.errors.push({
+          message: message,
+          source: source,
+          lineno: lineno,
+          colno: colno,
+          stack: error && error.stack
+        });
+        
+        // Log error
+        debugReport('ERROR DETECTED', {message, source, lineno}); 
+        
+        // Create visible error display
+        var errorDiv = document.createElement('div');
+        errorDiv.style.position = 'fixed';
+        errorDiv.style.top = '50px';
+        errorDiv.style.left = '20px';
+        errorDiv.style.right = '20px';
+        errorDiv.style.padding = '20px';
+        errorDiv.style.backgroundColor = '#ffdddd';
+        errorDiv.style.border = '2px solid red';
+        errorDiv.style.borderRadius = '8px';
+        errorDiv.style.color = 'black';
+        errorDiv.style.zIndex = '9999999';
+        errorDiv.style.maxHeight = '80vh';
+        errorDiv.style.overflowY = 'auto';
+        
+        errorDiv.innerHTML = '<h3>App Initialization Error</h3>' +
+          '<p><strong>Error:</strong> ' + message + '</p>' +
+          '<p><strong>Location:</strong> ' + source + ' (line ' + lineno + ', col ' + colno + ')</p>' +
+          '<button onclick="document.getElementById(\'debug-console\').style.display=\'block\'" style="background: #007bff; color: white; border: none; padding: 8px 16px; margin-top: 10px; border-radius: 4px;">Show Debug Log</button>' +
+          '<button onclick="this.parentNode.style.display=\'none\'" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-top: 10px; margin-left: 10px; border-radius: 4px;">Dismiss</button>';
+        
+        document.body.appendChild(errorDiv);
+        
+        // Hide splash screen if it exists to show error
+        var splash = document.getElementById('splash-screen');
+        if (splash) {
+          splash.style.display = 'none';
+        }
+        
+        return true; // Prevents default error handling
+      };
+      
+      // Initialize tracking
+      debugReport('App initialization started');
+      
+      // Detect React mount
+      function checkReactMount() {
+        var root = document.getElementById('root');
+        if (root && root.children && root.children.length > 0) {
+          window.appState.reactMounted = true;
+          debugReport('React content mounted', {elementCount: root.children.length});
+          clearInterval(reactCheckInterval);
+        }
+      }
+      
+      // Check every 200ms for React mounting
+      var reactCheckInterval = setInterval(checkReactMount, 200);
+      
+      // Fallback UI if React fails to mount
+      setTimeout(function() {
+        if (!window.appState.reactMounted) {
+          debugReport('WARNING: React not mounted after 8 seconds', window.appState);
+          
+          // Hide splash
+          var splash = document.getElementById('splash-screen');
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+          
+          // Show fallback UI
+          var fallbackUI = document.createElement('div');
+          fallbackUI.style.position = 'fixed';
+          fallbackUI.style.top = '0';
+          fallbackUI.style.left = '0';
+          fallbackUI.style.right = '0';
+          fallbackUI.style.bottom = '0';
+          fallbackUI.style.backgroundColor = 'white';
+          fallbackUI.style.display = 'flex';
+          fallbackUI.style.flexDirection = 'column';
+          fallbackUI.style.justifyContent = 'center';
+          fallbackUI.style.alignItems = 'center';
+          fallbackUI.style.textAlign = 'center';
+          fallbackUI.style.padding = '20px';
+          fallbackUI.style.zIndex = '999998';
+          
+          fallbackUI.innerHTML = 
+            '<img src="/logo-02.png" alt="TrashDrop" style="width: 150px; height: auto; margin-bottom: 20px;">' +
+            '<h2 style="color: #333;">App is taking longer than expected to load</h2>' +
+            '<p style="color: #666; margin-bottom: 20px;">We\'re having trouble initializing the app.</p>' +
+            '<div style="display: flex; flex-direction: column; gap: 10px;">' +
+              '<button onclick="window.location.reload()" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; margin-bottom: 10px;">Reload App</button>' +
+              '<button onclick="document.getElementById(\'debug-console\').style.display=\'block\'" style="background: #f1f1f1; color: #333; border: none; padding: 10px 20px; border-radius: 4px;">Show Debug Info</button>' +
+            '</div>';
+          
+          document.body.appendChild(fallbackUI);
+        }
+      }, 8000);
+    </script>
+
     <!-- Optimized splash screen -->
     <div id="splash-screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; margin: 0; padding: 0;">
       <img src="/logo-02.png" alt="TrashDrop" onerror="this.src='/logo.svg'" style="width: 260px; max-width: 70%; height: auto; display: block;" loading="eager" decoding="async" />
@@ -74,49 +241,124 @@
     <div id="root"></div>
     
     <script>
-      // Optimized splash screen handler
+      // Enhanced splash screen handler with debugging
       (function() {
         var splash = document.getElementById('splash-screen');
         var hidden = false;
         
+        // Track splash state
+        function updateSplashState(action, details) {
+          window.appState.splashAction = action;
+          debugReport('Splash: ' + action, details || {});
+        }
+        
+        updateSplashState('initialized');
+        
         function hideSplash() {
-          if (hidden || !splash) return;
+          if (hidden || !splash) {
+            updateSplashState('already-hidden');
+            return;
+          }
+          
+          updateSplashState('hiding');
           hidden = true;
+          window.appState.splashShown = false;
+          
           splash.style.opacity = '0';
           splash.style.transition = 'opacity 0.25s ease-out';
+          
           setTimeout(function() {
             if (splash && splash.parentNode) {
               splash.parentNode.removeChild(splash);
+              updateSplashState('removed');
             }
           }, 250);
         }
         
-        // Hide splash immediately for returning users with stored credentials
-      if (localStorage.getItem('trashdrop_user') && localStorage.getItem('trashdrop_auth_token')) {
-        // User has stored credentials - hide splash immediately
-        console.log('[Splash] Found stored credentials - hiding splash immediately');
-        hideSplash();
-      } else {
-        // First time user - normal splash behavior
-        var checkInterval = setInterval(function() {
-          var root = document.getElementById('root');
-          if (root && root.children.length > 0) {
-            clearInterval(checkInterval);
-            hideSplash(); // No delay for new users - hide as soon as content is ready
+        // Check for first run vs returning user
+        var isFirstRun = true;
+        try {
+          isFirstRun = !localStorage.getItem('trashdrop_installed');
+          if (isFirstRun) {
+            localStorage.setItem('trashdrop_installed', 'true');
+            updateSplashState('first-installation', {isFirstRun: true});
+          } else {
+            updateSplashState('returning-user', {isFirstRun: false});
           }
-        }, 50);
+        } catch (e) {
+          updateSplashState('storage-error', {error: e.message});
+        }
+
+        // Check for stored credentials
+        var hasStoredUser = false;
+        var hasStoredToken = false;
+        try {
+          hasStoredUser = !!localStorage.getItem('trashdrop_user');
+          hasStoredToken = !!localStorage.getItem('trashdrop_auth_token');
+          updateSplashState('checking-credentials', {hasStoredUser, hasStoredToken});
+        } catch (e) {
+          updateSplashState('credentials-check-error', {error: e.message});
+        }
         
-        // Shorter fallback time for all users
-        window.addEventListener('DOMContentLoaded', function() {
-          setTimeout(hideSplash, 800); // Reduced from 1200ms to 800ms
-        });
-        
-        // Safety: force hide after 2 seconds max (reduced from 3 seconds)
-        setTimeout(function() {
-          clearInterval(checkInterval);
+        // Strategy for first run: show splash longer to ensure app loads
+        if (isFirstRun) {
+          updateSplashState('first-run-splash-strategy');
+          
+          // Check for React content
+          var contentCheckInterval = setInterval(function() {
+            var root = document.getElementById('root');
+            if (root && root.children && root.children.length > 0) {
+              updateSplashState('content-detected', {childCount: root.children.length});
+              clearInterval(contentCheckInterval);
+              // Show splash slightly longer on first run to ensure JS loads
+              setTimeout(hideSplash, 500);
+            }
+          }, 100);
+          
+          // Safety: hide splash after 4s max for first run
+          setTimeout(function() {
+            if (window.appState.splashShown) {
+              updateSplashState('first-run-safety-timeout');
+              clearInterval(contentCheckInterval);
+              hideSplash();
+            }
+          }, 4000);
+          
+        } else if (hasStoredUser && hasStoredToken) {
+          // Returning user with credentials - hide splash quickly
+          updateSplashState('returning-user-with-credentials');
           hideSplash();
-        }, 2000);
-      }
+          
+        } else {
+          // Returning user without credentials - standard behavior
+          updateSplashState('standard-splash-behavior');
+          
+          var checkInterval = setInterval(function() {
+            var root = document.getElementById('root');
+            if (root && root.children && root.children.length > 0) {
+              updateSplashState('content-ready', {childCount: root.children.length});
+              clearInterval(checkInterval);
+              hideSplash();
+            }
+          }, 50);
+          
+          // Medium timeout for returning users
+          setTimeout(function() {
+            if (window.appState.splashShown) {
+              updateSplashState('standard-safety-timeout');
+              clearInterval(checkInterval);
+              hideSplash();
+            }
+          }, 2500);
+        }
+        
+        // Ultimate fallback - always hide splash after 5s
+        setTimeout(function() {
+          if (window.appState.splashShown) {
+            updateSplashState('ultimate-fallback-timeout');
+            hideSplash();
+          }
+        }, 5000);
       })();
     </script>
     <!--
