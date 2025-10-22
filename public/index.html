@@ -39,6 +39,12 @@
         width: 100%;
         height: 100%;
         overflow-x: hidden;
+        background-color: #ffffff !important;
+      }
+      
+      /* Ensure root element has white background */
+      #root {
+        min-height: 100vh;
         background-color: #ffffff;
       }
       
@@ -90,20 +96,21 @@
           var root = document.getElementById('root');
           if (root && root.children.length > 0) {
             clearInterval(checkInterval);
-            setTimeout(hideSplash, 200);
+            // Wait longer to ensure React has fully rendered
+            setTimeout(hideSplash, 500);
           }
         }, 50);
         
         // Fallback: hide after DOM loads + minimum time
         window.addEventListener('DOMContentLoaded', function() {
-          setTimeout(hideSplash, 800);
+          setTimeout(hideSplash, 1200);
         });
         
-        // Safety: force hide after 2.5 seconds max
+        // Safety: force hide after 3 seconds max
         setTimeout(function() {
           clearInterval(checkInterval);
           hideSplash();
-        }, 2500);
+        }, 3000);
       })();
     </script>
     <!--

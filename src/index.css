@@ -38,8 +38,25 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  background-color: var(--color-bg, #ffffff);
+  color: var(--color-text, #333333);
+  min-height: 100vh;
+}
+
+/* Ensure root always has white background initially */
+#root {
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+/* Allow dark theme to apply only when explicitly set */
+[data-theme='dark'] body {
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-dark);
+}
+
+[data-theme='dark'] #root {
+  background-color: var(--color-bg-dark);
 }
 
 code {
