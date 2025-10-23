@@ -26,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext.js';
 import { notificationService } from '../services/notificationService.js';
+import supabase from '../utils/supabaseClient.js';
 
 const NotificationList = () => {
   const { user } = useAuth();
@@ -64,6 +65,72 @@ const NotificationList = () => {
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [user.id]);
+
+  // Real-time subscription for new notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('[NotificationList] Setting up real-time notification subscription');
+
+    const notificationSubscription = supabase
+      .channel(`user_notifications_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'alerts',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('[NotificationList] New notification received:', payload.new);
+          const newNotification = payload.new;
+          
+          // Add new notification to the list
+          setNotifications(prev => [newNotification, ...prev]);
+          
+          // Show toast for pickup_accepted type
+          if (newNotification.type === 'pickup_accepted' || newNotification.type === 'pickup_status') {
+            // Toast notification will be shown by the ToastProvider if available
+            window.dispatchEvent(new CustomEvent('trashdrop:notification', {
+              detail: {
+                title: newNotification.title,
+                message: newNotification.message,
+                type: newNotification.type
+              }
+            }));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'alerts',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('[NotificationList] Notification updated:', payload.new);
+          // Update notification in the list
+          setNotifications(prev =>
+            prev.map(n => n.id === payload.new.id ? payload.new : n)
+          );
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[NotificationList] Successfully subscribed to notification updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[NotificationList] Error subscribing to notifications');
+        }
+      });
+
+    return () => {
+      console.log('[NotificationList] Cleaning up notification subscription');
+      supabase.removeChannel(notificationSubscription);
+    };
+  }, [user?.id]);
 
   // Fetch user preferences
   useEffect(() => {

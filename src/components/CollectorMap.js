@@ -62,59 +62,89 @@ const CollectorMap = ({ pickupLocation, onCollectorLocationUpdate }) => {
     const getUserLocation = async () => {
       try {
         setLoading(true);
+        
+        // If we have pickupLocation, use it and skip geolocation
+        if (pickupLocation) {
+          console.log('[CollectorMap] Using pickup location:', pickupLocation);
+          setUserLocation(pickupLocation);
+          setLoading(false);
+          return;
+        }
+        
         const locationResult = await GeolocationService.getCurrentPosition({
           enableHighAccuracy: false,
           timeout: 15000,
           maximumAge: 300000 // 5 minutes
         });
         
-        // Format coords to match the expected format in this component
-        setUserLocation({
-          lat: locationResult.coords.latitude,
-          lng: locationResult.coords.longitude
-        });
-        
-        // Only show error if we're using default location and it wasn't intentional
-        if (!locationResult.success && locationResult.error.code !== 'NOT_SUPPORTED') {
-          console.warn('Geolocation issue:', locationResult.error);
-          setError('Using approximate location. Location services may be disabled.');
+        if (locationResult.success) {
+          // Format coords to match the expected format in this component
+          setUserLocation({
+            lat: locationResult.coords.latitude,
+            lng: locationResult.coords.longitude
+          });
+        } else {
+          // Use default location as fallback
+          console.warn('[CollectorMap] Using default location');
+          setUserLocation({
+            lat: defaultCenter[0],
+            lng: defaultCenter[1]
+          });
         }
+        
       } catch (err) {
-        console.error('Geolocation error:', err);
-        setError('Failed to get your location. Using default location instead.');
+        console.error('[CollectorMap] Geolocation error:', err);
+        // Use default location on error
+        setUserLocation({
+          lat: defaultCenter[0],
+          lng: defaultCenter[1]
+        });
       } finally {
         setLoading(false);
       }
     };
     
     getUserLocation();
-  }, []);
+  }, [pickupLocation]);
 
   // Fetch nearby collectors
   useEffect(() => {
     const fetchNearbyCollectors = async () => {
-      if (!userLocation && !pickupLocation) return;
-
       const location = pickupLocation || userLocation;
+      
+      // Don't fetch if we don't have a valid location yet
+      if (!location || !location.lat || !location.lng) {
+        console.log('[CollectorMap] No valid location yet, skipping collector fetch');
+        return;
+      }
+
       try {
+        console.log('[CollectorMap] Fetching collectors near:', location);
         const { data, error: fetchError } = await collectorService.getNearbyCollectors(
           location,
           5 // 5km radius
         );
 
         if (fetchError) throw new Error(fetchError.message);
-        setCollectors(data);
+        setCollectors(data || []);
+        console.log('[CollectorMap] Found collectors:', data?.length || 0);
 
       } catch (err) {
-        console.error('Error fetching collectors:', err);
-        setError('Failed to fetch nearby collectors');
+        console.error('[CollectorMap] Error fetching collectors:', err);
+        // Don't show error for missing location, just log it
+        if (!err.message.includes('location')) {
+          setError('Failed to fetch nearby collectors');
+        }
       }
     };
 
-    fetchNearbyCollectors();
-    // Refresh collectors every 30 seconds
-    const interval = setInterval(fetchNearbyCollectors, 30000);
-    return () => clearInterval(interval);
+    // Only start fetching if we have a location
+    if (userLocation || pickupLocation) {
+      fetchNearbyCollectors();
+      // Refresh collectors every 30 seconds
+      const interval = setInterval(fetchNearbyCollectors, 30000);
+      return () => clearInterval(interval);
+    }
   }, [userLocation, pickupLocation]);
 
   // Update collector location if user is a collector

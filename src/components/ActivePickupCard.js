@@ -8,6 +8,7 @@ import supabase from '../utils/supabaseClient.js';
 import { FaQrcode, FaTimes } from 'react-icons/fa';
 import { QRCodeSVG } from 'qrcode.react';
 import { createPortal } from 'react-dom';
+import { subscribeToCollectorLocation, calculateETA } from '../utils/realtime.js';
 
 // Component to update the map view when position changes
 const MapUpdater = ({ position }) => {
@@ -147,20 +148,24 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
       return;
     }
     
-    // Subscribe to real-time updates on the collector's location and ETA
+    console.log('[ActivePickupCard] Setting up real-time subscriptions for pickup:', activePickup.id);
+
+    // Subscribe to real-time updates on the pickup status
     const pickupSubscription = supabase
       .channel(`pickup-${activePickup.id}`)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
-        table: 'pickups',
+        table: 'pickup_requests',
         filter: `id=eq.${activePickup.id}`
       }, payload => {
-        // Update pickup status, ETA, and distance if changed
+        console.log('[ActivePickupCard] Pickup status update received:', payload.new);
+        // Update pickup status if changed
         if (payload.new.status !== activePickup.status) {
           onRefresh();
         }
         
+        // Update ETA and distance if provided in pickup_requests table
         if (payload.new.eta_minutes !== undefined) {
           setEtaMinutes(payload.new.eta_minutes);
         }
@@ -171,35 +176,51 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
       })
       .subscribe();
 
-    // Subscribe to real-time updates on the collector's location
-    const collectorSubscription = supabase
-      .channel(`collector-${activePickup.collector_id}`)
-      .on('presence', { event: 'sync' }, () => {
-        const state = collectorSubscription.presenceState();
-        const collector = state[activePickup.collector_id];
-        if (collector && collector[0] && collector[0].location) {
-          setCollectorLocation([collector[0].location.lat, collector[0].location.lng]);
+    // Subscribe to real-time collector location updates using the new helper
+    let locationSubscription = null;
+    if (activePickup.collector_id) {
+      locationSubscription = subscribeToCollectorLocation(
+        activePickup.collector_id,
+        activePickup.id,
+        (locationUpdate) => {
+          console.log('[ActivePickupCard] Collector location update received:', locationUpdate);
+          
+          // Update collector location for map display
+          if (locationUpdate.location) {
+            const loc = locationUpdate.location;
+            // Handle both formats: {latitude, longitude} and {lat, lng}
+            const lat = loc.latitude || loc.lat;
+            const lng = loc.longitude || loc.lng;
+            if (lat && lng) {
+              setCollectorLocation([lat, lng]);
+              
+              // Calculate ETA if we have user location
+              if (activePickup.location && activePickup.location.length === 2) {
+                const userLoc = {
+                  latitude: activePickup.location[0],
+                  longitude: activePickup.location[1]
+                };
+                const collectorLoc = {
+                  latitude: lat,
+                  longitude: lng
+                };
+                const etaData = calculateETA(userLoc, collectorLoc);
+                if (etaData) {
+                  setEtaMinutes(etaData.eta);
+                  setDistance(etaData.distance);
+                }
+              }
+            }
+          }
         }
-      })
-      .subscribe();
+      );
+    }
 
     // Store the subscription for cleanup
-    setSubscription({ pickup: pickupSubscription, collector: collectorSubscription });
+    setSubscription({ pickup: pickupSubscription, location: locationSubscription });
 
-    // Simulate initial data if needed for development
-    if (!activePickup.collector_location && process.env.NODE_ENV === 'development') {
-      // Simulated collector location - slightly offset from user location
-      const userLocation = activePickup.location;
-      if (userLocation) {
-        const simulatedCollectorLocation = [
-          userLocation[0] + (Math.random() * 0.01 - 0.005),
-          userLocation[1] + (Math.random() * 0.01 - 0.005)
-        ];
-        setCollectorLocation(simulatedCollectorLocation);
-        setEtaMinutes(Math.floor(Math.random() * 15) + 5);
-        setDistance(Math.round((Math.random() * 2 + 0.5) * 10) / 10);
-      }
-    } else if (activePickup.collector_location) {
+    // Load initial collector location if available
+    if (activePickup.collector_location) {
       setCollectorLocation(activePickup.collector_location);
       setEtaMinutes(activePickup.eta_minutes);
       setDistance(activePickup.distance);
@@ -207,12 +228,17 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
 
     return () => {
       // Clean up subscriptions
+      console.log('[ActivePickupCard] Cleaning up subscriptions');
       if (subscription) {
-        subscription.pickup.unsubscribe();
-        subscription.collector.unsubscribe();
+        if (subscription.pickup) {
+          supabase.removeChannel(subscription.pickup);
+        }
+        if (subscription.location) {
+          subscription.location.unsubscribe();
+        }
       }
     };
-  }, [activePickup, onRefresh]);
+  }, [activePickup, onRefresh, isOnline]);
 
   if (!activePickup) return null;
 

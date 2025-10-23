@@ -579,3 +579,122 @@ export function handleDumpingReportUpdate(payload, refreshStats) {
     refreshStats();
   }
 }
+
+/**
+ * Subscribe to real-time updates for collector location tracking
+ * @param {string} collectorId - The ID of the collector to track
+ * @param {string} activeRequestId - The ID of the active pickup request
+ * @param {Function} onUpdate - Callback function when location update is received
+ * @returns {object} The subscription object with an unsubscribe method
+ */
+export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpdate) {
+  if (!collectorId) {
+    console.error('[Realtime] Collector ID is required for location tracking');
+    return { unsubscribe: () => {} };
+  }
+
+  // Check if subscription for this collector already exists
+  const subscriptionKey = `collector_location_${collectorId}`;
+  if (activeSubscriptions[subscriptionKey]) {
+    console.log(`[Realtime] Using existing subscription for collector location (${collectorId})`);
+    return activeSubscriptions[subscriptionKey];
+  }
+
+  try {
+    // Create a new channel with a unique name to prevent conflicts
+    const channelName = `collector_location_${collectorId}_${Date.now()}`;
+    
+    // Subscribe to changes in the collector_sessions table for real-time location updates
+    const subscription = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'collector_sessions',
+          filter: `collector_id=eq.${collectorId}`
+        },
+        (payload) => {
+          if (typeof onUpdate === 'function') {
+            console.log('[Realtime] Collector location update received');
+            const locationData = payload.new;
+            
+            // Only process if this is the active session
+            if (locationData.status === 'active' && locationData.current_location) {
+              onUpdate({
+                location: locationData.current_location,
+                lastUpdate: locationData.last_update,
+                sessionId: locationData.id
+              });
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[Realtime] Successfully subscribed to collector location updates for ${collectorId}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] Error subscribing to collector location');
+        } else if (status === 'TIMED_OUT') {
+          console.warn('[Realtime] Collector location subscription timed out. Reconnecting...');
+        } else if (status === 'CHANNEL_CLOSED') {
+          console.log('[Realtime] Collector location subscription closed');
+          // Remove from active subscriptions
+          delete activeSubscriptions[subscriptionKey];
+        }
+      });
+
+    const subscriptionObject = {
+      unsubscribe: () => {
+        try {
+          console.log(`[Realtime] Unsubscribing from collector location updates for ${collectorId}`);
+          supabase.removeChannel(subscription);
+          delete activeSubscriptions[subscriptionKey];
+        } catch (error) {
+          console.error('[Realtime] Error unsubscribing from collector location:', error);
+        }
+      }
+    };
+
+    // Store the subscription
+    activeSubscriptions[subscriptionKey] = subscriptionObject;
+    return subscriptionObject;
+  } catch (error) {
+    console.error('[Realtime] Error creating collector location subscription:', error);
+    return { unsubscribe: () => {} };
+  }
+}
+
+/**
+ * Calculate ETA based on distance and average speed
+ * @param {Object} userLocation - User's location {latitude, longitude}
+ * @param {Object} collectorLocation - Collector's location {latitude, longitude}
+ * @param {number} averageSpeedKmh - Average speed in km/h (default: 30)
+ * @returns {number} Estimated time in minutes
+ */
+export function calculateETA(userLocation, collectorLocation, averageSpeedKmh = 30) {
+  if (!userLocation || !collectorLocation) return null;
+  
+  // Haversine formula to calculate distance between two points
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (collectorLocation.latitude - userLocation.latitude) * Math.PI / 180;
+  const dLon = (collectorLocation.longitude - userLocation.longitude) * Math.PI / 180;
+  
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(userLocation.latitude * Math.PI / 180) * 
+    Math.cos(collectorLocation.latitude * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = R * c;
+  
+  // Calculate ETA in minutes
+  const etaMinutes = Math.round((distanceKm / averageSpeedKmh) * 60);
+  
+  return {
+    distance: Math.round(distanceKm * 10) / 10, // Round to 1 decimal place
+    eta: etaMinutes
+  };
+}

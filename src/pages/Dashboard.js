@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import DashboardOptimizer from '../components/DashboardOptimizer.js';
 import { userService, pickupService } from '../services/index.js';
+import { notificationService } from '../services/notificationService.js';
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
 import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
 
@@ -75,6 +76,7 @@ const Dashboard = () => {
   const mountedRef = useRef(true);
   const [bagsPulse, setBagsPulse] = useState(false);
   const bagsPulseTimerRef = useRef(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   
   // Load recent activities from all activity sources (pickup_requests, illegal_dumping_mobile, digital_bins, user_activity)
   const getDatabaseActivities = useCallback(async (limit = 5) => {
@@ -114,7 +116,7 @@ const Dashboard = () => {
         // User activities (excluding pickup_request to avoid duplicates)
         supabase
           .from('user_activity')
-          .select('id, created_at, activity_type, points')
+          .select('id, created_at, activity_type, points_impact')
           .eq('user_id', user.id)
           .neq('activity_type', 'pickup_request')
           .order('created_at', { ascending: false })
@@ -208,7 +210,7 @@ const Dashboard = () => {
             description: description,
             timestamp: activity.created_at,
             related_id: activity.id,
-            points: activity.points || 0,
+            points: activity.points_impact || 0,
             _source: 'user_activity'
           };
         });
@@ -407,6 +409,113 @@ const Dashboard = () => {
       window.removeEventListener('offline', handleOnlineStatus);
     };
   }, [user?.id, loadDashboardData]);
+
+  // Fetch unread notifications count and subscribe to updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const { data } = await notificationService.getUserNotifications(user.id, {
+          status: 'unread',
+          limit: 100
+        });
+        setUnreadNotifications(data?.length || 0);
+      } catch (err) {
+        console.error('[Dashboard] Error fetching unread notifications:', err);
+      }
+    };
+
+    fetchUnreadCount();
+
+    // Subscribe to real-time notification updates
+    const notificationSubscription = supabase
+      .channel(`dashboard_notifications_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'alerts',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          setUnreadNotifications(prev => prev + 1);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'alerts',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.new.status === 'read' && payload.old.status === 'unread') {
+            setUnreadNotifications(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notificationSubscription);
+    };
+  }, [user?.id]);
+
+  // Auto-navigate to tracking page when pickup is accepted
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('[Dashboard] Setting up pickup status tracking subscription');
+
+    // Subscribe to pickup status changes
+    const pickupStatusSubscription = supabase
+      .channel(`pickup_status_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pickup_requests',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          const oldStatus = payload.old.status;
+          
+          console.log('[Dashboard] Pickup status changed:', { oldStatus, newStatus });
+
+          // Auto-navigate when pickup is accepted or collector is en route
+          if (
+            (oldStatus === 'pending' && newStatus === 'accepted') ||
+            (oldStatus === 'accepted' && newStatus === 'en_route') ||
+            (oldStatus === 'pending' && newStatus === 'collector_assigned')
+          ) {
+            console.log('[Dashboard] Auto-navigating to tracking page');
+            
+            // Show a brief notification before navigating
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
+            notification.innerHTML = '🎉 Collector accepted! Taking you to live tracking...';
+            document.body.appendChild(notification);
+            
+            // Navigate after 2 seconds
+            setTimeout(() => {
+              notification.remove();
+              navigate(`/collector-tracking?pickupId=${payload.new.id}`);
+            }, 2000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[Dashboard] Cleaning up pickup status subscription');
+      supabase.removeChannel(pickupStatusSubscription);
+    };
+  }, [user?.id, navigate]);
 
   // Optimistic bag updates from scanner
   useEffect(() => {
@@ -1124,7 +1233,7 @@ const Dashboard = () => {
         {activePickups && activePickups.length > 0 && (
           <div className="bg-gradient-to-r from-purple-800 to-purple-700 rounded-lg shadow-lg p-6 mt-6">
             <h3 className="text-white text-lg font-bold mb-4">Active Pickup</h3>
-            <div className="bg-purple-900/30 rounded-lg p-4">
+            <div className="bg-purple-900/30 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-white">Status: <span className="text-green-400">{activePickups[0].status}</span></p>
@@ -1137,6 +1246,67 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+            {/* Action Buttons - Conditional layout based on pickup status */}
+            {activePickups[0].status === 'accepted' || 
+             activePickups[0].status === 'en_route' || 
+             activePickups[0].status === 'collector_assigned' ||
+             activePickups[0].status === 'in_transit' ||
+             activePickups[0].status === 'arrived' ? (
+              // Show both buttons when collector is assigned/accepted
+              <div className="grid grid-cols-2 gap-3">
+                {/* Track Collector Button */}
+                <Link 
+                  to={`/collector-tracking?pickupId=${activePickups[0].id}`}
+                  className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 rounded-lg p-3 transition-colors cursor-pointer shadow-md"
+                >
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-white font-medium text-sm">Track Collector</span>
+                  </div>
+                </Link>
+
+                {/* Alerts/Notifications Button */}
+                <Link 
+                  to="/notifications" 
+                  className="flex items-center justify-center bg-purple-900/40 hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2 relative">
+                    <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span className="text-gray-300 font-medium text-sm">Alerts</span>
+                    {unreadNotifications > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </div>
+            ) : (
+              // Show only Alerts button when pickup is pending
+              <div className="flex justify-center">
+                <Link 
+                  to="/notifications" 
+                  className="flex items-center justify-center bg-purple-900/40 hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer w-full"
+                >
+                  <div className="flex items-center space-x-2 relative">
+                    <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span className="text-gray-300 font-medium">Waiting for Collector... Check Alerts</span>
+                    {unreadNotifications > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>

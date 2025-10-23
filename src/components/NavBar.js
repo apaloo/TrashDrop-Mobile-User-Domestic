@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import { useTheme } from '../context/ThemeContext.js';
+import { notificationService } from '../services/notificationService.js';
+import supabase from '../utils/supabaseClient.js';
 
 /**
  * Main navigation component for the application
@@ -12,6 +14,7 @@ const NavBar = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleSignOut = async () => {
     console.log('[NavBar] Sign out initiated');
@@ -41,6 +44,62 @@ const NavBar = () => {
   const toggleProfileDropdown = () => {
     setProfileDropdownOpen(!profileDropdownOpen);
   };
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const { data } = await notificationService.getUserNotifications(user.id, {
+          status: 'unread',
+          limit: 100
+        });
+        setUnreadCount(data?.length || 0);
+      } catch (err) {
+        console.error('[NavBar] Error fetching unread count:', err);
+      }
+    };
+
+    fetchUnreadCount();
+
+    // Subscribe to real-time notification updates
+    const notificationSubscription = supabase
+      .channel(`navbar_notifications_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'alerts',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          // Increment unread count
+          setUnreadCount(prev => prev + 1);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'alerts',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Refresh count when notifications are marked as read
+          if (payload.new.status === 'read' && payload.old.status === 'unread') {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notificationSubscription);
+    };
+  }, [user?.id]);
   
   return (
     <>
@@ -141,6 +200,24 @@ const NavBar = () => {
                   `}
                 >
                   Activity
+                </NavLink>
+                <NavLink 
+                  to="/notifications" 
+                  className={({ isActive }) => `
+                    px-3 py-2 rounded-md text-sm font-medium transition-colors relative
+                    ${isActive ? activeStyle : inactiveStyle}
+                  `}
+                >
+                  <div className="relative inline-block">
+                    <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </NavLink>
                 <NavLink 
                   to="/profile" 
@@ -260,7 +337,6 @@ const NavBar = () => {
                 </svg>
                 <span className="text-xs">Report</span>
               </NavLink>
-              
 
             </div>
           </nav>

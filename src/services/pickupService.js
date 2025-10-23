@@ -132,6 +132,57 @@ export const pickupService = {
   },
 
   /**
+   * Get specific pickup request by ID
+   * @param {string} pickupId - Pickup request ID
+   * @returns {Object} Pickup request details or null
+   */
+  async getPickupDetails(pickupId) {
+    try {
+      if (!pickupId) {
+        throw new Error('Pickup ID is required');
+      }
+
+      console.log('[PickupService] Fetching pickup details for ID:', pickupId);
+
+      // Note: coordinates field contains PostGIS POINT data which needs special handling
+      // For now, we skip it and rely on location text or user geolocation
+      const { data, error } = await supabase
+        .from('pickup_requests')
+        .select(`
+          id, location, fee, status, collector_id, user_id,
+          accepted_at, picked_up_at, disposed_at, created_at, updated_at,
+          waste_type, bag_count, special_instructions, scheduled_date,
+          preferred_time, points_earned
+        `)
+        .eq('id', pickupId)
+        .single();
+
+      if (error) {
+        console.error('[PickupService] Error fetching pickup details:', error);
+        throw error;
+      }
+
+      if (data) {
+        console.log('[PickupService] Found pickup:', data.id);
+        return { data, error: null };
+      }
+
+      console.log('[PickupService] Pickup not found');
+      return { data: null, error: null };
+
+    } catch (error) {
+      console.error('[PickupService] Error in getPickupDetails:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to fetch pickup details',
+          code: error.code || 'GET_PICKUP_DETAILS_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
    * Get pickup history for a user
    * @param {string} userId - User ID
    * @param {number} limit - Number of records to fetch
