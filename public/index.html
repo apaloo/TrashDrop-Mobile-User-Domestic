@@ -65,7 +65,14 @@
   </head>
   <body style="margin: 0; padding: 0; background-color: #ffffff !important; min-height: 100vh;">
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root" style="min-height: 100vh; background-color: #ffffff;"></div>
+    <div id="root" style="min-height: 100vh; background-color: #ffffff;">
+      <!-- Fallback content shown before React loads -->
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #ffffff; flex-direction: column; padding: 20px;">
+        <img src="/logo.svg" alt="TrashDrop" style="width: 80px; height: 80px; margin-bottom: 20px;" />
+        <h1 style="color: #111827; font-size: 24px; margin-bottom: 10px;">TrashDrop Loading...</h1>
+        <p style="color: #6b7280; font-size: 16px;">Initializing app</p>
+      </div>
+    </div>
     <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.

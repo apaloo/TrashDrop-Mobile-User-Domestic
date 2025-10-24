@@ -122,8 +122,8 @@ const ResetPasswordConfirm = () => {
   // Show loading while validating tokens
   if (isValidating) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50 dark:bg-gray-900">
-        <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-center">
+      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50" style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
+        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg text-center" style={{ backgroundColor: '#ffffff' }}>
           <LoadingSpinner size="lg" />
           <p className="text-gray-600 dark:text-gray-300">Validating reset link...</p>
         </div>
@@ -134,8 +134,8 @@ const ResetPasswordConfirm = () => {
   // Show error if invalid token
   if (!isValidToken) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50 dark:bg-gray-900">
-        <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50" style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
+        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg" style={{ backgroundColor: '#ffffff' }}>
           <div className="text-center">
             <div className="flex justify-center mb-4">
               <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
@@ -162,8 +162,8 @@ const ResetPasswordConfirm = () => {
 
   // Show password reset form
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50 dark:bg-gray-900">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50" style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg" style={{ backgroundColor: '#ffffff' }}>
         <div className="text-center">
           <div className="flex justify-center mb-4">
             <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
