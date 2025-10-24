@@ -26,8 +26,10 @@ const Layout = () => {
     setHasBottomPadding(pagesWithMaps.includes(location.pathname));
   }, [location.pathname]);
   
+  console.log('[Layout] Layout rendering, location:', location.pathname);
+  
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-800">
+    <div className="flex flex-col min-h-screen bg-gray-100" style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
       <NavBar />
       <OfflineIndicator />
       {/* Add extra bottom padding for pages with maps on mobile */}
