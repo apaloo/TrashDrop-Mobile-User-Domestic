@@ -75,14 +75,27 @@ const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Force white background immediately on mount
+  useEffect(() => {
+    console.log('[App] AppContent mounted - forcing white background');
+    document.body.style.backgroundColor = '#ffffff';
+    document.documentElement.style.backgroundColor = '#ffffff';
+    const root = document.getElementById('root');
+    if (root) {
+      root.style.backgroundColor = '#ffffff';
+    }
+  }, []);
+  
   // Mark app as loaded after successful initialization
   useEffect(() => {
     if (!isLoading) {
       // Add class to HTML element to allow theme styling
       document.documentElement.classList.add('app-loaded');
-      console.log('[App] App initialization complete');
+      console.log('[App] App initialization complete - marking as loaded');
+    } else {
+      console.log('[App] Still loading...', { authState: authState?.status });
     }
-  }, [isLoading]);
+  }, [isLoading, authState?.status]);
   
   // Persist last visited path for bookmark/refresh restore
   useEffect(() => {
@@ -154,7 +167,7 @@ const AppContent = () => {
   // Show loading spinner during initial load, but with a maximum time limit
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-white">
+      <div className="flex justify-center items-center h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -168,7 +181,7 @@ const AppContent = () => {
   // Render normal app routes when authenticated
   return (
     <Suspense fallback={
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
         <LoadingSpinner size="lg" />
       </div>
     }>
@@ -316,7 +329,7 @@ const App = () => {
               <AppPerformanceOptimizer />
               <Suspense 
                 fallback={
-                  <div className="flex justify-center items-center h-screen">
+                  <div className="flex justify-center items-center h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
                     <LoadingSpinner size="lg" />
                   </div>
                 }
