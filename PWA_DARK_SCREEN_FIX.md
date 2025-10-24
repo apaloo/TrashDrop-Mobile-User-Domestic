@@ -8,10 +8,11 @@ After installing the TrashDrops app as a PWA on a mobile device, users experienc
 
 ## Root Causes Identified
 
-### 1. Dark Theme Applied During Initialization
-- The `ThemeContext` was checking system dark mode preference (`prefers-color-scheme`) and applying it immediately
-- This caused the entire app background to turn dark even during loading state
-- The loading spinner component had `bg-white` class but it was being overridden by global theme styles
+### 1. Dark Theme Applied During Initialization (CRITICAL)
+- The `ThemeContext` was checking system dark mode preference (`prefers-color-scheme`) and applying it **immediately on mount**
+- This caused `document.documentElement.setAttribute('data-theme', 'dark')` to run before app loaded
+- The dark theme CSS overrode all white background styles, even the `!important` declarations
+- The loading spinner component had `bg-white` class but it was being overridden by `data-theme="dark"` styles
 
 ### 2. Duplicate Initialization Call
 - `initializeAuth()` function was being called twice in the AuthContext cleanup
@@ -63,6 +64,50 @@ useEffect(() => {
 ```
 
 **Effect**: Theme styles only apply after app successfully loads
+
+### 2a. CRITICAL: Defer Theme Application (`src/context/ThemeContext.js`)
+```javascript
+// Always start with light theme during initialization
+const [theme, setTheme] = useState('light');
+const [isInitialized, setIsInitialized] = useState(false);
+
+useEffect(() => {
+  // Wait for app to be loaded before applying saved theme
+  const checkAppLoaded = () => {
+    if (document.documentElement.classList.contains('app-loaded')) {
+      // App has loaded, now we can safely apply the saved theme
+      const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
+      if (savedTheme) {
+        setTheme(savedTheme);
+      } else {
+        // Check for system preference only after app loads
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setTheme(prefersDark ? 'dark' : 'light');
+      }
+      setIsInitialized(true);
+    } else {
+      // App not loaded yet, check again in 100ms
+      setTimeout(checkAppLoaded, 100);
+    }
+  };
+  
+  setTimeout(checkAppLoaded, 100);
+}, []);
+
+useEffect(() => {
+  // Only apply theme after initialization
+  if (isInitialized) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(appConfig.storage.themeKey, theme);
+  }
+}, [theme, isInitialized]);
+```
+
+**Effect**: 
+- Theme **never** applies dark mode during initialization
+- Always starts with light theme
+- Waits for `app-loaded` class before checking saved/system theme
+- This is the **critical fix** that prevents the dark screen
 
 ### 3. Reduce Loading Timeout (`src/context/AuthContext.js`)
 - **Before**: 30 seconds timeout
@@ -171,22 +216,26 @@ File sizes after gzip:
 
 1. **src/index.css** - Force white background during loading
 2. **src/App.js** - Add app-loaded class after initialization
-3. **src/context/AuthContext.js** - Reduce timeout, fix duplicate init, add offline handling
-4. **public/manifest.json** - Update to use PNG icons
-5. **public/index.html** - Add cache clearing script
-6. **public/clear-pwa-cache.js** - New cache clearing utility (created)
+3. **src/context/ThemeContext.js** - **CRITICAL: Defer theme application until app loads**
+4. **src/context/AuthContext.js** - Reduce timeout, fix duplicate init, add offline handling
+5. **public/manifest.json** - Update to use PNG icons
+6. **public/index.html** - Add cache clearing script
+7. **public/clear-pwa-cache.js** - New cache clearing utility (created)
 
 ## Rollback Plan
 If issues occur, restore these files from git:
 ```bash
-git checkout HEAD -- src/index.css
-git checkout HEAD -- src/App.js
-git checkout HEAD -- src/context/AuthContext.js
-git checkout HEAD -- public/manifest.json
-git checkout HEAD -- public/index.html
+git checkout HEAD~2 -- src/index.css
+git checkout HEAD~2 -- src/App.js
+git checkout HEAD~2 -- src/context/ThemeContext.js
+git checkout HEAD~2 -- src/context/AuthContext.js
+git checkout HEAD~2 -- public/manifest.json
+git checkout HEAD~2 -- public/index.html
 rm public/clear-pwa-cache.js
 npm run build
 ```
+
+Note: Use `HEAD~2` to go back before both commits (initial fix + ThemeContext fix)
 
 ## Future Improvements
 - [ ] Add custom splash screen HTML for better branding
