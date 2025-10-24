@@ -254,21 +254,24 @@ export const AuthProvider = ({ children }) => {
     // Clear any existing timeout first
     clearLoadingTimeout();
     
-    // Set a new timeout (30 seconds)
+    // Set a new timeout (10 seconds for faster recovery)
     loadingTimeoutRef.current = setTimeout(() => {
       // If we're still loading after timeout, update to error state
-      if (authState.status === AUTH_STATES.LOADING) {
-        console.warn('[Auth] Loading timeout exceeded, forcing state update');
-        updateAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          error: {
-            message: 'Authentication check timed out. Please try again.',
-            code: 'TIMEOUT'
-          },
-          lastAction: 'timeout'
-        });
-      }
-    }, 30000); // 30 seconds timeout
+      setAuthState(prev => {
+        if (prev.status === AUTH_STATES.LOADING) {
+          console.warn('[Auth] Loading timeout exceeded, forcing state update');
+          return {
+            ...prev,
+            status: AUTH_STATES.UNAUTHENTICATED,
+            error: null, // Don't show error, just mark as unauthenticated
+            lastAction: 'timeout',
+            user: null,
+            session: null
+          };
+        }
+        return prev;
+      });
+    }, 10000); // 10 seconds timeout for faster recovery
   };
 
   // Handle successful authentication
@@ -860,7 +863,15 @@ export const AuthProvider = ({ children }) => {
           });
         }
         
-        // Always check session to validate/refresh token
+        // Check if we're offline - skip session validation if offline but have stored user
+        if (!navigator.onLine && storedUser) {
+          console.log('[Auth] Offline with stored user, skipping session validation');
+          // Already set authenticated state above, just return
+          isAuthInitialized.current = true;
+          return;
+        }
+        
+        // Always check session to validate/refresh token when online
         console.log('[Auth] Validating session...');
         await checkSession();
         
@@ -988,9 +999,6 @@ export const AuthProvider = ({ children }) => {
     const removeVisibilityListener = setupVisibilityListener();
     const removeFocusListener = setupFocusListener();
     setupRefreshIntervals();
-    
-    // Call initialization function once
-    initializeAuth();
     
     // Cleanup function
     return () => {

@@ -31,6 +31,8 @@
   --color-secondary: var(--color-secondary-dark);
 }
 
+/* Force white background during initialization */
+html,
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -38,15 +40,26 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-bg, #ffffff);
-  color: var(--color-text, #333333);
+  background-color: #ffffff !important;
+  color: #333333;
   min-height: 100vh;
 }
 
-/* Ensure root always has white background initially */
+/* Apply theme colors only after app has loaded */
+html.app-loaded body {
+  background-color: var(--color-bg, #ffffff) !important;
+  color: var(--color-text, #333333);
+}
+
+/* Ensure root always has white background during loading */
 #root {
   min-height: 100vh;
-  background-color: #ffffff;
+  background-color: #ffffff !important;
+}
+
+/* Allow theme to apply to root after app loads */
+html.app-loaded #root {
+  background-color: var(--color-bg, #ffffff) !important;
 }
 
 /* Allow dark theme to apply only when explicitly set */

@@ -75,6 +75,15 @@ const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Mark app as loaded after successful initialization
+  useEffect(() => {
+    if (!isLoading) {
+      // Add class to HTML element to allow theme styling
+      document.documentElement.classList.add('app-loaded');
+      console.log('[App] App initialization complete');
+    }
+  }, [isLoading]);
+  
   // Persist last visited path for bookmark/refresh restore
   useEffect(() => {
     try {
