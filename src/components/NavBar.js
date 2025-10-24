@@ -11,7 +11,16 @@ import supabase from '../utils/supabaseClient.js';
  */
 const NavBar = () => {
   const { isAuthenticated, signOut, user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  // ThemeProvider temporarily disabled - use fallback
+  let theme = 'light';
+  let toggleTheme = () => {};
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme;
+    toggleTheme = themeContext.toggleTheme;
+  } catch (e) {
+    // ThemeProvider not available, use defaults
+  }
   const navigate = useNavigate();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);

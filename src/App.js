@@ -316,7 +316,8 @@ const AppContent = () => {
 const App = () => {
   return (
     <AppPerformanceProvider>
-      <ThemeProvider>
+      {/* ThemeProvider DISABLED - causing dark screen issue */}
+      {/* <ThemeProvider> */}
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
             <AuthErrorBoundary>
@@ -334,7 +335,7 @@ const App = () => {
             <InstallPrompt />
           </AuthProvider>
         </ToastProvider>
-      </ThemeProvider>
+      {/* </ThemeProvider> */}
     </AppPerformanceProvider>
   );
 };
