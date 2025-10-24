@@ -17,6 +17,7 @@
   --color-secondary-dark: #84e184;
 }
 
+/* Light theme variables - always safe */
 [data-theme='light'] {
   --color-bg: var(--color-bg-light);
   --color-text: var(--color-text-light);
@@ -24,11 +25,20 @@
   --color-secondary: var(--color-secondary-light);
 }
 
-[data-theme='dark'] {
+/* CRITICAL: Dark theme variables ONLY when app is loaded */
+html.app-loaded[data-theme='dark'] {
   --color-bg: var(--color-bg-dark);
   --color-text: var(--color-text-dark);
   --color-primary: var(--color-primary-dark);
   --color-secondary: var(--color-secondary-dark);
+}
+
+/* Force light theme variables during loading */
+html:not(.app-loaded) {
+  --color-bg: var(--color-bg-light);
+  --color-text: var(--color-text-light);
+  --color-primary: var(--color-primary-light);
+  --color-secondary: var(--color-secondary-light);
 }
 
 /* Force white background during initialization */
@@ -62,14 +72,22 @@ html.app-loaded #root {
   background-color: var(--color-bg, #ffffff) !important;
 }
 
-/* Allow dark theme to apply only when explicitly set */
-[data-theme='dark'] body {
-  background-color: var(--color-bg-dark);
+/* CRITICAL: Dark theme ONLY applies after app is loaded */
+/* This prevents dark screen during initialization */
+html.app-loaded[data-theme='dark'] body {
+  background-color: var(--color-bg-dark) !important;
   color: var(--color-text-dark);
 }
 
-[data-theme='dark'] #root {
-  background-color: var(--color-bg-dark);
+html.app-loaded[data-theme='dark'] #root {
+  background-color: var(--color-bg-dark) !important;
+}
+
+/* Ensure dark theme NEVER applies during loading */
+html:not(.app-loaded) body,
+html:not(.app-loaded) #root {
+  background-color: #ffffff !important;
+  color: #333333 !important;
 }
 
 code {
@@ -85,7 +103,10 @@ select, input, textarea, option {
 
 /* Ensuring dark theme doesn't override text color but keeps other styling */
 .dark select, .dark input, .dark textarea, .dark option,
-[data-theme='dark'] select, [data-theme='dark'] input, [data-theme='dark'] textarea, [data-theme='dark'] option {
+html.app-loaded[data-theme='dark'] select, 
+html.app-loaded[data-theme='dark'] input, 
+html.app-loaded[data-theme='dark'] textarea, 
+html.app-loaded[data-theme='dark'] option {
   color: #000000 !important; /* Enforcing black text regardless of theme */
   font-weight: 500 !important;
 }
@@ -97,7 +118,9 @@ select::placeholder, input::placeholder, textarea::placeholder {
 }
 
 .dark select::placeholder, .dark input::placeholder, .dark textarea::placeholder,
-[data-theme='dark'] select::placeholder, [data-theme='dark'] input::placeholder, [data-theme='dark'] textarea::placeholder {
+html.app-loaded[data-theme='dark'] select::placeholder, 
+html.app-loaded[data-theme='dark'] input::placeholder, 
+html.app-loaded[data-theme='dark'] textarea::placeholder {
   color: #bbbbbb !important;
   font-weight: 500 !important;
   opacity: 1 !important;
@@ -109,7 +132,7 @@ select option {
   font-weight: 500 !important;
 }
 
-.dark select option, [data-theme='dark'] select option {
+.dark select option, html.app-loaded[data-theme='dark'] select option {
   background-color: #1a1a1a;
   color: #ffffff !important;
   font-weight: 500 !important;
