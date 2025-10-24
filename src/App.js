@@ -164,25 +164,8 @@ const AppContent = () => {
     return () => clearTimeout(timeoutId);
   }, [location.pathname, checkSession, isAuthenticated, navigate, location]);
   
-  // Show loading spinner during initial load, but with a maximum time limit
-  if (isLoading) {
-    console.log('[AppContent] Rendering LOADING state');
-    return (
-      <div className="flex justify-center items-center h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-  
-  console.log('[AppContent] NOT loading, isAuthenticated:', isAuthenticated, 'authState:', authState?.status);
-  
-  // Show auth fallback UI when there's an authentication error
-  if (authState?.status === 'ERROR' && authState?.error) {
-    console.log('[AppContent] Rendering ERROR state');
-    return <AuthFallback />;
-  }
-  
-  console.log('[AppContent] Rendering routes, location:', location.pathname);
+  // NO LOADING STATE - Render immediately based on auth status
+  console.log('[AppContent] Rendering immediately - isAuthenticated:', isAuthenticated, 'status:', authState?.status);
   
   // Render normal app routes when authenticated
   return (

@@ -67,8 +67,8 @@ const Login = () => {
           <div className="flex justify-center mb-4">
             <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
           </div>
-          <h1 className="text-3xl font-bold text-primary dark:text-primary-light">Welcome Back</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">Sign in to your TrashDrop account</p>
+          <h1 className="text-3xl font-bold text-primary">Welcome Back</h1>
+          <p className="mt-2 text-gray-600">Sign in to your TrashDrop account</p>
         </div>
 
         {error && (
@@ -80,7 +80,7 @@ const Login = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email Address
               </label>
               <input
@@ -91,17 +91,18 @@ const Login = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-gray-900"
+                style={{ backgroundColor: '#ffffff', color: '#111827' }}
                 placeholder="your.email@example.com"
               />
             </div>
             
             <div>
               <div className="flex justify-between">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-                <Link to="/reset-password" className="text-sm text-primary dark:text-primary-light hover:underline">
+                <Link to="/reset-password" className="text-sm text-primary hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -113,7 +114,8 @@ const Login = () => {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-gray-900"
+                style={{ backgroundColor: '#ffffff', color: '#111827' }}
                 placeholder="••••••••"
               />
             </div>
@@ -125,9 +127,9 @@ const Login = () => {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 dark:border-gray-700 rounded"
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
                 Remember me
               </label>
             </div>
@@ -145,9 +147,9 @@ const Login = () => {
         </form>
         
         <div className="text-center mt-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600">
             Don't have an account?{' '}
-            <Link to="/register" className="font-medium text-primary hover:text-primary-dark dark:text-primary-light dark:hover:text-primary">
+            <Link to="/register" className="font-medium text-primary hover:text-primary-dark">
               Sign up
             </Link>
           </p>

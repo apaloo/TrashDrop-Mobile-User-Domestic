@@ -50,30 +50,33 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // Auth state - Initialize with stored user if available to prevent race conditions
+  // Auth state - SYNCHRONOUS initialization, NO LOADING STATE
   const [authState, setAuthState] = useState(() => {
+    console.log('[AuthContext] SYNCHRONOUS initialization starting');
+    
     // Check for stored user during initialization
     const storedUser = getStoredUser();
     const storedToken = localStorage.getItem('trashdrop_auth_token');
     
-    if (storedUser && storedToken) {
-      console.log('[AuthContext] Initializing with stored user to prevent race conditions');
+    if (storedUser && storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
+      console.log('[AuthContext] Found stored credentials - AUTHENTICATED immediately');
       return {
         status: AUTH_STATES.AUTHENTICATED,
         user: storedUser,
         error: null,
         retryCount: 0,
-        lastAction: 'init_with_stored_user',
+        lastAction: 'sync_init_authenticated',
         session: { access_token: storedToken }
       };
     }
     
+    console.log('[AuthContext] No stored credentials - UNAUTHENTICATED immediately');
     return {
-      status: AUTH_STATES.INITIAL,
+      status: AUTH_STATES.UNAUTHENTICATED,
       user: null,
       error: null,
       retryCount: 0,
-      lastAction: null,
+      lastAction: 'sync_init_unauthenticated',
       session: null
     };
   });
@@ -815,185 +818,53 @@ export const AuthProvider = ({ children }) => {
     let tokenValidationInterval;
     
     const initializeAuth = async () => {
-      // Prevent multiple initializations
-      if (isAuthInitialized.current) {
-        console.log('[Auth] Auth already initialized, skipping');
-        return;
-      }
+      // State is already set synchronously in useState - no async init needed
+      console.log('[Auth] Auth state already initialized synchronously');
+      isAuthInitialized.current = true;
       
-      console.log('[Auth] Initializing authentication...');
-      
-      // CRITICAL: Set aggressive 5-second timeout for initialization
-      const initTimeout = setTimeout(() => {
-        console.error('[Auth] Initialization timeout - forcing unauthenticated state');
-        setAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          user: null,
-          session: null,
-          error: null,
-          lastAction: 'init_timeout',
-          isLoading: false
-        });
-        isAuthInitialized.current = true;
-      }, 5000); // 5 seconds max for initialization
-      
-      // Check if we already have valid user data - don't show loading if we do
-      const storedUser = getStoredUser();
-      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
-      
-      // If we have stored user and token, keep current AUTHENTICATED state instead of going to LOADING
-      if (!(storedUser && storedToken)) {
-        // Only set loading state if we don't have stored credentials
-        updateAuthState({
-          status: AUTH_STATES.LOADING,
-          lastAction: 'initializing'
-        });
-      } else {
-        console.log('[Auth] Found stored credentials, maintaining AUTHENTICATED state during validation');
-      }
-      
-      if (!storedToken || !storedToken.includes('.') || storedToken === 'undefined' || storedToken === 'null') {
-        console.warn('[Auth] Invalid or missing token, clearing auth data');
-        clearAuthData();
-        clearTimeout(initTimeout); // Clear timeout
-        updateAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          user: null,
-          session: null,
-          error: null,
-          lastAction: 'init_no_token'
-        });
-        isAuthInitialized.current = true;
-        return;
-      }
-      
-      try {
-        // If we have stored user, accept it immediately without validation
-        if (storedUser && storedToken) {
-          console.log('[Auth] Using stored credentials without validation');
-          clearTimeout(initTimeout); // Clear timeout
-          updateAuthState({
-            status: AUTH_STATES.AUTHENTICATED,
-            user: storedUser,
-            session: { access_token: storedToken },
-            lastAction: 'init_stored'
-          });
-          isAuthInitialized.current = true;
+      // Set up Supabase auth listener for future sign-ins/sign-outs
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          console.log('[Auth] Auth state changed:', event);
           
-          // Validate in background (don't await)
-          setTimeout(() => {
-            console.log('[Auth] Running background session validation');
-            checkSession().catch(err => {
-              console.warn('[Auth] Background validation failed:', err);
-            });
-          }, 1000);
-          
-          // Set up auth listener and return immediately
-          const { data } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-              console.log('[Auth] Auth state changed:', event);
-              
-              switch (event) {
-                case 'SIGNED_IN':
-                  if (session?.user) {
-                    handleAuthSuccess(session.user, session);
-                  }
-                  break;
-                  
-                case 'SIGNED_OUT':
-                  await resetAuthState();
-                  break;
-                  
-                case 'TOKEN_REFRESHED':
-                  console.log('[Auth] Token refreshed');
-                  if (session?.user && authState.status === AUTH_STATES.AUTHENTICATED) {
-                    updateAuthState({
-                      session,
-                      lastAction: 'token_refreshed'
-                    });
-                    
-                    if (session.access_token) {
-                      localStorage.setItem(appConfig.storage.tokenKey, session.access_token);
-                    }
-                  }
-                  break;
+          switch (event) {
+            case 'SIGNED_IN':
+              if (session?.user) {
+                handleAuthSuccess(session.user, session);
               }
-            }
-          );
-          
-          subscription = data.subscription;
-          return; // Exit early
-        }
-        
-        // No stored credentials - go to unauthenticated
-        console.log('[Auth] No stored credentials found');
-        clearTimeout(initTimeout); // Clear timeout
-        updateAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          user: null,
-          session: null,
-          error: null,
-          lastAction: 'init_no_credentials'
-        });
-        isAuthInitialized.current = true;
-        
-        // Set up auth state change listener
-        const { data } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            console.log('[Auth] Auth state changed:', event);
-            
-            switch (event) {
-              case 'SIGNED_IN':
-                if (session?.user) {
-                  handleAuthSuccess(session.user, session);
-                }
-                break;
+              break;
+              
+            case 'SIGNED_OUT':
+              await resetAuthState();
+              break;
+              
+            case 'TOKEN_REFRESHED':
+              console.log('[Auth] Token refreshed');
+              if (session?.user && authState.status === AUTH_STATES.AUTHENTICATED) {
+                updateAuthState({
+                  session,
+                  lastAction: 'token_refreshed'
+                });
                 
-              case 'SIGNED_OUT':
-                await resetAuthState();
-                break;
-                
-              case 'TOKEN_REFRESHED':
-                console.log('[Auth] Token refreshed');
-                if (session?.user && authState.status === AUTH_STATES.AUTHENTICATED) {
-                  updateAuthState({
-                    session,
-                    lastAction: 'token_refreshed'
-                  });
-                  
-                  // Store refreshed token
-                  if (session.access_token) {
-                    localStorage.setItem(appConfig.storage.tokenKey, session.access_token);
-                    console.log('[Auth] Stored refreshed token');
-                    
-                    // Reset the global refresh flag if it was set
-                    if (window.trashdropTokenNeedsRefresh) {
-                      window.trashdropTokenNeedsRefresh = false;
-                    }
-                  }
+                if (session.access_token) {
+                  localStorage.setItem(appConfig.storage.tokenKey, session.access_token);
                 }
-                break;
-            }
+              }
+              break;
           }
-        );
-        
-        // Store subscription for cleanup
-        subscription = data.subscription;
-        
-        // Mark auth as initialized
-        isAuthInitialized.current = true;
-      } catch (error) {
-        console.error('[Auth] Error during initialization:', error);
-        clearTimeout(initTimeout); // Clear timeout
-        // Force unauthenticated instead of error to allow access to login
-        updateAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          user: null,
-          session: null,
-          error: null,
-          lastAction: 'init_error'
-        });
-        isAuthInitialized.current = true;
+        }
+      );
+      
+      subscription = data.subscription;
+      
+      // Run background validation for authenticated users (non-blocking)
+      if (authState.status === AUTH_STATES.AUTHENTICATED) {
+        setTimeout(() => {
+          console.log('[Auth] Running background session validation');
+          checkSession().catch(err => {
+            console.warn('[Auth] Background validation failed:', err);
+          });
+        }, 2000); // Wait 2 seconds before validating
       }
     };
     
