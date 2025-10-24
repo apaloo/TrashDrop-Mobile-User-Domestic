@@ -12,26 +12,48 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  // Check if user has previously set a theme preference
-  const getSavedTheme = () => {
-    const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
-    if (savedTheme) {
-      return savedTheme;
-    }
-    // If user hasn't set a preference, check for system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? 'dark' : 'light';
-  };
-
-  const [theme, setTheme] = useState(getSavedTheme());
+  // Always start with light theme during initialization
+  const [theme, setTheme] = useState('light');
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Apply theme to document
-    document.documentElement.setAttribute('data-theme', theme);
+    // Wait for app to be loaded before applying saved theme
+    const checkAppLoaded = () => {
+      if (document.documentElement.classList.contains('app-loaded')) {
+        // App has loaded, now we can safely apply the saved theme
+        const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
+        if (savedTheme) {
+          setTheme(savedTheme);
+        } else {
+          // Check for system preference only after app loads
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          setTheme(prefersDark ? 'dark' : 'light');
+        }
+        setIsInitialized(true);
+      } else {
+        // App not loaded yet, check again in 100ms
+        setTimeout(checkAppLoaded, 100);
+      }
+    };
     
-    // Save theme preference to localStorage
-    localStorage.setItem(appConfig.storage.themeKey, theme);
-  }, [theme]);
+    // Start checking after a small delay
+    const timeoutId = setTimeout(checkAppLoaded, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    // Only apply theme after initialization
+    if (isInitialized) {
+      // Apply theme to document
+      document.documentElement.setAttribute('data-theme', theme);
+      
+      // Save theme preference to localStorage
+      localStorage.setItem(appConfig.storage.themeKey, theme);
+      
+      console.log('[Theme] Applied theme:', theme);
+    }
+  }, [theme, isInitialized]);
 
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
