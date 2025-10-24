@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#ffffff" />
     <meta
       name="description"
       content="Web site created using create-react-app"
@@ -15,6 +15,15 @@
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
+    <!-- CRITICAL: Force white background before anything loads -->
+    <script>
+      // Remove any data-theme attribute immediately
+      document.documentElement.removeAttribute('data-theme');
+      // Force white background
+      document.documentElement.style.backgroundColor = '#ffffff';
+      document.body.style.backgroundColor = '#ffffff';
+      console.log('[PWA] Forced white background before app load');
+    </script>
     <!-- Clear PWA cache and force fresh installation -->
     <script src="%PUBLIC_URL%/clear-pwa-cache.js"></script>
     <!-- Unregister stale service workers -->
