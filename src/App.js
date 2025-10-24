@@ -35,7 +35,6 @@ import PrivateRoute from './components/PrivateRoute.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import InstallPrompt from './components/InstallPrompt.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
-import DebugPanel from './components/DebugPanel.js';
 import AppPerformanceProvider from './components/AppPerformanceProvider.js';
 import AppPerformanceOptimizer from './components/AppPerformanceOptimizer.js';
 import ToastProvider from './components/ToastProvider.js';
@@ -171,9 +170,7 @@ const AppContent = () => {
   
   // Render normal app routes when authenticated
   return (
-    <>
-      <DebugPanel />
-      <Suspense fallback={
+    <Suspense fallback={
       <div className="flex justify-center items-center h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
         <LoadingSpinner size="lg" />
       </div>
@@ -306,7 +303,6 @@ const AppContent = () => {
             } />
           </Routes>
         </Suspense>
-      </>
   );
 };
 
