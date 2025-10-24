@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // CRITICAL: Use class-based dark mode instead of media query
+  // This prevents Tailwind dark: classes from applying based on system preference
+  // Dark mode only applies when html has both 'app-loaded' AND 'dark' classes
+  darkMode: ['class', '.app-loaded.dark'],
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
     "./public/index.html"

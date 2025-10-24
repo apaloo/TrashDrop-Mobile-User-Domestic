@@ -48,6 +48,13 @@ export const ThemeProvider = ({ children }) => {
       // Apply theme to document
       document.documentElement.setAttribute('data-theme', theme);
       
+      // CRITICAL: Also toggle 'dark' class for Tailwind
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      
       // Save theme preference to localStorage
       localStorage.setItem(appConfig.storage.themeKey, theme);
       
