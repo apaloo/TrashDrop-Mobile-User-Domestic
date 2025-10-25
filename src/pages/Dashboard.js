@@ -11,7 +11,7 @@ import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReport
 
 // Skeleton component to prevent CLS
 const DashboardSkeleton = () => (
-  <div className="min-h-screen bg-gradient-to-b from-purple-900 via-blue-900 to-indigo-900">
+  <div className="min-h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
     <div className="container mx-auto px-4 py-8">
       {/* Stats Cards Skeleton */}
       <div className="mb-6">
@@ -30,7 +30,7 @@ const DashboardSkeleton = () => (
           <div className="h-6 bg-white bg-opacity-20 rounded mb-4 w-32 animate-pulse" />
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-purple-900 bg-opacity-50 rounded-lg p-4 flex items-center animate-pulse">
+              <div key={i} className="bg-gray-100 rounded-lg p-4 flex items-center animate-pulse">
                 <div className="w-10 h-10 rounded-full bg-white bg-opacity-20 mr-4" />
                 <div className="flex-1">
                   <div className="h-4 bg-white bg-opacity-20 rounded mb-2 w-3/4" />
@@ -951,19 +951,19 @@ const Dashboard = () => {
   // Memoize non-critical UI elements to avoid unnecessary re-renders
   const ActivitySection = useMemo(() => {
     return (
-      <div className="activity-card bg-gradient-to-br from-purple-800 to-purple-900 rounded-lg shadow-lg p-6 mb-6 relative min-h-[300px]" loading="lazy">
+      <div className="activity-card bg-white border border-gray-200 rounded-lg shadow-lg p-6 mb-6 relative min-h-[300px]" loading="lazy">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Recent Activity</h2>
+          <h2 className="text-xl font-bold text-gray-900">Recent Activity</h2>
           {isRefreshingActivities && (
-            <div className="flex items-center text-purple-300 text-sm">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-300 mr-2"></div>
+            <div className="flex items-center text-gray-600 text-sm">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
               Updating...
             </div>
           )}
         </div>
         <div className="space-y-3">
           {!recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
-            <div className="text-center py-6 text-purple-300">
+            <div className="text-center py-6 text-gray-500">
               <p>No recent activities yet</p>
             </div>
           ) : (
@@ -972,11 +972,11 @@ const Dashboard = () => {
               return Array.isArray(recentActivities) && recentActivities.map((activity, index) => (
               <div 
                 key={activity.id || `activity-${index}`}
-                className="bg-purple-900 bg-opacity-50 rounded-lg p-4 mb-3 flex items-center"
+                className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3 flex items-center"
                 loading={index > 2 ? "lazy" : "eager"}
               >
                 <div className="flex-shrink-0 mr-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 flex items-center justify-center text-white">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white">
                     {(activity.type === 'pickup' || activity.type === 'pickup_request') && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" />
@@ -1011,7 +1011,7 @@ const Dashboard = () => {
                 </div>
                 <div className="flex-grow">
                   <p className="text-sm font-medium text-white">{activity.description || activity.message}</p>
-                  <p className="text-xs text-purple-300">
+                  <p className="text-xs text-gray-600">
                     {new Date(activity.timestamp).toLocaleString()}
                   </p>
                 </div>
@@ -1027,7 +1027,7 @@ const Dashboard = () => {
         </div>
         <div className="absolute bottom-4 right-4">
           <div 
-            className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white cursor-pointer hover:bg-purple-600"
+            className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 cursor-pointer hover:bg-gray-300"
             onClick={() => {/* View all activities */}}
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -1045,7 +1045,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
       <DashboardOptimizer />
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
@@ -1216,9 +1216,9 @@ const Dashboard = () => {
         </div>
 
         {/* Recent Activity - Original Dark Theme */}
-        <div className="bg-gradient-to-r from-purple-800 to-purple-700 rounded-lg shadow-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white text-lg font-bold">Recent Activity</h3>
+            <h3 className="text-gray-900 text-lg font-bold">Recent Activity</h3>
             <Link
               to="/activity"
               className="text-sm text-blue-300 hover:text-blue-200 underline underline-offset-2"
@@ -1231,17 +1231,17 @@ const Dashboard = () => {
 
         {/* Active Pickup Card */}
         {activePickups && activePickups.length > 0 && (
-          <div className="bg-gradient-to-r from-purple-800 to-purple-700 rounded-lg shadow-lg p-6 mt-6">
-            <h3 className="text-white text-lg font-bold mb-4">Active Pickup</h3>
-            <div className="bg-purple-900/30 rounded-lg p-4 mb-4">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6 mt-6">
+            <h3 className="text-gray-900 text-lg font-bold mb-4">Active Pickup</h3>
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-white">Status: <span className="text-green-400">{activePickups[0].status}</span></p>
-                  <p className="text-sm text-gray-300">Collector: {activePickups[0].collector_name}</p>
-                  <p className="text-sm text-gray-300">Location: {activePickups[0].address}</p>
+                  <p className="text-sm font-medium text-gray-900">Status: <span className="text-green-600">{activePickups[0].status}</span></p>
+                  <p className="text-sm text-gray-600">Collector: {activePickups[0].collector_name}</p>
+                  <p className="text-sm text-gray-600">Location: {activePickups[0].address}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-white">{activePickups[0].number_of_bags} bags</p>
+                  <p className="text-sm text-gray-900">{activePickups[0].number_of_bags} bags</p>
                   <p className="text-sm text-green-400 font-medium">+{activePickups[0].points} pts</p>
                 </div>
               </div>
@@ -1271,13 +1271,13 @@ const Dashboard = () => {
                 {/* Alerts/Notifications Button */}
                 <Link 
                   to="/notifications" 
-                  className="flex items-center justify-center bg-purple-900/40 hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer"
+                  className="flex items-center justify-center bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-3 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center space-x-2 relative">
-                    <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                     </svg>
-                    <span className="text-gray-300 font-medium text-sm">Alerts</span>
+                    <span className="text-blue-700 font-medium text-sm">Alerts</span>
                     {unreadNotifications > 0 && (
                       <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                         {unreadNotifications > 9 ? '9+' : unreadNotifications}
