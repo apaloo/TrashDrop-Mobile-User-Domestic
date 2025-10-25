@@ -1055,10 +1055,10 @@ const Dashboard = () => {
             <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
-              <div className="dashboard-card bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white border-2 border-emerald-400 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
-                <div className="absolute top-2 left-2 opacity-20">
-                  <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <div className="absolute top-2 left-2 opacity-10">
+                  <svg className="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12,2A3,3 0 0,1 15,5V6H20A1,1 0 0,1 21,7V19A3,3 0 0,1 18,22H6A3,3 0 0,1 3,19V7A1,1 0 0,1 4,6H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V6H13V5A1,1 0 0,0 12,4M5,8V19A1,1 0 0,0 6,20H18A1,1 0 0,0 19,19V8H5Z" />
                   </svg>
                 </div>
@@ -1067,47 +1067,47 @@ const Dashboard = () => {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12,2A3,3 0 0,1 15,5V6H20A1,1 0 0,1 21,7V19A3,3 0 0,1 18,22H6A3,3 0 0,1 3,19V7A1,1 0 0,1 4,6H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V6H13V5A1,1 0 0,0 12,4M5,8V19A1,1 0 0,0 6,20H18A1,1 0 0,0 19,19V8H5Z" />
                       </svg>
-                      <h3 className="text-white text-lg font-bold">Batches & Bags</h3>
+                      <h3 className="text-emerald-700 text-lg font-bold">Batches & Bags</h3>
                     </div>
-                    <div className="bg-emerald-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="bg-emerald-100 text-emerald-700 border border-emerald-300 px-3 py-1 rounded-full text-sm font-bold">
                       Lv {Math.floor((stats.points || 0) / 100) + 1}
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-center space-x-6 mb-4">
+                  <div className="flex items-center justify-around">
                     <div className="text-center">
-                      <p className="text-emerald-200 text-sm">Batches</p>
-                      <p className="text-white text-2xl font-bold">{stats.batches || 0}</p>
+                      <p className="text-emerald-600 text-xs mb-1">Batches</p>
+                      <p className="text-emerald-700 text-3xl font-bold">{stats.batches || 0}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-emerald-200 text-sm">Bags</p>
-                      <p className={`text-white text-2xl font-bold ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
+                      <p className="text-emerald-600 text-xs mb-1">Bags</p>
+                      <p className="text-emerald-700 text-3xl font-bold">{stats.totalBags || 0}</p>
                     </div>
                   </div>
                   
                   {/* Progress Bar */}
-                  <div className="w-full bg-emerald-900/40 rounded-full h-2 mb-2">
+                  <div className="w-full bg-emerald-100 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-emerald-400 h-2 rounded-full transition-all duration-300" 
+                      className="bg-emerald-500 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((stats.points || 0) % 100) / 100 * 100, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <p className="text-emerald-200 text-sm text-center">
+                  <p className="text-emerald-600 text-sm text-center">
                     {100 - ((stats.points || 0) % 100)} more to level up
                   </p>
                 </div>
               </div>
               
               {/* Pickups Card */}
-              <div className="dashboard-card bg-gradient-to-br from-teal-400 to-cyan-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white border-2 border-teal-400 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
-                <div className="absolute top-2 left-2 opacity-20">
-                  <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M8,6H16V7H8V6M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
+                <div className="absolute top-2 left-2 opacity-10">
+                  <svg className="w-16 h-16 text-teal-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
                   </svg>
                 </div>
                 
@@ -1115,39 +1115,39 @@ const Dashboard = () => {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M8,6H16V7H8V6M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
+                      <svg className="w-6 h-6 text-teal-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
                       </svg>
-                      <h3 className="text-white text-lg font-bold">Pickups</h3>
+                      <h3 className="text-teal-700 text-lg font-bold">Pickups</h3>
                     </div>
-                    <div className="bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="bg-teal-100 text-teal-700 border border-teal-300 px-3 py-1 rounded-full text-sm font-bold">
                       Lv {Math.floor((stats.pickups || 0) / 5) + 1}
                     </div>
                   </div>
                   
                   <div className="text-center mb-4">
-                    <p className="text-white text-4xl font-bold">{stats.pickups || 0}</p>
+                    <p className="text-teal-700 text-4xl font-bold">{stats.pickups || 0}</p>
                   </div>
                   
                   {/* Progress Bar */}
-                  <div className="w-full bg-teal-800/40 rounded-full h-2 mb-2">
+                  <div className="w-full bg-teal-100 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-cyan-400 h-2 rounded-full transition-all duration-300" 
+                      className="bg-teal-500 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((stats.pickups || 0) % 5) / 5 * 100, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <p className="text-cyan-200 text-sm text-center">
+                  <p className="text-teal-600 text-sm text-center">
                     {5 - ((stats.pickups || 0) % 5)} more to level up
                   </p>
                 </div>
               </div>
 
               {/* Reports Card */}
-              <div className="dashboard-card bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white border-2 border-amber-400 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
-                <div className="absolute top-2 left-2 opacity-20">
-                  <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <div className="absolute top-2 left-2 opacity-10">
+                  <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                   </svg>
                 </div>
@@ -1156,29 +1156,29 @@ const Dashboard = () => {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                       </svg>
-                      <h3 className="text-white text-lg font-bold">Reports</h3>
+                      <h3 className="text-amber-700 text-lg font-bold">Reports</h3>
                     </div>
-                    <div className="bg-amber-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="bg-amber-100 text-amber-700 border border-amber-300 px-3 py-1 rounded-full text-sm font-bold">
                       Lv {Math.floor((stats.reports || 0) / 3) + 1}
                     </div>
                   </div>
                   
                   <div className="text-center mb-4">
-                    <p className="text-white text-4xl font-bold">{stats.reports || 0}</p>
+                    <p className="text-amber-700 text-4xl font-bold">{stats.reports || 0}</p>
                   </div>
                   
                   {/* Progress Bar */}
-                  <div className="w-full bg-amber-900/40 rounded-full h-2 mb-2">
+                  <div className="w-full bg-amber-100 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-yellow-500 h-2 rounded-full transition-all duration-300" 
+                      className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((stats.reports || 0) % 3) / 3 * 100, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <p className="text-amber-200 text-sm text-center">
+                  <p className="text-amber-600 text-sm text-center">
                     {3 - ((stats.reports || 0) % 3)} more to level up
                   </p>
                 </div>
