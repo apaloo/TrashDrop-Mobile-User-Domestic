@@ -1055,7 +1055,7 @@ const Dashboard = () => {
             <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
-              <div className="dashboard-card bg-gradient-to-br from-emerald-600 to-green-700 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-20">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -1103,7 +1103,7 @@ const Dashboard = () => {
               </div>
               
               {/* Pickups Card */}
-              <div className="dashboard-card bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-gradient-to-br from-teal-400 to-cyan-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-20">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -1144,7 +1144,7 @@ const Dashboard = () => {
               </div>
 
               {/* Reports Card */}
-              <div className="dashboard-card bg-gradient-to-br from-amber-600 to-yellow-700 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-20">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -1194,7 +1194,7 @@ const Dashboard = () => {
             {/* Digital Bin Button */}
             <button 
               onClick={() => navigate('/digital-bin')}
-              className="w-full bg-blue-400 hover:bg-blue-500 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+              className="w-full bg-blue-300 hover:bg-blue-400 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1205,7 +1205,7 @@ const Dashboard = () => {
             {/* View Rewards Button */}
             <button 
               onClick={() => navigate('/rewards')}
-              className="w-full bg-amber-400 hover:bg-amber-500 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+              className="w-full bg-amber-300 hover:bg-amber-400 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
