@@ -951,17 +951,7 @@ const Dashboard = () => {
   // Memoize non-critical UI elements to avoid unnecessary re-renders
   const ActivitySection = useMemo(() => {
     return (
-      <div className="activity-card bg-white border border-gray-200 rounded-lg shadow-lg p-6 mb-6 relative min-h-[300px]" loading="lazy">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Recent Activity</h2>
-          {isRefreshingActivities && (
-            <div className="flex items-center text-gray-600 text-sm">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-              Updating...
-            </div>
-          )}
-        </div>
-        <div className="space-y-3">
+      <div className="space-y-3">
           {!recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
             <div className="text-center py-6 text-gray-500">
               <p>No recent activities yet</p>
@@ -1024,17 +1014,6 @@ const Dashboard = () => {
             ));
             })()
           )}
-        </div>
-        <div className="absolute bottom-4 right-4">
-          <div 
-            className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 cursor-pointer hover:bg-gray-300"
-            onClick={() => {/* View all activities */}}
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </div>
-        </div>
       </div>
     );
   }, [recentActivities, isRefreshingActivities]); // Re-render when activities change or refresh state changes
@@ -1219,12 +1198,20 @@ const Dashboard = () => {
         <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-900 text-lg font-bold">Recent Activity</h3>
-            <Link
-              to="/activity"
-              className="text-sm text-blue-300 hover:text-blue-200 underline underline-offset-2"
-            >
-              View all activity →
-            </Link>
+            <div className="flex items-center gap-3">
+              {isRefreshingActivities && (
+                <div className="flex items-center text-gray-600 text-sm">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                  Updating...
+                </div>
+              )}
+              <Link
+                to="/activity"
+                className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2"
+              >
+                View all activity →
+              </Link>
+            </div>
           </div>
           {ActivitySection}
         </div>

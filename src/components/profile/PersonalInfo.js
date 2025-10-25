@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
+import { userService } from '../../services/userService.js';
+import supabase from '../../utils/supabaseClient.js';
 
 /**
  * Personal Information tab component for the Profile page
@@ -8,34 +10,103 @@ import { useAuth } from '../../context/AuthContext.js';
 const PersonalInfo = () => {
   const { user } = useAuth();
   
-  // Sample user data - in a real app, this would come from a context or API
+  // User data state
   const [userData, setUserData] = useState({
     firstName: '',
     lastName: '',
-    email: user?.email || 'user@example.com',
+    email: user?.email || '',
     phone: '',
     address: '',
     profileImage: null,
-    memberSince: 'Jan 2025'
+    memberSince: ''
+  });
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(null);
+
+  // State to track form changes (initialized with same initial values as userData)
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: user?.email || '',
+    phone: '',
+    address: '',
+    profileImage: null,
+    memberSince: ''
   });
 
-  // Load profile data from localStorage on component mount
+  // Load profile data from Supabase on component mount
   useEffect(() => {
-    const userId = user?.id || 'guest';
-    const storedProfile = localStorage.getItem(`profile_${userId}`);
-    
-    if (storedProfile) {
-      try {
-        const parsedProfile = JSON.parse(storedProfile);
-        setUserData(prevData => ({ ...prevData, ...parsedProfile }));
-      } catch (error) {
-        console.error('Error parsing stored profile:', error);
+    const loadProfileData = async () => {
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
       }
-    }
+      
+      try {
+        setIsLoading(true);
+        console.log('[PersonalInfo] Loading profile for user:', user.id);
+        
+        // Fetch user profile from Supabase
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name, phone, address, avatar_url, created_at')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error('[PersonalInfo] Error loading profile:', error);
+          throw error;
+        }
+        
+        if (profileData) {
+          // Calculate member since date from created_at
+          const memberSince = profileData.created_at 
+            ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+            : 'Recently';
+          
+          const loadedData = {
+            firstName: profileData.first_name || '',
+            lastName: profileData.last_name || '',
+            email: profileData.email || user.email || '',
+            phone: profileData.phone || '',
+            address: profileData.address || '',
+            profileImage: profileData.avatar_url || null,
+            memberSince: memberSince
+          };
+          
+          setUserData(loadedData);
+          setFormData(loadedData);
+          
+          // Also cache in localStorage for offline access
+          localStorage.setItem(`profile_${user.id}`, JSON.stringify(loadedData));
+          console.log('[PersonalInfo] Profile loaded successfully');
+        } else {
+          // No profile found, try localStorage as fallback
+          const storedProfile = localStorage.getItem(`profile_${user.id}`);
+          if (storedProfile) {
+            try {
+              const parsedProfile = JSON.parse(storedProfile);
+              const fallbackData = { ...userData, ...parsedProfile, email: user.email };
+              setUserData(fallbackData);
+              setFormData(fallbackData);
+            } catch (err) {
+              console.error('[PersonalInfo] Error parsing cached profile:', err);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[PersonalInfo] Error in loadProfileData:', error);
+        setSaveMessage({ type: 'error', text: 'Failed to load profile data' });
+        setTimeout(() => setSaveMessage(null), 3000);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadProfileData();
   }, [user]);
-
-  // State to track form changes
-  const [formData, setFormData] = useState({ ...userData });
 
   // Handle form input changes
   const handleChange = (e) => {
@@ -47,9 +118,16 @@ const PersonalInfo = () => {
   };
 
   // Handle profile image upload
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        setSaveMessage({ type: 'error', text: 'Image must be less than 2MB' });
+        setTimeout(() => setSaveMessage(null), 3000);
+        return;
+      }
+      
       const reader = new FileReader();
       reader.onloadend = () => {
         const newProfileImage = reader.result;
@@ -60,42 +138,87 @@ const PersonalInfo = () => {
           profileImage: newProfileImage
         });
         
-        // Save image to localStorage immediately for persistence
-        const userId = user?.id || 'guest';
-        const storedProfile = localStorage.getItem(`profile_${userId}`);
-        let profileData = {};
-        
-        try {
-          if (storedProfile) {
-            profileData = JSON.parse(storedProfile);
-          }
-        } catch (error) {
-          console.error('Error parsing stored profile:', error);
-        }
-        
-        // Update profile with new image
-        profileData.profileImage = newProfileImage;
-        localStorage.setItem(`profile_${userId}`, JSON.stringify(profileData));
+        // Note: Image will be saved to database when user clicks Save Changes
+        setSaveMessage({ type: 'info', text: 'Click "Save Changes" to upload your profile picture' });
+        setTimeout(() => setSaveMessage(null), 3000);
       };
       reader.readAsDataURL(file);
     }
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // In a real app, this would make an API call to update the user data
-    setUserData({ ...formData });
     
-    // Save all form data to localStorage for persistence
-    const userId = user?.id || 'guest';
-    localStorage.setItem(`profile_${userId}`, JSON.stringify(formData));
+    if (!user?.id) {
+      setSaveMessage({ type: 'error', text: 'You must be logged in to update your profile' });
+      setTimeout(() => setSaveMessage(null), 3000);
+      return;
+    }
     
-    alert('Personal information updated!');
+    try {
+      setIsSaving(true);
+      console.log('[PersonalInfo] Saving profile for user:', user.id);
+      
+      // Prepare data for database update
+      const updateData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone: formData.phone,
+        address: formData.address,
+        avatar_url: formData.profileImage
+      };
+      
+      // Update profile in Supabase
+      const { data, error } = await userService.updateUserProfile(user.id, updateData);
+      
+      if (error) {
+        console.error('[PersonalInfo] Error updating profile:', error);
+        throw new Error(error.message || 'Failed to update profile');
+      }
+      
+      // Update local state
+      setUserData({ ...formData });
+      
+      // Update localStorage cache
+      localStorage.setItem(`profile_${user.id}`, JSON.stringify(formData));
+      
+      console.log('[PersonalInfo] Profile updated successfully');
+      setSaveMessage({ type: 'success', text: 'Personal information updated successfully!' });
+      setTimeout(() => setSaveMessage(null), 3000);
+      
+    } catch (error) {
+      console.error('[PersonalInfo] Error in handleSubmit:', error);
+      setSaveMessage({ type: 'error', text: error.message || 'Failed to update profile. Please try again.' });
+      setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  if (isLoading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Loading profile...</span>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+      {/* Save status message */}
+      {saveMessage && (
+        <div className={`mb-4 p-3 rounded-md ${
+          saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
+          saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
+          'bg-blue-100 text-blue-700'
+        }`}>
+          {saveMessage.text}
+        </div>
+      )}
       <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
         {/* Profile Picture Section */}
         <div className="flex flex-col items-center">
@@ -217,12 +340,25 @@ const PersonalInfo = () => {
             <div className="mt-6 flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+                disabled={isSaving}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-                Save Changes
+                {isSaving ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    Save Changes
+                  </>
+                )}
               </button>
             </div>
           </form>

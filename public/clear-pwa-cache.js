@@ -41,17 +41,37 @@
   
   // Clear localStorage items related to old app versions
   try {
-    var keysToCheck = ['trashdrop_version', 'app_version', 'pwa_version'];
-    keysToCheck.forEach(function(key) {
-      if (localStorage.getItem(key)) {
-        console.log('[PWA Cache Clear] Removing old version key: ' + key);
-        localStorage.removeItem(key);
-      }
-    });
+    var currentVersion = '2.0.1-' + Date.now();
+    var storedVersion = localStorage.getItem('trashdrop_version');
     
-    // Set current version
-    localStorage.setItem('trashdrop_version', '2.0.0');
-    console.log('[PWA Cache Clear] Set current app version to 2.0.0');
+    // If version mismatch, clear everything
+    if (storedVersion !== currentVersion) {
+      console.log('[PWA Cache Clear] Version mismatch detected. Clearing all app data...');
+      console.log('[PWA Cache Clear] Old version:', storedVersion, 'New version:', currentVersion);
+      
+      // Clear all trashdrop-related localStorage
+      var keys = Object.keys(localStorage);
+      keys.forEach(function(key) {
+        if (key.indexOf('trashdrop') === 0 || key.indexOf('profile_') === 0) {
+          console.log('[PWA Cache Clear] Removing:', key);
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Force page reload after clearing
+      localStorage.setItem('trashdrop_version', currentVersion);
+      localStorage.setItem('force_reload_done', 'true');
+      console.log('[PWA Cache Clear] Set current app version to', currentVersion);
+      
+      // Force hard reload
+      if (!sessionStorage.getItem('reload_done')) {
+        sessionStorage.setItem('reload_done', 'true');
+        console.log('[PWA Cache Clear] Forcing hard reload...');
+        window.location.reload(true);
+      }
+    } else {
+      console.log('[PWA Cache Clear] Version match, no clear needed');
+    }
   } catch (e) {
     console.error('[PWA Cache Clear] Error clearing localStorage:', e);
   }

@@ -21,9 +21,18 @@
       document.documentElement.removeAttribute('data-theme');
       document.documentElement.classList.remove('dark');
       document.documentElement.classList.remove('app-loaded');
-      // Force white background
+      // Force white background on documentElement (body doesn't exist yet)
       document.documentElement.style.backgroundColor = '#ffffff';
-      document.body.style.backgroundColor = '#ffffff';
+      // Set body background when it's available
+      if (document.body) {
+        document.body.style.backgroundColor = '#ffffff';
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          if (document.body) {
+            document.body.style.backgroundColor = '#ffffff';
+          }
+        });
+      }
       console.log('[PWA] Forced white background and removed dark classes before app load');
     </script>
     <!-- Clear PWA cache and force fresh installation -->
