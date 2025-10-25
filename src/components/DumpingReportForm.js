@@ -475,10 +475,10 @@ const DumpingReportForm = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen pt-2" style={{ backgroundColor: '#374151', color: 'white' }}>
+    <div className="min-h-screen pt-2 bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
       {/* Fixed Header (positioned below navbar) */}
-      <div className="px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md" style={{ backgroundColor: '#374151' }}>
-        <h1 className="text-2xl font-bold text-white text-center">
+      <div className="px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md bg-white" style={{ backgroundColor: '#ffffff' }}>
+        <h1 className="text-2xl font-bold text-gray-900 text-center">
           Report Illegal Dumping
         </h1>
       </div>
@@ -486,13 +486,13 @@ const DumpingReportForm = ({ onSuccess }) => {
       <div className="px-4 py-2">
 
         {/* Info Box */}
-        <div className="bg-blue-800 rounded-lg p-4 mb-6 flex items-start">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start">
           <div className="bg-blue-600 rounded-full p-2 mr-3 mt-1 flex-shrink-0">
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
           </div>
-          <div className="text-gray-200">
+          <div className="text-gray-700">
             <p className="text-sm">
               Help keep our community clean by reporting illegal waste dumps. Your report will be sent to local authorities for cleanup. Photos can only be taken with your device's camera.
             </p>
@@ -502,8 +502,8 @@ const DumpingReportForm = ({ onSuccess }) => {
         <form onSubmit={handleSubmit} autoComplete="off" noValidate>
           {/* Type of Waste */}
           <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
-              Type of Waste <span className="text-red-400">*</span>
+            <label className="block text-gray-700 text-sm font-medium mb-2">
+              Type of Waste <span className="text-red-500">*</span>
             </label>
             <select
               name="waste_type"
@@ -511,7 +511,7 @@ const DumpingReportForm = ({ onSuccess }) => {
               onChange={handleChange}
               required
               autoComplete="off"
-              className="w-full px-3 py-3 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Select waste type</option>
               <option value="mixed">Mixed Waste</option>
@@ -525,8 +525,8 @@ const DumpingReportForm = ({ onSuccess }) => {
 
           {/* Severity */}
           <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
-              Severity <span className="text-red-400">*</span>
+            <label className="block text-gray-700 text-sm font-medium mb-2">
+              Severity <span className="text-red-500">*</span>
             </label>
             <div className="flex space-x-2">
               {['Low', 'Medium', 'High'].map((level) => (
@@ -537,7 +537,7 @@ const DumpingReportForm = ({ onSuccess }) => {
                   className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
                     formData.severity === level
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
                   }`}
                 >
                   {level}
@@ -548,7 +548,7 @@ const DumpingReportForm = ({ onSuccess }) => {
 
           {/* Description */}
           <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
+            <label className="block text-gray-700 text-sm font-medium mb-2">
               Description (optional)
             </label>
             <textarea
@@ -557,14 +557,14 @@ const DumpingReportForm = ({ onSuccess }) => {
               onChange={handleChange}
               rows={4}
               placeholder="Describe the dumped waste and any relevant details..."
-              className="w-full px-3 py-3 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full px-3 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
             />
           </div>
 
           {/* Size of dumping */}
           <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
-              Size of the illegal dumping <span className="text-red-400">*</span>
+            <label className="block text-gray-700 text-sm font-medium mb-2">
+              Size of the illegal dumping <span className="text-red-500">*</span>
             </label>
             <select
               name="estimated_volume"
@@ -572,7 +572,7 @@ const DumpingReportForm = ({ onSuccess }) => {
               onChange={handleChange}
               required
               autoComplete="off"
-              className="w-full px-3 py-3 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Select a size option</option>
               <option value="small">Small (few bags)</option>
@@ -584,20 +584,20 @@ const DumpingReportForm = ({ onSuccess }) => {
 
           {/* Location */}
           <div className="mb-6">
-            <label className="block text-gray-300 text-sm font-medium mb-2">
-              Location <span className="text-red-400">*</span>
+            <label className="block text-gray-700 text-sm font-medium mb-2">
+              Location <span className="text-red-500">*</span>
             </label>
             <div>
-              <p className="text-sm text-gray-300 mb-2">
+              <p className="text-sm text-gray-600 mb-2">
                 Please click on the map to select a location or use the button below to detect your current location.
               </p>
             
             {/* Map */}
             <div className="mb-6">
-              <label className="block mb-2 text-sm font-medium text-white">
+              <label className="block mb-2 text-sm font-medium text-gray-700">
                 Pin Location <span className="text-red-500">*</span>
               </label>
-              <div className="h-64 bg-gray-700 rounded-lg overflow-hidden relative">
+              <div className="h-64 bg-gray-100 rounded-lg overflow-hidden relative">
                 <MapContainer 
                   center={mapPosition} 
                   zoom={13} 
@@ -618,7 +618,7 @@ const DumpingReportForm = ({ onSuccess }) => {
             
             {/* Location coordinates */}
             <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-gray-400">
+              <div className="text-sm text-gray-600">
                 <div>Lat: {formData?.coordinates?.latitude?.toFixed(6) || 'N/A'}</div>
                 <div>Lng: {formData?.coordinates?.longitude?.toFixed(6) || 'N/A'}</div>
               </div>
@@ -635,8 +635,8 @@ const DumpingReportForm = ({ onSuccess }) => {
 
         {/* Take Photos */}
         <div className="mb-6">
-          <label className="block text-gray-300 text-sm font-medium mb-2">
-            Take Photos <span className="text-red-400">*</span>
+          <label className="block text-gray-700 text-sm font-medium mb-2">
+            Take Photos <span className="text-red-500">*</span>
           </label>
           
           {/* Photo Grid */}
@@ -687,10 +687,10 @@ const DumpingReportForm = ({ onSuccess }) => {
                 Take Photo with Camera
               </button>
               
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600">
                 Add at least 1 photo (up to 6) to document the illegal dumping
               </p>
-              <p className="text-xs text-blue-400 mt-2">
+              <p className="text-xs text-blue-600 mt-2">
                 Note: Photos can only be taken with your device's camera
               </p>
             </div>
@@ -715,16 +715,16 @@ const DumpingReportForm = ({ onSuccess }) => {
                 name="contact_consent"
                 checked={formData.contact_consent}
                 onChange={handleChange}
-                className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500 mt-0.5 mr-3"
+                className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 mt-0.5 mr-3"
               />
-              <span className="text-gray-300 text-sm">
+              <span className="text-gray-700 text-sm">
                 I'm willing to be contacted for more information about this report
               </span>
             </label>
           </div>
 
           {/* Disclaimer */}
-          <div className="mb-6 text-gray-400 text-sm">
+          <div className="mb-6 text-gray-600 text-sm">
             <p className="mb-2">
               By submitting this report, you confirm that the information provided is accurate to the best of your knowledge.
             </p>
@@ -737,7 +737,7 @@ const DumpingReportForm = ({ onSuccess }) => {
           <button
             type="submit"
             disabled={loading || !formData.waste_type || !formData.estimated_volume || formData.photos.length === 0}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-lg transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-lg transition-colors"
           >
             {loading ? (
               <div className="flex items-center justify-center">

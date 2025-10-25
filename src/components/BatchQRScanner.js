@@ -253,10 +253,10 @@ const BatchQRScanner = ({ onScanComplete }) => {
               </div>
             </div>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900">
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
               {/* Camera Icon */}
               <svg
-                className="w-16 h-16 text-gray-400 mb-4"
+                className="w-16 h-16 text-gray-600 mb-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -274,7 +274,7 @@ const BatchQRScanner = ({ onScanComplete }) => {
                   d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              <span className="text-gray-300 text-lg font-medium">Camera Ready</span>
+              <span className="text-gray-700 text-lg font-medium">Camera Ready</span>
               
               {/* Corner Markers for inactive state */}
               <div className="absolute inset-0 pointer-events-none">
