@@ -44,14 +44,23 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     // Load theme when user ID changes
+    let retryCount = 0;
+    const MAX_RETRIES = 30; // Max 3 seconds wait (30 * 100ms)
+    
     const loadTheme = async () => {
-      console.log('[ThemeContext] loadTheme triggered, userId:', userId);
+      console.log('[ThemeContext] loadTheme triggered, userId:', userId, 'retry:', retryCount);
       
-      // Wait for app to be loaded
+      // Wait for app to be loaded, but with a maximum retry limit
       if (!document.documentElement.classList.contains('app-loaded')) {
-        console.log('[ThemeContext] App not loaded yet, waiting...');
-        setTimeout(loadTheme, 100);
-        return;
+        if (retryCount < MAX_RETRIES) {
+          console.log('[ThemeContext] App not loaded yet, waiting... (attempt', retryCount + 1, 'of', MAX_RETRIES, ')');
+          retryCount++;
+          setTimeout(loadTheme, 100);
+          return;
+        } else {
+          console.warn('[ThemeContext] Max retries reached, proceeding with theme load anyway');
+          // Continue to load theme even if app-loaded class is missing
+        }
       }
       
       let themeToApply = 'light';
@@ -84,10 +93,9 @@ export const ThemeProvider = ({ children }) => {
           themeToApply = savedTheme;
           console.log('[ThemeContext] Loaded theme from localStorage:', themeToApply);
         } else {
-          // Check for system preference only after app loads
-          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          themeToApply = prefersDark ? 'dark' : 'light';
-          console.log('[ThemeContext] Using system preference:', themeToApply);
+          // Always default to light theme to prevent dark screen issues
+          themeToApply = 'light';
+          console.log('[ThemeContext] Using default light theme');
         }
       }
       
