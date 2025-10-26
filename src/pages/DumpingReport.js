@@ -16,13 +16,7 @@ const DumpingReport = () => {
   };
 
   return (
-    <div className="min-h-screen pt-2 bg-gray-50" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
-      <div className="container mx-auto px-4">
-        <div className="max-w-md mx-auto">
-          <DumpingReportForm onSuccess={handleSuccess} />
-        </div>
-      </div>
-    </div>
+    <DumpingReportForm onSuccess={handleSuccess} />
   );
 };
 

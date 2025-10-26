@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { ThemeProvider } from './context/ThemeContext.js';
 import { NetworkProvider } from './utils/networkMonitor.js';
 import { OfflineQueueProvider } from './context/OfflineQueueContext.js';
+import supabase from './utils/supabaseClient.js';
 
 // Pages
 import Login from './pages/Login.js';
@@ -75,6 +76,51 @@ const AppContent = () => {
   const { isLoading, isAuthenticated, checkSession, authState, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Load and apply theme from database when user logs in
+  useEffect(() => {
+    console.log('[App Theme] ⚡ useEffect TRIGGERED, user:', user);
+    console.log('[App Theme] ⚡ user?.id:', user?.id);
+    
+    const loadAndApplyTheme = async () => {
+      if (!user?.id) {
+        console.log('[App Theme] ❌ No user ID, skipping theme load');
+        return;
+      }
+      
+      try {
+        console.log('[App Theme] 🎨 Loading theme for user:', user.id);
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('dark_mode')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('[App Theme] ❌ Error loading theme:', error);
+          return;
+        }
+        
+        const isDark = profileData?.dark_mode || false;
+        console.log('[App Theme] 📦 Theme from database:', isDark ? 'DARK' : 'LIGHT', profileData);
+        
+        // Apply theme
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+          document.body.classList.add('dark');
+          console.log('[App Theme] ✅ DARK MODE APPLIED to documentElement and body');
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.body.classList.remove('dark');
+          console.log('[App Theme] ✅ LIGHT MODE APPLIED to documentElement and body');
+        }
+      } catch (error) {
+        console.error('[App Theme] ❌ Error in loadAndApplyTheme:', error);
+      }
+    };
+    
+    loadAndApplyTheme();
+  }, [user?.id]);
   
   // Force white background immediately on mount
   useEffect(() => {
@@ -312,8 +358,7 @@ const AppContent = () => {
 const App = () => {
   return (
     <AppPerformanceProvider>
-      {/* ThemeProvider DISABLED - causing dark screen issue */}
-      {/* <ThemeProvider> */}
+      <ThemeProvider>
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
             <AuthErrorBoundary>
@@ -331,7 +376,7 @@ const App = () => {
             <InstallPrompt />
           </AuthProvider>
         </ToastProvider>
-      {/* </ThemeProvider> */}
+      </ThemeProvider>
     </AppPerformanceProvider>
   );
 };

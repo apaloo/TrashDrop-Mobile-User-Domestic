@@ -112,7 +112,7 @@ const NavBar = () => {
   
   return (
     <>
-      <nav className="bg-white py-3 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
+      <nav className="bg-white dark:bg-gray-800 py-3 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
         <div className="container mx-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
           <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] text-2xl font-bold">
@@ -137,13 +137,13 @@ const NavBar = () => {
               
               {/* Mobile Profile Dropdown */}
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-60">
-                  <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 z-60">
+                  <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
                     Your Profile
                   </NavLink>
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
                   >
                     Sign Out
                   </button>
@@ -293,7 +293,7 @@ const NavBar = () => {
       {/* Mobile Bottom Navigation */}
       {isAuthenticated && (
         <div className="mobile-bottom-nav-container">
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg z-50">
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg z-50">
             <div className="flex justify-between items-center px-4 py-2">
               <NavLink 
                 to="/dashboard" 

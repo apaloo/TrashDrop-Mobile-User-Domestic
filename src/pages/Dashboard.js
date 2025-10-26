@@ -11,7 +11,7 @@ import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReport
 
 // Skeleton component to prevent CLS
 const DashboardSkeleton = () => (
-  <div className="min-h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
+  <div className="min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
     <div className="container mx-auto px-4 py-8">
       {/* Stats Cards Skeleton */}
       <div className="mb-6">
@@ -1024,7 +1024,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
       <DashboardOptimizer />
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
@@ -1034,7 +1034,7 @@ const Dashboard = () => {
             <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
-              <div className="dashboard-card bg-white border-2 border-emerald-400 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-emerald-400 dark:border-emerald-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
                   <svg className="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 24 24">
@@ -1082,7 +1082,7 @@ const Dashboard = () => {
               </div>
               
               {/* Pickups Card */}
-              <div className="dashboard-card bg-white border-2 border-teal-400 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-teal-400 dark:border-teal-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
                   <svg className="w-16 h-16 text-teal-500" fill="currentColor" viewBox="0 0 24 24">
@@ -1123,7 +1123,7 @@ const Dashboard = () => {
               </div>
 
               {/* Reports Card */}
-              <div className="dashboard-card bg-white border-2 border-amber-400 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-amber-400 dark:border-amber-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
                   <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
@@ -1173,7 +1173,7 @@ const Dashboard = () => {
             {/* Digital Bin Button */}
             <button 
               onClick={() => navigate('/digital-bin')}
-              className="w-full bg-white border-2 border-blue-300 hover:border-blue-400 text-blue-600 hover:text-blue-700 font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+              className="w-full bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-600 hover:border-blue-400 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1184,7 +1184,7 @@ const Dashboard = () => {
             {/* View Rewards Button */}
             <button 
               onClick={() => navigate('/rewards')}
-              className="w-full bg-white border-2 border-amber-300 hover:border-amber-400 text-amber-600 hover:text-amber-700 font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+              className="w-full bg-white dark:bg-gray-800 border-2 border-amber-300 dark:border-amber-600 hover:border-amber-400 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
@@ -1195,9 +1195,9 @@ const Dashboard = () => {
         </div>
 
         {/* Recent Activity - Original Dark Theme */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-900 text-lg font-bold">Recent Activity</h3>
+            <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
             <div className="flex items-center gap-3">
               {isRefreshingActivities && (
                 <div className="flex items-center text-gray-600 text-sm">

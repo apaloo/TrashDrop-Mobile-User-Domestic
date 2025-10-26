@@ -29,14 +29,14 @@ const Layout = () => {
   console.log('[Layout] Layout rendering, location:', location.pathname);
   
   return (
-    <div className="flex flex-col min-h-screen bg-white" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
+    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
       <NavBar />
       <OfflineIndicator />
       {/* Add extra bottom padding for pages with maps on mobile */}
       <main className={`flex-grow container mx-auto px-2 md:px-4 ${hasBottomPadding ? 'pb-20 md:pb-6' : 'pb-2 md:pb-6'}`}>
         <Outlet />
       </main>
-      <footer className="bg-gray-100 py-4 text-center text-gray-600 text-sm">
+      <footer className="bg-gray-100 dark:bg-gray-800 py-4 text-center text-gray-600 dark:text-gray-300 text-sm">
         <div className="container mx-auto">
           <p>&copy; {new Date().getFullYear()} TrashDrop. All rights reserved.</p>
         </div>

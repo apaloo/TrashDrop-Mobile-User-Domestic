@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import appConfig from '../utils/app-config.js';
+import supabase from '../utils/supabaseClient.js';
 
 const ThemeContext = createContext(null);
 
@@ -12,35 +13,91 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
+  console.log('[ThemeContext] 🚀 ThemeProvider component mounting');
+  
   // Always start with light theme during initialization
   const [theme, setTheme] = useState('light');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [userId, setUserId] = useState(null);
+  
+  console.log('[ThemeContext] 📊 Initial state:', { theme, isInitialized, userId });
+
+  // Listen for auth state changes to get user ID
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+      } else {
+        setUserId(null);
+      }
+    });
+
+    // Get current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
-    // Wait for app to be loaded before applying saved theme
-    const checkAppLoaded = () => {
-      if (document.documentElement.classList.contains('app-loaded')) {
-        // App has loaded, now we can safely apply the saved theme
+    // Load theme when user ID changes
+    const loadTheme = async () => {
+      console.log('[ThemeContext] loadTheme triggered, userId:', userId);
+      
+      // Wait for app to be loaded
+      if (!document.documentElement.classList.contains('app-loaded')) {
+        console.log('[ThemeContext] App not loaded yet, waiting...');
+        setTimeout(loadTheme, 100);
+        return;
+      }
+      
+      let themeToApply = 'light';
+      
+      // Try to load from database first if user is logged in
+      if (userId) {
+        try {
+          console.log('[ThemeContext] Loading theme from database for user:', userId);
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('dark_mode')
+            .eq('id', userId)
+            .maybeSingle();
+          
+          if (!error && profileData) {
+            themeToApply = profileData.dark_mode ? 'dark' : 'light';
+            console.log('[ThemeContext] Loaded theme from database:', themeToApply);
+          } else {
+            console.log('[ThemeContext] No theme in database, using fallback');
+          }
+        } catch (error) {
+          console.error('[ThemeContext] Error loading theme from database:', error);
+        }
+      }
+      
+      // Fallback to localStorage if no database theme or no user
+      if (!userId || themeToApply === 'light') {
         const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
         if (savedTheme) {
-          setTheme(savedTheme);
+          themeToApply = savedTheme;
+          console.log('[ThemeContext] Loaded theme from localStorage:', themeToApply);
         } else {
           // Check for system preference only after app loads
           const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          setTheme(prefersDark ? 'dark' : 'light');
+          themeToApply = prefersDark ? 'dark' : 'light';
+          console.log('[ThemeContext] Using system preference:', themeToApply);
         }
-        setIsInitialized(true);
-      } else {
-        // App not loaded yet, check again in 100ms
-        setTimeout(checkAppLoaded, 100);
       }
+      
+      console.log('[ThemeContext] Final theme to apply:', themeToApply);
+      setTheme(themeToApply);
+      setIsInitialized(true);
     };
     
-    // Start checking after a small delay
-    const timeoutId = setTimeout(checkAppLoaded, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, []);
+    loadTheme();
+  }, [userId]);
 
   useEffect(() => {
     // Only apply theme after initialization

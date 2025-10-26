@@ -16,10 +16,10 @@ const QRScanner = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white pt-2" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-white dark:bg-gray-900 pt-2" style={{ minHeight: '100vh' }}>
       {/* Fixed Header (positioned below navbar) */}
-      <div className="bg-white px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md" style={{ backgroundColor: '#ffffff' }}>
-        <h1 className="text-2xl font-bold text-center text-gray-900">
+      <div className="bg-white dark:bg-gray-800 px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md">
+        <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
           Scan QR Code
         </h1>
       </div>

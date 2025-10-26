@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
+import { useTheme } from '../../context/ThemeContext.js';
 import supabase from '../../utils/supabaseClient.js';
 
 /**
@@ -8,6 +9,7 @@ import supabase from '../../utils/supabaseClient.js';
  */
 const Preferences = () => {
   const { user } = useAuth();
+  const { theme: globalTheme } = useTheme();
   
   // State for user preferences
   const [preferences, setPreferences] = useState({
@@ -142,15 +144,17 @@ const Preferences = () => {
       }
       
       console.log('[Preferences] Preferences saved successfully');
-      setSaveMessage({ type: 'success', text: 'Preferences saved successfully!' });
-      setTimeout(() => setSaveMessage(null), 3000);
+      setSaveMessage({ type: 'success', text: 'Preferences saved successfully! Reloading...' });
       
-      // Apply dark mode if changed
-      if (preferences.darkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      // Dispatch custom event to notify ThemeContext of theme change
+      window.dispatchEvent(new CustomEvent('theme-changed', { 
+        detail: { darkMode: preferences.darkMode } 
+      }));
+      
+      // Reload page after short delay to apply theme globally
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
       
     } catch (error) {
       console.error('[Preferences] Error in handleSubmit:', error);
