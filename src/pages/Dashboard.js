@@ -1024,14 +1024,12 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col" style={{ minHeight: '100vh' }}>
+    <div className="bg-white dark:bg-gray-900">
       <DashboardOptimizer />
-      {/* Main Content - Flex container to control scrolling */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Fixed Stats Cards - Horizontal scroll only, no vertical scroll */}
-        <div className="flex-shrink-0 px-4 pt-8 pb-4">
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
+      {/* Sticky Stats Cards - Horizontal scroll only */}
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2">
+        <div className="overflow-x-auto scrollbar-hide px-4">
+          <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
               <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-emerald-400 dark:border-emerald-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
@@ -1167,9 +1165,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Fixed Action Buttons - No vertical scroll */}
-        <div className="flex-shrink-0 px-4 pb-4">
-          <div className="grid gap-4">
+      {/* Sticky Action Buttons - Sticks below stats cards */}
+      <div className="sticky top-[152px] z-10 bg-white dark:bg-gray-900 px-4 pb-4">
+        <div className="grid gap-4">
             {/* Digital Bin Button */}
             <button 
               onClick={() => navigate('/digital-bin')}
@@ -1194,10 +1192,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Scrollable Content Container - Only Recent Activity and Active Pickup scroll */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-6">
-          {/* Recent Activity - Scrollable */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
+      {/* Scrollable Content - Recent Activity and Active Pickup */}
+      <div className="px-4 pb-4 space-y-6">
+        {/* Recent Activity */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
             <div className="flex items-center gap-3">
@@ -1298,7 +1296,6 @@ const Dashboard = () => {
             )}
           </div>
         )}
-        </div>
       </div>
     </div>
   );
