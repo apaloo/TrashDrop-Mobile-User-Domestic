@@ -464,11 +464,34 @@ export const AuthProvider = ({ children }) => {
     
     // Start loading timeout to prevent infinite spinner (shorter timeout in standalone mode)
     if (isStandalone) {
-      // Shorter timeout for standalone - 5 seconds instead of 10
+      // CRITICAL: Very short timeout for standalone - 2 seconds to prevent white screen
       loadingTimeoutRef.current = setTimeout(() => {
         setAuthState(prev => {
           if (prev.status === AUTH_STATES.LOADING) {
-            console.warn('[Auth] Standalone mode timeout - forcing unauthenticated state');
+            console.warn('[Auth] Standalone mode timeout (2s) - using cached credentials or forcing unauthenticated');
+            
+            // Try to use cached credentials first
+            const storedUser = localStorage.getItem('trashdrop_user');
+            const storedToken = localStorage.getItem('trashdrop_auth_token');
+            
+            if (storedUser && storedToken) {
+              try {
+                const userData = JSON.parse(storedUser);
+                console.log('[Auth] Using cached credentials after timeout');
+                return {
+                  ...prev,
+                  status: AUTH_STATES.AUTHENTICATED,
+                  user: userData,
+                  session: { access_token: storedToken },
+                  lastAction: 'standalone_timeout_cached',
+                  error: null
+                };
+              } catch (e) {
+                console.error('[Auth] Failed to parse cached user:', e);
+              }
+            }
+            
+            // No valid cached credentials, go to login
             return {
               ...prev,
               status: AUTH_STATES.UNAUTHENTICATED,
@@ -480,7 +503,8 @@ export const AuthProvider = ({ children }) => {
           }
           return prev;
         });
-      }, 5000);
+        isCheckingSession.current = false;
+      }, 2000); // 2 seconds for faster recovery
     } else {
       startLoadingTimeout();
     }
@@ -519,7 +543,7 @@ export const AuthProvider = ({ children }) => {
       try {
         // In standalone mode, add timeout protection to session refresh
         if (isStandalone) {
-          const refreshTimeoutDuration = 4000; // 4 seconds in standalone mode
+          const refreshTimeoutDuration = 2000; // 2 seconds in standalone mode
           const refreshTimeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Session refresh timeout in standalone mode')), refreshTimeoutDuration)
           );

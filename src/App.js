@@ -230,12 +230,17 @@ const AppContent = () => {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/reset-password-confirm" element={<ResetPasswordConfirm />} />
             
-            {/* Root route: if authenticated or has stored data, go to dashboard; else login */}
+            {/* Root route: if authenticated, go to dashboard; else login */}
             <Route
               path="/"
               element={
-                isAuthenticated || localStorage.getItem('trashdrop_user') ? 
+                isAuthenticated ? 
                 <Navigate to="/dashboard" replace /> : 
+                isLoading ? (
+                  <div className="flex justify-center items-center h-screen bg-white">
+                    <LoadingSpinner size="lg" />
+                  </div>
+                ) :
                 <Login />
               }
             />

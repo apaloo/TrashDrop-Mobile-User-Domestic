@@ -3,8 +3,8 @@
  * Handles caching, offline functionality, and background sync
  */
 
-const CACHE_NAME = 'trashdrop-v6';
-const API_CACHE_NAME = 'trashdrop-api-v4';
+const CACHE_NAME = 'trashdrop-v7';
+const API_CACHE_NAME = 'trashdrop-api-v5';
 
 // Resources to cache immediately
 const STATIC_RESOURCES = [

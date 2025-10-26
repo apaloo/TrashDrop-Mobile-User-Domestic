@@ -580,41 +580,35 @@ const Activity = () => {
     <div className="container mx-auto px-4 py-8 bg-gray-50 dark:bg-gray-900 min-h-screen">
       <h1 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">Activity History</h1>
       
-      {/* Filter tabs */}
-      <div className="flex flex-wrap mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+      {/* Filter tabs - Single row with smaller font */}
+      <div className="flex mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('all')}
         >
           All
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('pickup_request')}
         >
           Pickups
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('dumping_report')}
         >
           Reports
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('qr_scan')}
         >
           Scans
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'reward_redemption' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-          onClick={() => handleFilterChange('reward_redemption')}
-        >
-          Rewards
-        </button>
-        <button 
           onClick={handleRefresh}
-          className="px-4 py-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-700 flex items-center justify-center"
+          className="px-3 py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 flex items-center justify-center flex-shrink-0"
           aria-label="Refresh activity data"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

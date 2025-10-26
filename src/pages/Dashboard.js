@@ -1024,13 +1024,13 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
+    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col" style={{ minHeight: '100vh' }}>
       <DashboardOptimizer />
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        {/* Horizontal Scrollable Stats Cards */}
-        <div className="mb-6">
-          <div className="overflow-x-auto scrollbar-hide">
+      {/* Main Content - Flex container to control scrolling */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Fixed Stats Cards - Horizontal scroll only, no vertical scroll */}
+        <div className="flex-shrink-0 px-4 pt-8 pb-4">
+          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
             <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
@@ -1167,8 +1167,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Essential Action Buttons - Original Design */}
-        <div className="mb-8">
+        {/* Fixed Action Buttons - No vertical scroll */}
+        <div className="flex-shrink-0 px-4 pb-4">
           <div className="grid gap-4">
             {/* Digital Bin Button */}
             <button 
@@ -1194,8 +1194,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Recent Activity - Original Dark Theme */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
+        {/* Scrollable Content Container - Only Recent Activity and Active Pickup scroll */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-6">
+          {/* Recent Activity - Scrollable */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
             <div className="flex items-center gap-3">
@@ -1296,6 +1298,7 @@ const Dashboard = () => {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
