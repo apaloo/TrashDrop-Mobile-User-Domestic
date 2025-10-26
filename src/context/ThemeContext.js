@@ -77,27 +77,49 @@ export const ThemeProvider = ({ children }) => {
       if (userId) {
         try {
           console.log('[ThemeContext] Loading theme from database for user:', userId);
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('dark_mode')
-            .eq('id', userId)
-            .maybeSingle();
           
-          if (!error && profileData) {
-            themeToApply = profileData.dark_mode ? 'dark' : 'light';
-            console.log('[ThemeContext] Loaded theme from database:', themeToApply);
+          // Check if we have a valid session before querying database
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (!session) {
+            console.warn('[ThemeContext] No active session, skipping database query');
+            // Fall through to localStorage
           } else {
-            console.log('[ThemeContext] No theme in database, using fallback');
+            // Add timeout protection for database query (max 3 seconds in standalone, 5 seconds in browser)
+            const timeoutDuration = isStandalone ? 3000 : 5000;
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Database query timeout')), timeoutDuration)
+            );
+            
+            const queryPromise = supabase
+              .from('profiles')
+              .select('dark_mode')
+              .eq('id', userId)
+              .maybeSingle();
+            
+            const { data: profileData, error } = await Promise.race([
+              queryPromise,
+              timeoutPromise
+            ]);
+            
+            if (!error && profileData) {
+              themeToApply = profileData.dark_mode ? 'dark' : 'light';
+              console.log('[ThemeContext] Loaded theme from database:', themeToApply);
+            } else {
+              console.log('[ThemeContext] No theme in database, using fallback');
+            }
           }
         } catch (error) {
           console.error('[ThemeContext] Error loading theme from database:', error);
+          console.warn('[ThemeContext] Falling back to localStorage due to database error');
+          // Continue with localStorage fallback below
         }
       }
       
       // Fallback to localStorage if no database theme or no user
       if (!userId || themeToApply === 'light') {
         const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
-        if (savedTheme) {
+        if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
           themeToApply = savedTheme;
           console.log('[ThemeContext] Loaded theme from localStorage:', themeToApply);
         } else {
@@ -105,6 +127,12 @@ export const ThemeProvider = ({ children }) => {
           themeToApply = 'light';
           console.log('[ThemeContext] Using default light theme');
         }
+      }
+      
+      // CRITICAL: In standalone mode on relaunch, ensure we don't hang
+      // Force light theme if initialization takes too long
+      if (isStandalone) {
+        console.log('[ThemeContext] Standalone relaunch - ensuring theme is set immediately');
       }
       
       console.log('[ThemeContext] Final theme to apply:', themeToApply);

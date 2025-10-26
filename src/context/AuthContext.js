@@ -433,6 +433,14 @@ export const AuthProvider = ({ children }) => {
   const checkSession = useCallback(async (force = false) => {
     console.log('[Auth] Starting session check (real authentication only)...');
     
+    // Detect standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        window.navigator.standalone === true;
+    
+    if (isStandalone) {
+      console.log('[Auth] PWA Standalone mode detected - using fast authentication path');
+    }
+    
     // Prevent multiple concurrent session checks
     if (isCheckingSession.current) {
       console.log('[Auth] Session check already in progress, skipping...');
@@ -454,8 +462,28 @@ export const AuthProvider = ({ children }) => {
       error: null
     });
     
-    // Start loading timeout to prevent infinite spinner
-    startLoadingTimeout();
+    // Start loading timeout to prevent infinite spinner (shorter timeout in standalone mode)
+    if (isStandalone) {
+      // Shorter timeout for standalone - 5 seconds instead of 10
+      loadingTimeoutRef.current = setTimeout(() => {
+        setAuthState(prev => {
+          if (prev.status === AUTH_STATES.LOADING) {
+            console.warn('[Auth] Standalone mode timeout - forcing unauthenticated state');
+            return {
+              ...prev,
+              status: AUTH_STATES.UNAUTHENTICATED,
+              error: null,
+              lastAction: 'standalone_timeout',
+              user: null,
+              session: null
+            };
+          }
+          return prev;
+        });
+      }, 5000);
+    } else {
+      startLoadingTimeout();
+    }
     
     try {
       // First check if the stored token is valid before attempting to use it
@@ -489,9 +517,42 @@ export const AuthProvider = ({ children }) => {
       // Add additional error handling for the session refresh
       let refreshResult;
       try {
-        refreshResult = await supabase.auth.refreshSession();
+        // In standalone mode, add timeout protection to session refresh
+        if (isStandalone) {
+          const refreshTimeoutDuration = 4000; // 4 seconds in standalone mode
+          const refreshTimeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Session refresh timeout in standalone mode')), refreshTimeoutDuration)
+          );
+          
+          refreshResult = await Promise.race([
+            supabase.auth.refreshSession(),
+            refreshTimeout
+          ]);
+        } else {
+          refreshResult = await supabase.auth.refreshSession();
+        }
       } catch (refreshErr) {
         console.error('[Auth] Unhandled error during session refresh:', refreshErr);
+        
+        // In standalone mode, if refresh fails/times out, try to use stored credentials
+        if (isStandalone && storedToken && storedUser) {
+          console.warn('[Auth] Standalone mode: Session refresh failed, using stored credentials');
+          try {
+            const userData = JSON.parse(storedUser);
+            updateAuthState({
+              status: AUTH_STATES.AUTHENTICATED,
+              user: userData,
+              session: { access_token: storedToken },
+              lastAction: 'standalone_cached_auth',
+              error: null
+            });
+            isCheckingSession.current = false;
+            return { success: true, user: userData, session: { access_token: storedToken } };
+          } catch (parseErr) {
+            console.error('[Auth] Failed to parse stored user:', parseErr);
+          }
+        }
+        
         // Clear any corrupted auth data
         clearAuthData();
         return handleAuthError(refreshErr, 'session_refresh');
