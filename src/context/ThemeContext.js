@@ -44,23 +44,31 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     // Load theme when user ID changes
+    // Check if running in standalone PWA mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        window.navigator.standalone === true;
+    
     let retryCount = 0;
     const MAX_RETRIES = 30; // Max 3 seconds wait (30 * 100ms)
     
     const loadTheme = async () => {
-      console.log('[ThemeContext] loadTheme triggered, userId:', userId, 'retry:', retryCount);
+      console.log('[ThemeContext] loadTheme triggered, userId:', userId, 'standalone:', isStandalone, 'retry:', retryCount);
       
-      // Wait for app to be loaded, but with a maximum retry limit
-      if (!document.documentElement.classList.contains('app-loaded')) {
-        if (retryCount < MAX_RETRIES) {
-          console.log('[ThemeContext] App not loaded yet, waiting... (attempt', retryCount + 1, 'of', MAX_RETRIES, ')');
-          retryCount++;
-          setTimeout(loadTheme, 100);
-          return;
-        } else {
-          console.warn('[ThemeContext] Max retries reached, proceeding with theme load anyway');
-          // Continue to load theme even if app-loaded class is missing
+      // In standalone mode, skip the app-loaded check entirely
+      if (!isStandalone) {
+        // Wait for app to be loaded, but with a maximum retry limit (browser mode only)
+        if (!document.documentElement.classList.contains('app-loaded')) {
+          if (retryCount < MAX_RETRIES) {
+            console.log('[ThemeContext] App not loaded yet, waiting... (attempt', retryCount + 1, 'of', MAX_RETRIES, ')');
+            retryCount++;
+            setTimeout(() => loadTheme(), 100);
+            return;
+          } else {
+            console.warn('[ThemeContext] Max retries reached, proceeding with theme load anyway');
+          }
         }
+      } else {
+        console.log('[ThemeContext] Running in standalone mode - skipping app-loaded check, loading immediately');
       }
       
       let themeToApply = 'light';
