@@ -953,7 +953,7 @@ const Dashboard = () => {
     return (
       <div className="space-y-3">
           {!recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">
+            <div className="text-center py-6 text-gray-500 dark:text-gray-400">
               <p>No recent activities yet</p>
             </div>
           ) : (
@@ -962,7 +962,7 @@ const Dashboard = () => {
               return Array.isArray(recentActivities) && recentActivities.map((activity, index) => (
               <div 
                 key={activity.id || `activity-${index}`}
-                className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3 flex items-center"
+                className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-3 flex items-center"
                 loading={index > 2 ? "lazy" : "eager"}
               >
                 <div className="flex-shrink-0 mr-4">
@@ -1000,8 +1000,8 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="flex-grow">
-                  <p className="text-sm font-medium text-white">{activity.description || activity.message}</p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.description || activity.message}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {new Date(activity.timestamp).toLocaleString()}
                   </p>
                 </div>
@@ -1218,18 +1218,18 @@ const Dashboard = () => {
 
         {/* Active Pickup Card */}
         {activePickups && activePickups.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-6 mt-6">
-            <h3 className="text-gray-900 text-lg font-bold mb-4">Active Pickup</h3>
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6 mt-6">
+            <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold mb-4">Active Pickup</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Status: <span className="text-green-600">{activePickups[0].status}</span></p>
-                  <p className="text-sm text-gray-600">Collector: {activePickups[0].collector_name}</p>
-                  <p className="text-sm text-gray-600">Location: {activePickups[0].address}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Status: <span className="text-green-600 dark:text-green-400">{activePickups[0].status}</span></p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Location: {activePickups[0].address}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-900">{activePickups[0].number_of_bags} bags</p>
-                  <p className="text-sm text-green-400 font-medium">+{activePickups[0].points} pts</p>
+                  <p className="text-sm text-gray-900 dark:text-gray-100">{activePickups[0].number_of_bags} bags</p>
+                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">+{activePickups[0].points} pts</p>
                 </div>
               </div>
             </div>
@@ -1258,13 +1258,13 @@ const Dashboard = () => {
                 {/* Alerts/Notifications Button */}
                 <Link 
                   to="/notifications" 
-                  className="flex items-center justify-center bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-3 transition-colors cursor-pointer"
+                  className="flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-lg p-3 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center space-x-2 relative">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                     </svg>
-                    <span className="text-blue-700 font-medium text-sm">Alerts</span>
+                    <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Alerts</span>
                     {unreadNotifications > 0 && (
                       <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                         {unreadNotifications > 9 ? '9+' : unreadNotifications}
@@ -1278,13 +1278,13 @@ const Dashboard = () => {
               <div className="flex justify-center">
                 <Link 
                   to="/notifications" 
-                  className="flex items-center justify-center bg-purple-900/40 hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer w-full"
+                  className="flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer w-full"
                 >
                   <div className="flex items-center space-x-2 relative">
-                    <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                     </svg>
-                    <span className="text-gray-300 font-medium">Waiting for Collector... Check Alerts</span>
+                    <span className="text-purple-700 dark:text-purple-300 font-medium">Waiting for Collector... Check Alerts</span>
                     {unreadNotifications > 0 && (
                       <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                         {unreadNotifications > 9 ? '9+' : unreadNotifications}

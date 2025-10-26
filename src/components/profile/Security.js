@@ -257,7 +257,7 @@ const Security = () => {
       )}
       {/* Change Password Section */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Change Password</h2>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Change Password</h2>
         
         <form onSubmit={handlePasswordUpdate}>
           {/* Current Password */}
@@ -347,11 +347,11 @@ const Security = () => {
 
       {/* Login Sessions Section */}
       <section>
-        <h2 className="text-xl font-semibold mb-4">Login Sessions</h2>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Login Sessions</h2>
         
         {/* Current Device */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-2">Current Device</h3>
+          <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-gray-100">Current Device</h3>
           <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
             <p className="text-gray-800 dark:text-gray-200">{deviceInfo.device} • {deviceInfo.status}</p>
           </div>

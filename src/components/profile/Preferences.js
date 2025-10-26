@@ -202,7 +202,7 @@ const Preferences = () => {
       <form onSubmit={handleSubmit}>
         {/* Theme Section */}
         <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Theme</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Theme</h2>
           <div className="flex items-center">
             <div className="relative inline-block w-12 mr-2 align-middle select-none">
               <input 
@@ -226,7 +226,7 @@ const Preferences = () => {
                 }`}
               ></label>
             </div>
-            <label htmlFor="dark-mode" className="cursor-pointer">
+            <label htmlFor="dark-mode" className="cursor-pointer text-gray-900 dark:text-gray-100">
               Dark Mode
             </label>
           </div>
@@ -235,7 +235,7 @@ const Preferences = () => {
 
         {/* Language Section */}
         <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Language</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Language</h2>
           <div>
             <select
               id="language"
@@ -256,7 +256,7 @@ const Preferences = () => {
 
         {/* Accessibility Section */}
         <section>
-          <h2 className="text-xl font-semibold mb-4">Accessibility</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Accessibility</h2>
           <div className="space-y-4">
             {/* High Contrast */}
             <div className="flex items-center">
@@ -282,7 +282,7 @@ const Preferences = () => {
                   }`}
                 ></label>
               </div>
-              <label htmlFor="high-contrast" className="cursor-pointer">
+              <label htmlFor="high-contrast" className="cursor-pointer text-gray-900 dark:text-gray-100">
                 High Contrast
               </label>
             </div>
@@ -311,7 +311,7 @@ const Preferences = () => {
                   }`}
                 ></label>
               </div>
-              <label htmlFor="larger-text" className="cursor-pointer">
+              <label htmlFor="larger-text" className="cursor-pointer text-gray-900 dark:text-gray-100">
                 Larger Text
               </label>
             </div>
@@ -340,7 +340,7 @@ const Preferences = () => {
                   }`}
                 ></label>
               </div>
-              <label htmlFor="reduce-motion" className="cursor-pointer">
+              <label htmlFor="reduce-motion" className="cursor-pointer text-gray-900 dark:text-gray-100">
                 Reduce Motion
               </label>
             </div>

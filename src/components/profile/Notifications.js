@@ -234,7 +234,7 @@ const Notifications = () => {
         {/* Push Notifications Section */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Push Notifications</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Push Notifications</h2>
             <ToggleSwitch 
               checked={notificationSettings.pushEnabled} 
               onChange={() => handleMasterToggle('push')} 
@@ -279,7 +279,7 @@ const Notifications = () => {
         {/* Email Notifications Section */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Email Notifications</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Email Notifications</h2>
             <ToggleSwitch 
               checked={notificationSettings.emailEnabled} 
               onChange={() => handleMasterToggle('email')} 

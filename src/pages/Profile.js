@@ -42,10 +42,10 @@ const Profile = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
-      <h1 className="text-2xl font-bold p-4 mb-4">Profile & Settings</h1>
+      <h1 className="text-2xl font-bold p-4 mb-4 text-gray-900 dark:text-white">Profile & Settings</h1>
 
       {/* Tab navigation */}
-      <div className="border-b mb-6">
+      <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
         <div className="flex overflow-x-auto">
           {tabs.map(tab => (
             <button
@@ -53,8 +53,8 @@ const Profile = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 whitespace-nowrap ${
                 activeTab === tab.id 
-                  ? 'text-blue-500 border-b-2 border-blue-500 font-medium' 
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-blue-500 dark:text-blue-400 border-b-2 border-blue-500 dark:border-blue-400 font-medium' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               {tab.label}

@@ -600,7 +600,7 @@ const Locations = () => {
       {/* Header with Add Location button */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-semibold">Saved Locations</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Saved Locations</h2>
           <OnlineStatus />
         </div>
         <button

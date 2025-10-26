@@ -583,31 +583,31 @@ const Activity = () => {
       {/* Filter tabs */}
       <div className="flex flex-wrap mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'all' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-4 py-3 flex-1 text-center ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('all')}
         >
           All
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'pickup_request' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-4 py-3 flex-1 text-center ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('pickup_request')}
         >
           Pickups
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'dumping_report' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-4 py-3 flex-1 text-center ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('dumping_report')}
         >
           Reports
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'qr_scan' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-4 py-3 flex-1 text-center ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('qr_scan')}
         >
           Scans
         </button>
         <button 
-          className={`px-4 py-3 flex-1 text-center ${filter === 'reward_redemption' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`px-4 py-3 flex-1 text-center ${filter === 'reward_redemption' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           onClick={() => handleFilterChange('reward_redemption')}
         >
           Rewards
