@@ -50,33 +50,52 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // Auth state - SYNCHRONOUS initialization, NO LOADING STATE
+  // Auth state - Start with LOADING to validate session first
   const [authState, setAuthState] = useState(() => {
-    console.log('[AuthContext] SYNCHRONOUS initialization starting');
+    console.log('[AuthContext] Initialization starting');
+    
+    // Detect standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        window.navigator.standalone === true;
     
     // Check for stored user during initialization
     const storedUser = getStoredUser();
     const storedToken = localStorage.getItem('trashdrop_auth_token');
     
-    if (storedUser && storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
-      console.log('[AuthContext] Found stored credentials - AUTHENTICATED immediately');
+    // CRITICAL: In standalone mode, start with LOADING state to validate session
+    // This prevents auth bypass and white screen issues
+    if (isStandalone && storedUser && storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
+      console.log('[AuthContext] Standalone mode - found credentials, starting LOADING to validate');
+      return {
+        status: AUTH_STATES.LOADING,
+        user: null,
+        error: null,
+        retryCount: 0,
+        lastAction: 'standalone_init_loading',
+        session: null
+      };
+    }
+    
+    // Browser mode: Can use stored credentials immediately (faster UX)
+    if (!isStandalone && storedUser && storedToken && storedToken !== 'undefined' && storedToken !== 'null') {
+      console.log('[AuthContext] Browser mode - found credentials, AUTHENTICATED immediately');
       return {
         status: AUTH_STATES.AUTHENTICATED,
         user: storedUser,
         error: null,
         retryCount: 0,
-        lastAction: 'sync_init_authenticated',
+        lastAction: 'browser_init_authenticated',
         session: { access_token: storedToken }
       };
     }
     
-    console.log('[AuthContext] No stored credentials - UNAUTHENTICATED immediately');
+    console.log('[AuthContext] No stored credentials - UNAUTHENTICATED');
     return {
       status: AUTH_STATES.UNAUTHENTICATED,
       user: null,
       error: null,
       retryCount: 0,
-      lastAction: 'sync_init_unauthenticated',
+      lastAction: 'init_unauthenticated',
       session: null
     };
   });
@@ -940,8 +959,15 @@ export const AuthProvider = ({ children }) => {
     let tokenValidationInterval;
     
     const initializeAuth = async () => {
-      // State is already set synchronously in useState - no async init needed
-      console.log('[Auth] Auth state already initialized synchronously');
+      console.log('[Auth] Initializing auth, current status:', authState.status);
+      
+      // CRITICAL: If we're in LOADING state (standalone mode with cached credentials),
+      // validate the session immediately
+      if (authState.status === AUTH_STATES.LOADING) {
+        console.log('[Auth] In LOADING state - validating session now');
+        await checkSession(true);
+      }
+      
       isAuthInitialized.current = true;
       
       // Set up Supabase auth listener for future sign-ins/sign-outs
