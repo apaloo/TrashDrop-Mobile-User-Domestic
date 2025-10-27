@@ -33,7 +33,7 @@ const Layout = () => {
       <NavBar />
       <OfflineIndicator />
       {/* Add extra bottom padding for pages with maps on mobile */}
-      <main className={`flex-grow container mx-auto px-2 md:px-4 ${hasBottomPadding ? 'pb-20 md:pb-6' : 'pb-2 md:pb-6'}`}>
+      <main className={`flex-grow container mx-auto px-2 md:px-4 ${hasBottomPadding ? 'pb-10 md:pb-6' : 'pb-2 md:pb-6'}`}>
         <Outlet />
       </main>
       <footer className="bg-gray-100 dark:bg-gray-800 py-4 text-center text-gray-600 dark:text-gray-300 text-sm">

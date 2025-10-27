@@ -1027,7 +1027,7 @@ const Dashboard = () => {
     <div className="bg-white dark:bg-gray-900">
       <DashboardOptimizer />
       {/* Sticky Stats Cards - Horizontal scroll only */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2">
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2" style={{position: "fixed", top: "65px", width: "100%"}}>
         <div className="overflow-x-auto scrollbar-hide px-4">
           <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
@@ -1166,7 +1166,7 @@ const Dashboard = () => {
         </div>
 
       {/* Sticky Action Buttons - Sticks below stats cards */}
-      <div className="sticky top-[152px] z-10 bg-white dark:bg-gray-900 px-4 pb-4">
+      <div className="sticky top-[152px] z-10 bg-white dark:bg-gray-900 px-4 pb-4" style={{position: "fixed", top: "230px", width: "96%"}}>
         <div className="grid gap-4">
             {/* Digital Bin Button */}
             <button 
@@ -1193,7 +1193,7 @@ const Dashboard = () => {
         </div>
 
       {/* Scrollable Content - Recent Activity and Active Pickup */}
-      <div className="px-4 pb-4 space-y-6">
+      <div className="px-4 pb-4 space-y-6" style={{marginTop: "260px" }}>
         {/* Recent Activity */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
