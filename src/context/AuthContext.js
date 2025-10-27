@@ -962,10 +962,75 @@ export const AuthProvider = ({ children }) => {
       console.log('[Auth] Initializing auth, current status:', authState.status);
       
       // CRITICAL: If we're in LOADING state (standalone mode with cached credentials),
-      // validate the session immediately
+      // validate the session immediately with GUARANTEED 2-second max timeout
       if (authState.status === AUTH_STATES.LOADING) {
-        console.log('[Auth] In LOADING state - validating session now');
-        await checkSession(true);
+        console.log('[Auth] In LOADING state - validating session now with 2s max timeout');
+        
+        // Safety timeout - GUARANTEE we exit LOADING state within 2 seconds
+        const safetyTimeout = setTimeout(() => {
+          console.error('[Auth] SAFETY TIMEOUT: Forcing exit from LOADING state after 2s');
+          
+          // Try to use cached credentials
+          const storedUser = getStoredUser();
+          const storedToken = localStorage.getItem('trashdrop_auth_token');
+          
+          if (storedUser && storedToken) {
+            console.log('[Auth] Using cached credentials after safety timeout');
+            setAuthState({
+              status: AUTH_STATES.AUTHENTICATED,
+              user: storedUser,
+              session: { access_token: storedToken },
+              lastAction: 'safety_timeout_cached',
+              error: null,
+              retryCount: 0
+            });
+          } else {
+            console.log('[Auth] No cached credentials, forcing UNAUTHENTICATED');
+            setAuthState({
+              status: AUTH_STATES.UNAUTHENTICATED,
+              user: null,
+              session: null,
+              lastAction: 'safety_timeout_unauthenticated',
+              error: null,
+              retryCount: 0
+            });
+          }
+        }, 2000);
+        
+        try {
+          // Try to validate session
+          await checkSession(true);
+          clearTimeout(safetyTimeout);
+        } catch (error) {
+          console.error('[Auth] Error during session check:', error);
+          clearTimeout(safetyTimeout);
+          
+          // Fall back to cached credentials
+          const storedUser = getStoredUser();
+          const storedToken = localStorage.getItem('trashdrop_auth_token');
+          
+          if (storedUser && storedToken) {
+            console.log('[Auth] Session check failed, using cached credentials');
+            setAuthState({
+              status: AUTH_STATES.AUTHENTICATED,
+              user: storedUser,
+              session: { access_token: storedToken },
+              lastAction: 'session_check_failed_cached',
+              error: null,
+              retryCount: 0
+            });
+          } else {
+            console.log('[Auth] Session check failed, no cached credentials');
+            setAuthState({
+              status: AUTH_STATES.UNAUTHENTICATED,
+              user: null,
+              session: null,
+              lastAction: 'session_check_failed',
+              error: null,
+              retryCount: 0
+            });
+          }
+        }
       }
       
       isAuthInitialized.current = true;
@@ -1108,6 +1173,45 @@ export const AuthProvider = ({ children }) => {
       isAuthInitialized.current = false;
     };
   }, []); // Empty dependency array - only run on mount/unmount
+
+  // CRITICAL: Watchdog to prevent infinite LOADING state
+  useEffect(() => {
+    if (authState.status !== AUTH_STATES.LOADING) return;
+    
+    console.warn('[Auth] Watchdog: Detected LOADING state, starting 3s max timeout');
+    
+    const watchdogTimeout = setTimeout(() => {
+      console.error('[Auth] WATCHDOG TIMEOUT: Still in LOADING state after 3s, forcing resolution');
+      
+      // Force exit from LOADING state
+      const storedUser = getStoredUser();
+      const storedToken = localStorage.getItem('trashdrop_auth_token');
+      
+      if (storedUser && storedToken) {
+        console.log('[Auth] Watchdog using cached credentials');
+        setAuthState({
+          status: AUTH_STATES.AUTHENTICATED,
+          user: storedUser,
+          session: { access_token: storedToken },
+          lastAction: 'watchdog_timeout_cached',
+          error: null,
+          retryCount: 0
+        });
+      } else {
+        console.log('[Auth] Watchdog forcing UNAUTHENTICATED (no cached credentials)');
+        setAuthState({
+          status: AUTH_STATES.UNAUTHENTICATED,
+          user: null,
+          session: null,
+          lastAction: 'watchdog_timeout_unauthenticated',
+          error: null,
+          retryCount: 0
+        });
+      }
+    }, 3000); // 3 seconds max in LOADING state
+    
+    return () => clearTimeout(watchdogTimeout);
+  }, [authState.status]);
 
   // Context value
   const value = {
