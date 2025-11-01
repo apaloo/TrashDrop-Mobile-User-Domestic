@@ -36,12 +36,12 @@ import PrivateRoute from './components/PrivateRoute.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import InstallPrompt from './components/InstallPrompt.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
-import PwaInitializer from "./components/PwaInitializer.js";
 import AppPerformanceProvider from './components/AppPerformanceProvider.js';
 import AppPerformanceOptimizer from './components/AppPerformanceOptimizer.js';
 import ToastProvider from './components/ToastProvider.js';
 import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
+import PwaInitializer from './components/PwaInitializer.js';
 
 // Styling
 import { CssBaseline, ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
