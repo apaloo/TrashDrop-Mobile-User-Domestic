@@ -9,7 +9,7 @@ import reportWebVitals from './reportWebVitals';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // Make performance tracker available for splash screen
-if (typeof window \!== 'undefined') {
+if (typeof window !== "undefined") {
   window.performanceTracker = performanceTracker;
   
   // Start tracking splash screen if it's visible
@@ -50,7 +50,7 @@ try {
   logAppDebug('Creating React root');
   const rootElement = document.getElementById('root');
   
-  if (\!rootElement) {
+  if (!rootElement) {
     throw new Error('Root element #root not found in DOM');
   }
   
