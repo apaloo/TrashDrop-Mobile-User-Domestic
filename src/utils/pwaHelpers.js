@@ -9,7 +9,7 @@
  */
 export const isPwaMode = () => {
   return (
-    window.matchMedia('(display-mode: standalone)').matches || 
+    window.matchMedia("(display-mode: standalone)").matches || 
     window.navigator.standalone === true
   );
 };
@@ -21,10 +21,10 @@ export const isPwaMode = () => {
  * @param {string} tokenKey - Key to use for token storage
  * @param {string} userKey - Key to use for user storage
  */
-export const storePwaAuthData = (user, session, tokenKey = 'trashdrop_auth_token', userKey = 'trashdrop_user') => {
+export const storePwaAuthData = (user, session, tokenKey = "trashdrop_auth_token", userKey = "trashdrop_user") => {
   try {
-    if (\!user || \!session?.access_token) {
-      console.error('[PWA] Cannot store auth data - missing user or token');
+    if (!user || !session?.access_token) {
+      console.error("[PWA] Cannot store auth data - missing user or token");
       return false;
     }
 
@@ -42,12 +42,12 @@ export const storePwaAuthData = (user, session, tokenKey = 'trashdrop_auth_token
     localStorage.setItem(tokenKey, session.access_token);
     
     // Store additional PWA metadata
-    localStorage.setItem('trashdrop_pwa_last_login', new Date().toISOString());
+    localStorage.setItem("trashdrop_pwa_last_login", new Date().toISOString());
     
-    console.log('[PWA] Auth data stored successfully');
+    console.log("[PWA] Auth data stored successfully");
     return true;
   } catch (error) {
-    console.error('[PWA] Error storing auth data:', error);
+    console.error("[PWA] Error storing auth data:", error);
     return false;
   }
 };
@@ -58,12 +58,12 @@ export const storePwaAuthData = (user, session, tokenKey = 'trashdrop_auth_token
  * @param {string} userKey - Key used for user storage
  * @returns {Object|null} Object with user and token, or null if not found
  */
-export const getPwaAuthData = (tokenKey = 'trashdrop_auth_token', userKey = 'trashdrop_user') => {
+export const getPwaAuthData = (tokenKey = "trashdrop_auth_token", userKey = "trashdrop_user") => {
   try {
     const storedUserJson = localStorage.getItem(userKey);
     const storedToken = localStorage.getItem(tokenKey);
     
-    if (\!storedUserJson || \!storedToken || storedToken === 'undefined' || storedToken === 'null') {
+    if (!storedUserJson || !storedToken || storedToken === "undefined" || storedToken === "null") {
       return null;
     }
     
@@ -72,10 +72,10 @@ export const getPwaAuthData = (tokenKey = 'trashdrop_auth_token', userKey = 'tra
     return {
       user: storedUser,
       token: storedToken,
-      isPwaAuthenticated: \!\!storedUser.pwa_authenticated
+      isPwaAuthenticated: !!storedUser.pwa_authenticated
     };
   } catch (error) {
-    console.error('[PWA] Error retrieving auth data:', error);
+    console.error("[PWA] Error retrieving auth data:", error);
     return null;
   }
 };
@@ -85,24 +85,24 @@ export const getPwaAuthData = (tokenKey = 'trashdrop_auth_token', userKey = 'tra
  * @param {string} tokenKey - Key used for token storage
  * @param {string} userKey - Key used for user storage
  */
-export const clearPwaAuthData = (tokenKey = 'trashdrop_auth_token', userKey = 'trashdrop_user') => {
+export const clearPwaAuthData = (tokenKey = "trashdrop_auth_token", userKey = "trashdrop_user") => {
   try {
     localStorage.removeItem(tokenKey);
     localStorage.removeItem(userKey);
-    localStorage.removeItem('trashdrop_pwa_last_login');
+    localStorage.removeItem("trashdrop_pwa_last_login");
     
     // Also clear any Supabase-related items
     const supabaseKeys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
-      .filter(key => key && (key.includes('supabase') || key.includes('sb-')));
+      .filter(key => key && (key.includes("supabase") || key.includes("sb-")));
     
     supabaseKeys.forEach(key => {
       if (key) localStorage.removeItem(key);
     });
     
-    console.log('[PWA] Auth data cleared successfully');
+    console.log("[PWA] Auth data cleared successfully");
     return true;
   } catch (error) {
-    console.error('[PWA] Error clearing auth data:', error);
+    console.error("[PWA] Error clearing auth data:", error);
     return false;
   }
 };
