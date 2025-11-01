@@ -6,9 +6,10 @@ import App from './App.js';
 import ErrorBoundary from './components/ErrorBoundary';
 import performanceTracker from './utils/performanceTracker';
 import reportWebVitals from './reportWebVitals';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // Make performance tracker available for splash screen
-if (typeof window !== 'undefined') {
+if (typeof window \!== 'undefined') {
   window.performanceTracker = performanceTracker;
   
   // Start tracking splash screen if it's visible
@@ -29,14 +30,18 @@ function logAppDebug(message, data) {
 // Track initial React render
 logAppDebug('React initialization starting');
 
-// Initialize the app
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(let registration of registrations) {
-      registration.unregister();
-    }
-  });
-}
+// Initialize the app - REGISTER service worker instead of unregistering
+// This is critical for PWA functionality
+serviceWorkerRegistration.register({
+  onUpdate: registration => {
+    console.log('[PWA] New content is available, please refresh');
+    // Optional: Show a notification to the user
+  },
+  onSuccess: registration => {
+    console.log('[PWA] Content is cached for offline use');
+    // Optional: Show a notification to the user
+  }
+});
 
 // Using the ErrorBoundary component imported from ./components/ErrorBoundary
 
@@ -45,7 +50,7 @@ try {
   logAppDebug('Creating React root');
   const rootElement = document.getElementById('root');
   
-  if (!rootElement) {
+  if (\!rootElement) {
     throw new Error('Root element #root not found in DOM');
   }
   
@@ -109,8 +114,6 @@ try {
     };
   }
 }
-
-// Service worker registration temporarily disabled for debugging
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

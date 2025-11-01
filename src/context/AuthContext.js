@@ -298,6 +298,14 @@ export const AuthProvider = ({ children }) => {
 
   // Handle successful authentication
   const handleAuthSuccess = useCallback((user, session) => {
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    console.log("[Auth] Standalone/PWA mode detection:", isStandalone ? "YES" : "NO");
+    if (isStandalone) {
+      console.log("[Auth] PWA mode detected - using enhanced storage");
+      import("../utils/pwaHelpers.js").then(({ storePwaAuthData }) => {
+        storePwaAuthData(user, session, appConfig?.storage?.tokenKey, appConfig?.storage?.userKey);
+      });
+    }
     console.log('[Auth] Authentication successful:', { user: user?.email, session: !!session });
     
     // Load and apply theme from database IMMEDIATELY after successful authentication

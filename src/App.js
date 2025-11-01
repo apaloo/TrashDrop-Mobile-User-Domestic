@@ -36,6 +36,7 @@ import PrivateRoute from './components/PrivateRoute.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import InstallPrompt from './components/InstallPrompt.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
+import PwaInitializer from "./components/PwaInitializer.js";
 import AppPerformanceProvider from './components/AppPerformanceProvider.js';
 import AppPerformanceOptimizer from './components/AppPerformanceOptimizer.js';
 import ToastProvider from './components/ToastProvider.js';
@@ -366,6 +367,7 @@ const App = () => {
       <ThemeProvider>
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
+            <PwaInitializer />
             <AuthErrorBoundary>
               <AppPerformanceOptimizer />
               <Suspense 
