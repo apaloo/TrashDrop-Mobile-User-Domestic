@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from './LoadingSpinner.js';
@@ -10,7 +10,11 @@ import LoadingSpinner from './LoadingSpinner.js';
  * @param {React.ReactNode} props.children - Child components to render if authenticated
  */
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, isLoading, user, status } = useAuth();
+  const { isAuthenticated, isLoading, user, status, checkSession } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
+  const [initialRenderComplete, setInitialRenderComplete] = useState(false);
+  const refreshTimeoutRef = useRef(null);
   
   // Special case for test account in development
   const isTestAccount = process.env.NODE_ENV === 'development' && user?.email === 'prince02@mailinator.com';
@@ -25,6 +29,9 @@ const PrivateRoute = ({ children }) => {
       status,
       isAuthenticated,
       isLoading,
+      isRefreshing,
+      refreshAttempted,
+      initialRenderComplete,
       hasUser: !!user,
       userEmail: user?.email,
       isTestAccount,
@@ -33,9 +40,67 @@ const PrivateRoute = ({ children }) => {
     });
   }
 
+  // Mark initial render as complete after a short delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialRenderComplete(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Try to refresh the session if we have stored credentials but aren't authenticated yet
+  useEffect(() => {
+    const attemptSessionRefresh = async () => {
+      // Only attempt refresh if we have stored credentials but aren't authenticated
+      if (hasStoredUser && hasStoredToken && !isAuthenticated && !isLoading && !refreshAttempted) {
+        console.log('[PrivateRoute] Attempting to refresh session with stored credentials');
+        setIsRefreshing(true);
+        
+        try {
+          // Clear any existing timeout
+          if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+          }
+          
+          // Set a timeout to prevent infinite loading
+          refreshTimeoutRef.current = setTimeout(() => {
+            console.log('[PrivateRoute] Session refresh timeout - using stored credentials');
+            setIsRefreshing(false);
+            setRefreshAttempted(true);
+          }, 5000); // 5 second timeout
+          
+          await checkSession(true);
+          
+          // Clear the timeout if successful
+          clearTimeout(refreshTimeoutRef.current);
+        } catch (error) {
+          console.error('[PrivateRoute] Session refresh failed:', error);
+        } finally {
+          setIsRefreshing(false);
+          setRefreshAttempted(true);
+          
+          // Clear the timeout if it's still active
+          if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+          }
+        }
+      }
+    };
+
+    attemptSessionRefresh();
+    
+    // Cleanup function
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, [hasStoredUser, hasStoredToken, isAuthenticated, isLoading, refreshAttempted, checkSession]);
+
   // NEVER show loading spinner if user has stored credentials
   // Even during explicit LOADING state - this prevents intermediate screens
-  if (isLoading && status === 'LOADING' && !hasStoredUser) {
+  if ((isLoading || isRefreshing) && !hasStoredUser) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[PrivateRoute] No stored user - showing loading spinner during auth');
     }
@@ -51,20 +116,40 @@ const PrivateRoute = ({ children }) => {
     return children;
   }
   
-  // If we have stored user and not explicitly unauthenticated, grant access
-  // This prevents loading screens when credentials exist
-  if (hasStoredUser && hasStoredToken && status !== 'UNAUTHENTICATED') {
+  // IMPORTANT: Always grant access if we have stored credentials
+  // This is critical for bookmarked pages and page refreshes
+  if (hasStoredUser && hasStoredToken) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[PrivateRoute] Has stored credentials - granting immediate access');
     }
+    
+    // Store the current path in sessionStorage for restoration after refresh
+    try {
+      const currentPath = window.location.pathname + window.location.search;
+      sessionStorage.setItem('trashdrop_last_path', currentPath);
+      console.log('[PrivateRoute] Stored current path for refresh restoration:', currentPath);
+    } catch (e) {
+      console.error('[PrivateRoute] Failed to store path:', e);
+    }
+    
     return children;
   }
   
-  // Redirect to login only after all checks fail
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[PrivateRoute] All checks failed, redirecting to login');
+  // Only redirect to login if we've attempted a refresh or have no stored credentials
+  // AND initial render is complete (prevents premature redirects)
+  if ((refreshAttempted || (!hasStoredUser && !hasStoredToken)) && initialRenderComplete) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PrivateRoute] All checks failed, redirecting to login');
+    }
+    return <Navigate to="/login" replace />;
   }
-  return <Navigate to="/login" replace />;
+  
+  // Show loading while we're figuring things out
+  return (
+    <div className="flex justify-center items-center h-screen">
+      <LoadingSpinner size="lg" />
+    </div>
+  );
 };
 
 export default PrivateRoute;
