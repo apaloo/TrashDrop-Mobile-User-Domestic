@@ -1,23 +1,23 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import './index.css';
-import App from './App.js';
-import ErrorBoundary from './components/ErrorBoundary';
-import performanceTracker from './utils/performanceTracker';
-import reportWebVitals from './reportWebVitals';
-import * as serviceWorkerRegistration from './serviceWorkerRegistration';
-import { initGlobalErrorHandlers } from './utils/errorBoundary';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import "./index.css";
+import App from "./App.js";
+import ErrorBoundary from "./components/ErrorBoundary";
+import performanceTracker from "./utils/performanceTracker";
+import reportWebVitals from "./reportWebVitals";
+import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
+import { initGlobalErrorHandlers } from "./utils/errorBoundary";
 
 // Initialize global error handlers early
 initGlobalErrorHandlers();
 
 // Make performance tracker available for splash screen
-if (typeof window \!== "undefined") {
+if (typeof window !== "undefined") {
   window.performanceTracker = performanceTracker;
   
-  // Start tracking splash screen if it's visible
-  if (document.getElementById('splash-screen')) {
+  // Start tracking splash screen if it is visible
+  if (document.getElementById("splash-screen")) {
     performanceTracker.trackStartup.splashScreen();
   }
 }
@@ -25,24 +25,24 @@ if (typeof window \!== "undefined") {
 // Debug initialization tracking
 function logAppDebug(message, data) {
   if (window.debugReport) {
-    window.debugReport('React: ' + message, data);
+    window.debugReport("React: " + message, data);
   } else {
-    console.log('[React Debug]', message, data || '');
+    console.log("[React Debug]", message, data || "");
   }
 }
 
 // Track initial React render
-logAppDebug('React initialization starting');
+logAppDebug("React initialization starting");
 
 // Initialize the app - REGISTER service worker instead of unregistering
 // This is critical for PWA functionality
 serviceWorkerRegistration.register({
   onUpdate: registration => {
-    console.log('[PWA] New content is available, please refresh');
+    console.log("[PWA] New content is available, please refresh");
     // Optional: Show a notification to the user
   },
   onSuccess: registration => {
-    console.log('[PWA] Content is cached for offline use');
+    console.log("[PWA] Content is cached for offline use");
     // Optional: Show a notification to the user
   }
 });
@@ -51,11 +51,11 @@ serviceWorkerRegistration.register({
 
 // Error handling for React initialization
 try {
-  logAppDebug('Creating React root');
-  const rootElement = document.getElementById('root');
+  logAppDebug("Creating React root");
+  const rootElement = document.getElementById("root");
   
-  if (\!rootElement) {
-    throw new Error('Root element #root not found in DOM');
+  if (!rootElement) {
+    throw new Error("Root element #root not found in DOM");
   }
   
   const root = ReactDOM.createRoot(rootElement);
@@ -65,7 +65,7 @@ try {
     window.appState.reactRootCreated = true;
   }
   
-  logAppDebug('Rendering React application');
+  logAppDebug("Rendering React application");
   
   root.render(
     <React.StrictMode>
@@ -85,7 +85,7 @@ try {
     </React.StrictMode>
   );
   
-  logAppDebug('React render complete');
+  logAppDebug("React render complete");
   
   // Track successful render
   if (window.appState) {
@@ -93,13 +93,13 @@ try {
   }
   
 } catch (error) {
-  logAppDebug('React initialization failed', {
+  logAppDebug("React initialization failed", {
     errorMessage: error.message,
     stack: error.stack
   });
   
   // Display error in DOM
-  const rootElement = document.getElementById('root');
+  const rootElement = document.getElementById("root");
   if (rootElement) {
     rootElement.innerHTML = `
       <div style="padding: 20px; margin: 20px; border: 2px solid red; background-color: #fff8f8;">
