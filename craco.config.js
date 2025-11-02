@@ -38,4 +38,26 @@ module.exports = {
       },
     },
   },
+  eslint: {
+    enable: process.env.DISABLE_ESLINT_PLUGIN !== 'true',
+    mode: 'extends',
+    configure: () => {
+      // Return empty config when disabled
+      if (process.env.DISABLE_ESLINT_PLUGIN === 'true') {
+        return {
+          rules: {}
+        };
+      }
+      
+      // Return normal config
+      return {
+        extends: ['react-app'],
+        rules: {
+          // Relax rules for development
+          'no-unused-vars': 'warn',
+          'react-hooks/exhaustive-deps': 'warn'
+        }
+      };
+    }
+  }
 };

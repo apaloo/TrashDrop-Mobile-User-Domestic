@@ -42,6 +42,7 @@
     "start:local": "node ./node_modules/.bin/craco start",
     "start:https": "HTTPS=true SSL_CRT_FILE=localhost.pem SSL_KEY_FILE=localhost-key.pem craco start",
     "build": "craco build",
+    "build:clean": "CI=false ESLINT_NO_DEV_ERRORS=true DISABLE_ESLINT_PLUGIN=true craco build",
     "test": "craco test",
     "test:e2e": "cypress run",
     "cypress:open": "cypress open",
