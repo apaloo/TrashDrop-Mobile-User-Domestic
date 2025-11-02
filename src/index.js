@@ -15,7 +15,7 @@ import { isMobileDevice } from "./utils/mobileAuth";
 initGlobalErrorHandlers();
 
 // Make performance tracker available for splash screen
-if (typeof window \!== "undefined") {
+if (typeof window !== "undefined") {
   window.performanceTracker = performanceTracker;
   
   // Start tracking splash screen if it is visible
@@ -42,20 +42,20 @@ if (isMobileDevice()) {
   console.log("[PWA] Mobile device detected, using mobile-specific service worker");
   mobileServiceWorker.register({
     onUpdate: registration => {
-      console.log('[PWA] New content is available, please refresh');
+      console.log("[PWA] New content is available, please refresh");
     },
     onSuccess: registration => {
-      console.log('[PWA] Content is cached for offline use');
+      console.log("[PWA] Content is cached for offline use");
     }
   });
 } else {
   console.log("[PWA] Desktop device detected, using standard service worker");
   serviceWorkerRegistration.register({
     onUpdate: registration => {
-      console.log('[PWA] New content is available, please refresh');
+      console.log("[PWA] New content is available, please refresh");
     },
     onSuccess: registration => {
-      console.log('[PWA] Content is cached for offline use');
+      console.log("[PWA] Content is cached for offline use");
     }
   });
 }
@@ -67,7 +67,7 @@ try {
   logAppDebug("Creating React root");
   const rootElement = document.getElementById("root");
   
-  if (\!rootElement) {
+  if (!rootElement) {
     throw new Error("Root element #root not found in DOM");
   }
   
