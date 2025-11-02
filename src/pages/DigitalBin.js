@@ -14,6 +14,8 @@ import WasteDetailsStep from '../components/digitalBin/WasteDetailsStep.js';
 import AdditionalInfoStep from '../components/digitalBin/AdditionalInfoStep.js';
 import ReviewStep from '../components/digitalBin/ReviewStep.js';
 import ScheduledQRTab from '../components/digitalBin/ScheduledQRTab.js';
+import { getCostBreakdown } from '../utils/costCalculator.js';
+import { prepareDigitalBinData } from '../services/digitalBinService.js';
 
 /**
  * Tab component for the digital bin page
@@ -767,77 +769,38 @@ function DigitalBin() {
       console.log('[DigitalBin] Location ID:', locationId);
       console.log('[DigitalBin] User ID:', user.id);
       
-      if (isTestUser) {
-        console.log('[Dev] Test user - creating mock digital bin in localStorage');
-        const mockBin = {
-          id: '123e4567-e89b-12d3-a456-426614174002',
-          user_id: user.id,
-          location_id: locationId,
-          qr_code_url: qrCodeUrl,
-          frequency: formData.frequency,
-          waste_type: formData.waste_type,
-          bag_count: formData.bag_count,
-          bin_size_liters: formData.bin_size_liters,
-          is_urgent: formData.is_urgent,
-          is_active: true,
-          expires_at: expiryDate.toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          status: 'active'
-        };
-        
-        // NO CACHING: Mock bin created in memory only
-        console.log('[Dev] Mock bin created (no caching)');
-      } else {
-        // PRODUCTION: Create in database
-        try {
-          console.log('[DigitalBin] Attempting database insert with data:', {
-            user_id: user.id,
-            location_id: locationId,
-            qr_code_url: qrCodeUrl,
-            frequency: formData.frequency,
-            waste_type: formData.waste_type,
-            bag_count: formData.bag_count,
-            bin_size_liters: formData.bin_size_liters,
-            is_urgent: formData.is_urgent,
-            expires_at: expiryDate.toISOString(),
-            is_active: true
-          });
-          
-          const { data: binData, error: binError } = await supabase
-            .from('digital_bins')
-            .insert({
-              user_id: user.id,
-              location_id: locationId,
-              qr_code_url: qrCodeUrl,
-              frequency: formData.frequency,
-              waste_type: formData.waste_type,
-              bag_count: formData.bag_count,
-              bin_size_liters: formData.bin_size_liters,
-              is_urgent: formData.is_urgent,
-              expires_at: expiryDate.toISOString(),
-              is_active: true
-            })
-            .select()
-            .single();
+      // Prepare digital bin data with calculated fees
+      const digitalBinData = prepareDigitalBinData({
+        user_id: user.id,
+        location_id: locationId,
+        qr_code_url: qrCodeUrl,
+        frequency: formData.frequency,
+        waste_type: formData.waste_type,
+        bag_count: formData.bag_count,
+        bin_size_liters: formData.bin_size_liters,
+        is_urgent: formData.is_urgent || false,
+        expires_at: expiryDate.toISOString()
+      });
+      
+      console.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
+      
+      const { data: binData, error: binError} = await supabase
+        .from('digital_bins')
+        .insert(digitalBinData)
+        .select()
+        .single();
 
-          if (binError) {
-            console.error('[DigitalBin] Database insert failed:', binError);
-            throw new Error(`Failed to create digital bin: ${binError.message}`);
-          }
-          
-          if (!binData) {
-            console.error('[DigitalBin] No data returned from insert');
-            throw new Error('No data returned from digital bin creation');
-          }
-          
-          console.log('[DigitalBin] Successfully created digital bin:', binData);
-          
-        } catch (dbError) {
-          console.error('[DigitalBin] Database error:', dbError);
-          throw new Error(`Database error creating digital bin: ${dbError.message}`);
-        }
+      if (binError) {
+        console.error('[DigitalBin] Database insert failed:', binError);
+        throw new Error(`Failed to create digital bin: ${binError.message}`);
       }
+      
+      if (!binData) {
+        console.error('[DigitalBin] No data returned from insert');
+        throw new Error('No data returned from digital bin creation');
+      }
+      
+      console.log('[DigitalBin] Successfully created digital bin:', binData);
 
       // SERVER-FIRST: Immediately refresh from server to get all bins
       console.log('[DigitalBin] Digital bin created, refreshing from server');
@@ -886,18 +849,23 @@ function DigitalBin() {
 
       // Create digital bin with QR code
       const qrCodeUrl = `https://trashdrop.app/bin/${locationId}`;
+      
+      // Prepare digital bin data with calculated fees
+      const digitalBinData = prepareDigitalBinData({
+        user_id: user.id,
+        location_id: locationId,
+        qr_code_url: qrCodeUrl,
+        frequency: formData.frequency,
+        waste_type: formData.waste_type,
+        bag_count: formData.bag_count,
+        bin_size_liters: formData.bin_size_liters,
+        is_urgent: formData.is_urgent || false,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+      });
+      
       const { data: bin, error: binError } = await supabase
         .from('digital_bins')
-        .insert({
-          user_id: user.id,
-          location_id: locationId,
-          qr_code_url: qrCodeUrl,
-          frequency: formData.frequency,
-          waste_type: formData.waste_type,
-          bag_count: formData.bag_count,
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-          is_active: true
-        })
+        .insert(digitalBinData)
         .select()
         .single();
 
