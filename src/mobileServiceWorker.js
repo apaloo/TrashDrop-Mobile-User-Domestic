@@ -16,7 +16,7 @@ export function register(config) {
     const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href);
     
     // Our service worker won't work if PUBLIC_URL is on a different origin
-    if (publicUrl.origin \!== window.location.origin) {
+    if (publicUrl.origin !== window.location.origin) {
       console.log('[MobileSW] Different origin, skipping service worker registration');
       return;
     }
@@ -37,7 +37,7 @@ export function register(config) {
             // Check for updates
             registration.onupdatefound = () => {
               const installingWorker = registration.installing;
-              if (\!installingWorker) return;
+              if (!installingWorker) return;
               
               installingWorker.onstatechange = () => {
                 if (installingWorker.state === 'installed') {
@@ -60,7 +60,7 @@ export function register(config) {
                       updateNotification.style.padding = '10px';
                       updateNotification.style.textAlign = 'center';
                       updateNotification.style.zIndex = '9999';
-                      updateNotification.innerHTML = 'New version available\! <button style="background: white; color: #4CAF50; border: none; padding: 5px 10px; border-radius: 3px; margin-left: 10px;">Refresh</button>';
+                      updateNotification.innerHTML = 'New version available! <button style="background: white; color: #4CAF50; border: none; padding: 5px 10px; border-radius: 3px; margin-left: 10px;">Refresh</button>';
                       
                       // Add click handler
                       updateNotification.querySelector('button').addEventListener('click', () => {

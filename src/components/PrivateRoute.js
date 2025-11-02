@@ -23,8 +23,8 @@ const PrivateRoute = ({ children }) => {
   const isTestAccount = process.env.NODE_ENV === 'development' && user?.email === 'prince02@mailinator.com';
   
   // Check for stored user data
-  const hasStoredUser = \!\!localStorage.getItem('trashdrop_user');
-  const hasStoredToken = \!\!localStorage.getItem('trashdrop_auth_token');
+  const hasStoredUser = !!localStorage.getItem('trashdrop_user');
+  const hasStoredToken = !!localStorage.getItem('trashdrop_auth_token');
   
   // Check if we're in PWA mode
   useEffect(() => {
@@ -40,7 +40,7 @@ const PrivateRoute = ({ children }) => {
       isRefreshing,
       refreshAttempted,
       initialRenderComplete,
-      hasUser: \!\!user,
+      hasUser: !!user,
       userEmail: user?.email,
       isTestAccount,
       hasStoredUser,
@@ -62,7 +62,7 @@ const PrivateRoute = ({ children }) => {
   useEffect(() => {
     const attemptSessionRefresh = async () => {
       // Only attempt refresh if we have stored credentials but aren't authenticated
-      if (hasStoredUser && hasStoredToken && \!isAuthenticated && \!isLoading && \!refreshAttempted) {
+      if (hasStoredUser && hasStoredToken && !isAuthenticated && !isLoading && !refreshAttempted) {
         console.log('[PrivateRoute] Attempting to refresh session with stored credentials');
         setIsRefreshing(true);
         
@@ -110,14 +110,14 @@ const PrivateRoute = ({ children }) => {
   // PWA-specific recovery mechanism
   useEffect(() => {
     // Only run in PWA mode
-    if (\!pwaMode) return;
+    if (!pwaMode) return;
     
     // Only attempt recovery once
     if (recoveryAttemptedRef.current) return;
     
     // If we're in PWA mode and have stored credentials but still not authenticated after a delay
     const recoveryTimeout = setTimeout(() => {
-      if (hasStoredUser && hasStoredToken && \!isAuthenticated) {
+      if (hasStoredUser && hasStoredToken && !isAuthenticated) {
         console.log('[PrivateRoute] PWA recovery mechanism triggered');
         recoveryAttemptedRef.current = true;
         
@@ -135,7 +135,7 @@ const PrivateRoute = ({ children }) => {
 
   // NEVER show loading spinner if user has stored credentials
   // Even during explicit LOADING state - this prevents intermediate screens
-  if ((isLoading || isRefreshing) && \!hasStoredUser) {
+  if ((isLoading || isRefreshing) && !hasStoredUser) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[PrivateRoute] No stored user - showing loading spinner during auth');
     }
@@ -172,7 +172,7 @@ const PrivateRoute = ({ children }) => {
   
   // Only redirect to login if we've attempted a refresh or have no stored credentials
   // AND initial render is complete (prevents premature redirects)
-  if ((refreshAttempted || (\!hasStoredUser && \!hasStoredToken)) && initialRenderComplete) {
+  if ((refreshAttempted || (!hasStoredUser && !hasStoredToken)) && initialRenderComplete) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[PrivateRoute] All checks failed, redirecting to login');
     }

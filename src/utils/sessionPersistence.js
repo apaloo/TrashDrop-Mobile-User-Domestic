@@ -44,8 +44,8 @@ export const getLastPath = () => {
  */
 export const hasStoredCredentials = () => {
   try {
-    const hasUser = \!\!localStorage.getItem(USER_KEY);
-    const hasToken = \!\!localStorage.getItem(TOKEN_KEY);
+    const hasUser = !!localStorage.getItem(USER_KEY);
+    const hasToken = !!localStorage.getItem(TOKEN_KEY);
     return hasUser && hasToken;
   } catch (error) {
     console.error('[SessionPersistence] Failed to check stored credentials:', error);

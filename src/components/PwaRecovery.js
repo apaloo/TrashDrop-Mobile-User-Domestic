@@ -8,7 +8,7 @@ import { isPwaMode } from "../utils/pwaHelpers";
 const PwaRecovery = () => {
   useEffect(() => {
     // Only run in PWA mode
-    if (\!isPwaMode()) return;
+    if (!isPwaMode()) return;
     
     console.log("[PwaRecovery] Initializing PWA recovery mechanisms");
     
@@ -60,7 +60,7 @@ const PwaRecovery = () => {
                             document.querySelector('.app-content') || 
                             document.querySelector('#root > div');
         
-        if (\!mainContent || mainContent.children.length === 0) {
+        if (!mainContent || mainContent.children.length === 0) {
           console.log('[PwaRecovery] Potential blank screen detected, showing recovery button');
           recoveryButton.style.display = 'block';
         } else {
