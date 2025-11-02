@@ -7,13 +7,15 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import performanceTracker from "./utils/performanceTracker";
 import reportWebVitals from "./reportWebVitals";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
+import * as mobileServiceWorker from "./mobileServiceWorker";
 import { initGlobalErrorHandlers } from "./utils/errorBoundary";
+import { isMobileDevice } from "./utils/mobileAuth";
 
 // Initialize global error handlers early
 initGlobalErrorHandlers();
 
 // Make performance tracker available for splash screen
-if (typeof window !== "undefined") {
+if (typeof window \!== "undefined") {
   window.performanceTracker = performanceTracker;
   
   // Start tracking splash screen if it is visible
@@ -34,18 +36,29 @@ function logAppDebug(message, data) {
 // Track initial React render
 logAppDebug("React initialization starting");
 
-// Initialize the app - REGISTER service worker instead of unregistering
-// This is critical for PWA functionality
-serviceWorkerRegistration.register({
-  onUpdate: registration => {
-    console.log("[PWA] New content is available, please refresh");
-    // Optional: Show a notification to the user
-  },
-  onSuccess: registration => {
-    console.log("[PWA] Content is cached for offline use");
-    // Optional: Show a notification to the user
-  }
-});
+// Initialize the app - REGISTER service worker
+// Use mobile-specific service worker for mobile devices
+if (isMobileDevice()) {
+  console.log("[PWA] Mobile device detected, using mobile-specific service worker");
+  mobileServiceWorker.register({
+    onUpdate: registration => {
+      console.log('[PWA] New content is available, please refresh');
+    },
+    onSuccess: registration => {
+      console.log('[PWA] Content is cached for offline use');
+    }
+  });
+} else {
+  console.log("[PWA] Desktop device detected, using standard service worker");
+  serviceWorkerRegistration.register({
+    onUpdate: registration => {
+      console.log('[PWA] New content is available, please refresh');
+    },
+    onSuccess: registration => {
+      console.log('[PWA] Content is cached for offline use');
+    }
+  });
+}
 
 // Using the ErrorBoundary component imported from ./components/ErrorBoundary
 
@@ -54,7 +67,7 @@ try {
   logAppDebug("Creating React root");
   const rootElement = document.getElementById("root");
   
-  if (!rootElement) {
+  if (\!rootElement) {
     throw new Error("Root element #root not found in DOM");
   }
   

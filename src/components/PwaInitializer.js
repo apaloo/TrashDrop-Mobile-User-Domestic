@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { isPwaMode, getPwaAuthData } from "../utils/pwaHelpers";
+import { isMobilePwa, getMobileAuthData, initMobileAuthListeners } from "../utils/mobileAuth";
 
 /**
  * Component that handles PWA-specific initialization
@@ -10,11 +11,24 @@ const PwaInitializer = () => {
   const { isAuthenticated, checkSession, handleAuthSuccess } = useAuth();
   const [hasAttemptedRestore, setHasAttemptedRestore] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Detect mobile PWA on mount
+  useEffect(() => {
+    const mobile = isMobilePwa();
+    setIsMobile(mobile);
+    console.log("[PwaInitializer] Mobile PWA detection:", mobile ? "YES" : "NO");
+    
+    // Initialize mobile auth listeners
+    if (mobile) {
+      initMobileAuthListeners();
+    }
+  }, []);
   
   // Add a recovery mechanism for blank screens
   useEffect(() => {
     // This runs only in PWA mode
-    if (\!isPwaMode()) return;
+    if (!isPwaMode()) return;
     
     // If we detect a potential blank screen (no content after 3 seconds)
     const blankScreenTimeout = setTimeout(() => {
@@ -22,7 +36,7 @@ const PwaInitializer = () => {
                           document.querySelector('.app-content') || 
                           document.querySelector('#root > div');
       
-      if (\!mainContent || mainContent.children.length === 0) {
+      if (!mainContent || mainContent.children.length === 0) {
         console.error('[PwaInitializer] Potential blank screen detected, attempting recovery');
         
         try {
@@ -54,7 +68,7 @@ const PwaInitializer = () => {
   useEffect(() => {
     const initializePwa = async () => {
       // Only run in PWA mode
-      if (\!isPwaMode()) {
+      if (!isPwaMode()) {
         console.log("[PwaInitializer] Not in PWA mode, skipping initialization");
         return;
       }
@@ -74,11 +88,21 @@ const PwaInitializer = () => {
           return;
         }
         
-        // Try to get stored PWA auth data
-        const pwaAuthData = getPwaAuthData();
+        // Try mobile auth data first for mobile PWAs
+        let authData = null;
+        if (isMobile) {
+          console.log("[PwaInitializer] Checking mobile auth data first");
+          authData = getMobileAuthData();
+        }
         
-        if (pwaAuthData?.user && pwaAuthData?.token) {
-          console.log("[PwaInitializer] Found stored PWA credentials, restoring session");
+        // Fall back to regular PWA auth data if mobile auth data not found
+        if (!authData) {
+          console.log("[PwaInitializer] Checking regular PWA auth data");
+          authData = getPwaAuthData();
+        }
+        
+        if (authData?.user && authData?.token) {
+          console.log("[PwaInitializer] Found stored credentials, restoring session");
           
           try {
             // First try to refresh the session with Supabase
@@ -88,13 +112,13 @@ const PwaInitializer = () => {
             console.error("[PwaInitializer] Error refreshing session:", error);
             
             // If refresh fails, try to use stored credentials
-            if (pwaAuthData.isPwaAuthenticated) {
-              console.log("[PwaInitializer] Using stored PWA credentials as fallback");
-              handleAuthSuccess(pwaAuthData.user, { access_token: pwaAuthData.token });
+            if (authData.isMobileAuthenticated || authData.isPwaAuthenticated) {
+              console.log("[PwaInitializer] Using stored credentials as fallback");
+              handleAuthSuccess(authData.user, { access_token: authData.token });
             }
           }
         } else {
-          console.log("[PwaInitializer] No stored PWA credentials found");
+          console.log("[PwaInitializer] No stored credentials found");
         }
       } catch (error) {
         console.error("[PwaInitializer] Error during PWA initialization:", error);
@@ -108,7 +132,7 @@ const PwaInitializer = () => {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [isAuthenticated, checkSession, handleAuthSuccess, hasAttemptedRestore]);
+  }, [isAuthenticated, checkSession, handleAuthSuccess, hasAttemptedRestore, isMobile]);
   
   // Render an error message if initialization failed
   if (hasError && isPwaMode()) {

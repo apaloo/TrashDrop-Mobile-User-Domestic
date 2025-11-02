@@ -3,11 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="TrashDrop - Report illegal dumping and schedule trash pickups"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
     <!--
@@ -34,11 +36,32 @@
         });
       }
       console.log('[PWA] Forced white background and removed dark classes before app load');
+      
+      // Initialize PWA error tracking
+      window.pwaErrors = [];
+      window.addEventListener('error', function(event) {
+        try {
+          window.pwaErrors.push({
+            message: event.message,
+            source: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            timestamp: new Date().toISOString()
+          });
+          console.error('[PWA Error]', event.message, event.filename, event.lineno);
+        } catch (e) {}
+      });
+      
+      // Detect PWA mode
+      window.isPwaMode = window.matchMedia('(display-mode: standalone)').matches || 
+                         window.navigator.standalone === true;
+      console.log('[PWA] Running in PWA mode:', window.isPwaMode ? 'YES' : 'NO');
+      
+      // Store PWA mode in localStorage for later use
+      try {
+        localStorage.setItem('trashdrop_pwa_mode', window.isPwaMode ? 'true' : 'false');
+      } catch (e) {}
     </script>
-    <!-- Clear PWA cache and force fresh installation -->
-    <script src="%PUBLIC_URL%/clear-pwa-cache.js"></script>
-    <!-- Unregister stale service workers -->
-    <script src="%PUBLIC_URL%/unregister-sw.js"></script>
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.
@@ -69,6 +92,21 @@
       
       .leaflet-container .leaflet-control-attribution {
         z-index: 5 !important;
+      }
+      
+      /* PWA-specific styles */
+      @media (display-mode: standalone) {
+        body {
+          overscroll-behavior-y: none; /* Prevent pull-to-refresh */
+        }
+        
+        /* Add safe area insets for notches and home indicators */
+        #root {
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
       }
     </style>
   </head>
