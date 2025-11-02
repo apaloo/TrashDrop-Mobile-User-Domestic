@@ -42,6 +42,7 @@ import ToastProvider from './components/ToastProvider.js';
 import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
 import PwaInitializer from './components/PwaInitializer.js';
+import PwaRecovery from './components/PwaRecovery.js';
 
 // Styling
 import { CssBaseline, ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
@@ -84,7 +85,7 @@ const AppContent = () => {
     console.log('[App Theme] ⚡ user?.id:', user?.id);
     
     const loadAndApplyTheme = async () => {
-      if (!user?.id) {
+      if (\!user?.id) {
         console.log('[App Theme] ❌ No user ID, skipping theme load');
         return;
       }
@@ -136,7 +137,7 @@ const AppContent = () => {
   
   // Mark app as loaded after successful initialization
   useEffect(() => {
-    if (!isLoading) {
+    if (\!isLoading) {
       // Add class to HTML element to allow theme styling
       document.documentElement.classList.add('app-loaded');
       console.log('[App] App initialization complete - marking as loaded');
@@ -159,7 +160,7 @@ const AppContent = () => {
     try {
       const lastPath = sessionStorage.getItem('trashdrop_last_path');
       const isPublic = ['/', '/login', '/register', '/reset-password', '/reset-password-confirm'].includes(location.pathname);
-      if (isAuthenticated && lastPath && isPublic && lastPath !== location.pathname) {
+      if (isAuthenticated && lastPath && isPublic && lastPath \!== location.pathname) {
         navigate(lastPath, { replace: true });
       }
     } catch (_) {}
@@ -178,7 +179,7 @@ const AppContent = () => {
       
       console.log('[App] Auth check conditions:', {
         isPublicRoute,
-        hasStoredUser: !!hasStoredUser,
+        hasStoredUser: \!\!hasStoredUser,
         isAuthenticated,
         isLoading,
         pathname: location.pathname
@@ -197,7 +198,7 @@ const AppContent = () => {
       
       // If not authenticated and not on a public route, redirect to login
       // AuthContext already handles session management, we just check the state
-      if (!isAuthenticated && !hasStoredUser) {
+      if (\!isAuthenticated && \!hasStoredUser) {
         console.log('[App] Not authenticated, redirecting to login');
         navigate('/login', { 
           state: { from: location },
@@ -368,6 +369,7 @@ const App = () => {
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
             <PwaInitializer />
+            <PwaRecovery />
             <AuthErrorBoundary>
               <AppPerformanceOptimizer />
               <Suspense 
