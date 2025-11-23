@@ -116,7 +116,9 @@ const NavBar = () => {
         <div className="container mx-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
           <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] text-2xl font-bold">
-            <img src="/logo.svg" alt="TrashDrop Logo" className="w-12 h-12" />
+            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center p-1 dark:hidden">
+              <img src="/logo.svg" alt="TrashDrop Logo" className="w-full h-full object-contain" />
+            </div>
             <span>TrashDrop</span>
           </NavLink>
 

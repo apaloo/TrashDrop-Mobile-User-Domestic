@@ -323,10 +323,10 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Digital Bin Location</h2>
+      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Digital Bin Location</h2>
       
       <div className="mb-4">
-        <label htmlFor="address" className="block text-sm font-medium text-gray-900 mb-1">
+        <label htmlFor="address" className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
           Address
         </label>
         <input
@@ -335,7 +335,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           value={addressInput}
           onChange={handleAddressChange}
           placeholder="Enter address or select from saved locations"
-          className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-white bg-white dark:bg-gray-700 font-medium placeholder-gray-400 dark:placeholder-gray-500"
         />
         {addressError && (
           <p className="text-red-500 text-sm mt-1">{addressError}</p>
@@ -343,13 +343,13 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       </div>
       
       <div className="mb-4">
-        <label htmlFor="savedLocation" className="block text-sm font-medium text-gray-900 mb-1">
+        <label htmlFor="savedLocation" className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
           Saved Locations
         </label>
         <select
           id="savedLocation"
           onChange={handleLocationSelect}
-          className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-white bg-white dark:bg-gray-700 font-medium"
         >
           <option value="">-- Select a saved location --</option>
           {savedLocations.map(location => (
@@ -369,14 +369,14 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             onChange={handleUseCurrentLocation}
             className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
           />
-          <label htmlFor="useCurrentLocation" className="ml-2 block text-sm text-gray-700">
+          <label htmlFor="useCurrentLocation" className="ml-2 block text-sm text-gray-700 dark:text-gray-400">
             Use my current location
           </label>
         </div>
       </div>
       
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-900 mb-1">
+        <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
           Confirm on Map
         </label>
         <div className="h-48 rounded-lg overflow-hidden border border-gray-300">
@@ -403,25 +403,25 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       {position && position[0] != null && position[1] != null && (
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
               Latitude
             </label>
             <input
               type="text"
               value={position[0]?.toFixed(6) || ''}
               disabled
-              className="w-full p-2 bg-gray-100 border border-gray-300 rounded-md"
+              className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-300"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
               Longitude
             </label>
             <input
               type="text"
               value={position[1]?.toFixed(6) || ''}
               disabled
-              className="w-full p-2 bg-gray-100 border border-gray-300 rounded-md"
+              className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-300"
             />
           </div>
         </div>

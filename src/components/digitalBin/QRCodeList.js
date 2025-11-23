@@ -25,31 +25,31 @@ const getStatusInfo = (status) => {
     case 'active':
       return {
         icon: <FaClock className="mr-1" />,
-        color: 'bg-blue-100 text-blue-800',
+        color: 'bg-blue-100 dark:bg-blue-900 dark:bg-opacity-30 text-blue-800 dark:text-blue-300',
         label: 'Active'
       };
     case 'in_service':
       return {
         icon: <FaClock className="mr-1 animate-pulse" />,
-        color: 'bg-yellow-100 text-yellow-800',
+        color: 'bg-yellow-100 dark:bg-yellow-900 dark:bg-opacity-30 text-yellow-800 dark:text-yellow-300',
         label: 'In Service'
       };
     case 'completed':
       return {
         icon: <FaCheckCircle className="mr-1" />,
-        color: 'bg-green-100 text-green-800',
+        color: 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-800 dark:text-green-300',
         label: 'Completed'
       };
     case 'cancelled':
       return {
         icon: <FaExclamationTriangle className="mr-1" />,
-        color: 'bg-red-100 text-red-800',
+        color: 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-800 dark:text-red-300',
         label: 'Cancelled'
       };
     default:
       return {
         icon: <FaClock className="mr-1" />,
-        color: 'bg-gray-100 text-gray-800',
+        color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300',
         label: 'Pending'
       };
   }
@@ -184,13 +184,13 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
   
   return (
     <div 
-      className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4 transition-all duration-200 ${
+      className={`bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-100 dark:border-gray-600 overflow-hidden mb-4 transition-all duration-200 ${
         pickup.status === 'cancelled' ? 'opacity-70' : ''
       }`}
     >
       {/* Header */}
       <div 
-        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
         onClick={toggleExpand}
       >
         <div className="flex justify-between items-start">
@@ -200,31 +200,31 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
               
               {/* Bin Size Badge */}
               {pickup.bin_size_liters && (
-                <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-semibold">
+                <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900 dark:bg-opacity-30 text-blue-800 dark:text-blue-300 text-xs font-semibold">
                   {getBinSizeLabelShort(pickup.bin_size_liters)}
                 </span>
               )}
               
               {/* Urgent Badge */}
               {pickup.is_urgent && (
-                <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-100 text-yellow-800 text-xs font-semibold">
+                <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-100 dark:bg-yellow-900 dark:bg-opacity-30 text-yellow-800 dark:text-yellow-300 text-xs font-semibold">
                   ⚡ Urgent
                 </span>
               )}
               
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
                 {formatRelativeTime(pickup.created_at)}
               </span>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
               Digital Bin #{pickup.id}
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               {pickup.address || 'Custom Location'}
             </p>
           </div>
           <button 
-            className={`ml-4 text-gray-400 hover:text-gray-600 transition-colors ${isExpanded ? 'transform rotate-180' : ''}`}
+            className={`ml-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors ${isExpanded ? 'transform rotate-180' : ''}`}
           >
             <FaChevronDown />
           </button>
@@ -233,29 +233,29 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
       
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="border-t border-gray-100">
+        <div className="border-t border-gray-100 dark:border-gray-600">
           {/* QR Code Section */}
           <div className="p-4">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-sm font-medium text-gray-900">Digital Bin QR Code</h4>
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white">Digital Bin QR Code</h4>
               <div className="flex space-x-2">
                 <button
                   onClick={handleQRClick}
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                   title="Expand QR Code"
                 >
                   <FaExpand size={16} />
                 </button>
                 <button
                   onClick={handleShare}
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                   title="Share QR Code"
                 >
                   <FaShare size={16} />
                 </button>
                 <button
                   onClick={handleRefreshQR}
-                  className={`text-gray-500 hover:text-gray-700 transition-colors ${isLoading ? 'animate-spin' : ''}`}
+                  className={`text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ${isLoading ? 'animate-spin' : ''}`}
                   title="Refresh QR Code"
                   disabled={isLoading}
                 >
@@ -265,7 +265,7 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
             </div>
             
             <div 
-              className={`relative bg-gray-50 rounded-lg overflow-hidden transition-all duration-200 cursor-pointer group ${
+              className={`relative bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden transition-all duration-200 cursor-pointer group ${
                 isQrExpanded ? 'h-64' : 'h-32'
               }`}
               onClick={handleQRClick}
@@ -283,32 +283,32 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
                   />
                   {!isImageLoaded && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <FaSpinner className="animate-spin text-gray-400" size={24} />
+                      <FaSpinner className="animate-spin text-gray-400 dark:text-gray-500" size={24} />
                     </div>
                   )}
                   {/* Hover overlay for expand hint */}
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white rounded-full p-3 shadow-lg">
-                      <FaExpand className="text-gray-600" size={20} />
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white dark:bg-gray-700 rounded-full p-3 shadow-lg">
+                      <FaExpand className="text-gray-600 dark:text-gray-300" size={20} />
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-gray-400">QR Code not available</span>
+                  <span className="text-gray-400 dark:text-gray-500">QR Code not available</span>
                 </div>
               )}
             </div>
           </div>
           
           {/* Details Section */}
-          <div className="p-4 border-t border-gray-100">
+          <div className="p-4 border-t border-gray-100 dark:border-gray-600">
             <div className="space-y-4">
               <div className="flex items-start">
-                <FaCalendarAlt className="mt-1 mr-2 text-gray-400 flex-shrink-0" />
+                <FaCalendarAlt className="mt-1 mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500">Service Schedule</h4>
-                  <p className="text-gray-900">
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Service Schedule</h4>
+                  <p className="text-gray-900 dark:text-gray-200">
                     {pickup.frequency && pickup.preferred_time
                       ? `${pickup.frequency.charAt(0).toUpperCase() + pickup.frequency.slice(1)} • ${
                           pickup.preferred_time === 'morning'
@@ -323,20 +323,20 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
               </div>
               
               <div className="flex items-start">
-                <FaMapMarkerAlt className="mt-1 mr-2 text-gray-400 flex-shrink-0" />
+                <FaMapMarkerAlt className="mt-1 mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500">Location</h4>
-                  <p className="text-gray-900 break-words">
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Location</h4>
+                  <p className="text-gray-900 dark:text-gray-200 break-words">
                     {pickup.address || 'No address provided'}
                   </p>
                 </div>
               </div>
               
               <div className="flex items-start">
-                <FaInfoCircle className="mt-1 mr-2 text-gray-400 flex-shrink-0" />
+                <FaInfoCircle className="mt-1 mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500">Bin Details</h4>
-                  <p className="text-gray-900">
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Bin Details</h4>
+                  <p className="text-gray-900 dark:text-gray-200">
                     <span className="capitalize">{pickup.waste_type?.toLowerCase() || 'general'}</span>
                     {' • '}
                     {pickup.bag_count} bin{pickup.bag_count !== 1 ? 's' : ''}
@@ -348,7 +348,7 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
                     )}
                     {pickup.is_urgent && (
                       <span className="ml-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900 dark:bg-opacity-30 text-yellow-800 dark:text-yellow-300">
                           ⚡ Urgent
                         </span>
                       </span>
@@ -358,9 +358,9 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
               </div>
               
               <div className="flex items-start">
-                <FaClock className="mt-1 mr-2 text-gray-400 flex-shrink-0" />
+                <FaClock className="mt-1 mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h4>
                   <div className="flex items-center">
                     <StatusBadge status={pickup.status} />
                   </div>
@@ -369,16 +369,16 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
             </div>
             
             {pickup.special_instructions && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Special Instructions</h4>
-                <p className="text-gray-700 whitespace-pre-line">{pickup.special_instructions}</p>
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-600">
+                <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Special Instructions</h4>
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{pickup.special_instructions}</p>
               </div>
             )}
             
             {/* Actions */}
-            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between">
+            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-600 flex justify-between">
               <button 
-                className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-sm font-medium"
                 onClick={toggleExpand}
               >
                 Show Less
@@ -386,7 +386,7 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
               
               {pickup.status === 'active' && (
                 <button 
-                  className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center"
+                  className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm font-medium flex items-center"
                   onClick={handleCancel}
                 >
                   <FaTrash className="mr-1" size={12} />
@@ -412,11 +412,11 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
             </button>
             
             {/* QR Code */}
-            <div className="bg-white rounded-lg p-8 shadow-2xl max-w-full max-h-full flex flex-col items-center">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow-2xl max-w-full max-h-full flex flex-col items-center">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 text-center">
                 Digital Bin QR Code
               </h3>
-              <p className="text-sm text-gray-600 mb-6 text-center">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 text-center">
                 {pickup.location_name || 'Custom Location'}
               </p>
               
@@ -428,12 +428,12 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh }) => {
                   style={{ minWidth: '300px', minHeight: '300px' }}
                 />
               ) : (
-                <div className="w-80 h-80 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <span className="text-gray-400">QR Code not available</span>
+                <div className="w-80 h-80 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                  <span className="text-gray-400 dark:text-gray-500">QR Code not available</span>
                 </div>
               )}
               
-              <p className="text-xs text-gray-500 mt-4 text-center max-w-md">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center max-w-md">
                 Show this QR code to the service provider when they arrive. 
                 The QR code contains all necessary information about your digital bin service.
               </p>
@@ -464,11 +464,11 @@ const QRCodeList = ({
   if (pickups.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <FaQrcode className="text-gray-400 text-2xl" />
+        <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+          <FaQrcode className="text-gray-400 dark:text-gray-500 text-2xl" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No Digital Bins</h3>
-        <p className="text-gray-500 max-w-md mx-auto">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Digital Bins</h3>
+        <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
           {emptyStateMessage}
         </p>
       </div>

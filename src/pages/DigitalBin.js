@@ -25,7 +25,7 @@ const TabButton = ({ active, onClick, children, icon: Icon }) => (
     className={`flex-1 py-4 px-2 text-center font-medium text-sm sm:text-base transition-colors duration-200 ${
       active 
         ? 'text-primary border-b-2 border-primary' 
-        : 'text-gray-500 hover:text-gray-700'
+        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
     }`}
     onClick={onClick}
   >
@@ -910,10 +910,10 @@ function DigitalBin() {
   // Show loading spinner while auth is loading
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -921,18 +921,18 @@ function DigitalBin() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 z-[100] flex items-center justify-center p-4">
-      <div className="bg-white shadow-2xl rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative flex flex-col">
+      <div className="bg-white dark:bg-gray-800 shadow-2xl rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative flex flex-col">
         {/* Close button */}
         <button
           onClick={() => navigate('/dashboard')}
-          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
           aria-label="Close modal"
         >
-          <FaTimes className="text-gray-600 text-xl" />
+          <FaTimes className="text-gray-600 dark:text-gray-300 text-xl" />
         </button>
         
         {/* Tab navigation */}
-        <div className="flex border-b border-gray-200 bg-white z-10 shadow-sm flex-shrink-0 pr-16">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-10 shadow-sm flex-shrink-0 pr-16">
           <TabButton 
             active={activeTab === 'new'}
             onClick={() => setActiveTab('new')}
@@ -963,16 +963,16 @@ function DigitalBin() {
                       style={{ minWidth: '60px' }}
                     >
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1
-                        ${currentStep >= step ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'}`}>
+                        ${currentStep >= step ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
                         {step}
                       </div>
-                      <span className="text-xs text-center hidden sm:block">{getStepTitle(step)}</span>
+                      <span className="text-xs text-center hidden sm:block dark:text-gray-300">{getStepTitle(step)}</span>
                     </div>
                   ))}
                 </div>
                 
                 {/* Form steps */}
-                <div className="bg-white">
+                <div className="bg-white dark:bg-gray-800">
                   {currentStep === 1 && (
                     <LocationStep 
                       formData={formData}
@@ -1019,7 +1019,7 @@ function DigitalBin() {
                 {/* Link to one-time pickup */}
                 {currentStep === 5 && (
                   <div className="text-center mt-6">
-                    <a href="/pickup-request" className="text-primary hover:underline text-sm">
+                    <a href="/pickup-request" className="text-primary hover:underline text-sm dark:text-primary-light">
                       Need a one-time pickup? Request here
                     </a>
                   </div>
