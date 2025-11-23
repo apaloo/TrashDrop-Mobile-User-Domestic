@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import UberStyleTrackingMap from '../components/UberStyleTrackingMap.js';
 import { pickupService } from '../services/pickupService.js';
 import { subscribeToCollectorLocation, calculateETA } from '../utils/realtime.js';
 import GeolocationService from '../utils/geolocationService.js';
+import { showDistanceAlert, showStatusNotification } from '../utils/toastNotifications.js';
 
 /**
  * Collector Tracking page
@@ -21,6 +22,12 @@ const CollectorTracking = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [eta, setEta] = useState(null);
   const [distance, setDistance] = useState(null);
+  
+  // Refs for smart update logic
+  const lastUpdateTime = useRef(Date.now());
+  const lastNotificationDistance = useRef(null);
+  const lastStatus = useRef(null);
+  const updateThrottleMs = 5000; // Throttle updates to every 5 seconds
   
   // Get pickup ID from URL params if provided
   const pickupId = searchParams.get('pickupId');
@@ -87,25 +94,52 @@ const CollectorTracking = () => {
     getUserLocation();
   }, []);
 
-  // Subscribe to real-time collector location updates
+  // Subscribe to real-time collector location updates with smart throttling and notifications
   useEffect(() => {
     if (!activePickup?.collector_id) return;
 
     console.log('[CollectorTracking] Setting up real-time location tracking for collector:', activePickup.collector_id);
+    
+    // Initialize last status
+    if (activePickup.status && !lastStatus.current) {
+      lastStatus.current = activePickup.status;
+    }
 
     const locationSubscription = subscribeToCollectorLocation(
       activePickup.collector_id,
       activePickup.id,
       (locationUpdate) => {
+        const now = Date.now();
+        
+        // Throttle updates to prevent UI thrashing (update every 5 seconds max)
+        if (now - lastUpdateTime.current < updateThrottleMs) {
+          console.log('[CollectorTracking] Update throttled, skipping...');
+          return;
+        }
+        
+        lastUpdateTime.current = now;
         console.log('[CollectorTracking] Collector location updated:', locationUpdate);
         setCollectorLocation(locationUpdate.location);
 
-        // Calculate ETA if we have user location
+        // Calculate ETA and distance if we have user location
         if (userLocation && locationUpdate.location) {
           const etaData = calculateETA(userLocation, locationUpdate.location);
           if (etaData) {
-            setEta(etaData.eta);
-            setDistance(etaData.distance);
+            const newEta = etaData.eta;
+            const newDistance = etaData.distance;
+            
+            setEta(newEta);
+            setDistance(newDistance);
+            
+            // Distance-based notifications (only notify on significant changes)
+            const shouldNotify = 
+              !lastNotificationDistance.current ||
+              Math.abs(lastNotificationDistance.current - newDistance) > 0.2; // 200m threshold
+            
+            if (shouldNotify) {
+              showDistanceAlert(newDistance, newEta);
+              lastNotificationDistance.current = newDistance;
+            }
           }
         }
       }
@@ -116,6 +150,37 @@ const CollectorTracking = () => {
       locationSubscription.unsubscribe();
     };
   }, [activePickup?.collector_id, activePickup?.id, userLocation]);
+  
+  // Monitor pickup status changes and show notifications
+  useEffect(() => {
+    if (!activePickup?.status) return;
+    
+    if (lastStatus.current && lastStatus.current !== activePickup.status) {
+      const collectorName = activePickup.collector 
+        ? `${activePickup.collector.first_name} ${activePickup.collector.last_name}`
+        : 'Collector';
+      
+      showStatusNotification(lastStatus.current, activePickup.status, collectorName);
+    }
+    
+    lastStatus.current = activePickup.status;
+  }, [activePickup?.status, activePickup?.collector]);
+  
+  // ETA countdown timer (updates every 30 seconds when collector is moving)
+  useEffect(() => {
+    if (!eta || !distance || !userLocation || !collectorLocation) return;
+    
+    const countdownInterval = setInterval(() => {
+      // Recalculate ETA every 30 seconds
+      const etaData = calculateETA(userLocation, collectorLocation);
+      if (etaData) {
+        setEta(etaData.eta);
+        setDistance(etaData.distance);
+      }
+    }, 30000); // Update every 30 seconds
+    
+    return () => clearInterval(countdownInterval);
+  }, [eta, distance, userLocation, collectorLocation]);
 
   if (loading) {
     return (

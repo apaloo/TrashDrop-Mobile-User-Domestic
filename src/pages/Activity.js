@@ -577,100 +577,112 @@ const Activity = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100">Activity History</h1>
-      
-      {/* Filter tabs - Single row with smaller font */}
-      <div className="flex mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
-        <button 
-          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-          onClick={() => handleFilterChange('all')}
-        >
-          All
-        </button>
-        <button 
-          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-          onClick={() => handleFilterChange('pickup_request')}
-        >
-          Pickups
-        </button>
-        <button 
-          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-          onClick={() => handleFilterChange('dumping_report')}
-        >
-          Reports
-        </button>
-        <button 
-          className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-          onClick={() => handleFilterChange('qr_scan')}
-        >
-          Scans
-        </button>
-        <button 
-          onClick={handleRefresh}
-          className="px-3 py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 flex items-center justify-center flex-shrink-0"
-          aria-label="Refresh activity data"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-        </button>
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Fixed Header - positioned below navbar */}
+      <div className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto px-4 pt-2 pb-3">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Activity History</h1>
+        </div>
+        
+        {/* Filter tabs - Sticky below header */}
+        <div className="container mx-auto px-4 pb-3">
+          <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+            <button 
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              onClick={() => handleFilterChange('all')}
+            >
+              All
+            </button>
+            <button 
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              onClick={() => handleFilterChange('pickup_request')}
+            >
+              Pickups
+            </button>
+            <button 
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              onClick={() => handleFilterChange('dumping_report')}
+            >
+              Reports
+            </button>
+            <button 
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              onClick={() => handleFilterChange('qr_scan')}
+            >
+              Scans
+            </button>
+            <button 
+              onClick={handleRefresh}
+              className="px-3 py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 flex items-center justify-center flex-shrink-0"
+              aria-label="Refresh activity data"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
       
-      {/* Loading state */}
-      {isLoading && (
-        <div className="flex justify-center items-center py-12">
-          <LoadingSpinner />
-        </div>
-      )}
-      
-      {/* Error state */}
-      {error && !isLoading && (
-        <div className="bg-red-50 dark:bg-red-900/40 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg shadow-sm relative mb-4" role="alert">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
-          <button 
-            onClick={handleRefresh}
-            className="mt-2 bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-      
-      {/* Activity list */}
-      {!isLoading && !error && (
-        <div className="space-y-4">
-          {activities.length > 0 ? (
-            <>
-              {activities.map(activity => (
-                <ActivityCard key={`${activity.id}-${activity.created_at}`} activity={activity} />
-              ))}
-              
-              {/* Infinite scroll loading indicator */}
-              <div ref={loadingRef}>
-                <InfiniteScrollLoader />
-              </div>
-            </>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center border border-gray-200 dark:border-gray-700">
-              <div className="text-gray-500 dark:text-gray-400 mb-4">
-                <svg className="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                </svg>
-                <h3 className="text-xl font-medium mb-1">No activity yet</h3>
-                <p>Your activity history will appear here as you use the app.</p>
-              </div>
-              <div className="flex flex-col space-y-2">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Try these activities to get started:</p>
-                <a href="/pickup-request" className="text-blue-600 hover:underline">Request a trash pickup</a>
-                <a href="/dumping-report" className="text-blue-600 hover:underline">Report illegal dumping</a>
-                <a href="/scan" className="text-blue-600 hover:underline">Scan a QR code at a public bin</a>
-              </div>
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="container mx-auto px-4 py-4">
+          {/* Loading state */}
+          {isLoading && (
+            <div className="flex justify-center items-center py-12">
+              <LoadingSpinner />
+            </div>
+          )}
+          
+          {/* Error state */}
+          {error && !isLoading && (
+            <div className="bg-red-50 dark:bg-red-900/40 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg shadow-sm relative mb-4" role="alert">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{error}</span>
+              <button 
+                onClick={handleRefresh}
+                className="mt-2 bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+          
+          {/* Activity list */}
+          {!isLoading && !error && (
+            <div className="space-y-4">
+              {activities.length > 0 ? (
+                <>
+                  {activities.map(activity => (
+                    <ActivityCard key={`${activity.id}-${activity.created_at}`} activity={activity} />
+                  ))}
+                  
+                  {/* Infinite scroll loading indicator */}
+                  <div ref={loadingRef}>
+                    <InfiniteScrollLoader />
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center border border-gray-200 dark:border-gray-700">
+                  <div className="text-gray-500 dark:text-gray-400 mb-4">
+                    <svg className="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                    </svg>
+                    <h3 className="text-xl font-medium mb-1">No activity yet</h3>
+                    <p>Your activity history will appear here as you use the app.</p>
+                  </div>
+                  <div className="flex flex-col space-y-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Try these activities to get started:</p>
+                    <a href="/pickup-request" className="text-blue-600 hover:underline">Request a trash pickup</a>
+                    <a href="/dumping-report" className="text-blue-600 hover:underline">Report illegal dumping</a>
+                    <a href="/scan" className="text-blue-600 hover:underline">Scan a QR code at a public bin</a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

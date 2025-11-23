@@ -445,9 +445,9 @@ const Rewards = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Points summary */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+    <div className="flex flex-col h-full">
+      {/* Fixed Points summary header */}
+      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">My Rewards</h1>
           
@@ -466,14 +466,16 @@ const Rewards = () => {
         </p>
       </div>
       
-      {/* Error message */}
-      {errorMessage && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
-          <p>{errorMessage}</p>
-        </div>
-      )}
-      
-      {/* Rewards list */}
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto space-y-6 pb-6">
+        {/* Error message */}
+        {errorMessage && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
+            <p>{errorMessage}</p>
+          </div>
+        )}
+        
+        {/* Rewards list */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Available Rewards</h2>
         
@@ -673,6 +675,7 @@ const Rewards = () => {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

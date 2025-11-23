@@ -22,7 +22,7 @@ export const pickupService = {
       // Check both one-time and scheduled pickups
       const activeStatuses = ['accepted', 'in_transit', 'available'];
       
-      // Check one-time pickups
+      // Check one-time pickups (fetch collector separately since no FK constraint)
       const { data: oneTimeData, error: oneTimeError } = await supabase
         .from('pickup_requests')
         .select(`
@@ -39,6 +39,27 @@ export const pickupService = {
       if (oneTimeError) {
         console.error('[PickupService] Error fetching active one-time pickup:', oneTimeError);
         throw oneTimeError;
+      }
+      
+      // Fetch collector details separately if collector_id exists
+      if (oneTimeData?.[0]?.collector_id) {
+        try {
+          const { data: collectorData } = await supabase
+            .from('collector_profiles')
+            .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
+            .eq('user_id', oneTimeData[0].collector_id)
+            .single();
+          
+          if (collectorData) {
+            oneTimeData[0].collector = {
+              id: collectorData.user_id,
+              ...collectorData
+            };
+          }
+        } catch (collectorError) {
+          console.warn('[PickupService] Could not fetch collector details:', collectorError);
+          // Non-fatal, continue without collector data
+        }
       }
 
       // Check scheduled pickups
@@ -89,12 +110,15 @@ export const pickupService = {
           id: activePickup.id,
           user_id: userId,
           collector_id: activePickup.collector_id,
+          collector: activePickup.collector || null, // Include collector profile data
           status: activePickup.status,
           location: location || activePickup.location,
           coordinates: activePickup.coordinates,
           fee: activePickup.fee || 0,
           bags: activePickup.bag_count || 0,
+          bag_count: activePickup.bag_count || 0,
           notes: activePickup.special_instructions || '',
+          special_instructions: activePickup.special_instructions || '',
           waste_type: activePickup.waste_type || 'general',
           scheduled_date: activePickup.pickup_date || activePickup.scheduled_date,
           preferred_time: activePickup.preferred_time,
@@ -163,6 +187,27 @@ export const pickupService = {
       }
 
       if (data) {
+        // Fetch collector details separately if collector_id exists
+        if (data.collector_id) {
+          try {
+            const { data: collectorData } = await supabase
+              .from('collector_profiles')
+              .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
+              .eq('user_id', data.collector_id)
+              .single();
+            
+            if (collectorData) {
+              data.collector = {
+                id: collectorData.user_id,
+                ...collectorData
+              };
+            }
+          } catch (collectorError) {
+            console.warn('[PickupService] Could not fetch collector details:', collectorError);
+            // Non-fatal, continue without collector data
+          }
+        }
+        
         console.log('[PickupService] Found pickup:', data.id);
         return { data, error: null };
       }

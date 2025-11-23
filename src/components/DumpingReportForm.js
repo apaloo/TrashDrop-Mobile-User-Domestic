@@ -519,6 +519,7 @@ const DumpingReportForm = ({ onSuccess }) => {
               <option value="household">Household Waste</option>
               <option value="electronic">Electronic Waste</option>
               <option value="organic">Organic Waste</option>
+              <option value="recyclables">Recyclables (Plastics, Cardboard etc)</option>
               <option value="hazardous">Hazardous Materials</option>
             </select>
           </div>
