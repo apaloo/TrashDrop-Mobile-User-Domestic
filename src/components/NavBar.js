@@ -115,9 +115,14 @@ const NavBar = () => {
       <nav className="bg-white dark:bg-gray-800 py-3 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
         <div className="container mx-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
-          <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] text-2xl font-bold">
+          <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] dark:text-[#66BB6A] text-2xl font-bold">
+            {/* Light mode logo */}
             <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center p-1 dark:hidden">
               <img src="/logo.svg" alt="TrashDrop Logo" className="w-full h-full object-contain" />
+            </div>
+            {/* Dark mode logo */}
+            <div className="w-12 h-12 hidden dark:flex items-center justify-center">
+              <img src="/logo-02.svg" alt="TrashDrop Logo" className="w-full h-full object-contain brightness-0 invert" />
             </div>
             <span>TrashDrop</span>
           </NavLink>
