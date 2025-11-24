@@ -603,7 +603,7 @@ const PickupRequest = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-0 pt-2"> {/* Reduced padding-top to 0.5rem */}
+    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-0 pt-2" style={{marginTop: '80px'}}> {/* Reduced padding-top to 0.5rem */}
       {/* Fixed Header (positioned below navbar) */}
       <div className="p-4 bg-white dark:bg-gray-800 fixed top-16 left-0 right-0 z-40 shadow-md max-w-2xl mx-auto rounded-t-lg">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white text-center">
