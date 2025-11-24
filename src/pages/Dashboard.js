@@ -1193,7 +1193,7 @@ const Dashboard = () => {
         </div>
 
       {/* Scrollable Content - Recent Activity and Active Pickup */}
-      <div className="px-4 pb-4 space-y-6" style={{marginTop: "260px" }}>
+      <div className="px-4 pb-4 space-y-6" style={{marginTop: "280px" }}>
         {/* Recent Activity */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
