@@ -356,7 +356,7 @@ const NavBar = () => {
 
             </div>
           </nav>
-          <div className="pb-16 md:pb-0"></div>
+          {/* <div className="pb-16 md:pb-0"></div> */}
         </div>
       )}
     </>

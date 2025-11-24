@@ -579,7 +579,7 @@ const Activity = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Fixed Header - positioned below navbar */}
-      <div className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
+      <div className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700" style={{top: '70px'}}>
         <div className="container mx-auto px-4 pt-2 pb-3">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Activity History</h1>
         </div>

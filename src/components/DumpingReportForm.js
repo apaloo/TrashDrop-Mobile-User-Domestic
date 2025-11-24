@@ -483,7 +483,7 @@ const DumpingReportForm = ({ onSuccess }) => {
         </h1>
       </div>
       
-      <div className="px-4 py-2">
+      <div className="px-4 py-2" style={{marginTop: '65px'}}>
 
         {/* Info Box */}
         <div className="bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 flex items-start">

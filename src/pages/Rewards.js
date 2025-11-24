@@ -447,7 +447,7 @@ const Rewards = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Fixed Points summary header */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6" style={{top: '65px'}}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">My Rewards</h1>
           
