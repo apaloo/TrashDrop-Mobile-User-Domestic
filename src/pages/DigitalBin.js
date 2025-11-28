@@ -72,7 +72,7 @@ function DigitalBin() {
     is_default: true,
     
     // Schedule details
-    frequency: 'weekly',
+    frequency: 'one-time',
     startDate: '',
     preferredTime: 'morning',
     
@@ -890,7 +890,7 @@ function DigitalBin() {
         latitude: null,
         longitude: null,
         is_default: true,
-        frequency: 'weekly',
+        frequency: 'one-time',
         startDate: '',
         preferredTime: 'morning',
         bag_count: 1,

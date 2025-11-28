@@ -79,8 +79,44 @@ export const pickupService = {
         throw scheduledError;
       }
 
-      // Prioritize one-time pickup if both exist
-      const activePickup = oneTimeData?.[0] || scheduledData?.[0];
+      // Check digital bins (active bins)
+      const { data: digitalBinData, error: digitalBinError } = await supabase
+        .from('digital_bins')
+        .select(`
+          id, user_id, location_id, qr_code_url, frequency, waste_type, bag_count,
+          bin_size_liters, is_urgent, is_active, status, expires_at, collected_at,
+          collector_id, created_at, updated_at
+        `)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .in('status', ['available', 'in_service', 'accepted'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (digitalBinError) {
+        console.error('[PickupService] Error fetching active digital bin:', digitalBinError);
+        // Non-fatal, continue without digital bin data
+      }
+
+      // Fetch location details for digital bin if exists
+      if (digitalBinData?.[0]?.location_id) {
+        try {
+          const { data: binLocationData } = await supabase
+            .from('bin_locations')
+            .select('location_name, address, coordinates')
+            .eq('id', digitalBinData[0].location_id)
+            .single();
+          
+          if (binLocationData) {
+            digitalBinData[0].location = binLocationData;
+          }
+        } catch (locationError) {
+          console.warn('[PickupService] Could not fetch bin location:', locationError);
+        }
+      }
+
+      // Prioritize: one-time pickup > digital bin > scheduled pickup
+      const activePickup = oneTimeData?.[0] || digitalBinData?.[0] || scheduledData?.[0];
 
       if (activePickup) {
         // Get payment method details if available
@@ -94,9 +130,9 @@ export const pickupService = {
           paymentMethod = paymentData;
         }
 
-        // Get location details if available
+        // Get location details if available (for non-digital-bin pickups)
         let location = null;
-        if (activePickup.location_id) {
+        if (activePickup.location_id && !activePickup.qr_code_url) {
           const { data: locationData } = await supabase
             .from('locations')
             .select('location_name, address, latitude, longitude, location_type')
@@ -104,6 +140,9 @@ export const pickupService = {
             .single();
           location = locationData;
         }
+
+        // Determine if this is a digital bin
+        const isDigitalBin = !!activePickup.qr_code_url;
 
         // Format the pickup data to match expected structure
         const formattedPickup = {
@@ -127,13 +166,19 @@ export const pickupService = {
           payment_type: activePickup.payment_type,
           batch_id: activePickup.batch_id,
           is_scheduled: !!scheduledData?.[0],
+          is_digital_bin: isDigitalBin,
+          qr_code_url: activePickup.qr_code_url,
+          bin_size_liters: activePickup.bin_size_liters,
+          is_urgent: activePickup.is_urgent,
           schedule_type: activePickup.schedule_type,
           frequency: activePickup.frequency,
           created_at: activePickup.created_at,
           updated_at: activePickup.updated_at,
           accepted_at: activePickup.accepted_at,
           picked_up_at: activePickup.picked_up_at,
-          disposed_at: activePickup.disposed_at
+          disposed_at: activePickup.disposed_at,
+          expires_at: activePickup.expires_at,
+          collected_at: activePickup.collected_at
         };
 
         console.log('[PickupService] Found active pickup:', formattedPickup.id);

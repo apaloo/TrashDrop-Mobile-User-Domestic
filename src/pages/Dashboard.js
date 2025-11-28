@@ -1219,17 +1219,28 @@ const Dashboard = () => {
         {/* Active Pickup Card */}
         {activePickups && activePickups.length > 0 && (
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6 mt-6">
-            <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold mb-4">Active Pickup</h3>
+            <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold mb-4">
+              {activePickups[0].is_digital_bin ? 'Active Digital Bin' : 'Active Pickup'}
+            </h3>
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Status: <span className="text-green-600 dark:text-green-400">{activePickups[0].status}</span></p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Location: {activePickups[0].address}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Status: <span className="text-green-600 dark:text-green-400">{activePickups[0].status}</span>
+                    {activePickups[0].is_digital_bin && activePickups[0].frequency && (
+                      <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2 py-1 rounded">
+                        {activePickups[0].frequency}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name || 'Waiting...'}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Location: {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-900 dark:text-gray-100">{activePickups[0].number_of_bags} bags</p>
-                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">+{activePickups[0].points} pts</p>
+                  <p className="text-sm text-gray-900 dark:text-gray-100">{activePickups[0].bag_count || activePickups[0].number_of_bags} bags</p>
+                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">+{activePickups[0].points_earned || activePickups[0].points || 0} pts</p>
                 </div>
               </div>
             </div>

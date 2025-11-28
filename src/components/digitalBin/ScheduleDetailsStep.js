@@ -14,6 +14,8 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
   // Helper text for frequency selection
   const getFrequencyHelperText = () => {
     switch (formData.frequency) {
+      case 'one-time':
+        return 'Your digital bin will be serviced once on the scheduled date';
       case 'weekly':
         return 'Your digital bin will be serviced every week on the same day';
       case 'biweekly':
@@ -41,6 +43,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
           style={{color: '#333'}}
         >
+          <option value="one-time">One-time</option>
           <option value="weekly">Weekly</option>
           <option value="biweekly">Bi-weekly</option>
           <option value="monthly">Monthly</option>

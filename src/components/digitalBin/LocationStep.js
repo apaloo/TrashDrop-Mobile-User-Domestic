@@ -400,31 +400,12 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </div>
       </div>
       
+      {/* Hidden inputs to maintain coordinates in background */}
       {position && position[0] != null && position[1] != null && (
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
-              Latitude
-            </label>
-            <input
-              type="text"
-              value={position[0]?.toFixed(6) || ''}
-              disabled
-              className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-300"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
-              Longitude
-            </label>
-            <input
-              type="text"
-              value={position[1]?.toFixed(6) || ''}
-              disabled
-              className="w-full p-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-300"
-            />
-          </div>
-        </div>
+        <>
+          <input type="hidden" value={position[0]} />
+          <input type="hidden" value={position[1]} />
+        </>
       )}
       
       <div className="flex justify-end mt-6 pb-4">
