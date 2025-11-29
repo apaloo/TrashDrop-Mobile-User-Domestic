@@ -138,9 +138,16 @@ export const dumpingService = {
         throw new Error('Invalid size value. Must be one of: small, medium, large');
       }
 
-      // Validate photos if provided
-      if (reportData.photos && !validatePhotoUrls(reportData.photos)) {
-        throw new Error('Invalid photo URL format. All photos must be valid URLs');
+      // Validate photos if provided (allow blob URLs - they'll be uploaded to storage)
+      if (reportData.photos) {
+        const hasInvalidPhotos = reportData.photos.some(url => {
+          if (!url || typeof url !== 'string') return true;
+          // Allow blob URLs (for camera captures) and regular URLs
+          return !url.startsWith('blob:') && !validatePhotoUrls([url]);
+        });
+        if (hasInvalidPhotos) {
+          throw new Error('Invalid photo URL format');
+        }
       }
 
       // Convert coordinates to PostGIS/GeoJSON Point format
