@@ -28,6 +28,19 @@ const CollectorTracking = () => {
   const lastNotificationDistance = useRef(null);
   const lastStatus = useRef(null);
   const updateThrottleMs = 5000; // Throttle updates to every 5 seconds
+
+  // Helper function to parse PostGIS POINT string: "POINT(lng lat)"
+  const parsePostGISPoint = (pointString) => {
+    if (!pointString || typeof pointString !== 'string') return null;
+    const match = pointString.match(/POINT\(([^\s]+)\s+([^\)]+)\)/);
+    if (match) {
+      return {
+        lat: parseFloat(match[2]),
+        lng: parseFloat(match[1])
+      };
+    }
+    return null;
+  };
   
   // Get pickup ID from URL params if provided
   const pickupId = searchParams.get('pickupId');
@@ -54,6 +67,16 @@ const CollectorTracking = () => {
         }
 
         setActivePickup(pickup);
+        
+        // Debug logging for location data
+        if (pickup) {
+          console.log('[CollectorTracking] Active pickup loaded:', {
+            id: pickup.id,
+            location: pickup.location,
+            coordinates: pickup.coordinates,
+            collector_id: pickup.collector_id
+          });
+        }
       } catch (err) {
         console.error('Error fetching pickup:', err);
         setError('Failed to load pickup details');
@@ -105,6 +128,43 @@ const CollectorTracking = () => {
       lastStatus.current = activePickup.status;
     }
 
+    // Get pickup location from activePickup data
+    let pickupLoc = null;
+    if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
+      pickupLoc = {
+        latitude: activePickup.location.latitude,
+        longitude: activePickup.location.longitude
+      };
+    } else if (typeof activePickup?.location === 'string') {
+      // Parse PostGIS POINT string
+      const parsed = parsePostGISPoint(activePickup.location);
+      if (parsed) {
+        pickupLoc = {
+          latitude: parsed.lat,
+          longitude: parsed.lng
+        };
+      }
+    } else if (typeof activePickup?.coordinates === 'string') {
+      // Parse PostGIS POINT string
+      const parsed = parsePostGISPoint(activePickup.coordinates);
+      if (parsed) {
+        pickupLoc = {
+          latitude: parsed.lat,
+          longitude: parsed.lng
+        };
+      }
+    } else if (activePickup?.coordinates && Array.isArray(activePickup.coordinates) && activePickup.coordinates.length === 2) {
+      pickupLoc = {
+        latitude: activePickup.coordinates[0],
+        longitude: activePickup.coordinates[1]
+      };
+    } else if (activePickup?.location && Array.isArray(activePickup.location) && activePickup.location.length === 2) {
+      pickupLoc = {
+        latitude: activePickup.location[0],
+        longitude: activePickup.location[1]
+      };
+    }
+
     const locationSubscription = subscribeToCollectorLocation(
       activePickup.collector_id,
       activePickup.id,
@@ -121,9 +181,9 @@ const CollectorTracking = () => {
         console.log('[CollectorTracking] Collector location updated:', locationUpdate);
         setCollectorLocation(locationUpdate.location);
 
-        // Calculate ETA and distance if we have user location
-        if (userLocation && locationUpdate.location) {
-          const etaData = calculateETA(userLocation, locationUpdate.location);
+        // Calculate ETA and distance if we have pickup location
+        if (pickupLoc && locationUpdate.location) {
+          const etaData = calculateETA(pickupLoc, locationUpdate.location);
           if (etaData) {
             const newEta = etaData.eta;
             const newDistance = etaData.distance;
@@ -149,7 +209,7 @@ const CollectorTracking = () => {
       console.log('[CollectorTracking] Cleaning up location subscription');
       locationSubscription.unsubscribe();
     };
-  }, [activePickup?.collector_id, activePickup?.id, userLocation]);
+  }, [activePickup?.collector_id, activePickup?.id, activePickup?.location, activePickup?.coordinates]);
   
   // Monitor pickup status changes and show notifications
   useEffect(() => {
@@ -168,11 +228,50 @@ const CollectorTracking = () => {
   
   // ETA countdown timer (updates every 30 seconds when collector is moving)
   useEffect(() => {
-    if (!eta || !distance || !userLocation || !collectorLocation) return;
+    if (!eta || !distance || !activePickup || !collectorLocation) return;
+    
+    // Get pickup location from activePickup data
+    let pickupLoc = null;
+    if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
+      pickupLoc = {
+        latitude: activePickup.location.latitude,
+        longitude: activePickup.location.longitude
+      };
+    } else if (typeof activePickup?.location === 'string') {
+      // Parse PostGIS POINT string
+      const parsed = parsePostGISPoint(activePickup.location);
+      if (parsed) {
+        pickupLoc = {
+          latitude: parsed.lat,
+          longitude: parsed.lng
+        };
+      }
+    } else if (typeof activePickup?.coordinates === 'string') {
+      // Parse PostGIS POINT string
+      const parsed = parsePostGISPoint(activePickup.coordinates);
+      if (parsed) {
+        pickupLoc = {
+          latitude: parsed.lat,
+          longitude: parsed.lng
+        };
+      }
+    } else if (activePickup?.coordinates && Array.isArray(activePickup.coordinates) && activePickup.coordinates.length === 2) {
+      pickupLoc = {
+        latitude: activePickup.coordinates[0],
+        longitude: activePickup.coordinates[1]
+      };
+    } else if (activePickup?.location && Array.isArray(activePickup.location) && activePickup.location.length === 2) {
+      pickupLoc = {
+        latitude: activePickup.location[0],
+        longitude: activePickup.location[1]
+      };
+    }
+
+    if (!pickupLoc) return;
     
     const countdownInterval = setInterval(() => {
       // Recalculate ETA every 30 seconds
-      const etaData = calculateETA(userLocation, collectorLocation);
+      const etaData = calculateETA(pickupLoc, collectorLocation);
       if (etaData) {
         setEta(etaData.eta);
         setDistance(etaData.distance);
@@ -180,7 +279,7 @@ const CollectorTracking = () => {
     }, 30000); // Update every 30 seconds
     
     return () => clearInterval(countdownInterval);
-  }, [eta, distance, userLocation, collectorLocation]);
+  }, [eta, distance, activePickup, collectorLocation]);
 
   if (loading) {
     return (
@@ -206,10 +305,64 @@ const CollectorTracking = () => {
       <div className="fixed inset-0 top-16 z-0">
         <UberStyleTrackingMap 
           collectorLocation={collectorLocation}
-          pickupLocation={userLocation || {
-            lat: -1.286389,
-            lng: 36.817223
-          }}
+          pickupLocation={(() => {
+            console.log('[CollectorTracking] Extracting pickupLocation from:', {
+              location: activePickup?.location,
+              coordinates: activePickup?.coordinates
+            });
+            
+            // Try location object first (has latitude/longitude fields)
+            if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
+              console.log('[CollectorTracking] Using location.latitude/longitude');
+              return {
+                lat: activePickup.location.latitude,
+                lng: activePickup.location.longitude
+              };
+            }
+            
+            // Try parsing location as PostGIS POINT string
+            if (typeof activePickup?.location === 'string') {
+              const parsed = parsePostGISPoint(activePickup.location);
+              if (parsed) {
+                console.log('[CollectorTracking] Parsed location PostGIS POINT:', parsed);
+                return parsed;
+              }
+            }
+            
+            // Try parsing coordinates as PostGIS POINT string
+            if (typeof activePickup?.coordinates === 'string') {
+              const parsed = parsePostGISPoint(activePickup.coordinates);
+              if (parsed) {
+                console.log('[CollectorTracking] Parsed coordinates PostGIS POINT:', parsed);
+                return parsed;
+              }
+            }
+            
+            // Try coordinates array [lat, lng]
+            if (activePickup?.coordinates && Array.isArray(activePickup.coordinates) && activePickup.coordinates.length === 2) {
+              console.log('[CollectorTracking] Using coordinates array');
+              return {
+                lat: activePickup.coordinates[0],
+                lng: activePickup.coordinates[1]
+              };
+            }
+            
+            // Try location as array [lat, lng]
+            if (activePickup?.location && Array.isArray(activePickup.location) && activePickup.location.length === 2) {
+              console.log('[CollectorTracking] Using location array');
+              return {
+                lat: activePickup.location[0],
+                lng: activePickup.location[1]
+              };
+            }
+            
+            // Fallback to user location or default
+            console.warn('[CollectorTracking] Using fallback location - no valid pickup location found');
+            return userLocation || {
+              lat: -1.286389,
+              lng: 36.817223
+            };
+          })()}
           distance={distance}
           eta={eta}
           activePickup={activePickup}

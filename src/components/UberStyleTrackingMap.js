@@ -133,13 +133,34 @@ const UberStyleTrackingMap = ({
   const [routeLine, setRouteLine] = useState([]);
   const [isCardExpanded, setIsCardExpanded] = useState(true);
 
+  // Debug logging for incoming props
+  useEffect(() => {
+    console.log('[UberStyleTrackingMap] Props received:', {
+      collectorLocation,
+      pickupLocation,
+      distance,
+      eta,
+      activePickup: activePickup ? {
+        id: activePickup.id,
+        location: activePickup.location,
+        coordinates: activePickup.coordinates
+      } : null
+    });
+  }, [collectorLocation, pickupLocation, distance, eta, activePickup]);
+
   // Validate location has valid coordinates
   const isValidLocation = (loc) => {
-    return loc && 
+    const isValid = loc && 
            typeof loc.lat === 'number' && 
            typeof loc.lng === 'number' &&
            !isNaN(loc.lat) && 
            !isNaN(loc.lng);
+    
+    if (!isValid) {
+      console.log('[UberStyleTrackingMap] Invalid location:', loc);
+    }
+    
+    return isValid;
   };
 
   // Update route line when collector or pickup location changes
@@ -325,8 +346,8 @@ const UberStyleTrackingMap = ({
               </svg>
             </div>
 
-            {/* Collector Mini Profile - Always Visible */}
-            {activePickup.collector && (
+            {/* Collector Mini Profile - Only Visible When Collapsed */}
+            {!isCardExpanded && activePickup.collector && (
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
                   {activePickup.collector.first_name?.[0]}{activePickup.collector.last_name?.[0]}
@@ -340,7 +361,7 @@ const UberStyleTrackingMap = ({
                     <span className="text-sm text-gray-600">{activePickup.collector.rating || '5.0'}</span>
                   </div>
                 </div>
-                {!isCardExpanded && distance !== null && (
+                {distance !== null && (
                   <div className="text-right">
                     <p className="text-xs text-gray-500">Distance</p>
                     <p className="text-sm font-bold text-blue-600">{distance} km</p>
