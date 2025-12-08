@@ -65,10 +65,15 @@ const BatchQRScanner = ({ onScanComplete }) => {
       }
 
       // New primary flow: verify in 'batch' table and update user account
-      setLoadingMessage('Verifying batch...');
+      setLoadingMessage('Verifying batch and checking ownership...');
       const verifyRes = await batchService.verifyBatchAndUpdateUser(batchId, user.id, {
-        timeoutMs: 10000,
+        timeoutMs: 45000,
         maxRetries,
+        onAttempt: (attemptNum) => {
+          if (attemptNum > 1) {
+            setLoadingMessage(`Retrying... (attempt ${attemptNum}/${maxRetries})`);
+          }
+        }
       });
       if (verifyRes.error) {
         const code = verifyRes.error.code || '';

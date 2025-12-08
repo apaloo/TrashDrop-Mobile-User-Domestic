@@ -14,13 +14,13 @@ const FUNCTIONS_BASE = process.env.NODE_ENV === 'development'
 
 export const batchService = {
   // ---- Runtime helpers (timeout/retry) ----
-  _DEFAULT_TIMEOUT_MS: 30000,
+  _DEFAULT_TIMEOUT_MS: 45000,
   _DEFAULT_MAX_RETRIES: 3,
   _USER_ACCOUNT_TABLE: 'user_stats',
   _BATCH_TABLE: 'batches',
   _BAGS_TABLE: 'bags',
 
-  _withTimeout(promise, ms = 10000) {
+  _withTimeout(promise, ms = 45000) {
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('Request timed out')), ms);
       promise
