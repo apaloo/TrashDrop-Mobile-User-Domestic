@@ -248,31 +248,67 @@ const Activity = () => {
         newActivities = allTableActivities.slice(0, itemsPerPage);
         
       } else if (filter === 'pickup_request') {
-        // Single table query for pickup requests
-        let query = supabase
-          .from('pickup_requests')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(itemsPerPage);
-          
-        if (cursorsRef.current.pickup_requests) {
-          query = query.lt('created_at', cursorsRef.current.pickup_requests);
+        // Query both pickup requests AND digital bins (both are types of pickups)
+        const itemsPerTable = Math.ceil(itemsPerPage / 2); // Split between two tables
+        
+        const [pickupResult, digitalBinResult] = await Promise.allSettled([
+          // Pickup requests query
+          fetchWithTimeout(async () => {
+            let query = supabase
+              .from('pickup_requests')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(itemsPerTable);
+              
+            if (cursorsRef.current.pickup_requests) {
+              query = query.lt('created_at', cursorsRef.current.pickup_requests);
+            }
+            
+            return query;
+          }),
+          // Digital bins query
+          fetchWithTimeout(async () => {
+            let query = supabase
+              .from('digital_bins')
+              .select('*, bin_locations:location_id(location_name, address)')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(itemsPerTable);
+              
+            if (cursorsRef.current.digital_bins) {
+              query = query.lt('created_at', cursorsRef.current.digital_bins);
+            }
+            
+            return query;
+          })
+        ]);
+        
+        let allPickupActivities = [];
+        
+        // Process pickup requests results
+        if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
+          const activities = pickupResult.value.data.map(item => ({ ...item, _source: 'pickup_requests' }));
+          allPickupActivities = [...allPickupActivities, ...activities];
+          if (activities.length > 0) {
+            newCursors.pickup_requests = activities[activities.length - 1].created_at;
+            hasMore = hasMore || activities.length === itemsPerTable;
+          }
         }
         
-        const { data: pickupData, error: pickupError } = await fetchWithTimeout(async () => query);
-        
-        if (pickupError) {
-          console.error('Error fetching pickup requests:', pickupError);
-          throw pickupError;
+        // Process digital bins results
+        if (digitalBinResult.status === 'fulfilled' && digitalBinResult.value?.data) {
+          const activities = digitalBinResult.value.data.map(item => ({ ...item, _source: 'digital_bins' }));
+          allPickupActivities = [...allPickupActivities, ...activities];
+          if (activities.length > 0) {
+            newCursors.digital_bins = activities[activities.length - 1].created_at;
+            hasMore = hasMore || activities.length === itemsPerTable;
+          }
         }
         
-        newActivities = (pickupData || []).map(item => ({ ...item, _source: 'pickup_requests' }));
-        hasMore = newActivities.length === itemsPerPage;
-        
-        if (newActivities.length > 0) {
-          newCursors.pickup_requests = newActivities[newActivities.length - 1].created_at;
-        }
+        // Sort all pickup-related activities by date
+        allPickupActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        newActivities = allPickupActivities.slice(0, itemsPerPage);
         
       } else {
         // Single table query for specific activity types
