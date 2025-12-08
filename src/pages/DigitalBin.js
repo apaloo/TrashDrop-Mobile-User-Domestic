@@ -512,195 +512,190 @@ function DigitalBin() {
 
       // If no valid location_id, create a new location
       if (!locationId) {
-        if (isTestUser) {
-          console.log('[Dev] Using mock location for test user');
-          locationId = '123e4567-e89b-12d3-a456-426614174001'; // Mock location ID for test user
-        } else {
-          // Ensure we have coordinates for the location (required by database schema)
-          let latitude = formData.latitude;
-          let longitude = formData.longitude;
+        // Ensure we have coordinates for the location (required by database schema)
+        let latitude = formData.latitude;
+        let longitude = formData.longitude;
+        
+        console.log('Initial coordinates from formData:', { latitude, longitude });
+        
+        // If coordinates are not available, use default location (Accra, Ghana)
+        if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
+          console.log('No coordinates provided, using default location (Accra, Ghana)');
           
-          console.log('Initial coordinates from formData:', { latitude, longitude });
-          
-          // If coordinates are not available, use default location (Accra, Ghana)
-          if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
-            console.log('No coordinates provided, using default location (Accra, Ghana)');
-            
-            try {
-              const defaultCoords = GeolocationService.DEFAULT_LOCATION;
-              console.log('GeolocationService default coords:', defaultCoords);
-              latitude = defaultCoords.latitude;
-              longitude = defaultCoords.longitude;
-            } catch (error) {
-              console.error('Error accessing GeolocationService.DEFAULT_LOCATION:', error);
-              throw new Error('Location coordinates are required. Please enable location services and try again.');
-            }
-            
-            // Final validation - ensure we have valid numbers
-            if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
-                isNaN(latitude) || isNaN(longitude)) {
-              console.error('Invalid coordinates detected'); 
-              throw new Error('Invalid location coordinates. Please enable location services and try again.');
-            }
-          }
-          
-          console.log('Final coordinates for location creation:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
-          
-          // Create new location with required coordinates
-          // Try both 'locations' and 'bin_locations' tables to handle schema variations
-          let newLocation = null;
-          let insertError = null;
-          
-          // Validate coordinates are available
-          if (!latitude || !longitude) {
-            throw new Error('Location coordinates are required but not available');
-          }
-          
-          // Prepare location data for both bin_locations and locations tables
-          const locationData = {
-            user_id: user.id,
-            location_name: formData.location_name || 'Home',
-            address: formData.address || '',
-            coordinates: `POINT(${longitude} ${latitude})`, // PostGIS Point format: POINT(lng lat)
-            is_default: false
-          };
-          
-          // First try 'bin_locations' table (as indicated by the foreign key error)
           try {
-            console.log('Attempting to create location in bin_locations table');
-            console.log('[DigitalBin] Creating location with actual schema:', locationData);
-            
-            // Try with timeout first
-            let binLocationResult;
-            try {
-              const insertPromise = supabase
-                .from('bin_locations')
-                .insert(locationData)
-                .select()
-                .single();
-              
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Location insert timed out after 10 seconds')), 10000)
-              );
-              
-              binLocationResult = await Promise.race([insertPromise, timeoutPromise]);
-            } catch (timeoutError) {
-              console.warn('[DigitalBin] Insert with select timed out, trying insert only:', timeoutError.message);
-              
-              // Fallback: Insert without select (may succeed even if RLS blocks select)
-              const insertOnlyResult = await supabase
-                .from('bin_locations')
-                .insert(locationData);
-              
-              if (insertOnlyResult.error) {
-                throw new Error(`Failed to create location: ${insertOnlyResult.error.message}`);
-              }
-              
-              console.log('[DigitalBin] Insert succeeded without select, querying for location');
-              
-              // Query for the location we just created
-              const queryResult = await supabase
-                .from('bin_locations')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('location_name', locationData.location_name)
-                .eq('address', locationData.address)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-              
-              if (queryResult.error || !queryResult.data) {
-                // If we still can't query it, create a local-only location
-                console.warn('[DigitalBin] Could not query created location, using timestamp-based ID');
-                throw new Error('Location created but could not be retrieved');
-              }
-              
-              binLocationResult = { data: queryResult.data, error: null };
-            }
-              
-            if (binLocationResult.error) {
-              console.error('[DigitalBin] Failed to create location:', binLocationResult.error);
-              throw new Error(`Failed to create location: ${binLocationResult.error.message}`);
-            }
-            
-            if (!binLocationResult.data) {
-              throw new Error('No location data returned from insert');
-            }
-            
-            newLocation = binLocationResult.data;
-            console.log('[DigitalBin] Successfully created location:', newLocation);
-          } catch (binLocationError) {
-            console.warn('bin_locations table completely failed, trying locations table:', binLocationError?.message || binLocationError);
-            
-            // Fallback to 'locations' table with different schema
-            try {
-              console.log('Attempting to create location in locations table');
-              
-              // Create fallback data for locations table (might use different field names)
-              const fallbackLocationData = {
-                user_id: user.id,
-                name: formData.location_name || 'Home', // locations table might use 'name' instead of 'location_name'
-                address: formData.address || '',
-                latitude: latitude,
-                longitude: longitude,
-                is_default: false
-              };
-              
-              const { data: locationTableData, error: locationTableError } = await supabase
-                .from('locations')
-                .insert(fallbackLocationData)
-                .select()
-                .single();
-                
-              if (!locationTableError && locationTableData) {
-                newLocation = locationTableData;
-                console.log('Successfully created location in locations table');
-              } else {
-                insertError = locationTableError || new Error('No data returned from locations table');
-              }
-            } catch (locationError) {
-              insertError = locationError;
-              console.error('Both bin_locations and locations tables failed:', locationError.message);
-            }
+            const defaultCoords = GeolocationService.DEFAULT_LOCATION;
+            console.log('GeolocationService default coords:', defaultCoords);
+            latitude = defaultCoords.latitude;
+            longitude = defaultCoords.longitude;
+          } catch (error) {
+            console.error('Error accessing GeolocationService.DEFAULT_LOCATION:', error);
+            throw new Error('Location coordinates are required. Please enable location services and try again.');
           }
-
-          if (insertError || !newLocation) {
-            // If all database operations fail, create a local-only location for offline usage
-            console.warn('All database location creation failed, creating local-only location');
-            const localLocationId = `local_location_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Final validation - ensure we have valid numbers
+          if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
+              isNaN(latitude) || isNaN(longitude)) {
+            console.error('Invalid coordinates detected'); 
+            throw new Error('Invalid location coordinates. Please enable location services and try again.');
+          }
+        }
+        
+        console.log('Final coordinates for location creation:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
+        
+        // Create new location with required coordinates
+        // Try both 'locations' and 'bin_locations' tables to handle schema variations
+        let newLocation = null;
+        let insertError = null;
+        
+        // Validate coordinates are available
+        if (!latitude || !longitude) {
+          throw new Error('Location coordinates are required but not available');
+        }
+        
+        // Prepare location data for both bin_locations and locations tables
+        const locationData = {
+          user_id: user.id,
+          location_name: formData.location_name || 'Home',
+          address: formData.address || '',
+          coordinates: `POINT(${longitude} ${latitude})`, // PostGIS Point format: POINT(lng lat)
+          is_default: false
+        };
+          
+        // First try 'bin_locations' table (as indicated by the foreign key error)
+        try {
+          console.log('Attempting to create location in bin_locations table');
+          console.log('[DigitalBin] Creating location with actual schema:', locationData);
+          
+          // Try with timeout first
+          let binLocationResult;
+          try {
+            const insertPromise = supabase
+              .from('bin_locations')
+              .insert(locationData)
+              .select()
+              .single();
             
-            // Store location data locally for offline use
-            const localLocationData = {
-              id: localLocationId,
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Location insert timed out after 10 seconds')), 10000)
+            );
+            
+            binLocationResult = await Promise.race([insertPromise, timeoutPromise]);
+          } catch (timeoutError) {
+            console.warn('[DigitalBin] Insert with select timed out, trying insert only:', timeoutError.message);
+            
+            // Fallback: Insert without select (may succeed even if RLS blocks select)
+            const insertOnlyResult = await supabase
+              .from('bin_locations')
+              .insert(locationData);
+            
+            if (insertOnlyResult.error) {
+              throw new Error(`Failed to create location: ${insertOnlyResult.error.message}`);
+            }
+            
+            console.log('[DigitalBin] Insert succeeded without select, querying for location');
+            
+            // Query for the location we just created
+            const queryResult = await supabase
+              .from('bin_locations')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('location_name', locationData.location_name)
+              .eq('address', locationData.address)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            
+            if (queryResult.error || !queryResult.data) {
+              // If we still can't query it, create a local-only location
+              console.warn('[DigitalBin] Could not query created location, using timestamp-based ID');
+              throw new Error('Location created but could not be retrieved');
+            }
+            
+            binLocationResult = { data: queryResult.data, error: null };
+          }
+            
+          if (binLocationResult.error) {
+            console.error('[DigitalBin] Failed to create location:', binLocationResult.error);
+            throw new Error(`Failed to create location: ${binLocationResult.error.message}`);
+          }
+          
+          if (!binLocationResult.data) {
+            throw new Error('No location data returned from insert');
+          }
+          
+          newLocation = binLocationResult.data;
+          console.log('[DigitalBin] Successfully created location:', newLocation);
+        } catch (binLocationError) {
+          console.warn('bin_locations table completely failed, trying locations table:', binLocationError?.message || binLocationError);
+          
+          // Fallback to 'locations' table with different schema
+          try {
+            console.log('Attempting to create location in locations table');
+            
+            // Create fallback data for locations table (might use different field names)
+            const fallbackLocationData = {
               user_id: user.id,
-              location_name: formData.location_name || 'Home',
+              name: formData.location_name || 'Home', // locations table might use 'name' instead of 'location_name'
               address: formData.address || '',
               latitude: latitude,
               longitude: longitude,
-              is_default: formData.is_default || false,
-              created_at: new Date().toISOString(),
-              local_only: true,
-              sync_pending: true
+              is_default: false
             };
             
-            try {
-              const localLocationKey = `location_${localLocationId}`;
-              localStorage.setItem(localLocationKey, JSON.stringify(localLocationData));
+            const { data: locationTableData, error: locationTableError } = await supabase
+              .from('locations')
+              .insert(fallbackLocationData)
+              .select()
+              .single();
               
-              // Add to pending sync list
-              const pendingSyncList = JSON.parse(localStorage.getItem('pending_location_sync') || '[]');
-              pendingSyncList.push(localLocationId);
-              localStorage.setItem('pending_location_sync', JSON.stringify(pendingSyncList));
-              
-              console.log('Created local-only location:', localLocationId);
-              locationId = localLocationId;
-            } catch (localStorageError) {
-              console.error('Failed to create local location:', localStorageError);
-              throw new Error(`Error creating location: ${insertError?.message || 'Failed to create location in any table and localStorage also failed'}`);
+            if (!locationTableError && locationTableData) {
+              newLocation = locationTableData;
+              console.log('Successfully created location in locations table');
+            } else {
+              insertError = locationTableError || new Error('No data returned from locations table');
             }
-          } else {
-            locationId = newLocation.id;
+          } catch (locationError) {
+            insertError = locationError;
+            console.error('Both bin_locations and locations tables failed:', locationError.message);
           }
+        }
+
+        if (insertError || !newLocation) {
+          // If all database operations fail, create a local-only location for offline usage
+          console.warn('All database location creation failed, creating local-only location');
+          const localLocationId = `local_location_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Store location data locally for offline use
+          const localLocationData = {
+            id: localLocationId,
+            user_id: user.id,
+            location_name: formData.location_name || 'Home',
+            address: formData.address || '',
+            latitude: latitude,
+            longitude: longitude,
+            is_default: formData.is_default || false,
+            created_at: new Date().toISOString(),
+            local_only: true,
+            sync_pending: true
+          };
+          
+          try {
+            const localLocationKey = `location_${localLocationId}`;
+            localStorage.setItem(localLocationKey, JSON.stringify(localLocationData));
+            
+            // Add to pending sync list
+            const pendingSyncList = JSON.parse(localStorage.getItem('pending_location_sync') || '[]');
+            pendingSyncList.push(localLocationId);
+            localStorage.setItem('pending_location_sync', JSON.stringify(pendingSyncList));
+            
+            console.log('Created local-only location:', localLocationId);
+            locationId = localLocationId;
+          } catch (localStorageError) {
+            console.error('Failed to create local location:', localStorageError);
+            throw new Error(`Error creating location: ${insertError?.message || 'Failed to create location in any table and localStorage also failed'}`);
+          }
+        } else {
+          locationId = newLocation.id;
         }
       } else {
         // Ensure we have coordinates for the location update
@@ -817,7 +812,7 @@ function DigitalBin() {
       setActiveTab('scheduled');
 
       // Show success message
-      toastService.success(`Digital bin created successfully! ${isTestUser ? '(Test mode)' : ''}`);
+      toastService.success('Digital bin created successfully!');
     } catch (error) {
       console.error('Error in form submission:', error);
       setError(error.message);
