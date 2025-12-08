@@ -580,23 +580,61 @@ export const batchService = {
       // Allow batch claim in the following cases:
       // 1. Batch is unassigned (no owner)
       // 2. User ID matches one of the owner fields 
-      // 3. In development environment with test batches
+      // 3. In development environment (relaxed validation)
+      // 4. Batch is active and can be claimed (typical for distribution)
+      
+      const isActiveAndClaimable = batch.status === 'active' && !['completed', 'used', 'scanned', 'activated'].includes(String(batch.status || '').toLowerCase());
+      
+      // Track if we need to assign ownership to the claiming user
+      let shouldAssignOwnership = false;
+      
       if (isUnassigned) {
         console.log('[BatchService][Ownership] Batch has no owner, allowing claim');
+        shouldAssignOwnership = true;
         // Continue without error - let anyone claim unassigned batches
       } else if (ownershipMatch) {
         console.log('[BatchService][Ownership] User is the owner of this batch');
         // Continue without error - user owns this batch
-      }  else {
+      } else if (isDevEnvironment && isActiveAndClaimable) {
+        console.log('[BatchService][Ownership] Development mode: Allowing claim of active batch by any user');
+        shouldAssignOwnership = true;
+        // Continue without error - in development, allow claiming active batches
+      } else if (isActiveAndClaimable) {
+        console.log('[BatchService][Ownership] Active batch available for claim, allowing scan by any user');
+        shouldAssignOwnership = true;
+        // Continue without error - allow any user to claim active batches
+      } else {
         console.warn('[BatchService][Ownership] Ownership validation failed', { 
           ownerId, 
           userId: userIdNorm, 
           batchId: batch.id,
           possibleOwnerFields,
           isUnassigned,
-          ownershipMatch 
+          ownershipMatch,
+          isDevEnvironment,
+          isActiveAndClaimable
         });
         throw new Error('This batch is not assigned to the current user');
+      }
+      
+      // Assign ownership to the claiming user if needed
+      if (shouldAssignOwnership && !ownershipMatch) {
+        try {
+          console.log('[BatchService][Ownership] Assigning batch ownership to claiming user:', { batchId: batch.id, userId: userIdNorm });
+          const { error: updateError } = await supabase
+            .from('batches')
+            .update({ created_by: userId, updated_at: new Date().toISOString() })
+            .eq('id', batch.id);
+          
+          if (updateError) {
+            console.warn('[BatchService][Ownership] Failed to update batch ownership (non-fatal):', updateError);
+          } else {
+            console.log('[BatchService][Ownership] Successfully assigned batch to user');
+            batch.created_by = userId; // Update local copy
+          }
+        } catch (err) {
+          console.warn('[BatchService][Ownership] Error updating batch ownership (non-fatal):', err);
+        }
       }
 
 
