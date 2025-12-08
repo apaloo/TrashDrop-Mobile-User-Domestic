@@ -343,7 +343,7 @@ const Activity = () => {
       const formattedActivities = newActivities.map(activity => {
         let formattedActivity;
         
-        if (filter === 'dumping_report' || activity._source === 'illegal_dumping_mobile') {
+        if (activity._source === 'illegal_dumping_mobile') {
           formattedActivity = {
             id: activity.id,
             type: 'dumping_report',
@@ -355,7 +355,7 @@ const Activity = () => {
             address: activity.location || 'Unknown location',
             created_at: activity.created_at
           };
-        } else if (filter === 'pickup_request' || activity._source === 'pickup_requests') {
+        } else if (activity._source === 'pickup_requests') {
           formattedActivity = {
             id: activity.id,
             type: 'pickup_request',
