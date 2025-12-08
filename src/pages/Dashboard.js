@@ -54,7 +54,7 @@ const Dashboard = () => {
   
   // Stats state with database table field mappings:
   // points: profiles.points (user profile table)
-  // pickups: COUNT(pickup_requests) WHERE collector_id = user.id AND status = 'completed'
+  // pickups: COUNT(pickup_requests) + COUNT(digital_bins) WHERE user_id = user.id (both requests and digital bins)
   // reports: COUNT(illegal_dumping) WHERE reported_by = user.id  
   // batches: COUNT(bag_inventory) WHERE user_id = user.id (bag batch count)
   // totalBags: SUM(pickup_requests.bag_count) WHERE collector_id = user.id AND status = 'completed'

@@ -94,6 +94,33 @@ export const userService = {
         console.error('[UserService] Error counting pickups:', pickupError);
       }
 
+      // Count user's digital bins and add to pickup count
+      let digitalBinCount = 0;
+      let totalPointsFromDigitalBins = 0;
+      
+      try {
+        console.log('[UserService] Querying digital_bins by user_id');
+        
+        const result = await supabase
+          .from('digital_bins')
+          .select('id', { count: 'exact' })
+          .eq('user_id', userId);
+        
+        digitalBinCount = result.count || 0;
+        
+        // Digital bins earn 15 points each
+        if (result.data && Array.isArray(result.data)) {
+          totalPointsFromDigitalBins = result.data.length * 15;
+          console.log(`[UserService] Calculated total points from digital_bins: ${totalPointsFromDigitalBins}`);
+        }
+        
+        // Add digital bin count to pickup count for display
+        pickupCount = (pickupCount || 0) + digitalBinCount;
+        console.log(`[UserService] Total pickups (requests + digital bins): ${pickupCount} (${pickupCount - digitalBinCount} requests + ${digitalBinCount} bins)`);
+      } catch (error) {
+        console.warn('[UserService] digital_bins table query failed:', error.message);
+      }
+
       // Count user's dumping reports and calculate points from them
       let reportCount = 0;
       let totalPointsFromReports = 0;
@@ -259,11 +286,12 @@ export const userService = {
       }
 
       // Calculate total points from all sources (earned - spent)
-      const totalPoints = totalPointsFromPickups + totalPointsFromReports + totalPointsFromScans - totalPointsSpent;
+      const totalPoints = totalPointsFromPickups + totalPointsFromDigitalBins + totalPointsFromReports + totalPointsFromScans - totalPointsSpent;
       
       // Debug output to verify data mapping
       console.log('[UserService] User stats calculation:', {
         'pickup_requests.points': totalPointsFromPickups,
+        'digital_bins.points': totalPointsFromDigitalBins,
         'dumping_reports.points': totalPointsFromReports,
         'qr_scans.points': totalPointsFromScans,
         'rewards_redemption.points_spent': totalPointsSpent,
