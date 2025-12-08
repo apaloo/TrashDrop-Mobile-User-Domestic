@@ -49,17 +49,66 @@ const pickupIcon = new L.Icon({
 // Component to auto-fit map bounds
 const AutoFitBounds = ({ collectorLocation, pickupLocation, isValidLocation }) => {
   const map = useMap();
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    // Only update map if we have valid locations
-    if (isValidLocation(collectorLocation) && isValidLocation(pickupLocation)) {
-      const bounds = L.latLngBounds(
-        [collectorLocation.lat, collectorLocation.lng],
-        [pickupLocation.lat, pickupLocation.lng]
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    } else if (isValidLocation(pickupLocation)) {
-      map.setView([pickupLocation.lat, pickupLocation.lng], 15);
+    // Guard: ensure map is ready and has valid container
+    if (!map || !map.getContainer()) {
+      console.warn('[AutoFitBounds] Map not ready');
+      return;
+    }
+
+    try {
+      // Only update map if we have valid locations
+      if (isValidLocation(collectorLocation) && isValidLocation(pickupLocation)) {
+        const bounds = L.latLngBounds(
+          [collectorLocation.lat, collectorLocation.lng],
+          [pickupLocation.lat, pickupLocation.lng]
+        );
+        
+        // Use setTimeout to ensure DOM is ready
+        setTimeout(() => {
+          try {
+            const container = map.getContainer();
+            const panes = map.getPanes();
+            
+            // Comprehensive check: container exists, has leaflet ID, and panes are ready
+            if (container && container._leaflet_id && panes && panes.mapPane) {
+              // Force map invalidation before bounds adjustment
+              map.invalidateSize();
+              map.fitBounds(bounds, { 
+                padding: [50, 50], 
+                maxZoom: 15,
+                animate: hasInitialized.current, // Only animate after first load
+                duration: 0.5
+              });
+              hasInitialized.current = true;
+            }
+          } catch (err) {
+            console.warn('[UberStyleTrackingMap] Error fitting bounds:', err);
+          }
+        }, 150);
+      } else if (isValidLocation(pickupLocation) && !hasInitialized.current) {
+        setTimeout(() => {
+          try {
+            const container = map.getContainer();
+            const panes = map.getPanes();
+            
+            // Comprehensive check: container exists, has leaflet ID, and panes are ready
+            if (container && container._leaflet_id && panes && panes.mapPane) {
+              map.invalidateSize();
+              map.setView([pickupLocation.lat, pickupLocation.lng], 15, {
+                animate: false
+              });
+              hasInitialized.current = true;
+            }
+          } catch (err) {
+            console.warn('[UberStyleTrackingMap] Error setting view:', err);
+          }
+        }, 150);
+      }
+    } catch (error) {
+      console.error('[AutoFitBounds] Error updating map bounds:', error);
     }
   }, [collectorLocation, pickupLocation, map, isValidLocation]);
 
@@ -69,11 +118,30 @@ const AutoFitBounds = ({ collectorLocation, pickupLocation, isValidLocation }) =
 // Animated marker component with pulsing ring effect
 const AnimatedCollectorMarker = ({ position, prevPosition }) => {
   const markerRef = useRef();
+  const animationRef = useRef();
   
   useEffect(() => {
     if (markerRef.current && prevPosition) {
       const marker = markerRef.current;
-      const duration = 1000; // 1 second animation
+      
+      // Calculate distance moved (in degrees, rough approximation)
+      const deltaLat = Math.abs(position.lat - prevPosition.lat);
+      const deltaLng = Math.abs(position.lng - prevPosition.lng);
+      const distanceMoved = Math.sqrt(deltaLat * deltaLat + deltaLng * deltaLng);
+      
+      // Only animate if movement is significant (> 0.0005 degrees ≈ 55 meters)
+      // This prevents bouncing from GPS drift or minor location updates
+      if (distanceMoved < 0.0005) {
+        // Don't update position at all if movement is negligible
+        return;
+      }
+      
+      // Cancel any ongoing animation
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      
+      const duration = 1500; // 1.5 seconds for smooth animation
       const start = Date.now();
       
       const animate = () => {
@@ -91,12 +159,20 @@ const AnimatedCollectorMarker = ({ position, prevPosition }) => {
         marker.setLatLng([lat, lng]);
         
         if (progress < 1) {
-          requestAnimationFrame(animate);
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          animationRef.current = null;
         }
       };
       
       animate();
     }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [position, prevPosition]);
 
   return (
@@ -119,7 +195,8 @@ const AnimatedCollectorMarker = ({ position, prevPosition }) => {
 };
 
 const UberStyleTrackingMap = ({ 
-  collectorLocation, 
+  collectorLocation,
+  collectorData, // Collector profile with is_online, status, location_updated_at
   pickupLocation, 
   distance, 
   eta,
@@ -137,30 +214,28 @@ const UberStyleTrackingMap = ({
   useEffect(() => {
     console.log('[UberStyleTrackingMap] Props received:', {
       collectorLocation,
+      collectorData,
       pickupLocation,
       distance,
       eta,
       activePickup: activePickup ? {
         id: activePickup.id,
+        status: activePickup.status,
         location: activePickup.location,
         coordinates: activePickup.coordinates
       } : null
     });
-  }, [collectorLocation, pickupLocation, distance, eta, activePickup]);
+  }, [collectorLocation, collectorData, pickupLocation, distance, eta, activePickup]);
 
   // Validate location has valid coordinates
   const isValidLocation = (loc) => {
-    const isValid = loc && 
+    return loc && 
            typeof loc.lat === 'number' && 
            typeof loc.lng === 'number' &&
            !isNaN(loc.lat) && 
-           !isNaN(loc.lng);
-    
-    if (!isValid) {
-      console.log('[UberStyleTrackingMap] Invalid location:', loc);
-    }
-    
-    return isValid;
+           !isNaN(loc.lng) &&
+           isFinite(loc.lat) &&
+           isFinite(loc.lng);
   };
 
   // Update route line when collector or pickup location changes
@@ -171,25 +246,80 @@ const UberStyleTrackingMap = ({
         [pickupLocation.lat, pickupLocation.lng]
       ]);
       
-      // Store previous location for animation
-      setPrevCollectorLocation(collectorLocation);
+      // Only store previous location if movement is significant (same threshold as animation)
+      if (prevCollectorLocation) {
+        const deltaLat = Math.abs(collectorLocation.lat - prevCollectorLocation.lat);
+        const deltaLng = Math.abs(collectorLocation.lng - prevCollectorLocation.lng);
+        const distanceMoved = Math.sqrt(deltaLat * deltaLat + deltaLng * deltaLng);
+        
+        // Only update previous location if movement > 0.0005 degrees (≈ 55 meters)
+        if (distanceMoved >= 0.0005) {
+          console.log('[UberStyleTrackingMap] Significant movement detected:', {
+            distanceMoved: (distanceMoved * 111000).toFixed(0) + 'm',
+            from: prevCollectorLocation,
+            to: collectorLocation
+          });
+          setPrevCollectorLocation(collectorLocation);
+        } else {
+          console.log('[UberStyleTrackingMap] Ignoring minor GPS drift:', (distanceMoved * 111000).toFixed(0) + 'm');
+        }
+        // Otherwise, keep the old prevCollectorLocation - don't update it
+      } else {
+        // First time - set it
+        console.log('[UberStyleTrackingMap] Setting initial collector location');
+        setPrevCollectorLocation(collectorLocation);
+      }
     }
-  }, [collectorLocation, pickupLocation]);
+  }, [collectorLocation, pickupLocation, prevCollectorLocation]);
 
-  // Default center with proper validation
+  // Use pickup location as center - no fallback
+  // Map should only render when we have valid pickup location
   const defaultCenter = isValidLocation(pickupLocation)
     ? [pickupLocation.lat, pickupLocation.lng]
-    : [-1.286389, 36.817223]; // Nairobi
+    : null;
+
+  // Create a stable key for MapContainer based on pickup location
+  // This ensures map re-initializes cleanly when location changes significantly
+  const mapKey = React.useMemo(() => {
+    if (isValidLocation(pickupLocation)) {
+      return `map-${pickupLocation.lat.toFixed(4)}-${pickupLocation.lng.toFixed(4)}`;
+    }
+    return null;
+  }, [pickupLocation, isValidLocation]);
+
+  // Don't render map if we don't have valid pickup location
+  if (!defaultCenter || !mapKey) {
+    return (
+      <div className="relative w-full h-full bg-gray-100 flex items-center justify-center">
+        <div className="text-center p-8">
+          <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          </svg>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Location Required</h3>
+          <p className="text-sm text-gray-500">Waiting for pickup location data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full">
       {/* Map Container - Full Screen */}
       <div className="w-full h-full">
         <MapContainer
+          key={mapKey}
           center={defaultCenter}
           zoom={13}
           style={{ width: '100%', height: '100%' }}
           zoomControl={false}
+          whenCreated={(mapInstance) => {
+            // Ensure map container is properly initialized
+            setTimeout(() => {
+              if (mapInstance && mapInstance.getContainer()) {
+                mapInstance.invalidateSize();
+              }
+            }, 200);
+          }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -257,51 +387,111 @@ const UberStyleTrackingMap = ({
       </div>
 
       {/* Top-Center ETA Badge - Prominent Display */}
-      {isValidLocation(collectorLocation) && eta !== null && (
+      {isValidLocation(collectorLocation) && typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0 && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-[1001]">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-full shadow-2xl px-6 py-3 flex items-center space-x-3 animate-pulse">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-full shadow-2xl px-5 py-2.5 flex items-center space-x-2.5 animate-pulse">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
               <div className="text-xs font-medium opacity-90">Arrives in</div>
-              <div className="text-2xl font-bold">{eta} min</div>
+              <div className="text-xl font-bold">{eta} min</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Bottom Floating info card - Uber style */}
-      {isValidLocation(collectorLocation) && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-4 z-[1000] min-w-[280px]">
-          <div className="flex items-center space-x-4">
-            {/* Collector Avatar */}
-            <div className="flex-shrink-0">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+      {isValidLocation(collectorLocation) && (() => {
+        // Check if collector is actually online and moving (same logic as progress bar)
+        const isCollectorOnline = collectorData?.is_online === true || collectorData?.status === 'online';
+        const hasRecentLocation = collectorData?.location_updated_at ? 
+          (new Date() - new Date(collectorData.location_updated_at)) < 300000 : false; // 5 minutes
+        
+        // For digital bins, use distance-based visual status ONLY for initial tracking
+        // Once collector takes action (picked_up, collected, etc.), use real status
+        // For pickup requests, always use actual database status
+        let displayStatus = activePickup?.status;
+        if (activePickup?.is_digital_bin && typeof distance === 'number') {
+          // Only override status if it's still in initial "accepted" state
+          // Once collector updates to picked_up, collected, etc., show real status
+          const isInitialTrackingPhase = displayStatus === 'accepted' || displayStatus === 'active';
+          if (isInitialTrackingPhase) {
+            // Visual status based on proximity for digital bins
+            if (distance <= 50) {
+              displayStatus = 'arrived';
+            } else if (distance <= 500) {
+              displayStatus = 'en_route';
+            }
+          }
+          // else: use real database status (picked_up, collected, etc.)
+        }
+        
+        // Determine display text based on status
+        const isActuallyArrived = displayStatus === 'arrived' || displayStatus === 'collecting';
+        const isEnRoute = displayStatus === 'en_route' || displayStatus === 'in_transit';
+        const isPickingUp = displayStatus === 'picked_up';
+        const isCollected = displayStatus === 'collected' || displayStatus === 'completed';
+        
+        let statusText = 'Collector accepted';
+        if (isCollected) {
+          statusText = 'Waste collected';
+        } else if (isPickingUp) {
+          statusText = 'Collector picking up waste';
+        } else if (isActuallyArrived) {
+          statusText = 'Collector at pickup location';
+        } else if (isEnRoute) {
+          statusText = 'Collector en route';
+        }
+        
+        return (
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-3 z-[1000] min-w-[260px] max-w-[90vw]">
+            <div className="flex items-center space-x-3">
+              {/* Collector Avatar */}
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
               </div>
-            </div>
 
-            {/* Info */}
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-gray-900">Collector en route</p>
-              <div className="flex items-center space-x-3 mt-1">
-                {eta !== null && (
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {statusText}
+                </p>
+                <div className="flex items-center space-x-3 mt-1">
+                  {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) ? (
+                    isActuallyArrived ? (
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-bold text-green-600">Arrived</span>
+                      </div>
+                    ) : (
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm font-bold text-green-600">{eta} min</span>
+                    </div>
+                  )
+                ) : (
                   <div className="flex items-center">
-                    <svg className="w-4 h-4 text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-4 h-4 text-gray-400 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span className="text-sm font-bold text-green-600">{eta} min</span>
+                    <span className="text-xs text-gray-400">Calculating...</span>
                   </div>
                 )}
-                {distance !== null && (
+                {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                   <div className="flex items-center">
                     <svg className="w-4 h-4 text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     </svg>
-                    <span className="text-sm text-gray-600">{distance} km</span>
+                    <span className="text-sm text-gray-600">{distance < 1000 ? `${distance}m` : `${distance}km`}</span>
                   </div>
                 )}
               </div>
@@ -310,17 +500,18 @@ const UberStyleTrackingMap = ({
             {/* Pulse indicator */}
             <div className="flex-shrink-0">
               <div className="relative">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-3 h-3 bg-green-500 rounded-full animate-ping opacity-75"></div>
+                <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-2.5 h-2.5 bg-green-500 rounded-full animate-ping opacity-75"></div>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Enhanced Active Pickup Card with Collector Profile */}
       {activePickup && (
-        <div className="absolute top-20 left-4 right-4 md:left-4 md:right-auto md:max-w-md bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden z-[1000] transition-all duration-300">
+        <div className="absolute top-20 left-4 right-4 md:left-4 md:right-auto md:max-w-sm bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden z-[1000] transition-all duration-300">
           {/* Drag Handle */}
           <div 
             className="flex items-center justify-center py-2 bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
@@ -364,7 +555,7 @@ const UberStyleTrackingMap = ({
                 {distance !== null && (
                   <div className="text-right">
                     <p className="text-xs text-gray-500">Distance</p>
-                    <p className="text-sm font-bold text-blue-600">{distance} km</p>
+                    <p className="text-sm font-bold text-blue-600">{distance < 1000 ? `${distance}m` : `${distance}km`}</p>
                   </div>
                 )}
               </div>
@@ -405,32 +596,62 @@ const UberStyleTrackingMap = ({
                         )}
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      activePickup.status === 'accepted' ? 'bg-blue-100 text-blue-700' :
-                      activePickup.status === 'in_transit' ? 'bg-purple-100 text-purple-700' :
-                      activePickup.status === 'arrived' ? 'bg-green-100 text-green-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {activePickup.status?.replace('_', ' ').toUpperCase()}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${(() => {
+                      // For digital bins, use distance-based visual status ONLY for initial tracking
+                      let displayStatus = activePickup.status;
+                      if (activePickup.is_digital_bin && typeof distance === 'number') {
+                        const isInitialTrackingPhase = displayStatus === 'accepted' || displayStatus === 'active';
+                        if (isInitialTrackingPhase) {
+                          if (distance <= 50) {
+                            displayStatus = 'arrived';
+                          } else if (distance <= 500) {
+                            displayStatus = 'en_route';
+                          }
+                        }
+                      }
+                      
+                      if (displayStatus === 'accepted' || displayStatus === 'active') return 'bg-blue-100 text-blue-700';
+                      if (displayStatus === 'in_transit' || displayStatus === 'en_route') return 'bg-purple-100 text-purple-700';
+                      if (displayStatus === 'arrived') return 'bg-green-100 text-green-700';
+                      if (displayStatus === 'picked_up' || displayStatus === 'collecting') return 'bg-orange-100 text-orange-700';
+                      if (displayStatus === 'collected' || displayStatus === 'completed') return 'bg-emerald-100 text-emerald-700';
+                      return 'bg-yellow-100 text-yellow-700';
+                    })()}`}>
+                      {(() => {
+                        // For digital bins, use distance-based visual status ONLY for initial tracking
+                        let displayStatus = activePickup.status;
+                        if (activePickup.is_digital_bin && typeof distance === 'number') {
+                          const isInitialTrackingPhase = displayStatus === 'accepted' || displayStatus === 'active';
+                          if (isInitialTrackingPhase) {
+                            if (distance <= 50) {
+                              return 'ARRIVED';
+                            } else if (distance <= 500) {
+                              return 'EN ROUTE';
+                            }
+                          }
+                        }
+                        return activePickup.status?.replace('_', ' ').toUpperCase();
+                      })()}
                     </span>
                   </div>
                 </div>
               )}
 
               {/* Distance & ETA Info Box */}
-              {(distance !== null || eta !== null) && (
-                <div className="bg-blue-600 text-white rounded-xl p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    {distance !== null && (
+              {((typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0) || 
+                (typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0)) && (
+                <div className="bg-blue-600 text-white rounded-lg p-2.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                       <div>
-                        <p className="text-xs text-blue-200 mb-1">Distance</p>
-                        <p className="text-2xl font-bold">{distance} km</p>
+                        <p className="text-[10px] text-blue-200 mb-0.5">Distance</p>
+                        <p className="text-lg font-bold">{distance < 1000 ? `${distance}m` : `${distance}km`}</p>
                       </div>
                     )}
-                    {eta !== null && (
+                    {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0 && (
                       <div>
-                        <p className="text-xs text-blue-200 mb-1">ETA</p>
-                        <p className="text-2xl font-bold">{eta} min</p>
+                        <p className="text-[10px] text-blue-200 mb-0.5">ETA</p>
+                        <p className="text-lg font-bold">{eta} min</p>
                       </div>
                     )}
                   </div>
@@ -446,31 +667,61 @@ const UberStyleTrackingMap = ({
                   <div 
                     className="absolute top-4 left-4 h-0.5 bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500"
                     style={{ 
-                      width: `${(
-                        activePickup.status === 'available' ? '0%' :
-                        activePickup.status === 'accepted' ? '25%' :
-                        activePickup.status === 'en_route' || activePickup.status === 'in_transit' ? '50%' :
-                        activePickup.status === 'arrived' ? '75%' :
-                        activePickup.status === 'collecting' ? '90%' :
-                        '100%'
-                      )}` 
+                      width: `${(() => {
+                        // For digital bins, use distance-based visual status ONLY for initial tracking
+                        // For pickup requests, use actual database status
+                        let status = activePickup.status;
+                        if (activePickup.is_digital_bin && typeof distance === 'number') {
+                          const isInitialTrackingPhase = status === 'accepted' || status === 'active';
+                          if (isInitialTrackingPhase) {
+                            if (distance <= 50) {
+                              status = 'arrived';
+                            } else if (distance <= 500) {
+                              status = 'en_route';
+                            }
+                          }
+                        }
+                        
+                        if (status === 'available') return '0%';
+                        if (status === 'accepted' || status === 'active') return '25%';
+                        if (status === 'en_route' || status === 'in_transit') return '50%';
+                        if (status === 'arrived') return '75%';
+                        if (status === 'collecting' || status === 'picked_up') return '90%';
+                        return '100%';
+                      })()}` 
                     }}
                   ></div>
                   
                   {/* Progress Stages */}
                   <div className="relative flex justify-between">
                     {['accepted', 'en_route', 'arrived', 'collecting', 'complete'].map((stage, index) => {
+                      // For digital bins, use distance-based visual status ONLY for initial tracking
+                      // For pickup requests, use actual database status
+                      let currentStatus = activePickup.status;
+                      if (activePickup.is_digital_bin && typeof distance === 'number') {
+                        const isInitialTrackingPhase = currentStatus === 'accepted' || currentStatus === 'active';
+                        if (isInitialTrackingPhase) {
+                          if (distance <= 50) {
+                            currentStatus = 'arrived';
+                          } else if (distance <= 500) {
+                            currentStatus = 'en_route';
+                          }
+                        }
+                      }
+                      
                       const stageStatuses = {
-                        accepted: ['accepted', 'en_route', 'in_transit', 'arrived', 'collecting', 'completed'],
-                        en_route: ['en_route', 'in_transit', 'arrived', 'collecting', 'completed'],
-                        arrived: ['arrived', 'collecting', 'completed'],
-                        collecting: ['collecting', 'completed'],
-                        complete: ['completed']
+                        accepted: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed'],
+                        en_route: ['en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed'],
+                        arrived: ['arrived', 'collecting', 'picked_up', 'collected', 'completed'],
+                        collecting: ['collecting', 'picked_up', 'collected', 'completed'],
+                        complete: ['collected', 'completed']
                       };
-                      const isCompleted = stageStatuses[stage]?.includes(activePickup.status);
-                      const isCurrent = activePickup.status === stage || 
-                        (stage === 'en_route' && activePickup.status === 'in_transit') ||
-                        (stage === 'complete' && activePickup.status === 'completed');
+                      const isCompleted = stageStatuses[stage]?.includes(currentStatus);
+                      const isCurrent = currentStatus === stage || 
+                        (stage === 'accepted' && currentStatus === 'active') ||
+                        (stage === 'en_route' && currentStatus === 'in_transit') ||
+                        (stage === 'collecting' && currentStatus === 'picked_up') ||
+                        (stage === 'complete' && (currentStatus === 'completed' || currentStatus === 'collected'));
                       
                       return (
                         <div key={stage} className="flex flex-col items-center space-y-2 z-10">
@@ -490,7 +741,17 @@ const UberStyleTrackingMap = ({
                           <p className={`text-[10px] font-medium text-center max-w-[60px] ${
                             isCurrent ? 'text-blue-600' : 'text-gray-500'
                           }`}>
-                            {stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {(() => {
+                              // Custom label mapping
+                              const labels = {
+                                'accepted': 'Accepted',
+                                'en_route': 'En Route',
+                                'arrived': 'Arrived',
+                                'collecting': 'Picked Up',
+                                'complete': 'Disposed'
+                              };
+                              return labels[stage] || stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            })()}
                           </p>
                         </div>
                       );
@@ -539,8 +800,8 @@ const UberStyleTrackingMap = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      // TODO: Implement chat functionality
-                      console.log('Chat with collector');
+                      // Chat feature coming soon
+                      alert('Chat feature coming soon! For now, please use the Call button to contact the collector.');
                     }}
                     className="flex flex-col items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-xl p-3 transition-colors shadow-md"
                   >
@@ -553,8 +814,8 @@ const UberStyleTrackingMap = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      // TODO: Show full pickup details
-                      console.log('Show details');
+                      // Expand/collapse card to show full details
+                      setIsCardExpanded(!isCardExpanded);
                     }}
                     className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white rounded-xl p-3 transition-colors shadow-md"
                   >

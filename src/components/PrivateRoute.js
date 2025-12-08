@@ -19,9 +19,6 @@ const PrivateRoute = ({ children }) => {
   const refreshTimeoutRef = useRef(null);
   const recoveryAttemptedRef = useRef(false);
   
-  // Special case for test account in development
-  const isTestAccount = process.env.NODE_ENV === 'development' && user?.email === 'prince02@mailinator.com';
-  
   // Check for stored user data
   const hasStoredUser = !!localStorage.getItem('trashdrop_user');
   const hasStoredToken = !!localStorage.getItem('trashdrop_auth_token');
@@ -42,7 +39,6 @@ const PrivateRoute = ({ children }) => {
       initialRenderComplete,
       hasUser: !!user,
       userEmail: user?.email,
-      isTestAccount,
       hasStoredUser,
       hasStoredToken,
       pwaMode

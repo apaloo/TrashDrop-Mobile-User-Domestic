@@ -688,19 +688,6 @@ const Dashboard = () => {
       return sessionRefreshRef.current.result;
     }
 
-    // Special cases
-    if (user && user.email === 'prince02@mailinator.com') {
-      const result = { success: true, testAccount: true };
-      sessionRefreshRef.current = { result, timestamp: Date.now() };
-      return result;
-    }
-
-    if (appConfig?.features?.enableMocks) {
-      const result = { success: true, mock: true };
-      sessionRefreshRef.current = { result, timestamp: Date.now() };
-      return result;
-    }
-
     try {
       const { data, error } = await supabase.auth.refreshSession();
       const result = error ? 

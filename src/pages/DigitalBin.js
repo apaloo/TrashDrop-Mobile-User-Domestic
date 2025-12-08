@@ -196,36 +196,6 @@ function DigitalBin() {
   const fetchScheduledPickups = async (userId) => {
     try {
       console.log('[DigitalBin] Fetching digital bins from server for user:', userId);
-      
-      // Special handling for test user in development mode
-      const isTestUser = process.env.NODE_ENV === 'development' && user?.email === 'prince02@mailinator.com';
-
-      if (isTestUser) {
-        console.log('[Dev] Using mock digital bins for test user');
-        const mockPickups = [
-          {
-            id: '123e4567-e89b-12d3-a456-426614174002',
-            user_id: userId,
-            location_id: '123e4567-e89b-12d3-a456-426614174001',
-            qr_code_url: 'https://trashdrop.app/bin/123e4567-e89b-12d3-a456-426614174001',
-            frequency: 'weekly',
-            waste_type: 'general',
-            bag_count: 2,
-            is_active: true,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            location_name: 'Test Location',
-            address: '123 Test Street, Accra',
-            status: 'active'
-          }
-        ];
-        
-        // NO CACHING: Return mock data directly
-        setScheduledPickups(mockPickups);
-        setLastUpdated(new Date());
-        return mockPickups;
-      }
 
       // SERVER-FIRST: Always fetch from server first
       try {
@@ -466,20 +436,13 @@ function DigitalBin() {
       return;
     }
 
-    // Special handling for test user in development mode
-    const isTestUser = process.env.NODE_ENV === 'development' && user.email === 'prince02@mailinator.com';
-    
-    // Verify token hasn't expired (skip check for test user)
-    if (!isTestUser) {
-      const tokenExpiry = session.expires_at * 1000; // Convert to milliseconds
-      if (Date.now() >= tokenExpiry) {
-        console.error('Session token expired');
-        toastService.error('Your session has expired. Please log in again.');
-        navigate('/login', { state: { returnTo: '/digital-bin' } });
-        return;
-      }
-    } else {
-      console.log('[Dev] Skipping token expiry check for test user');
+    // Verify token hasn't expired
+    const tokenExpiry = session.expires_at * 1000; // Convert to milliseconds
+    if (Date.now() >= tokenExpiry) {
+      console.error('Session token expired');
+      toastService.error('Your session has expired. Please log in again.');
+      navigate('/login', { state: { returnTo: '/digital-bin' } });
+      return;
     }
 
     setIsLoading(true);
@@ -607,11 +570,53 @@ function DigitalBin() {
             console.log('Attempting to create location in bin_locations table');
             console.log('[DigitalBin] Creating location with actual schema:', locationData);
             
-            const binLocationResult = await supabase
-              .from('bin_locations')
-              .insert(locationData)
-              .select()
-              .single();
+            // Try with timeout first
+            let binLocationResult;
+            try {
+              const insertPromise = supabase
+                .from('bin_locations')
+                .insert(locationData)
+                .select()
+                .single();
+              
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Location insert timed out after 10 seconds')), 10000)
+              );
+              
+              binLocationResult = await Promise.race([insertPromise, timeoutPromise]);
+            } catch (timeoutError) {
+              console.warn('[DigitalBin] Insert with select timed out, trying insert only:', timeoutError.message);
+              
+              // Fallback: Insert without select (may succeed even if RLS blocks select)
+              const insertOnlyResult = await supabase
+                .from('bin_locations')
+                .insert(locationData);
+              
+              if (insertOnlyResult.error) {
+                throw new Error(`Failed to create location: ${insertOnlyResult.error.message}`);
+              }
+              
+              console.log('[DigitalBin] Insert succeeded without select, querying for location');
+              
+              // Query for the location we just created
+              const queryResult = await supabase
+                .from('bin_locations')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('location_name', locationData.location_name)
+                .eq('address', locationData.address)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              
+              if (queryResult.error || !queryResult.data) {
+                // If we still can't query it, create a local-only location
+                console.warn('[DigitalBin] Could not query created location, using timestamp-based ID');
+                throw new Error('Location created but could not be retrieved');
+              }
+              
+              binLocationResult = { data: queryResult.data, error: null };
+            }
               
             if (binLocationResult.error) {
               console.error('[DigitalBin] Failed to create location:', binLocationResult.error);

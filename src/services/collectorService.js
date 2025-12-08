@@ -19,6 +19,9 @@ export const collectorService = {
 
       console.log('[CollectorService] Starting session for collector:', collectorId);
 
+      // Update collector profile to online/active status
+      await this.updateCollectorStatus(collectorId, true, 'active');
+
       // End any existing active sessions first
       await this.endActiveSession(collectorId);
 
@@ -93,6 +96,9 @@ export const collectorService = {
           throw error;
         }
 
+        // Update collector profile to offline/inactive status
+        await this.updateCollectorStatus(collectorId, false, 'inactive');
+
         console.log('[CollectorService] Successfully ended session:', data.id);
         return { data, error: null };
       }
@@ -112,7 +118,57 @@ export const collectorService = {
   },
 
   /**
-   * Update collector's current location
+   * Update collector's current location in their profile
+   * @param {string} collectorId - Collector's user ID
+   * @param {Object} location - New location {latitude, longitude}
+   * @returns {Object} Updated profile
+   */
+  async updateCollectorLocation(collectorId, location) {
+    try {
+      if (!collectorId || !location || !location.latitude || !location.longitude) {
+        throw new Error('Collector ID and valid location (latitude, longitude) are required');
+      }
+
+      console.log('[CollectorService] Updating collector profile location:', collectorId);
+
+      // Update collector_profiles with both formats
+      // Use PostGIS function to create geometry point (SRID 4326 = WGS84)
+      const { data, error } = await supabase
+        .from('collector_profiles')
+        .update({
+          current_latitude: location.latitude,
+          current_longitude: location.longitude,
+          current_location: `SRID=4326;POINT(${location.longitude} ${location.latitude})`,
+          location_updated_at: new Date().toISOString(),
+          last_active: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', collectorId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[CollectorService] Error updating collector location:', error);
+        throw error;
+      }
+
+      console.log('[CollectorService] Successfully updated collector location');
+      return { data, error: null };
+
+    } catch (error) {
+      console.error('[CollectorService] Error in updateCollectorLocation:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to update collector location',
+          code: error.code || 'UPDATE_COLLECTOR_LOCATION_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
+   * Update collector's current location in session
    * @param {string} sessionId - Collector session ID
    * @param {Object} location - New location {latitude, longitude}
    * @returns {Object} Updated session
@@ -139,6 +195,11 @@ export const collectorService = {
       if (error) {
         console.error('[CollectorService] Error updating location:', error);
         throw error;
+      }
+
+      // Update collector profile with real-time location
+      if (data.collector_id && location.latitude && location.longitude) {
+        await this.updateCollectorLocation(data.collector_id, location);
       }
 
       // Also update any active pickup requests
@@ -254,6 +315,53 @@ export const collectorService = {
         error: {
           message: error.message || 'Failed to find nearby collectors',
           code: error.code || 'NEARBY_COLLECTORS_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
+   * Update collector's online status and activity status
+   * @param {string} collectorId - Collector's user ID
+   * @param {boolean} isOnline - Whether collector is online
+   * @param {string} status - Collector status (active, inactive, busy)
+   * @returns {Object} Updated profile
+   */
+  async updateCollectorStatus(collectorId, isOnline, status) {
+    try {
+      if (!collectorId) {
+        throw new Error('Collector ID is required');
+      }
+
+      console.log(`[CollectorService] Updating collector status: ${collectorId} -> ${status} (online: ${isOnline})`);
+
+      const { data, error } = await supabase
+        .from('collector_profiles')
+        .update({
+          is_online: isOnline,
+          status: status,
+          last_active: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', collectorId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[CollectorService] Error updating collector status:', error);
+        throw error;
+      }
+
+      console.log('[CollectorService] Successfully updated collector status');
+      return { data, error: null };
+
+    } catch (error) {
+      console.error('[CollectorService] Error in updateCollectorStatus:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to update collector status',
+          code: error.code || 'UPDATE_STATUS_ERROR'
         }
       };
     }

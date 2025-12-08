@@ -59,29 +59,6 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     try {
-      // Special case for test account
-      if (email === 'prince02@mailinator.com' && password === 'sChool@123') {
-        console.log('Using test account credentials');
-        const mockUser = {
-          id: 'test-user-id',
-          email: 'prince02@mailinator.com',
-          user_metadata: {
-            name: 'Test User'
-          }
-        };
-        const mockSession = {
-          user: mockUser,
-          access_token: 'mock-token'
-        };
-        updateAuthState({
-          session: mockSession,
-          user: mockUser,
-          status: 'authenticated',
-          error: null
-        }, true);
-        return { data: { user: mockUser, session: mockSession }, error: null };
-      }
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password

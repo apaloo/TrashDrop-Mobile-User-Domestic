@@ -5,6 +5,62 @@
 
 import supabase from '../utils/supabaseClient.js';
 
+/**
+ * Parse PostGIS POINT format to {latitude, longitude}
+ * @param {string} pointString - PostGIS POINT string like "POINT(lng lat)" or EWKB hex
+ * @returns {Object|null} - {latitude, longitude} or null
+ */
+const parsePostGISPoint = (pointString) => {
+  if (!pointString || typeof pointString !== 'string') return null;
+  
+  // Check if it's EWKB hex format (starts with 0101000020)
+  if (pointString.match(/^0101000020/i)) {
+    try {
+      // EWKB format: 01 (little endian) 01000000 (point) 20 (has SRID) E6100000 (SRID 4326) + coordinates
+      // Skip to coordinate data (after SRID): 01 01000000 20 E6100000 = 18 chars
+      const coordHex = pointString.substring(18);
+      
+      // Extract longitude (8 bytes = 16 hex chars)
+      const lngHex = coordHex.substring(0, 16);
+      // Extract latitude (next 8 bytes = 16 hex chars)
+      const latHex = coordHex.substring(16, 32);
+      
+      // Convert hex to double (little endian)
+      const lngBuffer = new ArrayBuffer(8);
+      const lngView = new DataView(lngBuffer);
+      for (let i = 0; i < 8; i++) {
+        lngView.setUint8(i, parseInt(lngHex.substring(i * 2, i * 2 + 2), 16));
+      }
+      const longitude = lngView.getFloat64(0, true); // true = little endian
+      
+      const latBuffer = new ArrayBuffer(8);
+      const latView = new DataView(latBuffer);
+      for (let i = 0; i < 8; i++) {
+        latView.setUint8(i, parseInt(latHex.substring(i * 2, i * 2 + 2), 16));
+      }
+      const latitude = latView.getFloat64(0, true);
+      
+      console.log('[parsePostGISPoint] Parsed EWKB:', { longitude, latitude });
+      
+      return { longitude, latitude };
+    } catch (err) {
+      console.error('[parsePostGISPoint] Error parsing EWKB:', err);
+      return null;
+    }
+  }
+  
+  // Match WKT POINT(lng lat) format
+  const match = pointString.match(/POINT\s*\(\s*([+-]?\d+\.?\d*)\s+([+-]?\d+\.?\d*)\s*\)/i);
+  if (match) {
+    return {
+      longitude: parseFloat(match[1]),
+      latitude: parseFloat(match[2])
+    };
+  }
+  
+  return null;
+};
+
 export const pickupService = {
   /**
    * Get active pickup request for a user
@@ -22,11 +78,11 @@ export const pickupService = {
       // Check both one-time and scheduled pickups
       const activeStatuses = ['accepted', 'in_transit', 'available'];
       
-      // Check one-time pickups (fetch collector separately since no FK constraint)
+      // Check one-time pickups
       const { data: oneTimeData, error: oneTimeError } = await supabase
         .from('pickup_requests')
         .select(`
-          id, location, coordinates, fee, status, collector_id,
+          id, location, fee, status, collector_id,
           accepted_at, picked_up_at, disposed_at, created_at, updated_at,
           waste_type, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
@@ -35,6 +91,36 @@ export const pickupService = {
         .in('status', activeStatuses)
         .order('created_at', { ascending: false })
         .limit(1);
+      
+      // Fetch coordinates for active pickup - try RPC first, fallback to ::text
+      if (oneTimeData && oneTimeData.length > 0) {
+        try {
+          const { data: coordResult } = await supabase
+            .rpc('get_request_coordinates_wkt', { request_id: oneTimeData[0].id });
+          
+          if (coordResult) {
+            oneTimeData[0].coordinates = coordResult;
+            console.log('[PickupService] Fetched active pickup coordinates via RPC (WKT):', coordResult);
+          }
+        } catch (coordError) {
+          console.warn('[PickupService] RPC not available, using ::text fallback');
+          // Fallback: fetch as text (returns EWKB hex)
+          try {
+            const { data: textResult } = await supabase
+              .from('pickup_requests')
+              .select('coordinates::text')
+              .eq('id', oneTimeData[0].id)
+              .single();
+            
+            if (textResult?.coordinates) {
+              oneTimeData[0].coordinates = textResult.coordinates;
+              console.log('[PickupService] Fetched active pickup coordinates as EWKB:', textResult.coordinates);
+            }
+          } catch (textError) {
+            console.warn('[PickupService] Could not fetch coordinates:', textError);
+          }
+        }
+      }
 
       if (oneTimeError) {
         console.error('[PickupService] Error fetching active one-time pickup:', oneTimeError);
@@ -103,11 +189,45 @@ export const pickupService = {
         try {
           const { data: binLocationData } = await supabase
             .from('bin_locations')
-            .select('location_name, address, coordinates')
+            .select('location_name, address')
             .eq('id', digitalBinData[0].location_id)
             .single();
           
           if (binLocationData) {
+            // Fetch coordinates - try RPC first, fallback to ::text
+            try {
+              const { data: coordResult } = await supabase
+                .rpc('get_bin_coordinates_wkt', { bin_location_id: digitalBinData[0].location_id });
+              
+              if (coordResult) {
+                binLocationData.coordinates = coordResult;
+                const coords = parsePostGISPoint(coordResult);
+                binLocationData.latitude = coords?.latitude;
+                binLocationData.longitude = coords?.longitude;
+                console.log('[PickupService] Fetched bin location via RPC (WKT):', binLocationData);
+              }
+            } catch (coordError) {
+              console.warn('[PickupService] RPC not available, using ::text fallback');
+              // Fallback: fetch as text (returns EWKB hex)
+              try {
+                const { data: textResult } = await supabase
+                  .from('bin_locations')
+                  .select('coordinates::text')
+                  .eq('id', digitalBinData[0].location_id)
+                  .single();
+                
+                if (textResult?.coordinates) {
+                  binLocationData.coordinates = textResult.coordinates;
+                  const coords = parsePostGISPoint(textResult.coordinates);
+                  binLocationData.latitude = coords?.latitude;
+                  binLocationData.longitude = coords?.longitude;
+                  console.log('[PickupService] Fetched bin location as EWKB:', binLocationData);
+                }
+              } catch (textError) {
+                console.warn('[PickupService] Could not fetch bin coordinates:', textError);
+              }
+            }
+            
             digitalBinData[0].location = binLocationData;
           }
         } catch (locationError) {
@@ -211,10 +331,9 @@ export const pickupService = {
         throw new Error('Pickup ID is required');
       }
 
-      console.log('[PickupService] Fetching pickup details for ID:', pickupId);
+      console.log('[PickupService] Fetching fresh pickup details for ID:', pickupId);
 
-      // Note: coordinates field contains PostGIS POINT data which needs special handling
-      // For now, we skip it and rely on location text or user geolocation
+      // Fetch basic data first
       const { data, error } = await supabase
         .from('pickup_requests')
         .select(`
@@ -224,7 +343,165 @@ export const pickupService = {
           preferred_time, points_earned
         `)
         .eq('id', pickupId)
-        .single();
+        .maybeSingle();
+      
+      // Fetch coordinates - try RPC first, fallback to ::text
+      if (data) {
+        try {
+          const { data: coordResult } = await supabase
+            .rpc('get_request_coordinates_wkt', { request_id: pickupId });
+          
+          if (coordResult) {
+            data.coordinates = coordResult;
+            console.log('[PickupService] Fetched coordinates via RPC (WKT):', coordResult);
+          }
+        } catch (coordError) {
+          console.warn('[PickupService] RPC not available, using ::text fallback');
+          // Fallback: fetch as text (returns EWKB hex which we can parse)
+          try {
+            const { data: textResult } = await supabase
+              .from('pickup_requests')
+              .select('coordinates::text')
+              .eq('id', pickupId)
+              .single();
+            
+            if (textResult?.coordinates) {
+              data.coordinates = textResult.coordinates;
+              console.log('[PickupService] Fetched coordinates as EWKB:', textResult.coordinates);
+            }
+          } catch (textError) {
+            console.warn('[PickupService] Could not fetch coordinates:', textError);
+          }
+        }
+      }
+
+      // If not found in pickup_requests, try digital_bins table
+      if (!data && !error) {
+        console.log('[PickupService] Not found in pickup_requests, checking digital_bins...');
+        
+        // Fetch fresh digital bin data
+        const { data: digitalBinData, error: digitalBinError } = await supabase
+          .from('digital_bins')
+          .select(`
+            id, user_id, location_id, qr_code_url, frequency, waste_type, bag_count,
+            bin_size_liters, is_urgent, is_active, status, expires_at, collected_at,
+            collector_id, created_at, updated_at
+          `)
+          .eq('id', pickupId)
+          .maybeSingle();
+        
+        if (digitalBinError) {
+          console.error('[PickupService] Error fetching digital bin:', digitalBinError);
+          throw digitalBinError;
+        }
+        
+        if (digitalBinData) {
+          // Fetch location details for digital bin
+          let location = null;
+          if (digitalBinData.location_id) {
+            try {
+              // Fetch bin location basic data
+              const { data: binLocationData } = await supabase
+                .from('bin_locations')
+                .select('id, location_name, address')
+                .eq('id', digitalBinData.location_id)
+                .maybeSingle();
+              
+              // Fetch coordinates - try RPC first, fallback to ::text
+              if (binLocationData) {
+                try {
+                  const { data: coordResult } = await supabase
+                    .rpc('get_bin_coordinates_wkt', { bin_location_id: digitalBinData.location_id });
+                  
+                  if (coordResult) {
+                    binLocationData.coordinates = coordResult;
+                    console.log('[PickupService] Fetched bin coordinates via RPC (WKT):', coordResult);
+                  }
+                } catch (coordError) {
+                  console.warn('[PickupService] RPC not available, using ::text fallback');
+                  // Fallback: fetch as text (returns EWKB hex)
+                  try {
+                    const { data: textResult } = await supabase
+                      .from('bin_locations')
+                      .select('coordinates::text')
+                      .eq('id', digitalBinData.location_id)
+                      .single();
+                    
+                    if (textResult?.coordinates) {
+                      binLocationData.coordinates = textResult.coordinates;
+                      console.log('[PickupService] Fetched bin coordinates as EWKB:', textResult.coordinates);
+                    }
+                  } catch (textError) {
+                    console.warn('[PickupService] Could not fetch bin coordinates:', textError);
+                  }
+                }
+              }
+              
+              if (binLocationData) {
+                // Parse PostGIS coordinates to lat/lng
+                const coords = parsePostGISPoint(binLocationData.coordinates);
+                location = {
+                  ...binLocationData,
+                  latitude: coords?.latitude,
+                  longitude: coords?.longitude
+                };
+                console.log('[PickupService] Parsed bin location:', location);
+              }
+            } catch (locationError) {
+              console.warn('[PickupService] Could not fetch bin location:', locationError);
+            }
+          }
+          
+          // Fetch collector details if exists
+          let collector = null;
+          if (digitalBinData.collector_id) {
+            try {
+              const { data: collectorData } = await supabase
+                .from('collector_profiles')
+                .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
+                .eq('user_id', digitalBinData.collector_id)
+                .maybeSingle();
+              
+              if (collectorData) {
+                collector = {
+                  id: collectorData.user_id,
+                  ...collectorData
+                };
+              }
+            } catch (collectorError) {
+              console.warn('[PickupService] Could not fetch collector details:', collectorError);
+            }
+          }
+          
+          // Format digital bin as pickup data
+          const formattedData = {
+            id: digitalBinData.id,
+            user_id: digitalBinData.user_id,
+            collector_id: digitalBinData.collector_id,
+            collector: collector,
+            status: digitalBinData.status,
+            location: location,
+            fee: 0,
+            bag_count: digitalBinData.bag_count || 0,
+            waste_type: digitalBinData.waste_type || 'general',
+            special_instructions: '',
+            points_earned: 15, // Digital bin points
+            is_digital_bin: true,
+            qr_code_url: digitalBinData.qr_code_url,
+            frequency: digitalBinData.frequency,
+            bin_size_liters: digitalBinData.bin_size_liters,
+            is_urgent: digitalBinData.is_urgent,
+            is_active: digitalBinData.is_active,
+            expires_at: digitalBinData.expires_at,
+            collected_at: digitalBinData.collected_at,
+            created_at: digitalBinData.created_at,
+            updated_at: digitalBinData.updated_at
+          };
+          
+          console.log('[PickupService] Found digital bin:', formattedData.id);
+          return { data: formattedData, error: null };
+        }
+      }
 
       if (error) {
         console.error('[PickupService] Error fetching pickup details:', error);
@@ -239,7 +516,7 @@ export const pickupService = {
               .from('collector_profiles')
               .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
               .eq('user_id', data.collector_id)
-              .single();
+              .maybeSingle();
             
             if (collectorData) {
               data.collector = {

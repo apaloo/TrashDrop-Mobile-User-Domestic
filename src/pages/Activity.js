@@ -17,13 +17,14 @@ const Activity = () => {
   const [cursors, setCursors] = useState({
     user_activity: null,
     illegal_dumping_mobile: null,
-    pickup_requests: null
+    pickup_requests: null,
+    digital_bins: null
   });
   const itemsPerPage = 20; // Increased for better infinite scroll experience
   const mountedRef = useRef(true);
   const observerRef = useRef(null);
   const loadingRef = useRef(null);
-  const cursorsRef = useRef({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null });
+  const cursorsRef = useRef({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null });
 
   // Enhanced session refresh function with validation
   const refreshAndValidateSession = async () => {
@@ -67,8 +68,8 @@ const Activity = () => {
     if (!isLoadMore) {
       setIsLoading(true);
       setActivities([]);
-      setCursors({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null });
-      cursorsRef.current = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null };
+      setCursors({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null });
+      cursorsRef.current = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null };
       setHasMoreData(true);
     } else {
       setIsLoadingMore(true);
@@ -133,10 +134,10 @@ const Activity = () => {
         }
         
       } else if (filter === 'all') {
-        // Fetch from all three tables with cursor-based pagination
-        const itemsPerTable = Math.ceil(itemsPerPage / 3);
+        // Fetch from all four tables with cursor-based pagination
+        const itemsPerTable = Math.ceil(itemsPerPage / 4);
         
-        const [activityResult, dumpingResult, pickupResult] = await Promise.allSettled([
+        const [activityResult, dumpingResult, pickupResult, digitalBinResult] = await Promise.allSettled([
           // User activity query
           fetchWithTimeout(async () => {
             let query = supabase
@@ -182,6 +183,21 @@ const Activity = () => {
             }
             
             return query;
+          }),
+          // Digital bins query
+          fetchWithTimeout(async () => {
+            let query = supabase
+              .from('digital_bins')
+              .select('*, bin_locations:location_id(location_name, address)')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(itemsPerTable);
+              
+            if (cursorsRef.current.digital_bins) {
+              query = query.lt('created_at', cursorsRef.current.digital_bins);
+            }
+            
+            return query;
           })
         ]);
         
@@ -213,6 +229,16 @@ const Activity = () => {
           allTableActivities = [...allTableActivities, ...activities];
           if (activities.length > 0) {
             newCursors.pickup_requests = activities[activities.length - 1].created_at;
+            hasMore = hasMore || activities.length === itemsPerTable;
+          }
+        }
+        
+        // Process digital bins results
+        if (digitalBinResult.status === 'fulfilled' && digitalBinResult.value?.data) {
+          const activities = digitalBinResult.value.data.map(item => ({ ...item, _source: 'digital_bins' }));
+          allTableActivities = [...allTableActivities, ...activities];
+          if (activities.length > 0) {
+            newCursors.digital_bins = activities[activities.length - 1].created_at;
             hasMore = hasMore || activities.length === itemsPerTable;
           }
         }
@@ -303,6 +329,23 @@ const Activity = () => {
             related_id: activity.id,
             description: `${activity.waste_type || 'Waste'} Pickup - ${activity.bag_count || 1} bag(s)`,
             address: activity.location || 'Custom location',
+            created_at: activity.created_at
+          };
+        } else if (activity._source === 'digital_bins') {
+          const locationName = activity.bin_locations?.location_name || 'Unknown location';
+          const statusText = activity.is_active ? 'active' : 'inactive';
+          const isExpired = new Date(activity.expires_at) < new Date();
+          const finalStatus = isExpired ? 'expired' : statusText;
+          
+          formattedActivity = {
+            id: activity.id,
+            type: 'digital_bin',
+            status: finalStatus,
+            date: new Date(activity.created_at).toLocaleDateString(),
+            points: 15, // Digital bins earn 15 points
+            related_id: activity.id,
+            description: `Digital bin (${activity.frequency})`,
+            address: locationName,
             created_at: activity.created_at
           };
         } else {
@@ -443,7 +486,7 @@ const Activity = () => {
     console.log('Filter changed to:', newFilter);
     setFilter(newFilter);
     // Reset cursors and activities when filter changes
-    const resetCursors = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null };
+    const resetCursors = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null };
     setCursors(resetCursors);
     cursorsRef.current = resetCursors;
     setActivities([]);
@@ -486,6 +529,14 @@ const Activity = () => {
               </svg>
             </div>
           );
+        case 'digital_bin':
+          return (
+            <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
+              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+            </div>
+          );
         default:
           return (
             <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
@@ -507,7 +558,8 @@ const Activity = () => {
                 <h3 className="text-lg font-medium text-gray-800 dark:text-white capitalize">
                   {activity.type === 'pickup_request' ? 'Waste Pickup' : 
                    activity.type === 'dumping_report' ? 'Dumping Report' : 
-                   activity.type === 'qr_scan' ? 'QR Code Scan' : 'Reward Redemption'}
+                   activity.type === 'qr_scan' ? 'QR Code Scan' : 
+                   activity.type === 'digital_bin' ? 'Digital Bin' : 'Reward Redemption'}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
                   {activity.date} • {activity.description}

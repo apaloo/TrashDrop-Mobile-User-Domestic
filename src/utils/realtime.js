@@ -4,6 +4,51 @@ import supabase from './supabaseClient.js';
 const activeSubscriptions = {};
 
 /**
+ * Parse PostGIS EWKB hex format to lat/lng coordinates
+ * @param {string} ewkbHex - EWKB hex string from PostGIS
+ * @returns {object|null} - { latitude, longitude } or null if parsing fails
+ */
+function parseLocationFromEWKB(ewkbHex) {
+  if (!ewkbHex || typeof ewkbHex !== 'string') return null;
+  
+  // Check if it's EWKB hex format (starts with 0101000020)
+  if (ewkbHex.match(/^0101000020/i)) {
+    try {
+      // EWKB format: 01 (little endian) 01000000 (point) 20 (has SRID) E6100000 (SRID 4326) + coordinates
+      // Skip to coordinate data (after SRID): 01 01000000 20 E6100000 = 18 chars
+      const coordHex = ewkbHex.substring(18);
+      
+      // Extract longitude (8 bytes = 16 hex chars)
+      const lngHex = coordHex.substring(0, 16);
+      // Extract latitude (next 8 bytes = 16 hex chars)
+      const latHex = coordHex.substring(16, 32);
+      
+      // Convert hex to double (little endian)
+      const lngBuffer = new ArrayBuffer(8);
+      const lngView = new DataView(lngBuffer);
+      for (let i = 0; i < 8; i++) {
+        lngView.setUint8(i, parseInt(lngHex.substring(i * 2, i * 2 + 2), 16));
+      }
+      const longitude = lngView.getFloat64(0, true); // true = little endian
+      
+      const latBuffer = new ArrayBuffer(8);
+      const latView = new DataView(latBuffer);
+      for (let i = 0; i < 8; i++) {
+        latView.setUint8(i, parseInt(latHex.substring(i * 2, i * 2 + 2), 16));
+      }
+      const latitude = latView.getFloat64(0, true);
+      
+      return { latitude, longitude };
+    } catch (err) {
+      console.error('[Realtime] Error parsing EWKB:', err);
+      return null;
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Subscribe to real-time updates for scheduled pickups
  * @param {string} userId - The ID of the current user
  * @param {Function} onUpdate - Callback function when an update is received
@@ -604,7 +649,7 @@ export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpd
     // Create a new channel with a unique name to prevent conflicts
     const channelName = `collector_location_${collectorId}_${Date.now()}`;
     
-    // Subscribe to changes in the collector_sessions table for real-time location updates
+    // Subscribe to changes in the collector_profiles table for real-time location updates
     const subscription = supabase
       .channel(channelName)
       .on(
@@ -612,21 +657,40 @@ export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpd
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'collector_sessions',
-          filter: `collector_id=eq.${collectorId}`
+          table: 'collector_profiles',
+          filter: `user_id=eq.${collectorId}`
         },
         (payload) => {
           if (typeof onUpdate === 'function') {
-            console.log('[Realtime] Collector location update received');
-            const locationData = payload.new;
+            console.log('[Realtime] Collector location update received:', payload.new);
+            const profileData = payload.new;
             
-            // Only process if this is the active session
-            if (locationData.status === 'active' && locationData.current_location) {
-              onUpdate({
-                location: locationData.current_location,
-                lastUpdate: locationData.last_update,
-                sessionId: locationData.id
-              });
+            // Process location update if collector is online and has location data
+            if (profileData.is_online && profileData.current_location) {
+              // Parse EWKB or use lat/lng
+              let location = null;
+              
+              // Try to parse current_location (EWKB format)
+              if (profileData.current_location) {
+                location = parseLocationFromEWKB(profileData.current_location);
+              }
+              
+              // Fallback to lat/lng fields
+              if (!location && profileData.current_latitude && profileData.current_longitude) {
+                location = {
+                  latitude: parseFloat(profileData.current_latitude),
+                  longitude: parseFloat(profileData.current_longitude)
+                };
+              }
+              
+              if (location) {
+                onUpdate({
+                  location: location,
+                  lastUpdate: profileData.location_updated_at || new Date().toISOString(),
+                  isOnline: profileData.is_online,
+                  status: profileData.status
+                });
+              }
             }
           }
         }
@@ -689,12 +753,18 @@ export function calculateETA(userLocation, collectorLocation, averageSpeedKmh = 
   
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distanceKm = R * c;
+  const distanceMeters = distanceKm * 1000;
   
   // Calculate ETA in minutes
   const etaMinutes = Math.round((distanceKm / averageSpeedKmh) * 60);
   
+  // Return distance in meters for distances < 1km, otherwise in km
   return {
-    distance: Math.round(distanceKm * 10) / 10, // Round to 1 decimal place
+    distance: distanceMeters < 1000 
+      ? Math.round(distanceMeters) // Return meters (e.g., 10, 50, 250)
+      : Math.round(distanceKm * 10) / 10, // Return km with 1 decimal (e.g., 1.5, 2.3)
+    distanceKm: distanceKm,
+    distanceMeters: Math.round(distanceMeters),
     eta: etaMinutes
   };
 }
