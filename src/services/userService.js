@@ -351,11 +351,11 @@ export const userService = {
 
       const { data, error } = await supabase
         .from('profiles')
-        .upsert({
-          id: userId,
+        .update({
           ...profileData,
           updated_at: new Date().toISOString()
         })
+        .eq('id', userId)
         .select()
         .single();
 

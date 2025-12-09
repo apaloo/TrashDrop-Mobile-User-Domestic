@@ -21,7 +21,10 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
         <select
           id="numberOfBags"
           value={formData.numberOfBags}
-          onChange={(e) => updateFormData({ numberOfBags: e.target.value })}
+          onChange={(e) => updateFormData({ 
+            numberOfBags: e.target.value,
+            bag_count: parseInt(e.target.value)  // Sync with bag_count field
+          })}
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
           style={{color: '#333'}}
         >

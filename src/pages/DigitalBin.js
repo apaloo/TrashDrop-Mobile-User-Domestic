@@ -790,7 +790,7 @@ function DigitalBin() {
         qr_code_url: qrCodeUrl,
         frequency: formData.frequency,
         waste_type: formData.waste_type,
-        bag_count: formData.bag_count,
+        bag_count: formData.numberOfBags || formData.bag_count || 1,  // FIX: Use numberOfBags from form
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
         expires_at: expiryDate.toISOString()
@@ -871,7 +871,7 @@ function DigitalBin() {
         qr_code_url: qrCodeUrl,
         frequency: formData.frequency,
         waste_type: formData.waste_type,
-        bag_count: formData.bag_count,
+        bag_count: formData.numberOfBags || formData.bag_count || 1,  // FIX: Use numberOfBags from form
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
