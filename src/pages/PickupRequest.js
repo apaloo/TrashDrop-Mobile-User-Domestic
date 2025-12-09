@@ -150,6 +150,9 @@ const PickupRequest = () => {
     const loadSavedLocations = async () => {
       if (!user) return;
       
+      // User-specific cache key
+      const cacheKey = `trashdrop_locations_${user.id}`;
+      
       // Clear any existing saved locations in state (not localStorage)
       setSavedLocations([]);
       
@@ -192,8 +195,8 @@ const PickupRequest = () => {
           
           console.log('Loaded user locations from Supabase:', formattedLocations);
           
-          // Merge with local storage data for any offline-saved locations
-          const cachedLocations = localStorage.getItem('trashdrop_locations');
+          // Merge with local storage data for any offline-saved locations (user-specific cache)
+          const cachedLocations = localStorage.getItem(cacheKey);
           const localLocations = cachedLocations ? JSON.parse(cachedLocations) : [];
           
           // Identify any local-only locations (ones not synced to server yet)
@@ -209,13 +212,13 @@ const PickupRequest = () => {
           // Update state with all locations
           setSavedLocations(mergedLocations);
           
-          // Update localStorage cache with properly parsed coordinates
-          localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
+          // Update localStorage cache with properly parsed coordinates (user-specific cache)
+          localStorage.setItem(cacheKey, JSON.stringify(mergedLocations));
           console.log('[PickupRequest] ✅ Saved locations loaded and cached:', mergedLocations.length, 'locations');
         } else {
           console.log('[PickupRequest] No saved locations found in database for user');
-          // Clear stale cache
-          localStorage.removeItem('trashdrop_locations');
+          // Clear stale cache (user-specific)
+          localStorage.removeItem(cacheKey);
         }
       } catch (error) {
         console.error('Error loading saved locations:', error);
@@ -238,7 +241,9 @@ const PickupRequest = () => {
     // Add event listener to refresh locations when localStorage changes
     // This helps synchronize data between tabs/windows
     const handleStorageChange = (e) => {
-      if (e.key === 'trashdrop_locations') {
+      // Check both user-specific and legacy cache keys
+      const userCacheKey = user?.id ? `trashdrop_locations_${user.id}` : null;
+      if (e.key === userCacheKey || e.key === 'trashdrop_locations') {
         loadSavedLocations();
       }
     };

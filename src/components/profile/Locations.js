@@ -93,8 +93,11 @@ const Locations = () => {
         console.log('[Locations] 🔄 loadLocations() called for user:', user?.id);
         setBackendStatus('Loading locations...');
         
+        // User-specific cache key
+        const cacheKey = user?.id ? `trashdrop_locations_${user.id}` : 'trashdrop_locations';
+        
         // Always load from localStorage first for immediate display
-        const cachedLocations = localStorage.getItem('trashdrop_locations');
+        const cachedLocations = localStorage.getItem(cacheKey);
         console.log('[Locations] 💾 localStorage cache:', cachedLocations ? 'FOUND' : 'EMPTY');
         
         if (cachedLocations) {
@@ -174,7 +177,7 @@ const Locations = () => {
               setLocations(mergedLocations);
               
               // Update localStorage with the merged data
-              localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
+              localStorage.setItem(cacheKey, JSON.stringify(mergedLocations));
               console.log('[Locations] ✅ Saved', mergedLocations.length, 'locations to localStorage');
               
               setBackendStatus('Locations synced with server');
@@ -201,7 +204,7 @@ const Locations = () => {
                 !existingLocations.some(el => el.id === ol.id))];
               
               setLocations(mergedLocations);
-              localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
+              localStorage.setItem(cacheKey, JSON.stringify(mergedLocations));
             }
           } catch (dbError) {
             console.error('Failed to load locations from IndexedDB:', dbError);
@@ -426,8 +429,9 @@ const Locations = () => {
       const updatedLocations = [...locations, locationToSave];
       setLocations(updatedLocations);
       
-      // Always update localStorage for persistence across page refreshes
-      localStorage.setItem('trashdrop_locations', JSON.stringify(updatedLocations));
+      // Always update localStorage for persistence across page refreshes (user-specific)
+      const cacheKey = user?.id ? `trashdrop_locations_${user.id}` : 'trashdrop_locations';
+      localStorage.setItem(cacheKey, JSON.stringify(updatedLocations));
       
       const online = isOnline();
       console.log('Online status:', online);
@@ -499,7 +503,7 @@ const Locations = () => {
               );
               
               setLocations(updatedWithServerIds);
-              localStorage.setItem('trashdrop_locations', JSON.stringify(updatedWithServerIds));
+              localStorage.setItem(cacheKey, JSON.stringify(updatedWithServerIds));
             }
           }
         } catch (authError) {
@@ -569,8 +573,9 @@ const Locations = () => {
       const updatedLocations = locations.filter(location => location.id !== id);
       setLocations(updatedLocations);
       
-      // Always update localStorage
-      localStorage.setItem('trashdrop_locations', JSON.stringify(updatedLocations));
+      // Always update localStorage (user-specific)
+      const cacheKey = user?.id ? `trashdrop_locations_${user.id}` : 'trashdrop_locations';
+      localStorage.setItem(cacheKey, JSON.stringify(updatedLocations));
       
       if (isOnline()) {
         // Online: Delete from Supabase

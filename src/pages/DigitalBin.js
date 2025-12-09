@@ -77,8 +77,10 @@ function DigitalBin() {
     preferredTime: 'morning',
     
     // Waste details
-    bag_count: 1,
-    waste_type: 'general',
+    numberOfBags: 1,              // UI field name (used in WasteDetailsStep)
+    bag_count: 1,                 // Database field name (kept in sync)
+    wasteType: 'general',         // UI field name (used in WasteDetailsStep)
+    waste_type: 'general',        // Database field name (kept in sync)
     bin_size_liters: 120,        // NEW: Default to 120L (standard size)
     is_urgent: false,             // NEW: Default not urgent
     
@@ -784,19 +786,23 @@ function DigitalBin() {
       console.log('[DigitalBin] User ID:', user.id);
       
       // Prepare digital bin data with calculated fees
+      // Ensure bag_count is always an integer
+      const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
+      
       const digitalBinData = prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
         frequency: formData.frequency,
-        waste_type: formData.waste_type,
-        bag_count: formData.numberOfBags || formData.bag_count || 1,  // FIX: Use numberOfBags from form
+        waste_type: formData.waste_type || formData.wasteType,
+        bag_count: bagCount,
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
         expires_at: expiryDate.toISOString()
       });
       
       console.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
+      console.log('[DigitalBin] Bag count being sent:', bagCount, '(from numberOfBags:', formData.numberOfBags, 'or bag_count:', formData.bag_count, ')');
       
       const { data: binData, error: binError} = await supabase
         .from('digital_bins')
@@ -865,13 +871,16 @@ function DigitalBin() {
       const qrCodeUrl = `https://trashdrop.app/bin/${locationId}`;
       
       // Prepare digital bin data with calculated fees
+      // Ensure bag_count is always an integer
+      const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
+      
       const digitalBinData = prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
         frequency: formData.frequency,
-        waste_type: formData.waste_type,
-        bag_count: formData.numberOfBags || formData.bag_count || 1,  // FIX: Use numberOfBags from form
+        waste_type: formData.waste_type || formData.wasteType,
+        bag_count: bagCount,
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days

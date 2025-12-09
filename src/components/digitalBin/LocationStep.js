@@ -90,8 +90,9 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       setIsLoading(true);
       
       try {
-        // First check localStorage for immediate display
-        const cachedLocations = localStorage.getItem('trashdrop_locations');
+        // First check localStorage for immediate display (user-specific cache)
+        const cacheKey = `trashdrop_locations_${user.id}`;
+        const cachedLocations = localStorage.getItem(cacheKey);
         if (cachedLocations) {
           const parsedLocations = JSON.parse(cachedLocations);
           console.log('Loaded locations from local storage in LocationStep:', parsedLocations);
@@ -121,8 +122,8 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           
           console.log('Loaded user locations from Supabase in LocationStep:', formattedLocations);
           
-          // Merge with local storage data for any offline-saved locations
-          const cachedLocations = localStorage.getItem('trashdrop_locations');
+          // Merge with local storage data for any offline-saved locations (reuse cacheKey)
+          const cachedLocations = localStorage.getItem(cacheKey);
           const localLocations = cachedLocations ? JSON.parse(cachedLocations) : [];
           
           // Identify any local-only locations (ones not synced to server yet)
@@ -138,8 +139,8 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           // Update state with all locations
           setSavedLocations(mergedLocations);
           
-          // Update localStorage with merged data
-          localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
+          // Update localStorage with merged data (reuse cacheKey)
+          localStorage.setItem(cacheKey, JSON.stringify(mergedLocations));
         }
       } catch (error) {
         console.error('Error fetching locations:', error);
