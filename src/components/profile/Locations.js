@@ -69,7 +69,6 @@ const Locations = () => {
   const [newLocation, setNewLocation] = useState({
     name: '',
     address: '',
-    city: '',
     latitude: null,
     longitude: null
   });
@@ -91,19 +90,26 @@ const Locations = () => {
     const loadLocations = async () => {
       try {
         setIsLoading(true);
+        console.log('[Locations] 🔄 loadLocations() called for user:', user?.id);
         setBackendStatus('Loading locations...');
         
         // Always load from localStorage first for immediate display
         const cachedLocations = localStorage.getItem('trashdrop_locations');
+        console.log('[Locations] 💾 localStorage cache:', cachedLocations ? 'FOUND' : 'EMPTY');
+        
         if (cachedLocations) {
           const parsedLocations = JSON.parse(cachedLocations);
-          console.log('Loaded locations from local storage:', parsedLocations);
+          console.log('[Locations] ✅ Loaded', parsedLocations.length, 'locations from cache:', parsedLocations);
           setLocations(parsedLocations);
           setBackendStatus(null);
+        } else {
+          console.log('[Locations] ⚠️ No cached locations found, will load from database');
         }
         
         // Try Supabase in background but don't block UI
+        console.log('[Locations] 🌐 Online?', isOnline(), 'User?', !!user);
         if (isOnline() && user) {
+          console.log('[Locations] 📡 Fetching fresh locations from Supabase...');
           try {
             // Set a timeout to prevent hanging on this request
             const supabasePromise = new Promise(async (resolve) => {
@@ -131,21 +137,29 @@ const Locations = () => {
             const { data, error } = await Promise.race([supabasePromise, timeoutPromise]);
             
             if (error) {
-              console.error('Error loading locations from Supabase:', error);
+              console.error('[Locations] Error loading locations from Supabase:', error);
               setBackendStatus('Using offline locations - server sync unavailable');
               setTimeout(() => setBackendStatus(null), 3000);
             } else if (data) {
-              console.log('Loaded locations from Supabase:', data);
-              // Transform to our expected format
-              const formattedLocations = data.map(loc => ({
-                id: loc.id,
-                name: loc.name,
-                address: loc.address,
-                city: loc.city || '',
-                latitude: loc.latitude,
-                longitude: loc.longitude,
-                synced: true
-              }));
+              console.log('[Locations] ✅ Raw locations from Supabase:', data);
+              console.log('[Locations] Number of locations:', data?.length || 0);
+              
+              // Transform to our expected format - locations table uses separate lat/lng columns
+              const formattedLocations = data.map(loc => {
+                console.log('[Locations] Processing location:', loc);
+                
+                const formatted = {
+                  id: loc.id,
+                  name: loc.location_name,  // Database column is 'location_name'
+                  address: loc.address,
+                  latitude: loc.latitude,
+                  longitude: loc.longitude,
+                  synced: true
+                };
+                
+                console.log('[Locations] ✅ Formatted location:', formatted);
+                return formatted;
+              });
               
               // Merge with any locally created locations that don't exist on server
               const localLocations = cachedLocations ? JSON.parse(cachedLocations) : [];
@@ -154,12 +168,19 @@ const Locations = () => {
               );
               
               const mergedLocations = [...formattedLocations, ...localOnlyLocations];
+              console.log('[Locations] 📍 Final merged locations:', mergedLocations);
+              console.log('[Locations] 📊 Setting', mergedLocations.length, 'locations in state');
+              
               setLocations(mergedLocations);
               
               // Update localStorage with the merged data
               localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
+              console.log('[Locations] ✅ Saved', mergedLocations.length, 'locations to localStorage');
+              
               setBackendStatus('Locations synced with server');
               setTimeout(() => setBackendStatus(null), 3000);
+            } else {
+              console.warn('[Locations] ⚠️ No data returned from Supabase (might be empty array)');
             }
           } catch (syncError) {
             console.error('Sync error:', syncError);
@@ -436,16 +457,25 @@ const Locations = () => {
           }
         
           // By now we've confirmed we have a valid session
-          // Proceed with API call
+          // Validate coordinates
+          const lat = locationToSave.latitude;
+          const lng = locationToSave.longitude;
+          
+          if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+            throw new Error('Invalid coordinates. Please use the map or enter valid coordinates.');
+          }
+          
+          console.log('[Locations] Saving location with coordinates:', { lat, lng });
+          
+          // Proceed with API call using separate latitude/longitude columns
           const { data, error } = await supabase
             .from('locations')
             .insert({
               user_id: user.id,
-              name: newLocation.name,
+              location_name: newLocation.name,  // Column is 'location_name' not 'name'
               address: newLocation.address,
-              city: newLocation.city || '',
-              latitude: locationToSave.latitude,
-              longitude: locationToSave.longitude,
+              latitude: lat,
+              longitude: lng,
               created_at: new Date().toISOString()
             })
             .select();
@@ -488,7 +518,6 @@ const Locations = () => {
       setNewLocation({
         name: '',
         address: '',
-        city: '',
         latitude: null,
         longitude: null
       });
@@ -518,7 +547,6 @@ const Locations = () => {
           setNewLocation({
             name: '',
             address: '',
-            city: '',
             latitude: null,
             longitude: null
           });
@@ -698,21 +726,6 @@ const Locations = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="col-span-2 md:col-span-2">
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  City
-                </label>
-                <input
-                  type="text"
-                  id="city"
-                  name="city"
-                  value={newLocation.city}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
 
             {/* Map Component */}
             <div className="mt-6 mb-4">

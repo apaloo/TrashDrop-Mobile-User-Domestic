@@ -154,34 +154,41 @@ const PickupRequest = () => {
       setSavedLocations([]);
       
       try {
-        // First check localStorage for immediate display
-        const cachedLocations = localStorage.getItem('trashdrop_locations');
-        if (cachedLocations) {
-          const parsedLocations = JSON.parse(cachedLocations);
-          console.log('Loaded locations from local storage:', parsedLocations);
-          setSavedLocations(parsedLocations);
-        }
+        // IMPORTANT: Always fetch fresh from database to ensure we have PostGIS coordinates
+        console.log('[PickupRequest] Loading saved locations from database...');
         
-        // Then fetch from Supabase to ensure we have the latest
         const { data: locationsData, error: locationsError } = await supabase
-          .from('locations') // Use the correct table name
+          .from('locations')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (locationsError) throw locationsError;
+        if (locationsError) {
+          console.error('[PickupRequest] Error loading locations:', locationsError);
+          throw locationsError;
+        }
+        
+        console.log('[PickupRequest] Raw locations from database:', locationsData);
         
         if (locationsData && locationsData.length > 0) {
           // Format locations to match component's expected structure
-          const formattedLocations = locationsData.map(location => ({
-            id: location.id,
-            name: location.name,
-            address: location.address || '',
-            city: location.city || '',
-            latitude: location.latitude,
-            longitude: location.longitude,
-            synced: true
-          }));
+          // Format locations - locations table uses separate lat/lng columns
+          const formattedLocations = locationsData.map(location => {
+            console.log(`[PickupRequest] Processing location "${location.location_name}":`, location);
+            
+            const formattedLocation = {
+              id: location.id,
+              name: location.location_name,  // Database column is 'location_name'
+              address: location.address || '',
+              latitude: location.latitude,
+              longitude: location.longitude,
+              synced: true
+            };
+            
+            console.log(`[PickupRequest] ✅ Formatted location:`, formattedLocation);
+            
+            return formattedLocation;
+          });
           
           console.log('Loaded user locations from Supabase:', formattedLocations);
           
@@ -202,14 +209,13 @@ const PickupRequest = () => {
           // Update state with all locations
           setSavedLocations(mergedLocations);
           
-          // Keep localStorage in sync
+          // Update localStorage cache with properly parsed coordinates
           localStorage.setItem('trashdrop_locations', JSON.stringify(mergedLocations));
+          console.log('[PickupRequest] ✅ Saved locations loaded and cached:', mergedLocations.length, 'locations');
         } else {
-          // Check if we already have locations in localStorage
-          const cachedLocations = localStorage.getItem('trashdrop_locations');
-          if (!cachedLocations) {
-            console.log('No saved locations found for user');
-          }
+          console.log('[PickupRequest] No saved locations found in database for user');
+          // Clear stale cache
+          localStorage.removeItem('trashdrop_locations');
         }
       } catch (error) {
         console.error('Error loading saved locations:', error);
@@ -245,25 +251,40 @@ const PickupRequest = () => {
     };
   }, [user?.id]);
 
-  // Update position when form location changes or saved location is selected
+  // Update position when saved location is selected
   useEffect(() => {
     if (formData.savedLocationId) {
       const selectedLocation = savedLocations.find(loc => loc.id === formData.savedLocationId);
+      console.log('[PickupRequest] Selected location from dropdown:', selectedLocation);
+      
       if (selectedLocation) {
-        // Use the new latitude/longitude properties
-        setPosition([selectedLocation.latitude, selectedLocation.longitude]);
-        setFormData(prev => ({
-          ...prev,
-          location: {
-            lat: selectedLocation.latitude,
-            lng: selectedLocation.longitude,
-          },
-        }));
+        const lat = selectedLocation.latitude;
+        const lng = selectedLocation.longitude;
+        
+        console.log('[PickupRequest] Parsed coordinates:', { lat, lng });
+        
+        // Validate coordinates are valid numbers
+        if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+          console.log('[PickupRequest] Setting map position to:', [lat, lng]);
+          setPosition([lat, lng]);
+          setFormData(prev => ({
+            ...prev,
+            location: {
+              lat: lat,
+              lng: lng,
+            },
+          }));
+        } else {
+          console.error('[PickupRequest] Invalid coordinates for selected location:', { lat, lng, selectedLocation });
+          // Don't update position if coordinates are invalid
+        }
+      } else {
+        console.warn('[PickupRequest] Selected location not found in savedLocations array');
       }
-    } else {
-      setPosition([formData.location.lat, formData.location.lng]);
     }
-  }, [formData.location, formData.savedLocationId, savedLocations]);
+    // IMPORTANT: Don't include formData.location in dependencies - we're updating it here!
+    // Only watch for changes to savedLocationId and savedLocations
+  }, [formData.savedLocationId, savedLocations]);
 
   // Fetch user stats to check available bags
   useEffect(() => {
@@ -487,6 +508,26 @@ const PickupRequest = () => {
         throw new Error(`You don't have enough bags available. You have ${availableBags} bag(s) available (${userStats.totalBags} total, ${requestedBags} already requested), but you're trying to request ${values.numberOfBags}.`);
       }
       
+      // Validate coordinates before creating pickup
+      const lat = values.location?.lat;
+      const lng = values.location?.lng;
+      
+      console.log('[PickupRequest] 📍 Form submission - checking coordinates:', {
+        lat,
+        lng,
+        savedLocationId: values.savedLocationId,
+        fullLocation: values.location,
+        formData: formData.location
+      });
+      
+      if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+        console.error('[PickupRequest] ❌ Invalid coordinates at submission:', { lat, lng, values });
+        throw new Error('Invalid location coordinates. Please select a valid location or use the map to set your location.');
+      }
+      
+      console.log('[PickupRequest] ✅ Using coordinates for pickup:', { lat, lng });
+      console.log('[PickupRequest] 📝 Will save as POINT:', `POINT(${lng} ${lat})`);
+      
       // Format the pickup data - generate UUID for id
       const pickupData = {
         id: crypto.randomUUID(),
@@ -495,8 +536,8 @@ const PickupRequest = () => {
         bag_count: Number(values.numberOfBags),
         waste_type: values.wasteType,
         special_instructions: values.notes,
-        location: `POINT(${values.location.lng} ${values.location.lat})`,
-        coordinates: `POINT(${values.location.lng} ${values.location.lat})`,
+        location: `POINT(${lng} ${lat})`,
+        coordinates: `POINT(${lng} ${lat})`,
         fee: 0, // Default fee - can be updated later
       };
 
@@ -685,6 +726,46 @@ const PickupRequest = () => {
                       id="savedLocationId"
                       name="savedLocationId"
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        setFieldValue('savedLocationId', selectedId);
+                        
+                        // Find the selected location to get its coordinates
+                        const selectedLocation = savedLocations.find(loc => loc.id === selectedId);
+                        
+                        if (selectedLocation && selectedLocation.latitude && selectedLocation.longitude) {
+                          console.log('[PickupRequest] Dropdown selected location:', selectedLocation);
+                          
+                          // CRITICAL: Update Formik's location values (these are used in form submission)
+                          setFieldValue('location', {
+                            lat: selectedLocation.latitude,
+                            lng: selectedLocation.longitude
+                          });
+                          
+                          // Update formData state to trigger map position update
+                          setFormData(prev => ({
+                            ...prev,
+                            savedLocationId: selectedId,
+                            location: {
+                              lat: selectedLocation.latitude,
+                              lng: selectedLocation.longitude
+                            }
+                          }));
+                          
+                          console.log('[PickupRequest] ✅ Updated form location to:', {
+                            lat: selectedLocation.latitude,
+                            lng: selectedLocation.longitude
+                          });
+                        } else {
+                          console.error('[PickupRequest] ❌ Selected location has no coordinates:', selectedLocation);
+                          
+                          // Update formData state anyway (will trigger map update useEffect)
+                          setFormData(prev => ({
+                            ...prev,
+                            savedLocationId: selectedId
+                          }));
+                        }
+                      }}
                     >
                       <option value="" className="text-gray-900 dark:text-white font-medium">-- Select a saved location --</option>
                       {savedLocations.map(location => (

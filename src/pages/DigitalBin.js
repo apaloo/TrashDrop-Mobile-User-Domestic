@@ -469,12 +469,26 @@ function DigitalBin() {
           // Check if it exists in locations table
           const { data: legacyLocation, error: legacyLookupError } = await supabase
             .from('locations')
-            .select('id, name, location_name, address, latitude, longitude')
+            .select('id, name, location_name, address, latitude, longitude, coordinates')
             .eq('id', formData.location_id)
             .single();
 
           if (!legacyLookupError && legacyLocation) {
             console.log('[DigitalBin] Location found in locations table, migrating to bin_locations:', legacyLocation);
+            
+            // Extract coordinates from PostGIS POINT format if separate lat/lng not available
+            let latitude = legacyLocation.latitude;
+            let longitude = legacyLocation.longitude;
+            
+            if ((!latitude || !longitude) && legacyLocation.coordinates) {
+              // Parse PostGIS POINT format: "POINT(lng lat)"
+              const match = legacyLocation.coordinates.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+              if (match) {
+                longitude = parseFloat(match[1]);
+                latitude = parseFloat(match[2]);
+                console.log('[DigitalBin] Parsed coordinates from PostGIS:', { latitude, longitude });
+              }
+            }
             
             // Migrate location from locations to bin_locations table
             try {
@@ -482,7 +496,7 @@ function DigitalBin() {
                 user_id: user.id,
                 location_name: legacyLocation.location_name || legacyLocation.name || 'Migrated Location',
                 address: legacyLocation.address || '',
-                coordinates: `POINT(${legacyLocation.longitude || 0} ${legacyLocation.latitude || 0})`,
+                coordinates: `POINT(${longitude || 0} ${latitude || 0})`,
                 is_default: false
               };
               
