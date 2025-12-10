@@ -18,13 +18,14 @@ const Activity = () => {
     user_activity: null,
     illegal_dumping_mobile: null,
     pickup_requests: null,
-    digital_bins: null
+    digital_bins: null,
+    batches: null
   });
   const itemsPerPage = 20; // Increased for better infinite scroll experience
   const mountedRef = useRef(true);
   const observerRef = useRef(null);
   const loadingRef = useRef(null);
-  const cursorsRef = useRef({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null });
+  const cursorsRef = useRef({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null, batches: null });
 
   // Enhanced session refresh function with validation
   const refreshAndValidateSession = async () => {
@@ -68,8 +69,8 @@ const Activity = () => {
     if (!isLoadMore) {
       setIsLoading(true);
       setActivities([]);
-      setCursors({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null });
-      cursorsRef.current = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null };
+      setCursors({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null, batches: null });
+      cursorsRef.current = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null, batches: null };
       setHasMoreData(true);
     } else {
       setIsLoadingMore(true);
@@ -310,6 +311,33 @@ const Activity = () => {
         allPickupActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         newActivities = allPickupActivities.slice(0, itemsPerPage);
         
+      } else if (filter === 'qr_scan') {
+        // Fetch scan-related activity from batches table for current user
+        let query = supabase
+          .from('batches')
+          .select('*')
+          .eq('created_by', user.id)
+          .order('created_at', { ascending: false })
+          .limit(itemsPerPage);
+
+        if (cursorsRef.current.batches) {
+          query = query.lt('created_at', cursorsRef.current.batches);
+        }
+
+        const { data: batchData, error: batchError } = await fetchWithTimeout(async () => query);
+
+        if (batchError) {
+          console.error('Error fetching batch scan activities:', batchError);
+          throw batchError;
+        }
+
+        newActivities = (batchData || []).map(item => ({ ...item, _source: 'batches' }));
+        hasMore = newActivities.length === itemsPerPage;
+
+        if (newActivities.length > 0) {
+          newCursors.batches = newActivities[newActivities.length - 1].created_at;
+        }
+
       } else {
         // Single table query for specific activity types
         let query = supabase
@@ -384,6 +412,22 @@ const Activity = () => {
             address: locationName,
             created_at: activity.created_at
           };
+        } else if (activity._source === 'batches') {
+          const batchNumber = activity.batch_number || activity.code || activity.id;
+          const bagCount = Number(activity.bag_count || activity.total_bags || 0);
+
+          formattedActivity = {
+            id: activity.id,
+            type: 'qr_scan',
+            status: activity.status || 'activated',
+            date: new Date(activity.created_at).toLocaleDateString(),
+            points: 0,
+            related_id: activity.id,
+            description: `Activated batch ${batchNumber}${bagCount ? ` - ${bagCount} bag(s)` : ''}`,
+            address: activity.distribution_center || activity.location || 'Batch activation',
+            created_at: activity.created_at
+          };
+
         } else {
           formattedActivity = {
             id: activity.id,
