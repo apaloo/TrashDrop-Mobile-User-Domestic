@@ -728,13 +728,39 @@ export const AuthProvider = ({ children }) => {
       if (error) {
         console.error('[Auth] Sign-in error:', error);
         
+        // Provide user-friendly error messages for common authentication errors
+        let userMessage = error.message || 'Failed to sign in';
+        
+        switch (error.message) {
+          case 'Email not confirmed':
+            userMessage = 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
+            break;
+          case 'Invalid login credentials':
+            userMessage = 'Invalid email or password. Please check your credentials and try again.';
+            break;
+          case 'User not found':
+            userMessage = 'No account found with this email address.';
+            break;
+          case 'Email rate limit exceeded':
+            userMessage = 'Too many login attempts. Please wait a few minutes and try again.';
+            break;
+          default:
+            // For other errors, try to extract a cleaner message
+            if (error.message.includes('email_not_confirmed')) {
+              userMessage = 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
+            } else if (error.message.includes('invalid')) {
+              userMessage = 'Invalid email or password. Please check your credentials and try again.';
+            }
+        }
+        
         // Set error state directly
         setAuthState({
           status: AUTH_STATES.ERROR,
           user: null,
           error: {
-            message: error.message || 'Failed to sign in',
-            code: error.code || 'SIGN_IN_ERROR'
+            message: userMessage,
+            code: error.code || 'SIGN_IN_ERROR',
+            originalMessage: error.message
           },
           lastAction: 'sign_in_error'
         });
@@ -742,8 +768,9 @@ export const AuthProvider = ({ children }) => {
         return { 
           success: false, 
           error: { 
-            message: error.message || 'Failed to sign in', 
-            code: error.code || 'SIGN_IN_ERROR' 
+            message: userMessage, 
+            code: error.code || 'SIGN_IN_ERROR',
+            originalMessage: error.message
           } 
         };
       }
@@ -898,6 +925,41 @@ export const AuthProvider = ({ children }) => {
       
     } catch (error) {
       console.error('[Auth] Unexpected error during password reset:', error);
+      return { 
+        success: false, 
+        error: error.message || 'An unexpected error occurred' 
+      };
+    }
+  }, []);
+
+  const resendConfirmationEmail = useCallback(async (email) => {
+    console.log('[Auth] Resending confirmation email to:', email);
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: window.location.origin + '/dashboard'
+        }
+      });
+      
+      if (error) {
+        console.error('[Auth] Resend confirmation error:', error);
+        return { 
+          success: false, 
+          error: error.message || 'Failed to resend confirmation email' 
+        };
+      }
+      
+      console.log('[Auth] Confirmation email resent successfully');
+      return { 
+        success: true, 
+        message: 'Verification email sent! Please check your inbox.' 
+      };
+      
+    } catch (error) {
+      console.error('[Auth] Unexpected error during resend confirmation:', error);
       return { 
         success: false, 
         error: error.message || 'An unexpected error occurred' 
@@ -1235,6 +1297,7 @@ export const AuthProvider = ({ children }) => {
     signUp,
     signOut,
     resetPassword,
+    resendConfirmationEmail,
     checkSession,
     resetAuthState,
     clearAuthData,

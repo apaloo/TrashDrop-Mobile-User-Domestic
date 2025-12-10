@@ -8,7 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner.js';
  */
 const Login = () => {
   const navigate = useNavigate();
-  const { signIn, isLoading } = useAuth();
+  const { signIn, isLoading, resendConfirmationEmail } = useAuth();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -16,6 +16,8 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResendButton, setShowResendButton] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,6 +29,8 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setShowResendButton(false);
+    setResendMessage('');
     setIsSubmitting(true);
     
     try {
@@ -51,10 +55,38 @@ const Login = () => {
       } else {
         console.error('[Login] Sign in failed:', result?.error);
         setError(result?.error?.message || 'Failed to sign in');
+        
+        // Show resend button if email is not confirmed
+        const errorMessage = result?.error?.originalMessage || result?.error?.message || '';
+        if (errorMessage.includes('email_not_confirmed') || errorMessage.includes('Email not confirmed')) {
+          setShowResendButton(true);
+        }
       }
     } catch (err) {
       console.error('[Login] Unexpected error during sign in:', err);
       setError('An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setResendMessage('');
+    setIsSubmitting(true);
+    
+    try {
+      const result = await resendConfirmationEmail(formData.email);
+      
+      if (result?.success) {
+        setResendMessage(result.message || 'Verification email sent! Please check your inbox.');
+        setError('');
+        setShowResendButton(false);
+      } else {
+        setResendMessage(result?.error || 'Failed to resend verification email');
+      }
+    } catch (err) {
+      console.error('[Login] Error resending confirmation:', err);
+      setResendMessage('An error occurred while resending the verification email');
     } finally {
       setIsSubmitting(false);
     }
@@ -74,6 +106,28 @@ const Login = () => {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+
+        {showResendButton && (
+          <div className="bg-blue-50 border border-blue-400 px-4 py-3 rounded">
+            <p className="text-sm text-blue-700 mb-2">
+              Haven't received the verification email?
+            </p>
+            <button
+              type="button"
+              onClick={handleResendConfirmation}
+              disabled={isSubmitting}
+              className="text-sm font-medium text-primary hover:text-primary-dark underline disabled:opacity-50"
+            >
+              Resend Verification Email
+            </button>
+          </div>
+        )}
+
+        {resendMessage && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+            <span className="block sm:inline">{resendMessage}</span>
           </div>
         )}
 
