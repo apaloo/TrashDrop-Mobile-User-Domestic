@@ -180,6 +180,7 @@ const PersonalInfo = () => {
       
       // Prepare data for database update
       const updateData = {
+        email: formData.email,
         first_name: formData.firstName,
         last_name: formData.lastName,
         phone: formData.phone,
