@@ -349,22 +349,23 @@ export const userService = {
 
       console.log('[UserService] Updating user profile for:', userId);
 
+      // Use upsert to create profile if it doesn't exist or update if it does
       const { data, error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: userId,
           ...profileData,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId)
         .select()
         .single();
 
       if (error) {
-        console.error('[UserService] Error updating profile:', error);
+        console.error('[UserService] Error upserting profile:', error);
         throw error;
       }
 
-      console.log('[UserService] Successfully updated user profile');
+      console.log('[UserService] Successfully upserted user profile');
       return { data, error: null };
 
     } catch (error) {

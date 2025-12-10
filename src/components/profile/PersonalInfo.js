@@ -83,7 +83,10 @@ const PersonalInfo = () => {
           localStorage.setItem(`profile_${user.id}`, JSON.stringify(loadedData));
           console.log('[PersonalInfo] Profile loaded successfully');
         } else {
-          // No profile found, try localStorage as fallback
+          // No profile found - this is a new user
+          console.log('[PersonalInfo] No profile found, will create on first save');
+          
+          // Try localStorage as fallback
           const storedProfile = localStorage.getItem(`profile_${user.id}`);
           if (storedProfile) {
             try {
@@ -91,9 +94,24 @@ const PersonalInfo = () => {
               const fallbackData = { ...userData, ...parsedProfile, email: user.email };
               setUserData(fallbackData);
               setFormData(fallbackData);
+              console.log('[PersonalInfo] Loaded from localStorage');
             } catch (err) {
               console.error('[PersonalInfo] Error parsing cached profile:', err);
             }
+          } else {
+            // Set default data for new user
+            const defaultData = {
+              firstName: '',
+              lastName: '',
+              email: user.email || '',
+              phone: '',
+              address: '',
+              profileImage: null,
+              memberSince: 'Recently'
+            };
+            setUserData(defaultData);
+            setFormData(defaultData);
+            console.log('[PersonalInfo] Initialized with default data');
           }
         }
       } catch (error) {
