@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Authentication</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f7f7f7;
+      color: #333;
+    }
+    .container {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      margin-top: 0;
+      color: #2563eb;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin-top: 1rem;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    pre {
+      background-color: #f1f1f1;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow: auto;
+      margin-top: 1rem;
+    }
+    .success {
+      color: #16a34a;
+      font-weight: bold;
+    }
+    .error {
+      color: #dc2626;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TrashDrop Auth Reset Tool</h1>
+    <p>This tool will completely reset your authentication state and redirect you to the login page.</p>
+    
+    <button id="resetButton">Reset Authentication</button>
+    <button id="checkButton">Check Current State</button>
+    
+    <pre id="output">Click a button to begin...</pre>
+  </div>
+
+  <script>
+    document.getElementById('resetButton').addEventListener('click', function() {
+      const output = document.getElementById('output');
+      output.innerHTML = 'Resetting authentication state...\n';
+      
+      try {
+        // Clear all localStorage items related to auth
+        localStorage.removeItem('dev_mode_session');
+        localStorage.removeItem('user_logged_out');
+        
+        // Find and remove any Supabase tokens
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase.auth.token') || key.includes('sb-')) {
+            output.innerHTML += `Removing: ${key}\n`;
+            localStorage.removeItem(key);
+          }
+        });
+        
+        output.innerHTML += '\n<span class="success">Authentication state reset complete!</span>\n';
+        output.innerHTML += 'Redirecting to login page in 3 seconds...';
+        
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
+      } catch (error) {
+        output.innerHTML += `\n<span class="error">Error: ${error.message}</span>`;
+      }
+    });
+
+    document.getElementById('checkButton').addEventListener('click', function() {
+      const output = document.getElementById('output');
+      output.innerHTML = 'Current localStorage state:\n\n';
+      
+      try {
+        // Check if dev mode session exists
+        const devModeSession = localStorage.getItem('dev_mode_session');
+        output.innerHTML += `dev_mode_session: ${devModeSession ? 'EXISTS' : 'not found'}\n`;
+        
+        // Check if logged out flag exists
+        const loggedOut = localStorage.getItem('user_logged_out');
+        output.innerHTML += `user_logged_out: ${loggedOut ? loggedOut : 'not found'}\n`;
+        
+        // Check for any Supabase tokens
+        let foundSupabaseTokens = false;
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('sb-')) {
+            foundSupabaseTokens = true;
+            output.innerHTML += `${key}: EXISTS\n`;
+          }
+        });
+        
+        if (!foundSupabaseTokens) {
+          output.innerHTML += 'No Supabase tokens found\n';
+        }
+      } catch (error) {
+        output.innerHTML += `\n<span class="error">Error: ${error.message}</span>`;
+      }
+    });
+  </script>
+</body>
+</html>

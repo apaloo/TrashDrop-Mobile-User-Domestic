@@ -1,0 +1,41 @@
+[build]
+  publish = "build"
+  command = "CI=false npm run build"
+
+# Redirect rule to support client-side routing for the SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Cache control for static assets
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment settings for production
+[context.production.environment]
+  REACT_APP_API_URL = "https://api.trashdrops.com"
+  # Note: Sensitive environment variables should be set in the Netlify dashboard
+
+# Enable PWA features and offline capabilities
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
+
+# Local development configuration
+[dev]
+  # Netlify Dev UI port
+  port = 8889
+  # Proxy to an already running CRA dev server
+  targetPort = 3010
+  # Directory for Netlify Functions
+  functions = "netlify/functions"
+  # Disable framework auto-detection to avoid auto-starting CRA
+  framework = "#custom"
+  # Do not auto open browser
+  autoLaunch = false
+  # No-op command; CRA is already running on targetPort
+  command = "npm run dev:noop"
