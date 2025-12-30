@@ -1,5 +1,4 @@
 [build]
-  base = "trashdrop"
   publish = "build"
   command = "CI=false npm run build"
 
