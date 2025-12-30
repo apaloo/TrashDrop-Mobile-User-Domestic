@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta
+      name="description"
+      content="TrashDrop - Report illegal dumping and schedule trash pickups"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" type="application/manifest+json" />
+    <!-- CRITICAL: Force white background before anything loads -->
+    <script>
+      // Remove any theme attributes/classes immediately
+      document.documentElement.removeAttribute('data-theme');
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove('app-loaded');
+      // Force white background on documentElement (body doesn't exist yet)
+      document.documentElement.style.backgroundColor = '#ffffff';
+      // Set body background when it's available
+      if (document.body) {
+        document.body.style.backgroundColor = '#ffffff';
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          if (document.body) {
+            document.body.style.backgroundColor = '#ffffff';
+          }
+        });
+      }
+      console.log('[PWA] Forced white background and removed dark classes before app load');
+      
+      // Initialize PWA error tracking
+      window.pwaErrors = [];
+      window.addEventListener('error', function(event) {
+        try {
+          window.pwaErrors.push({
+            message: event.message,
+            source: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            timestamp: new Date().toISOString()
+          });
+          console.error('[PWA Error]', event.message, event.filename, event.lineno);
+        } catch (e) {}
+      });
+      
+      // Detect PWA mode
+      window.isPwaMode = window.matchMedia('(display-mode: standalone)').matches || 
+                         window.navigator.standalone === true;
+      console.log('[PWA] Running in PWA mode:', window.isPwaMode ? 'YES' : 'NO');
+      
+      // Store PWA mode in localStorage for later use
+      try {
+        localStorage.setItem('trashdrop_pwa_mode', window.isPwaMode ? 'true' : 'false');
+      } catch (e) {}
+    </script>
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <title>TrashDrop</title>
+    <style>
+      /* Fix for map floating over bottom navigation */
+      .leaflet-map-pane,
+      .leaflet-tile,
+      .leaflet-marker-icon,
+      .leaflet-marker-shadow,
+      .leaflet-tile-pane,
+      .leaflet-overlay-pane,
+      .leaflet-shadow-pane,
+      .leaflet-marker-pane,
+      .leaflet-popup-pane,
+      .leaflet-overlay-pane svg,
+      .leaflet-zoom-box,
+      .leaflet-image-layer,
+      .leaflet-layer {
+        z-index: 1 !important;
+      }
+      
+      .leaflet-container .leaflet-control-attribution {
+        z-index: 5 !important;
+      }
+      
+      /* PWA-specific styles */
+      @media (display-mode: standalone) {
+        body {
+          overscroll-behavior-y: none; /* Prevent pull-to-refresh */
+        }
+        
+        /* Add safe area insets for notches and home indicators */
+        #root {
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+      }
+    </style>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #ffffff !important; min-height: 100vh;">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root" style="min-height: 100vh; background-color: #ffffff;">
+      <!-- Fallback content shown before React loads -->
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #ffffff; flex-direction: column; padding: 20px;">
+        <img src="/logo.svg" alt="TrashDrop" style="width: 80px; height: 80px; margin-bottom: 20px;" />
+        <h1 style="color: #111827; font-size: 24px; margin-bottom: 10px;">TrashDrop Loading...</h1>
+        <p style="color: #6b7280; font-size: 16px;">Initializing app</p>
+      </div>
+    </div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+    <!-- Force correct MIME type for module scripts -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0"
+      }
+    }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,559 @@
+/**
+ * Service for managing illegal dumping reports and history
+ */
+
+import supabase from '../utils/supabaseClient.js';
+import { toastService } from '../services/toastService.js';
+import { retrySupabaseOperation } from '../utils/retryUtils.js';
+import syncService from './syncService.js';
+import { uploadPhotos } from './photoUploadService.js';
+
+/**
+ * Get address from coordinates using reverse geocoding
+ * @param {number} latitude - Latitude
+ * @param {number} longitude - Longitude
+ * @returns {Promise<string>} Address string
+ */
+const reverseGeocode = async (latitude, longitude) => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'TrashDropMobileApp/1.0'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.warn('[DumpingService] Reverse geocoding failed:', response.statusText);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    // Build address from components
+    const address = data.address || {};
+    const parts = [
+      address.road || address.street,
+      address.suburb || address.neighbourhood,
+      address.city || address.town || address.village,
+      address.state || address.region,
+      address.country
+    ].filter(Boolean);
+    
+    const formattedAddress = parts.length > 0 ? parts.join(', ') : data.display_name;
+    console.log('[DumpingService] Reverse geocoded address:', formattedAddress);
+    
+    return formattedAddress;
+  } catch (error) {
+    console.warn('[DumpingService] Error in reverse geocoding:', error);
+    return null;
+  }
+};
+
+/**
+ * Maps the estimated_volume value from the form to the required size value for the database
+ * @param {string} estimatedVolume - Value from the form's estimated_volume field
+ * @returns {string} Size value for database (small, medium, or large)
+ */
+const mapEstimatedVolumeToSize = (estimatedVolume) => {
+  // Default to 'medium' if no valid value provided
+  if (!estimatedVolume) return 'medium';
+  
+  // Map the form values to database size categories
+  const estimatedVolumeLower = estimatedVolume.toLowerCase();
+  
+  if (estimatedVolumeLower.includes('small') || estimatedVolumeLower.includes('few bags')) {
+    return 'small';
+  } else if (estimatedVolumeLower.includes('large') || estimatedVolumeLower.includes('truck')) {
+    return 'large';
+  } else {
+    // For everything else (medium size, unknown, etc.), use 'medium'
+    return 'medium';
+  }
+};
+
+export const dumpingService = {
+  /**
+   * Create a new illegal dumping report
+   * @param {string} userId - User ID reporting the dumping
+   * @param {Object} reportData - Report details
+   * @returns {Object} Created report
+   */
+  async createReport(userId, reportData) {
+    const validatePhotoUrls = (urls) => {
+      if (!Array.isArray(urls)) return false;
+      return urls.every(url => {
+        try {
+          new URL(url);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    };
+
+    const validateEnumValue = (value, allowedValues) => {
+      return allowedValues.includes(value);
+    };
+
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      
+      console.log('[DumpingService] Creating dumping report for user:', userId);
+
+      // Validate required coordinates - handle both direct lat/lng and GeoJSON Point format
+      let latitude, longitude;
+      if (reportData.coordinates) {
+        if (reportData.coordinates.type === 'Point' && Array.isArray(reportData.coordinates.coordinates)) {
+          // GeoJSON Point format: {type: 'Point', coordinates: [longitude, latitude]}
+          [longitude, latitude] = reportData.coordinates.coordinates;
+          console.log('[DumpingService] Found GeoJSON Point coordinates:', { longitude, latitude });
+        } else if (typeof reportData.coordinates.latitude === 'number' && typeof reportData.coordinates.longitude === 'number') {
+          // Direct lat/lng object: {latitude: number, longitude: number}
+          latitude = reportData.coordinates.latitude;
+          longitude = reportData.coordinates.longitude;
+          console.log('[DumpingService] Found direct lat/lng coordinates:', { latitude, longitude });
+        }
+      }
+
+      if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+        console.error('[DumpingService] Missing or invalid coordinates:', reportData.coordinates);
+        throw new Error('Coordinates (latitude and longitude) are required');
+      }
+      
+      // Log the coordinates for debugging
+      console.log('[DumpingService] Using coordinates:', { latitude, longitude });
+
+      // Validate severity
+      if (reportData.severity && !validateEnumValue(reportData.severity, ['low', 'medium', 'high'])) {
+        throw new Error('Invalid severity value. Must be one of: low, medium, high');
+      }
+
+      // Validate size
+      if (reportData.size && !validateEnumValue(reportData.size, ['small', 'medium', 'large'])) {
+        throw new Error('Invalid size value. Must be one of: small, medium, large');
+      }
+
+      // Validate photos if provided (allow blob URLs - they'll be uploaded to storage)
+      if (reportData.photos) {
+        const hasInvalidPhotos = reportData.photos.some(url => {
+          if (!url || typeof url !== 'string') return true;
+          // Allow blob URLs (for camera captures) and regular URLs
+          return !url.startsWith('blob:') && !validatePhotoUrls([url]);
+        });
+        if (hasInvalidPhotos) {
+          throw new Error('Invalid photo URL format');
+        }
+      }
+
+      // Convert coordinates to PostGIS/GeoJSON Point format
+      // This is the format required by the database schema
+      const geoJsonPoint = {
+        type: 'Point',
+        coordinates: [longitude, latitude]
+      };
+
+      console.log('[DumpingService] Formatted GeoJSON Point:', geoJsonPoint);
+      
+      // Get address from coordinates if not provided
+      let location = reportData.location;
+      if (!location || location === 'Unknown location' || location.trim() === '') {
+        console.log('[DumpingService] No location provided, attempting reverse geocoding...');
+        const geocodedAddress = await reverseGeocode(latitude, longitude);
+        location = geocodedAddress || 'Unknown location';
+      }
+      console.log('[DumpingService] Using location:', location);
+      
+      // Upload photos to Supabase Storage if blob URLs are provided
+      let photoUrls = reportData.photos || [];
+      if (photoUrls.length > 0 && photoUrls[0].startsWith('blob:')) {
+        console.log('[DumpingService] Uploading blob photos to storage...');
+        const uploadResult = await uploadPhotos(photoUrls, userId);
+        
+        if (uploadResult.success && uploadResult.publicUrls.length > 0) {
+          photoUrls = uploadResult.publicUrls;
+          console.log(`[DumpingService] Successfully uploaded ${photoUrls.length} photos`);
+        } else {
+          console.warn('[DumpingService] Photo upload failed:', uploadResult.error);
+          // Continue with empty photos array rather than failing the whole report
+          photoUrls = [];
+        }
+      }
+      
+      // Include all required fields for illegal_dumping_mobile table based on confirmed schema
+      const report = {
+        reported_by: userId,
+        location: location,
+        coordinates: geoJsonPoint, // PostGIS column expects GeoJSON format
+        latitude: latitude, // Separate latitude field
+        longitude: longitude, // Separate longitude field
+        waste_type: reportData.waste_type || 'mixed',
+        severity: reportData.severity || 'medium',
+        size: mapEstimatedVolumeToSize(reportData.estimated_volume),
+        photos: photoUrls,
+        status: 'pending'
+        // Note: created_at and updated_at are auto-generated by DB
+      };
+      
+      console.log('[DumpingService] Mapped size value:', report.size);
+
+      // Removed localStorage activity caching - using direct database operations only
+
+      let report_data, reportError;
+      try {
+        [report_data, reportError] = await retrySupabaseOperation(
+          async () => {
+            const { data, error } = await supabase
+              .from('illegal_dumping_mobile')
+              .insert([report])
+              .select('*');
+            return [data, error];
+          },
+          {
+            operationName: 'Create dumping report',
+            maxAttempts: 3,
+            onRetry: (attempt, error, delay) => {
+              console.log(`[DumpingService] Retry attempt ${attempt} for report creation in ${delay}ms`);
+            }
+          }
+        );
+      } catch (retryError) {
+        // Convert retry operation error to reportError for local fallback handling
+        reportError = retryError;
+        report_data = null;
+      }
+
+      if (reportError) {
+        console.error('[DumpingService] Error creating dumping report:', reportError);
+        console.error('[DumpingService] Report data being inserted:', report);
+        console.error('[DumpingService] Error details:', {
+          message: reportError.message,
+          code: reportError.code,
+          details: reportError.details,
+          hint: reportError.hint
+        });
+
+        // Detect FK violation or RLS policy violation and fall back to local-first storage
+        const msg = `${reportError.message || ''} ${reportError.details || ''}`;
+        const isFKViolation = msg.includes('23503') || msg.includes('reported_by_fkey') || msg.includes('not present in table "users"');
+        const isRLSViolation = reportError.code === '42501' || msg.includes('row-level security policy') || msg.includes('42501') || 
+                              (reportError.message && reportError.message.includes('42501')) ||
+                              (reportError.status === 401 && msg.includes('row-level security'));
+        
+        if (isFKViolation || isRLSViolation) {
+          const violationType = isRLSViolation ? 'RLS policy violation' : 'Foreign key violation';
+          console.error(`[DumpingService] ${violationType} on reported_by. Cannot submit report.`);
+          throw new Error('Failed to submit report due to user validation issues. Please try logging out and back in.');
+        }
+
+        // Provide more specific error messages for other issues
+        if (reportError.message && reportError.message.includes('column')) {
+          throw new Error(`Database schema error: ${reportError.message}`);
+        }
+        throw new Error(reportError.message || 'Failed to create report in database');
+      }
+
+      // Try to create the additional report details in the dumping_reports_mobile table with retry
+      try {
+        const reportDetails = {
+          dumping_id: report_data[0].id,
+          estimated_volume: reportData.estimated_volume || 'unknown',
+          hazardous_materials: reportData.hazardous_materials || false,
+          accessibility_notes: reportData.description || reportData.accessibility_notes || 'No additional details provided'
+          // Note: created_at is auto-generated by DB
+        };
+
+        console.log('[DumpingService] Creating dumping report details:', reportDetails);
+
+        await retrySupabaseOperation(
+          async () => {
+            const result = await supabase
+              .from('dumping_reports_mobile')
+              .insert(reportDetails);
+            
+            if (result.error) {
+              throw result.error;
+            }
+            
+            return result;
+          },
+          {
+            operationName: 'Create report details',
+            maxAttempts: 2, // Fewer attempts for secondary operation
+            onRetry: (attempt, error, delay) => {
+              console.log(`[DumpingService] Retry attempt ${attempt} for report details in ${delay}ms`);
+            }
+          }
+        );
+
+        console.log('[DumpingService] Successfully created report details');
+      } catch (detailsErr) {
+        console.warn('[DumpingService] Report details creation failed, continuing without it:', detailsErr);
+      }
+
+      console.log('[DumpingService] Successfully created dumping report:', report_data[0].id);
+      
+      // Activity will be shown directly from illegal_dumping_mobile table
+      return { data: report_data[0], error: null };
+
+    } catch (error) {
+      console.error('[DumpingService] Error in createReport:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to create dumping report',
+          code: error.code || 'CREATE_REPORT_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
+   * Get report details including history
+   * @param {string} reportId - Report ID
+   * @returns {Object} Report details with history
+   */
+  async getReportDetails(reportId) {
+    try {
+      if (!reportId) {
+        throw new Error('Report ID is required');
+      }
+
+      console.log('[DumpingService] Fetching report details:', reportId);
+
+      const { data: report, error: reportError } = await supabase
+        .from('illegal_dumping_mobile')
+        .select(`
+          *,
+          dumping_reports (*),
+          illegal_dumping_history (*)
+        `)
+        .eq('id', reportId)
+        .single();
+
+      if (reportError) {
+        console.error('[DumpingService] Error fetching report details:', reportError);
+        throw reportError;
+      }
+
+      return { data: report, error: null };
+
+    } catch (error) {
+      console.error('[DumpingService] Error in getReportDetails:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to fetch report details',
+          code: error.code || 'GET_REPORT_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
+   * Update report status
+   * @param {string} reportId - Report ID
+   * @param {string} status - New status
+   * @param {string} userId - User ID making the update
+   * @param {string} notes - Optional notes about the update
+   * @returns {Object} Updated report
+   */
+  async updateReportStatus(reportId, status, userId, notes = '') {
+    // Validate status
+    const validStatuses = ['pending', 'verified', 'in_progress', 'completed'];
+    if (!validStatuses.includes(status)) {
+      return {
+        data: null,
+        error: {
+          message: `Invalid status value. Must be one of: ${validStatuses.join(', ')}`,
+          code: 'INVALID_STATUS'
+        }
+      };
+    }
+
+    try {
+      if (!reportId || !status || !userId) {
+        throw new Error('Report ID, status, and user ID are required');
+      }
+
+      console.log('[DumpingService] Updating report status:', reportId, status);
+
+      // Update the main report
+      const { data: report, error: reportError } = await supabase
+        .from('illegal_dumping_mobile')
+        .update({
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', reportId)
+        .select()
+        .single();
+
+      if (reportError) {
+        console.error('[DumpingService] Error updating report status:', reportError);
+        throw reportError;
+      }
+
+      // Add history entry
+      const historyEntry = {
+        dumping_id: reportId,
+        status,
+        notes: notes || `Status updated to ${status}`,
+        updated_by: userId,
+        created_at: new Date().toISOString()
+      };
+
+      const { error: historyError } = await supabase
+        .from('illegal_dumping_history_mobile')
+        .insert(historyEntry);
+
+      if (historyError) {
+        console.error('[DumpingService] Error creating history entry:', historyError);
+        throw historyError;
+      }
+
+      console.log('[DumpingService] Successfully updated report status');
+      return { data: report, error: null };
+
+    } catch (error) {
+      console.error('[DumpingService] Error in updateReportStatus:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to update report status',
+          code: error.code || 'UPDATE_STATUS_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
+   * Get nearby dumping reports
+   * @param {Object} location - Location to search around {latitude, longitude}
+   * @param {number} radiusKm - Search radius in kilometers
+   * @returns {Array} Array of nearby reports
+   */
+  async getNearbyReports(location, radiusKm = 5) {
+    try {
+      if (!location?.latitude || !location?.longitude) {
+        throw new Error('Valid location is required');
+      }
+
+      console.log('[DumpingService] Finding reports near:', location);
+
+      // Use PostGIS to find nearby reports with retry logic
+      const { data, error } = await retrySupabaseOperation(
+        async () => {
+          const result = await supabase.rpc('find_nearby_dumping', {
+            p_latitude: location.latitude,
+            p_longitude: location.longitude,
+            p_radius_km: radiusKm
+          });
+          
+          if (result.error) {
+            throw result.error;
+          }
+          
+          return result;
+        },
+        {
+          operationName: 'Find nearby reports',
+          maxAttempts: 2
+        }
+      );
+
+      if (error) {
+        console.error('[DumpingService] Error finding nearby reports:', error);
+        throw error;
+      }
+
+      return { data: data || [], error: null };
+
+    } catch (error) {
+      console.error('[DumpingService] Error in getNearbyReports:', error);
+      return {
+        data: [],
+        error: {
+          message: error.message || 'Failed to find nearby reports',
+          code: error.code || 'NEARBY_REPORTS_ERROR'
+        }
+      };
+    }
+  },
+
+  /**
+   * Add photos to an existing report
+   * @param {string} reportId - Report ID
+   * @param {string[]} photoUrls - Array of photo URLs
+   * @param {string} userId - User ID adding the photos
+   * @returns {Object} Updated report
+   */
+  async addPhotosToReport(reportId, photoUrls, userId) {
+    const validatePhotoUrls = (urls) => {
+      if (!Array.isArray(urls)) return false;
+      return urls.every(url => {
+        try {
+          new URL(url);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    };
+
+    try {
+      if (!reportId || !photoUrls?.length || !userId) {
+        throw new Error('Report ID, photos, and user ID are required');
+      }
+
+      console.log('[DumpingService] Adding photos to report:', reportId);
+
+      // Get current photos
+      const { data: currentReport } = await supabase
+        .from('illegal_dumping_mobile')
+        .select('photos')
+        .eq('id', reportId)
+        .single();
+
+      const updatedPhotos = [...(currentReport?.photos || []), ...photoUrls];
+
+      // Update the report with new photos
+      const { data: report, error: reportError } = await supabase
+        .from('illegal_dumping_mobile')
+        .update({
+          photos: updatedPhotos,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', reportId)
+        .select()
+        .single();
+
+      if (reportError) {
+        console.error('[DumpingService] Error updating report photos:', reportError);
+        throw reportError;
+      }
+
+      // We don't need to add history entry for photos since the photos field doesn't exist in either table
+      // based on the confirmed database schema
+
+      console.log('[DumpingService] Successfully added photos to report');
+      return { data: report, error: null };
+
+    } catch (error) {
+      console.error('[DumpingService] Error in addPhotosToReport:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to add photos to report',
+          code: error.code || 'ADD_PHOTOS_ERROR'
+        }
+      };
+    }
+  }
+};
+
+export default dumpingService;
