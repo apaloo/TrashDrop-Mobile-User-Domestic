@@ -8,7 +8,13 @@
  * Pricing Order (SOP v4.5.6):
  * Base → On-site → Discounts (max 80%) → Urgent (30% of Base) → 
  * Distance (>5-10km, Urgent only) → Surge (hidden from user) → Request fee (₵1) → Taxes
+ * 
+ * GPS-BASED PRICING (v4.5.7):
+ * When coordinates are provided, base pricing is fetched from GPS pricing zones.
+ * Falls back to DEFAULT BASE_COSTS if no zone is found within 10km.
  */
+
+import gpsPricingService from '../services/gpsPricingService.js';
 
 /**
  * Available bin sizes in liters
@@ -356,17 +362,162 @@ export const SOP_CONSTANTS = {
   DISTANCE_CAP_KM,
   DISTANCE_RATE_MULTIPLIER,
   DISCOUNT_CAP_PERCENTAGE,
-  VERSION: '4.5.6'
+  VERSION: '4.5.7'
+};
+
+/**
+ * ============================================================================
+ * GPS-BASED PRICING FUNCTIONS (v4.5.7)
+ * These async functions use location-specific pricing when coordinates are provided.
+ * They fall back to default BASE_COSTS if no GPS zone is found.
+ * ============================================================================
+ */
+
+/**
+ * Get cost breakdown with GPS-based pricing (ASYNC)
+ * 
+ * This is the GPS-enhanced version of getCostBreakdown.
+ * Uses location-specific base pricing when coordinates are provided.
+ * 
+ * @param {Object} params - Bin service parameters
+ * @param {number} params.bin_size_liters - Size of bin in liters
+ * @param {number} params.latitude - GPS latitude (optional)
+ * @param {number} params.longitude - GPS longitude (optional)
+ * @param {string} params.frequency - Service frequency
+ * @param {string} params.waste_type - Type of waste
+ * @param {boolean} params.is_urgent - Whether request is urgent
+ * @param {number} params.bag_count - Number of bins
+ * @param {number} params.distance_km - Distance for urgent charge
+ * @param {number} params.on_site_charges - Additional on-site charges
+ * @param {number} params.discount_amount - Discount amount
+ * @returns {Promise<Object>} Cost breakdown with GPS pricing info
+ */
+export const getCostBreakdownWithGPS = async ({
+  bin_size_liters,
+  latitude = null,
+  longitude = null,
+  frequency = 'weekly',
+  waste_type = 'general',
+  is_urgent = false,
+  bag_count = 1,
+  distance_km = 0,
+  on_site_charges = 0,
+  discount_amount = 0
+}) => {
+  const binCount = Math.max(1, parseInt(bag_count) || 1);
+  
+  // Get base cost - try GPS pricing first, fallback to default
+  let baseCost;
+  let pricingSource = 'default';
+  let pricingZone = null;
+
+  if (latitude !== null && longitude !== null) {
+    try {
+      const priceInfo = await gpsPricingService.getLocationPrice(latitude, longitude, bin_size_liters);
+      baseCost = priceInfo.price;
+      pricingSource = priceInfo.source;
+      pricingZone = priceInfo.zone;
+      console.log('[CostCalculator] GPS pricing used:', baseCost, 'GHS from', pricingSource);
+    } catch (error) {
+      console.warn('[CostCalculator] GPS pricing failed, using default:', error.message);
+      baseCost = BASE_COSTS[bin_size_liters] || BASE_COSTS[120];
+    }
+  } else {
+    baseCost = BASE_COSTS[bin_size_liters] || BASE_COSTS[120];
+  }
+
+  const base = baseCost * binCount;
+
+  // Core = Base + On-site - Discounts (capped at 80%)
+  const coreBeforeDiscount = base + on_site_charges;
+  const maxDiscount = coreBeforeDiscount * DISCOUNT_CAP_PERCENTAGE;
+  const appliedDiscount = Math.min(discount_amount, maxDiscount);
+  const core = Math.max(0, coreBeforeDiscount - appliedDiscount);
+
+  // Urgent surcharge (30% of base, not core)
+  const urgentCharge = is_urgent ? (base * URGENT_SURCHARGE) : 0;
+
+  // Distance charge (Urgent only, >5-10km)
+  let distanceCharge = 0;
+  if (is_urgent && distance_km > DISTANCE_THRESHOLD_KM) {
+    const billableKm = Math.max(0, Math.min(distance_km, DISTANCE_CAP_KM) - DISTANCE_THRESHOLD_KM);
+    const perKmRate = DISTANCE_RATE_MULTIPLIER * base;
+    distanceCharge = billableKm * perKmRate;
+  }
+
+  // Request fee
+  const requestFee = REQUEST_FEE;
+
+  // Subtotal
+  const subtotal = core + urgentCharge + distanceCharge;
+
+  // Total
+  const total = subtotal + requestFee;
+
+  return {
+    base: parseFloat(base.toFixed(2)),
+    base_per_bin: parseFloat(baseCost.toFixed(2)),
+    bin_count: binCount,
+    on_site_charges: parseFloat(on_site_charges.toFixed(2)),
+    discount_applied: parseFloat(appliedDiscount.toFixed(2)),
+    core: parseFloat(core.toFixed(2)),
+    urgent_charge: parseFloat(urgentCharge.toFixed(2)),
+    distance_charge: parseFloat(distanceCharge.toFixed(2)),
+    distance_km: distance_km,
+    billable_km: is_urgent ? Math.max(0, Math.min(distance_km, DISTANCE_CAP_KM) - DISTANCE_THRESHOLD_KM) : 0,
+    request_fee: requestFee,
+    subtotal: parseFloat(subtotal.toFixed(2)),
+    total: parseFloat(total.toFixed(2)),
+    
+    // GPS pricing info
+    pricing_source: pricingSource,
+    pricing_zone: pricingZone,
+    
+    // Display flags (hide if 0)
+    display: {
+      urgent_charge: urgentCharge > 0,
+      distance_charge: distanceCharge > 0,
+      on_site_charges: on_site_charges > 0,
+      discount: appliedDiscount > 0,
+      gps_pricing: pricingSource === 'gps'
+    }
+  };
+};
+
+/**
+ * Get all prices for a location (for bin size selection UI)
+ * 
+ * @param {number} latitude - GPS latitude
+ * @param {number} longitude - GPS longitude
+ * @returns {Promise<Object>} All bin prices for the location
+ */
+export const getLocationPrices = async (latitude, longitude) => {
+  return gpsPricingService.getAllPricesForLocation(latitude, longitude);
+};
+
+/**
+ * Get GPS-based base cost for a specific bin size
+ * 
+ * @param {number} binSize - Bin size in liters
+ * @param {number} latitude - GPS latitude
+ * @param {number} longitude - GPS longitude
+ * @returns {Promise<number>} Base cost in GHS
+ */
+export const getGPSBaseCost = async (binSize, latitude, longitude) => {
+  return gpsPricingService.getBaseCost(binSize, latitude, longitude);
 };
 
 // Default export with all functions
 export default {
   BIN_SIZES,
   calculateBinCost,           // Legacy (deprecated)
-  getEstimatedCost,           // New: Simple client-side estimate
+  getEstimatedCost,           // Simple client-side estimate
   getBinSizeLabel,
   getBinSizeLabelShort,
-  getCostBreakdown,
+  getCostBreakdown,           // Sync version (uses default pricing)
+  getCostBreakdownWithGPS,    // Async version (uses GPS pricing when available)
+  getLocationPrices,          // Get all bin prices for a location
+  getGPSBaseCost,             // Get GPS-based base cost
   calculateDistanceCharge,
   formatCurrency,
   getRecommendedBinSize,
