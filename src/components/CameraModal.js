@@ -315,10 +315,11 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
     }
 
     try {
-      // Ultra-small canvas size to guarantee no crashes
-      // Fixed dimensions regardless of camera to prevent variable memory usage
-      const captureWidth = 480; // Even smaller than before
-      const captureHeight = 270; // 16:9 aspect ratio
+      // Balanced capture settings: good quality without excessive memory/upload cost
+      // 800x600 @ 60% quality = ~50-80KB per image (vs 15-30KB before)
+      // This is a ~3x increase but still manageable for mobile devices
+      const captureWidth = 800;
+      const captureHeight = 600;
       
       console.log('CameraModal: Capture size', { captureWidth, captureHeight });
       
@@ -334,8 +335,8 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
       
-      // Very low quality JPEG to minimize memory use
-      const dataURL = canvas.toDataURL('image/jpeg', 0.3);
+      // 60% JPEG quality - good balance between clarity and file size
+      const dataURL = canvas.toDataURL('image/jpeg', 0.6);
       
       // Clear canvas immediately after capture to free memory
       ctx.clearRect(0, 0, canvas.width, canvas.height);
