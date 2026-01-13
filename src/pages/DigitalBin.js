@@ -789,7 +789,7 @@ function DigitalBin() {
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
       
-      const digitalBinData = prepareDigitalBinData({
+      const digitalBinData = await prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
@@ -874,7 +874,7 @@ function DigitalBin() {
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
       
-      const digitalBinData = prepareDigitalBinData({
+      const digitalBinData = await prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,

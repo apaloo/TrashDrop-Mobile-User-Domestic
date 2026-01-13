@@ -4,13 +4,14 @@
  */
 
 import { getCostBreakdown } from '../utils/costCalculator.js';
+import { calculateWelcomeDiscount } from './welcomeDiscountService.js';
 
 /**
- * Prepare digital bin data with calculated fees
+ * Prepare digital bin data with calculated fees (ASYNC for welcome discount)
  * @param {Object} params - Parameters for digital bin creation
- * @returns {Object} Complete digital bin data ready for database insert
+ * @returns {Promise<Object>} Complete digital bin data ready for database insert
  */
-export const prepareDigitalBinData = ({
+export const prepareDigitalBinData = async ({
   user_id,
   location_id,
   qr_code_url,
@@ -21,7 +22,22 @@ export const prepareDigitalBinData = ({
   is_urgent,
   expires_at
 }) => {
-  // Calculate cost breakdown using SOP v4.5.6
+  // First, get base cost to calculate welcome discount
+  const preliminaryBreakdown = getCostBreakdown({
+    bin_size_liters,
+    frequency,
+    waste_type,
+    is_urgent,
+    bag_count,
+    distance_km: 0,
+    on_site_charges: 0,
+    discount_amount: 0
+  });
+
+  // Calculate silent welcome discount (4.5% of base for first 5 requests)
+  const welcomeDiscount = await calculateWelcomeDiscount(user_id, preliminaryBreakdown.base);
+
+  // Calculate final cost breakdown with welcome discount applied silently
   const costBreakdown = getCostBreakdown({
     bin_size_liters,
     frequency,
@@ -30,7 +46,7 @@ export const prepareDigitalBinData = ({
     bag_count,
     distance_km: 0, // Will be calculated when collector accepts
     on_site_charges: 0,
-    discount_amount: 0
+    discount_amount: welcomeDiscount // Silent welcome discount
   });
 
   console.log('[DigitalBinService] Calculated cost breakdown:', costBreakdown);
