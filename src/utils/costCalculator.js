@@ -55,8 +55,12 @@ const FREQUENCY_MULTIPLIERS = {
  */
 const WASTE_TYPE_MULTIPLIERS = {
   general: 1.0,     // Standard rate
-  recycling: 0.9,   // 10% cheaper (easier to process)
-  organic: 1.1      // 10% more expensive (requires special handling)
+  organic: 1.1,     // 10% more expensive (requires special handling)
+  plastic: 0.9,     // 10% cheaper (recyclable)
+  paper: 0.9,       // 10% cheaper (recyclable)
+  glass: 0.95,      // 5% cheaper (recyclable but heavier)
+  metal: 0.9,       // 10% cheaper (recyclable)
+  textiles: 1.0     // Standard rate
 };
 
 /**

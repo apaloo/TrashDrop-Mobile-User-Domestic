@@ -21,10 +21,18 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
     switch (type) {
       case 'general':
         return 'General Waste';
-      case 'recycling':
-        return 'Recycling';
       case 'organic':
-        return 'Organic Waste';
+        return 'Organic';
+      case 'plastic':
+        return 'Plastic';
+      case 'paper':
+        return 'Paper';
+      case 'glass':
+        return 'Glass';
+      case 'metal':
+        return 'Metal';
+      case 'textiles':
+        return 'Textiles';
       default:
         return type;
     }

@@ -514,13 +514,13 @@ const DumpingReportForm = ({ onSuccess }) => {
               className="w-full px-3 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Select waste type</option>
-              <option value="mixed">Mixed Waste</option>
-              <option value="construction">Construction Debris</option>
-              <option value="household">Household Waste</option>
-              <option value="electronic">Electronic Waste</option>
-              <option value="organic">Organic Waste</option>
-              <option value="recyclables">Recyclables (Plastics, Cardboard etc)</option>
-              <option value="hazardous">Hazardous Materials</option>
+              <option value="general">General Waste</option>
+              <option value="organic">Organic</option>
+              <option value="plastic">Plastic</option>
+              <option value="paper">Paper</option>
+              <option value="glass">Glass</option>
+              <option value="metal">Metal</option>
+              <option value="textiles">Textiles</option>
             </select>
           </div>
 

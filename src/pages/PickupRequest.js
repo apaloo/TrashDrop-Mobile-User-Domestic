@@ -121,7 +121,7 @@ const PickupRequest = () => {
       })
       .required('Number of bags is required'),
     priority: Yup.string().oneOf(['normal', 'urgent', 'low']).required('Priority is required'),
-    wasteType: Yup.string().oneOf(['general', 'recycling', 'plastic', 'organic']).required('Waste type is required'),
+    wasteType: Yup.string().oneOf(['general', 'organic', 'plastic', 'paper', 'glass', 'metal', 'textiles']).required('Waste type is required'),
     notes: Yup.string().max(500, 'Notes must be at most 500 characters'),
   }), []);
   
@@ -911,10 +911,10 @@ const PickupRequest = () => {
                           <Field 
                             type="radio" 
                             name="wasteType" 
-                            value="recycling" 
+                            value="organic" 
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                           />
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">Recycling</span>
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">Organic</span>
                         </label>
                       </div>
                       
@@ -935,10 +935,46 @@ const PickupRequest = () => {
                           <Field 
                             type="radio" 
                             name="wasteType" 
-                            value="organic" 
+                            value="paper" 
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                           />
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">Organic Waste</span>
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">Paper</span>
+                        </label>
+                      </div>
+                      
+                      <div className="block">
+                        <label className="inline-flex items-center">
+                          <Field 
+                            type="radio" 
+                            name="wasteType" 
+                            value="glass" 
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                          />
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">Glass</span>
+                        </label>
+                      </div>
+                      
+                      <div className="block">
+                        <label className="inline-flex items-center">
+                          <Field 
+                            type="radio" 
+                            name="wasteType" 
+                            value="metal" 
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                          />
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">Metal</span>
+                        </label>
+                      </div>
+                      
+                      <div className="block">
+                        <label className="inline-flex items-center">
+                          <Field 
+                            type="radio" 
+                            name="wasteType" 
+                            value="textiles" 
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                          />
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">Textiles</span>
                         </label>
                       </div>
                     </div>

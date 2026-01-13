@@ -204,13 +204,12 @@ const CollectorPickup = () => {
   // Available waste types
   const wasteTypes = [
     'General Waste',
-    'Recyclables',
     'Organic',
-    'Hazardous',
-    'E-waste',
-    'Construction Debris',
-    'Medical',
-    'Other'
+    'Plastic',
+    'Paper',
+    'Glass',
+    'Metal',
+    'Textiles'
   ];
   
   // Available tags

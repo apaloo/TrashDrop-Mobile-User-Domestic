@@ -81,26 +81,11 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
               className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
             />
             <label htmlFor="waste-general" className="ml-3 block text-sm font-medium text-gray-900">
-              General Waste Bin
+              General Waste
             </label>
           </div>
           
-          {/* Recycling */}
-          <div className="flex items-center">
-            <input
-              id="waste-recycling"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'recycling'}
-              onChange={() => updateFormData({ wasteType: 'recycling' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-recycling" className="ml-3 block text-sm font-medium text-gray-900">
-              Recycling Bin
-            </label>
-          </div>
-          
-          {/* Organic Waste */}
+          {/* Organic */}
           <div className="flex items-center">
             <input
               id="waste-organic"
@@ -111,7 +96,82 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
               className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
             />
             <label htmlFor="waste-organic" className="ml-3 block text-sm font-medium text-gray-900">
-              Organic Waste Bin
+              Organic
+            </label>
+          </div>
+          
+          {/* Plastic */}
+          <div className="flex items-center">
+            <input
+              id="waste-plastic"
+              name="wasteType"
+              type="radio"
+              checked={formData.wasteType === 'plastic'}
+              onChange={() => updateFormData({ wasteType: 'plastic' })}
+              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+            />
+            <label htmlFor="waste-plastic" className="ml-3 block text-sm font-medium text-gray-900">
+              Plastic
+            </label>
+          </div>
+          
+          {/* Paper */}
+          <div className="flex items-center">
+            <input
+              id="waste-paper"
+              name="wasteType"
+              type="radio"
+              checked={formData.wasteType === 'paper'}
+              onChange={() => updateFormData({ wasteType: 'paper' })}
+              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+            />
+            <label htmlFor="waste-paper" className="ml-3 block text-sm font-medium text-gray-900">
+              Paper
+            </label>
+          </div>
+          
+          {/* Glass */}
+          <div className="flex items-center">
+            <input
+              id="waste-glass"
+              name="wasteType"
+              type="radio"
+              checked={formData.wasteType === 'glass'}
+              onChange={() => updateFormData({ wasteType: 'glass' })}
+              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+            />
+            <label htmlFor="waste-glass" className="ml-3 block text-sm font-medium text-gray-900">
+              Glass
+            </label>
+          </div>
+          
+          {/* Metal */}
+          <div className="flex items-center">
+            <input
+              id="waste-metal"
+              name="wasteType"
+              type="radio"
+              checked={formData.wasteType === 'metal'}
+              onChange={() => updateFormData({ wasteType: 'metal' })}
+              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+            />
+            <label htmlFor="waste-metal" className="ml-3 block text-sm font-medium text-gray-900">
+              Metal
+            </label>
+          </div>
+          
+          {/* Textiles */}
+          <div className="flex items-center">
+            <input
+              id="waste-textiles"
+              name="wasteType"
+              type="radio"
+              checked={formData.wasteType === 'textiles'}
+              onChange={() => updateFormData({ wasteType: 'textiles' })}
+              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+            />
+            <label htmlFor="waste-textiles" className="ml-3 block text-sm font-medium text-gray-900">
+              Textiles
             </label>
           </div>
         </div>
@@ -135,7 +195,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
               ⚡ Mark as Urgent
             </label>
             <p className="text-sm text-gray-600 mt-1">
-              Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+10%).
+              Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+30%). It takes up to 2 hours for urgent pickup to be collected.
             </p>
           </div>
         </div>
