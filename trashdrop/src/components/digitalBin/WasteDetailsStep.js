@@ -135,7 +135,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
               ⚡ Mark as Urgent
             </label>
             <p className="text-sm text-gray-600 mt-1">
-              Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+10%).
+              Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+30%). It takes up to 2 hours for urgent pickup to be collected.
             </p>
           </div>
         </div>
