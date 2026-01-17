@@ -771,7 +771,7 @@ function DigitalBin() {
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
       
-      const digitalBinData = prepareDigitalBinData({
+      const digitalBinData = await prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
@@ -780,7 +780,9 @@ function DigitalBin() {
         bag_count: bagCount,
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
-        expires_at: expiryDate.toISOString()
+        expires_at: expiryDate.toISOString(),
+        latitude: formData.latitude,
+        longitude: formData.longitude
       });
       
       console.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
@@ -856,7 +858,7 @@ function DigitalBin() {
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
       
-      const digitalBinData = prepareDigitalBinData({
+      const digitalBinData = await prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
@@ -865,7 +867,9 @@ function DigitalBin() {
         bag_count: bagCount,
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        latitude: formData.latitude,
+        longitude: formData.longitude
       });
       
       const { data: bin, error: binError } = await supabase
