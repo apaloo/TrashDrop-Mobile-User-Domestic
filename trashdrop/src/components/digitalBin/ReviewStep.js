@@ -1,20 +1,52 @@
-import React, { useState } from 'react';
-import { getCostBreakdown, formatCurrency, getBinSizeLabelShort } from '../../utils/costCalculator';
+import React, { useState, useEffect } from 'react';
+import { getCostBreakdown, getCostBreakdownWithGPS, formatCurrency, getBinSizeLabelShort } from '../../utils/costCalculator';
 
 const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingPrice, setIsLoadingPrice] = useState(false);
+  const [costBreakdown, setCostBreakdown] = useState(null);
   
-  // Calculate cost breakdown (SOP v4.5.6)
-  const costBreakdown = getCostBreakdown({
-    bin_size_liters: formData.bin_size_liters,
-    frequency: formData.frequency,
-    waste_type: formData.wasteType || formData.waste_type,
-    is_urgent: formData.is_urgent,
-    bag_count: formData.numberOfBags || formData.bag_count || 1,
-    distance_km: 0, // Client-side estimate; server provides actual
-    on_site_charges: 0,
-    discount_amount: 0
-  });
+  // Fetch GPS-based pricing on mount
+  useEffect(() => {
+    const fetchGPSPricing = async () => {
+      setIsLoadingPrice(true);
+      try {
+        // Use GPS-based pricing with user's location coordinates
+        const breakdown = await getCostBreakdownWithGPS({
+          bin_size_liters: formData.bin_size_liters,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          frequency: formData.frequency,
+          waste_type: formData.wasteType || formData.waste_type,
+          is_urgent: formData.is_urgent,
+          bag_count: formData.numberOfBags || formData.bag_count || 1,
+          distance_km: 0,
+          on_site_charges: 0,
+          discount_amount: 0
+        });
+        console.log('[ReviewStep] GPS pricing breakdown:', breakdown);
+        setCostBreakdown(breakdown);
+      } catch (error) {
+        console.error('[ReviewStep] GPS pricing failed, using default:', error);
+        // Fallback to synchronous pricing
+        const fallbackBreakdown = getCostBreakdown({
+          bin_size_liters: formData.bin_size_liters,
+          frequency: formData.frequency,
+          waste_type: formData.wasteType || formData.waste_type,
+          is_urgent: formData.is_urgent,
+          bag_count: formData.numberOfBags || formData.bag_count || 1,
+          distance_km: 0,
+          on_site_charges: 0,
+          discount_amount: 0
+        });
+        setCostBreakdown(fallbackBreakdown);
+      } finally {
+        setIsLoadingPrice(false);
+      }
+    };
+
+    fetchGPSPricing();
+  }, [formData]);
   
   // Format waste type for display
   const formatWasteType = (type) => {
@@ -156,83 +188,99 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
       <div className="bg-blue-50 p-4 rounded-md mb-6 border border-blue-200">
         <h3 className="text-lg font-semibold mb-3 text-gray-900">Estimated Cost</h3>
         
-        {/* Line items breakdown */}
-        <div className="bg-white p-3 rounded-md mb-3 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-700 font-medium">
-              Base ({getBinSizeLabelShort(formData.bin_size_liters)} × {formData.numberOfBags})
-            </span>
-            <span className="text-sm text-gray-900 font-semibold">
-              {formatCurrency(costBreakdown.base)}
-            </span>
+        {isLoadingPrice || !costBreakdown ? (
+          <div className="bg-white p-3 rounded-md mb-3 flex items-center justify-center py-8">
+            <span className="inline-block animate-spin mr-2 text-2xl">⟳</span>
+            <span className="text-gray-600">Calculating price...</span>
           </div>
-          
-          {/* Conditional: Show urgent charge only if applicable */}
-          {costBreakdown.display.urgent_charge && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-700 font-medium">
-                Urgent surcharge (30%)
-              </span>
-              <span className="text-sm text-yellow-700 font-semibold">
-                {formatCurrency(costBreakdown.urgent_charge)}
+        ) : (
+          <>
+            {/* GPS Pricing indicator */}
+            {costBreakdown.pricing_source === 'gps' && costBreakdown.pricing_zone && (
+              <div className="bg-green-100 border border-green-300 rounded-md p-2 mb-3 text-sm">
+                <span className="text-green-800 font-medium">📍 Location-based pricing for {costBreakdown.pricing_zone.suburb || costBreakdown.pricing_zone.community}</span>
+              </div>
+            )}
+            
+            {/* Line items breakdown */}
+            <div className="bg-white p-3 rounded-md mb-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-700 font-medium">
+                  Base ({getBinSizeLabelShort(formData.bin_size_liters)} × {formData.numberOfBags})
+                </span>
+                <span className="text-sm text-gray-900 font-semibold">
+                  {formatCurrency(costBreakdown.base)}
+                </span>
+              </div>
+              
+              {/* Conditional: Show urgent charge only if applicable */}
+              {costBreakdown.display?.urgent_charge && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700 font-medium">
+                    Urgent surcharge (30%)
+                  </span>
+                  <span className="text-sm text-yellow-700 font-semibold">
+                    {formatCurrency(costBreakdown.urgent_charge)}
+                  </span>
+                </div>
+              )}
+              
+              {/* Conditional: Show distance charge only if applicable */}
+              {costBreakdown.display?.distance_charge && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700 font-medium">
+                    Distance ({costBreakdown.billable_km.toFixed(1)} km)
+                  </span>
+                  <span className="text-sm text-gray-900 font-semibold">
+                    {formatCurrency(costBreakdown.distance_charge)}
+                  </span>
+                </div>
+              )}
+              
+              {/* Conditional: Show on-site charges only if applicable */}
+              {costBreakdown.display?.on_site_charges && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700 font-medium">
+                    On-site charges
+                  </span>
+                  <span className="text-sm text-gray-900 font-semibold">
+                    {formatCurrency(costBreakdown.on_site_charges)}
+                  </span>
+                </div>
+              )}
+              
+              {/* Conditional: Show discount only if applicable */}
+              {costBreakdown.display?.discount && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-green-700 font-medium">
+                    Discount
+                  </span>
+                  <span className="text-sm text-green-700 font-semibold">
+                    -{formatCurrency(costBreakdown.discount_applied)}
+                  </span>
+                </div>
+              )}
+              
+              {/* Always show request fee */}
+              <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                <span className="text-sm text-gray-700 font-medium">
+                  Request fee
+                </span>
+                <span className="text-sm text-gray-900 font-semibold">
+                  {formatCurrency(costBreakdown.request_fee)}
+                </span>
+              </div>
+            </div>
+            
+            {/* Total */}
+            <div className="flex justify-between items-center pt-3 border-t-2 border-blue-300">
+              <span className="text-lg font-semibold text-gray-900">TOTAL</span>
+              <span className="text-3xl font-bold text-primary">
+                {formatCurrency(costBreakdown.total)}
               </span>
             </div>
-          )}
-          
-          {/* Conditional: Show distance charge only if applicable */}
-          {costBreakdown.display.distance_charge && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-700 font-medium">
-                Distance ({costBreakdown.billable_km.toFixed(1)} km)
-              </span>
-              <span className="text-sm text-gray-900 font-semibold">
-                {formatCurrency(costBreakdown.distance_charge)}
-              </span>
-            </div>
-          )}
-          
-          {/* Conditional: Show on-site charges only if applicable */}
-          {costBreakdown.display.on_site_charges && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-700 font-medium">
-                On-site charges
-              </span>
-              <span className="text-sm text-gray-900 font-semibold">
-                {formatCurrency(costBreakdown.on_site_charges)}
-              </span>
-            </div>
-          )}
-          
-          {/* Conditional: Show discount only if applicable */}
-          {costBreakdown.display.discount && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-green-700 font-medium">
-                Discount
-              </span>
-              <span className="text-sm text-green-700 font-semibold">
-                -{formatCurrency(costBreakdown.discount_applied)}
-              </span>
-            </div>
-          )}
-          
-          {/* Always show request fee */}
-          <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-            <span className="text-sm text-gray-700 font-medium">
-              Request fee
-            </span>
-            <span className="text-sm text-gray-900 font-semibold">
-              {formatCurrency(costBreakdown.request_fee)}
-            </span>
-          </div>
-        </div>
-        
-        {/* Total */}
-        <div className="flex justify-between items-center pt-3 border-t-2 border-blue-300">
-          <span className="text-lg font-semibold text-gray-900">TOTAL</span>
-          <span className="text-3xl font-bold text-primary">
-            {formatCurrency(costBreakdown.total)}
-          </span>
-        </div>
+          </>
+        )}
         
         <p className="text-xs text-gray-600 mt-3 italic">
           ⚠️ Estimate only. Final price calculated at confirmation.
