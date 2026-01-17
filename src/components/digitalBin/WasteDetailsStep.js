@@ -13,28 +13,53 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
     <div>
       <h2 className="text-xl font-semibold mb-4 text-gray-900">Digital Bin Details</h2>
       
-      {/* Number of Bins - EXISTING */}
+      {/* Number of Bins - Horizontal Scrollable Cards */}
       <div className="mb-5">
-        <label htmlFor="numberOfBags" className="block text-sm font-medium text-gray-900 mb-1">
+        <label className="block text-sm font-medium text-gray-900 mb-2">
           Number of Digital Bins Needed
         </label>
-        <select
-          id="numberOfBags"
-          value={formData.numberOfBags}
-          onChange={(e) => updateFormData({ 
-            numberOfBags: e.target.value,
-            bag_count: parseInt(e.target.value)  // Sync with bag_count field
-          })}
-          className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
-          style={{color: '#333'}}
+        
+        {/* Horizontal scrollable container */}
+        <div 
+          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+          style={{
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
         >
-          <option value="1">1 Bin</option>
-          <option value="2">2 Bins</option>
-          <option value="3">3 Bins</option>
-          <option value="4">4 Bins</option>
-          <option value="5">5 Bins</option>
-        </select>
-        <p className="text-sm text-gray-500 mt-1">
+          {[1, 2, 3, 4, 5].map((num) => (
+            <div
+              key={num}
+              onClick={() => updateFormData({ 
+                numberOfBags: String(num),
+                bag_count: num
+              })}
+              className={`flex-shrink-0 w-20 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                parseInt(formData.numberOfBags) === num
+                  ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                  : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+              }`}
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="text-2xl font-bold mb-1" style={{
+                  color: parseInt(formData.numberOfBags) === num ? '#15803d' : '#374151'
+                }}>
+                  {num}
+                </div>
+                <span className={`text-xs font-medium ${
+                  parseInt(formData.numberOfBags) === num ? 'text-green-700' : 'text-gray-700'
+                }`}>
+                  {num === 1 ? 'Bin' : 'Bins'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <p className="text-sm text-gray-500 mt-2">
           Select the number of digital bins you need for your waste collection
         </p>
       </div>
@@ -63,120 +88,165 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
         </p>
       </div>
       
-      {/* Waste Type - EXISTING */}
+      {/* Waste Type - Horizontal Scrollable Cards */}
       <div className="mb-5">
         <label className="block text-sm font-medium text-gray-900 mb-2">
           Bin Type
         </label>
         
-        <div className="space-y-3">
-          {/* General Waste */}
-          <div className="flex items-center">
-            <input
-              id="waste-general"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'general'}
-              onChange={() => updateFormData({ wasteType: 'general' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-general" className="ml-3 block text-sm font-medium text-gray-900">
-              General Waste
-            </label>
+        {/* Horizontal scrollable container */}
+        <div 
+          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+          style={{
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
+          {/* General Waste Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'general' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'general'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">🗑️</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'general' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                General Waste
+              </span>
+            </div>
           </div>
-          
-          {/* Organic */}
-          <div className="flex items-center">
-            <input
-              id="waste-organic"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'organic'}
-              onChange={() => updateFormData({ wasteType: 'organic' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-organic" className="ml-3 block text-sm font-medium text-gray-900">
-              Organic
-            </label>
+
+          {/* Organic Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'organic' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'organic'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">🥬</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'organic' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                Organic
+              </span>
+            </div>
           </div>
-          
-          {/* Plastic */}
-          <div className="flex items-center">
-            <input
-              id="waste-plastic"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'plastic'}
-              onChange={() => updateFormData({ wasteType: 'plastic' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-plastic" className="ml-3 block text-sm font-medium text-gray-900">
-              Plastic
-            </label>
+
+          {/* Plastic Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'plastic' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'plastic'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">🧴</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'plastic' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                Plastics
+              </span>
+            </div>
           </div>
-          
-          {/* Paper */}
-          <div className="flex items-center">
-            <input
-              id="waste-paper"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'paper'}
-              onChange={() => updateFormData({ wasteType: 'paper' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-paper" className="ml-3 block text-sm font-medium text-gray-900">
-              Paper
-            </label>
+
+          {/* Paper Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'paper' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'paper'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">📄</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'paper' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                Paper
+              </span>
+            </div>
           </div>
-          
-          {/* Glass */}
-          <div className="flex items-center">
-            <input
-              id="waste-glass"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'glass'}
-              onChange={() => updateFormData({ wasteType: 'glass' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-glass" className="ml-3 block text-sm font-medium text-gray-900">
-              Glass
-            </label>
+
+          {/* Glass Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'glass' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'glass'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">🫙</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'glass' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                Glass
+              </span>
+            </div>
           </div>
-          
-          {/* Metal */}
-          <div className="flex items-center">
-            <input
-              id="waste-metal"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'metal'}
-              onChange={() => updateFormData({ wasteType: 'metal' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-metal" className="ml-3 block text-sm font-medium text-gray-900">
-              Metal
-            </label>
+
+          {/* Metal Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'metal' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'metal'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">🥫</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'metal' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                Metal
+              </span>
+            </div>
           </div>
-          
-          {/* Textiles */}
-          <div className="flex items-center">
-            <input
-              id="waste-textiles"
-              name="wasteType"
-              type="radio"
-              checked={formData.wasteType === 'textiles'}
-              onChange={() => updateFormData({ wasteType: 'textiles' })}
-              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
-            />
-            <label htmlFor="waste-textiles" className="ml-3 block text-sm font-medium text-gray-900">
-              Textiles
-            </label>
+
+          {/* Textiles Card */}
+          <div
+            onClick={() => updateFormData({ wasteType: 'textiles' })}
+            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+              formData.wasteType === 'textiles'
+                ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+            }`}
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="text-3xl mb-2">👕</div>
+              <span className={`text-xs font-medium ${
+                formData.wasteType === 'textiles' ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                Textiles
+              </span>
+            </div>
           </div>
         </div>
+        
         <p className="text-sm text-gray-500 mt-2">
-          Choose the type of bin that matches your waste collection needs
+          Swipe to see more options • Choose the type that matches your waste
         </p>
       </div>
       
