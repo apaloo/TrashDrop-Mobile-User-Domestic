@@ -8,10 +8,19 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
   
   // Fetch GPS-based pricing when component mounts or formData changes
   useEffect(() => {
+    console.log('[ReviewStep] useEffect triggered with formData:', {
+      bin_size_liters: formData.bin_size_liters,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
+      frequency: formData.frequency
+    });
+    
     const fetchGPSPricing = async () => {
+      console.log('[ReviewStep] Starting fetchGPSPricing...');
       setIsLoadingPrice(true);
       try {
         // Use GPS-based pricing with user's location coordinates
+        console.log('[ReviewStep] Calling getCostBreakdownWithGPS with lat/lng:', formData.latitude, formData.longitude);
         const breakdown = await getCostBreakdownWithGPS({
           bin_size_liters: formData.bin_size_liters,
           latitude: formData.latitude,
