@@ -92,38 +92,36 @@ SECURITY DEFINER
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
-    pz.id AS zone_id,
-    pz.region,
-    pz.district,
-    pz.community,
-    pz.suburb,
-    -- Haversine formula for distance calculation (in km)
-    (6371 * acos(
-      cos(radians(p_latitude)) * cos(radians(pz.latitude)) *
-      cos(radians(pz.longitude) - radians(p_longitude)) +
-      sin(radians(p_latitude)) * sin(radians(pz.latitude))
-    ))::DECIMAL AS distance_km,
-    pz.price_50l,
-    pz.price_60l,
-    pz.price_80l,
-    pz.price_90l,
-    pz.price_100l,
-    pz.price_120l,
-    pz.price_240l,
-    pz.price_260l,
-    pz.price_320l,
-    pz.price_360l
-  FROM public.pricing_zones pz
-  WHERE pz.is_active = true
-    AND pz.latitude IS NOT NULL
-    AND pz.longitude IS NOT NULL
-  HAVING (6371 * acos(
-      cos(radians(p_latitude)) * cos(radians(pz.latitude)) *
-      cos(radians(pz.longitude) - radians(p_longitude)) +
-      sin(radians(p_latitude)) * sin(radians(pz.latitude))
-    )) <= p_max_distance_km
-  ORDER BY distance_km ASC
+  SELECT * FROM (
+    SELECT 
+      pz.id AS zone_id,
+      pz.region,
+      pz.district,
+      pz.community,
+      pz.suburb,
+      -- Haversine formula for distance calculation (in km)
+      (6371 * acos(
+        cos(radians(p_latitude)) * cos(radians(pz.latitude)) *
+        cos(radians(pz.longitude) - radians(p_longitude)) +
+        sin(radians(p_latitude)) * sin(radians(pz.latitude))
+      ))::DECIMAL AS distance_km,
+      pz.price_50l,
+      pz.price_60l,
+      pz.price_80l,
+      pz.price_90l,
+      pz.price_100l,
+      pz.price_120l,
+      pz.price_240l,
+      pz.price_260l,
+      pz.price_320l,
+      pz.price_360l
+    FROM public.pricing_zones pz
+    WHERE pz.is_active = true
+      AND pz.latitude IS NOT NULL
+      AND pz.longitude IS NOT NULL
+  ) AS zones_with_distance
+  WHERE zones_with_distance.distance_km <= p_max_distance_km
+  ORDER BY zones_with_distance.distance_km ASC
   LIMIT 1;
 END;
 $$;
