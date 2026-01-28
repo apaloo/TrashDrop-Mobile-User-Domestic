@@ -869,78 +869,80 @@ const PickupRequest = () => {
                     )}
                   </div>
                   
-                  {/* Priority */}
+                  {/* Priority - Horizontal Scrollable Cards */}
                   <div className="mb-4">
-                    <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Priority <span className="text-red-600">*</span>
                     </label>
-                    <Field
-                      as="select"
-                      id="priority"
-                      name="priority"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
-                    >
-                      <option value="normal" className="text-gray-900 dark:text-white font-medium">Normal</option>
-                      <option value="urgent">Urgent</option>
-                      <option value="low">Low Priority</option>
-                    </Field>
+                    <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {[
+                        { value: 'low', label: 'Low', icon: '🐢', description: 'Flexible timing' },
+                        { value: 'normal', label: 'Normal', icon: '📦', description: 'Standard pickup' },
+                        { value: 'urgent', label: 'Urgent', icon: '⚡', description: 'Priority service' }
+                      ].map((option) => (
+                        <div
+                          key={option.value}
+                          onClick={() => setFieldValue('priority', option.value)}
+                          className={`flex-shrink-0 w-28 p-3 rounded-lg cursor-pointer transition-all duration-200 snap-start ${
+                            values.priority === option.value
+                              ? 'bg-primary/10 border-2 border-primary shadow-md'
+                              : 'bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <span className="text-2xl">{option.icon}</span>
+                            <p className={`text-sm font-semibold mt-1 ${
+                              values.priority === option.value 
+                                ? 'text-primary' 
+                                : 'text-gray-700 dark:text-gray-300'
+                            }`}>
+                              {option.label}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{option.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                     {touched.priority && errors.priority && (
                       <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</div>
                     )}
                   </div>
                   
-                  {/* Waste Type */}
+                  {/* Waste Type - Horizontal Scrollable Cards */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Waste Type <span className="text-red-600">*</span>
                     </label>
                     
-                    <div className="mt-2 space-y-2">
-                      <label className="inline-flex items-center">
-                        <Field 
-                          type="radio" 
-                          name="wasteType" 
-                          value="general" 
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <span className="ml-2 text-gray-700 dark:text-gray-300">General Waste</span>
-                      </label>
-                      
-                      <div className="block">
-                        <label className="inline-flex items-center">
-                          <Field 
-                            type="radio" 
-                            name="wasteType" 
-                            value="recycling" 
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          />
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">Recycling</span>
-                        </label>
-                      </div>
-                      
-                      <div className="block">
-                        <label className="inline-flex items-center">
-                          <Field 
-                            type="radio" 
-                            name="wasteType" 
-                            value="plastic" 
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          />
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">Plastic</span>
-                        </label>
-                      </div>
-                      
-                      <div className="block">
-                        <label className="inline-flex items-center">
-                          <Field 
-                            type="radio" 
-                            name="wasteType" 
-                            value="organic" 
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          />
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">Organic Waste</span>
-                        </label>
-                      </div>
+                    <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {[
+                        { value: 'general', label: 'General', icon: '🗑️', description: 'Mixed waste' },
+                        { value: 'recycling', label: 'Recycling', icon: '♻️', description: 'Paper, cans' },
+                        { value: 'plastic', label: 'Plastic', icon: '🥤', description: 'Bottles, bags' },
+                        { value: 'organic', label: 'Organic', icon: '🍂', description: 'Food, garden' }
+                      ].map((option) => (
+                        <div
+                          key={option.value}
+                          onClick={() => setFieldValue('wasteType', option.value)}
+                          className={`flex-shrink-0 w-24 p-3 rounded-lg cursor-pointer transition-all duration-200 snap-start ${
+                            values.wasteType === option.value
+                              ? 'bg-primary/10 border-2 border-primary shadow-md'
+                              : 'bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <span className="text-2xl">{option.icon}</span>
+                            <p className={`text-sm font-semibold mt-1 ${
+                              values.wasteType === option.value 
+                                ? 'text-primary' 
+                                : 'text-gray-700 dark:text-gray-300'
+                            }`}>
+                              {option.label}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{option.description}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     
                     {touched.wasteType && errors.wasteType && (
