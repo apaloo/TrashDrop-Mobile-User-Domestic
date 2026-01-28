@@ -126,10 +126,12 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
             <span className="text-sm text-gray-700 font-medium">Start Date:</span>
             <p className="text-gray-900 font-medium">{formData.startDate}</p>
           </div>
-          <div>
-            <span className="text-sm text-gray-700 font-medium">Preferred Time:</span>
-            <p className="text-gray-900 font-medium">{formatPreferredTime(formData.preferredTime)}</p>
-          </div>
+          {!formData.is_urgent && (
+            <div>
+              <span className="text-sm text-gray-700 font-medium">Preferred Time:</span>
+              <p className="text-gray-900 font-medium">{formatPreferredTime(formData.preferredTime)}</p>
+            </div>
+          )}
         </div>
       </div>
       

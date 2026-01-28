@@ -185,14 +185,56 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     }
   };
   
+  // Helper function to reverse geocode coordinates to address
+  const reverseGeocode = async (latitude, longitude) => {
+    try {
+      console.log('[LocationStep] Reverse geocoding:', latitude, longitude);
+      // Note: User-Agent cannot be set in browser fetch (forbidden header)
+      // Use email parameter for identification per Nominatim usage policy
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@trashdrop.app`
+      );
+      
+      console.log('[LocationStep] Nominatim response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[LocationStep] Reverse geocoding result:', data);
+        if (data.display_name) {
+          setAddressInput(data.display_name);
+          updateFormData({ address: data.display_name });
+          console.log('[LocationStep] Address set to:', data.display_name);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn('[LocationStep] Reverse geocoding error:', error);
+    }
+    
+    // Fallback to coordinates
+    const fallbackAddress = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    setAddressInput(fallbackAddress);
+    updateFormData({ address: fallbackAddress });
+    console.log('[LocationStep] Using coordinate fallback:', fallbackAddress);
+    return false;
+  };
+  
   // Handler for current location using GeolocationService
   const handleUseCurrentLocation = async (e) => {
-    e.preventDefault();
+    // Don't prevent default - let checkbox toggle naturally
     
+    // If unchecking, just update the form data
+    if (formData.useCurrentLocation) {
+      updateFormData({ useCurrentLocation: false });
+      return;
+    }
+    
+    // Set useCurrentLocation: true immediately so checkbox shows checked
+    updateFormData({ useCurrentLocation: true });
     setLoadingLocation(true);
     
     try {
-      console.log('Requesting current location using GeolocationService...');
+      console.log('[LocationStep] Requesting current location using GeolocationService...');
       
       // Check if geolocation is supported and avoid problematic scenarios
       if (!navigator.geolocation) {
@@ -221,31 +263,10 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         const { latitude, longitude } = locationResult.coords;
         
         setPosition([latitude, longitude]);
-        updateFormData({
-          latitude,
-          longitude,
-          useCurrentLocation: true
-        });
+        updateFormData({ latitude, longitude });
 
-        // Try to get address from coordinates using OpenStreetMap
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.display_name) {
-              setAddressInput(data.display_name);
-              updateFormData({
-                address: data.display_name
-              });
-            }
-          }
-        } catch (geocodeError) {
-          console.warn('Error getting address from coordinates:', geocodeError);
-          // This is non-critical, continue without address
-        }
+        // Reverse geocode to get address
+        await reverseGeocode(latitude, longitude);
 
         // Show success message based on source
         if (locationResult.source === 'default') {
@@ -257,34 +278,32 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         setLoadingLocation(false);
         
       } else {
-        // GeolocationService already provided fallback coordinates
+        // GeolocationService provided fallback coordinates - still try to reverse geocode
         const { latitude, longitude } = locationResult.coords;
         
         setPosition([latitude, longitude]);
-        updateFormData({
-          latitude,
-          longitude,
-          useCurrentLocation: false // Mark as not using current location since it's fallback
-        });
+        updateFormData({ latitude, longitude });
         
-        toastService.info('Using default location (Accra, Ghana). You can adjust it on the map.');
+        // Try reverse geocoding for fallback too
+        await reverseGeocode(latitude, longitude);
+        
+        toastService.info('Using approximate location. You can adjust it on the map.');
         setLoadingLocation(false);
       }
       
     } catch (error) {
-      console.error('GeolocationService error:', error);
+      console.error('[LocationStep] GeolocationService error:', error);
       
       // Use default location (Accra, Ghana) as fallback
       const [defaultLat, defaultLng] = DEFAULT_LOCATION;
       
       setPosition(DEFAULT_LOCATION);
-      updateFormData({
-        latitude: defaultLat,
-        longitude: defaultLng,
-        useCurrentLocation: false
-      });
+      updateFormData({ latitude: defaultLat, longitude: defaultLng });
       
-      toastService.info('Using default location (Accra, Ghana). Please adjust the marker on the map to your actual location.');
+      // Try to reverse geocode even for default location
+      await reverseGeocode(defaultLat, defaultLng);
+      
+      toastService.info('Using default location. Please adjust the marker on the map to your actual location.');
       
       setLoadingLocation(false);
     }
@@ -305,8 +324,13 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       return;
     }
 
+    if (!formData.useCurrentLocation) {
+      setAddressError('Please use your current location to continue');
+      return;
+    }
+
     if (!addressInput.trim()) {
-      setAddressError('Please enter an address or select a location');
+      setAddressError('Location address not found. Please try again.');
       return;
     }
 
@@ -327,41 +351,6 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Digital Bin Location</h2>
       
       <div className="mb-4">
-        <label htmlFor="address" className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
-          Address
-        </label>
-        <input
-          type="text"
-          id="address"
-          value={addressInput}
-          onChange={handleAddressChange}
-          placeholder="Enter address or select from saved locations"
-          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-white bg-white dark:bg-gray-700 font-medium placeholder-gray-400 dark:placeholder-gray-500"
-        />
-        {addressError && (
-          <p className="text-red-500 text-sm mt-1">{addressError}</p>
-        )}
-      </div>
-      
-      <div className="mb-4">
-        <label htmlFor="savedLocation" className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
-          Saved Locations
-        </label>
-        <select
-          id="savedLocation"
-          onChange={handleLocationSelect}
-          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-white bg-white dark:bg-gray-700 font-medium"
-        >
-          <option value="">-- Select a saved location --</option>
-          {savedLocations.map(location => (
-            <option key={location.id} value={location.id}>
-              {location.name} - {location.address}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-      <div className="mb-4">
         <div className="flex items-center">
           <input
             type="checkbox"
@@ -371,9 +360,26 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
           />
           <label htmlFor="useCurrentLocation" className="ml-2 block text-sm text-gray-700 dark:text-gray-400">
-            Use my current location
+            Use my current location <span className="text-red-500">*</span>
           </label>
         </div>
+      </div>
+      
+      <div className="mb-4">
+        <label htmlFor="address" className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
+          Address
+        </label>
+        <input
+          type="text"
+          id="address"
+          value={addressInput}
+          readOnly
+          placeholder="Use current location to auto-fill"
+          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white font-medium placeholder-gray-400 dark:placeholder-gray-500 cursor-not-allowed"
+        />
+        {addressError && (
+          <p className="text-red-500 text-sm mt-1">{addressError}</p>
+        )}
       </div>
       
       <div className="mb-4">

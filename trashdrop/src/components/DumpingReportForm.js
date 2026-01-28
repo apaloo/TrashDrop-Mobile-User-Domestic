@@ -500,50 +500,258 @@ const DumpingReportForm = ({ onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} autoComplete="off" noValidate>
-          {/* Type of Waste */}
+          {/* Type of Waste - Horizontal Scrollable Cards */}
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
               Type of Waste <span className="text-red-500">*</span>
             </label>
-            <select
-              name="waste_type"
-              value={formData.waste_type}
-              onChange={handleChange}
-              required
-              autoComplete="off"
-              className="w-full px-3 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            
+            {/* Horizontal scrollable container */}
+            <div 
+              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+              style={{
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
             >
-              <option value="">Select waste type</option>
-              <option value="mixed">Mixed Waste</option>
-              <option value="construction">Construction Debris</option>
-              <option value="household">Household Waste</option>
-              <option value="electronic">Electronic Waste</option>
-              <option value="organic">Organic Waste</option>
-              <option value="recyclables">Recyclables (Plastics, Cardboard etc)</option>
-              <option value="hazardous">Hazardous Materials</option>
-            </select>
+              {/* Mixed Waste Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'mixed' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'mixed'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🗑️</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'mixed' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Mixed
+                  </span>
+                </div>
+              </div>
+
+              {/* Construction Debris Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'construction' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'construction'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🧱</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'construction' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Construction
+                  </span>
+                </div>
+              </div>
+
+              {/* Household Waste Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'household' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'household'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🏠</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'household' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Household
+                  </span>
+                </div>
+              </div>
+
+              {/* Electronic Waste Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'electronic' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'electronic'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">📱</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'electronic' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Electronic
+                  </span>
+                </div>
+              </div>
+
+              {/* Organic Waste Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'organic' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'organic'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🥬</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'organic' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Organic
+                  </span>
+                </div>
+              </div>
+
+              {/* Recyclables Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'recyclables' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'recyclables'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">♻️</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'recyclables' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Recyclables
+                  </span>
+                </div>
+              </div>
+
+              {/* Hazardous Materials Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'hazardous' }))}
+                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.waste_type === 'hazardous'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">☣️</div>
+                  <span className={`text-xs font-medium ${
+                    formData.waste_type === 'hazardous' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Hazardous
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Swipe to see more options
+            </p>
           </div>
 
-          {/* Severity */}
+          {/* Severity - Horizontal Scrollable Cards */}
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
               Severity <span className="text-red-500">*</span>
             </label>
-            <div className="flex space-x-2">
-              {['Low', 'Medium', 'High'].map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => handleSeverityClick(level)}
-                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
-                    formData.severity === level
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
+            
+            {/* Horizontal scrollable container */}
+            <div 
+              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+              style={{
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              {/* Low Severity Card */}
+              <div
+                onClick={() => handleSeverityClick('Low')}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.severity === 'low'
+                    ? 'bg-green-50 dark:bg-green-900 border-2 border-green-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🟢</div>
+                  <span className={`text-sm font-medium ${
+                    formData.severity === 'low' ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Low
+                  </span>
+                  <span className={`text-xs ${
+                    formData.severity === 'low' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Minor issue
+                  </span>
+                </div>
+              </div>
+
+              {/* Medium Severity Card */}
+              <div
+                onClick={() => handleSeverityClick('Medium')}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.severity === 'medium'
+                    ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🟡</div>
+                  <span className={`text-sm font-medium ${
+                    formData.severity === 'medium' ? 'text-yellow-700 dark:text-yellow-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Medium
+                  </span>
+                  <span className={`text-xs ${
+                    formData.severity === 'medium' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Needs attention
+                  </span>
+                </div>
+              </div>
+
+              {/* High Severity Card */}
+              <div
+                onClick={() => handleSeverityClick('High')}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.severity === 'high'
+                    ? 'bg-red-50 dark:bg-red-900 border-2 border-red-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🔴</div>
+                  <span className={`text-sm font-medium ${
+                    formData.severity === 'high' ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    High
+                  </span>
+                  <span className={`text-xs ${
+                    formData.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Urgent
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -562,25 +770,122 @@ const DumpingReportForm = ({ onSuccess }) => {
             />
           </div>
 
-          {/* Size of dumping */}
+          {/* Size of dumping - Horizontal Scrollable Cards */}
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
               Size of the illegal dumping <span className="text-red-500">*</span>
             </label>
-            <select
-              name="estimated_volume"
-              value={formData.estimated_volume}
-              onChange={handleChange}
-              required
-              autoComplete="off"
-              className="w-full px-3 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            
+            {/* Horizontal scrollable container */}
+            <div 
+              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+              style={{
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
             >
-              <option value="">Select a size option</option>
-              <option value="small">Small (few bags)</option>
-              <option value="medium">Medium (car load)</option>
-              <option value="large">Large (truck load)</option>
-              <option value="massive">Massive (multiple trucks)</option>
-            </select>
+              {/* Small Size Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'small' }))}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.estimated_volume === 'small'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🛍️</div>
+                  <span className={`text-sm font-medium ${
+                    formData.estimated_volume === 'small' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Small
+                  </span>
+                  <span className={`text-xs ${
+                    formData.estimated_volume === 'small' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Few bags
+                  </span>
+                </div>
+              </div>
+
+              {/* Medium Size Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'medium' }))}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.estimated_volume === 'medium'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🚗</div>
+                  <span className={`text-sm font-medium ${
+                    formData.estimated_volume === 'medium' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Medium
+                  </span>
+                  <span className={`text-xs ${
+                    formData.estimated_volume === 'medium' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Car load
+                  </span>
+                </div>
+              </div>
+
+              {/* Large Size Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'large' }))}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.estimated_volume === 'large'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🚚</div>
+                  <span className={`text-sm font-medium ${
+                    formData.estimated_volume === 'large' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Large
+                  </span>
+                  <span className={`text-xs ${
+                    formData.estimated_volume === 'large' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Truck load
+                  </span>
+                </div>
+              </div>
+
+              {/* Massive Size Card */}
+              <div
+                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'massive' }))}
+                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.estimated_volume === 'massive'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🚛</div>
+                  <span className={`text-sm font-medium ${
+                    formData.estimated_volume === 'massive' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Massive
+                  </span>
+                  <span className={`text-xs ${
+                    formData.estimated_volume === 'massive' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Multiple trucks
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Location */}
