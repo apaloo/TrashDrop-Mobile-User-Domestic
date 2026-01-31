@@ -22,7 +22,10 @@ const DEFAULT_PRICES = {
   240: 40,
   260: 50,
   320: 65,
-  360: 75
+  340: 55,
+  360: 75,
+  660: 100,
+  1100: 150
 };
 
 /**
@@ -120,12 +123,12 @@ export const findNearestPricingZone = async (latitude, longitude, maxDistanceKm 
  * 
  * @param {number} latitude - GPS latitude
  * @param {number} longitude - GPS longitude
- * @param {number} binSize - Bin size in liters (50, 60, 80, 90, 100, 120, 240, 260, 320, 360)
+ * @param {number} binSize - Bin size in liters (50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100)
  * @returns {Promise<Object>} Price info with source indicator
  */
 export const getLocationPrice = async (latitude, longitude, binSize) => {
   // Validate bin size
-  const validSizes = [50, 60, 80, 90, 100, 120, 240, 260, 320, 360];
+  const validSizes = [50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100];
   if (!validSizes.includes(binSize)) {
     console.warn('[GPSPricing] Invalid bin size:', binSize, '- using default 120L');
     binSize = 120;
@@ -175,7 +178,7 @@ export const getAllPricesForLocation = async (latitude, longitude) => {
   const zone = await findNearestPricingZone(latitude, longitude);
 
   const prices = {};
-  const binSizes = [50, 60, 80, 90, 100, 120, 240, 260, 320, 360];
+  const binSizes = [50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100];
 
   if (zone) {
     binSizes.forEach(size => {
