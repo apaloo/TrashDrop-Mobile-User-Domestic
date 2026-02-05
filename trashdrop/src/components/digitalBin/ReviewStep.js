@@ -6,8 +6,10 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [costBreakdown, setCostBreakdown] = useState(null);
   
-  // Fetch GPS-based pricing on mount
+  // Fetch GPS-based pricing on mount with cancellation support
   useEffect(() => {
+    let isCancelled = false;
+    
     const fetchGPSPricing = async () => {
       setIsLoadingPrice(true);
       try {
@@ -24,9 +26,15 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
           on_site_charges: 0,
           discount_amount: 0
         });
-        console.log('[ReviewStep] GPS pricing breakdown:', breakdown);
-        setCostBreakdown(breakdown);
+        
+        // Only update state if component is still mounted
+        if (!isCancelled) {
+          console.log('[ReviewStep] GPS pricing breakdown:', breakdown);
+          setCostBreakdown(breakdown);
+        }
       } catch (error) {
+        if (isCancelled) return; // Don't update state if cancelled
+        
         console.error('[ReviewStep] GPS pricing failed, using default:', error);
         // Fallback to synchronous pricing
         const fallbackBreakdown = getCostBreakdown({
@@ -41,12 +49,19 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
         });
         setCostBreakdown(fallbackBreakdown);
       } finally {
-        setIsLoadingPrice(false);
+        if (!isCancelled) {
+          setIsLoadingPrice(false);
+        }
       }
     };
 
     fetchGPSPricing();
-  }, [formData]);
+    
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isCancelled = true;
+    };
+  }, [formData.bin_size_liters, formData.latitude, formData.longitude, formData.frequency, formData.wasteType, formData.waste_type, formData.is_urgent, formData.numberOfBags, formData.bag_count]);
   
   // Format waste type for display
   const formatWasteType = (type) => {

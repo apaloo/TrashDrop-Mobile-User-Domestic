@@ -28,6 +28,7 @@ import PaymentMethods from './pages/PaymentMethods.js';
 import Notifications from './pages/Notifications.js';
 import CollectorTracking from './pages/CollectorTracking.js';
 import ToastTest from './pages/ToastTest.js';
+import AuthCallback from './pages/AuthCallback.js';
 
 // Components
 import Layout from './components/Layout.js';
@@ -172,7 +173,7 @@ const AppContent = () => {
       console.log('[App] Auth check triggered for path:', location.pathname);
       
       // Skip check if we're on a public route
-      const isPublicRoute = ['/', '/login', '/register', '/reset-password', '/reset-password-confirm'].includes(location.pathname);
+      const isPublicRoute = ['/', '/login', '/register', '/reset-password', '/reset-password-confirm', '/auth/callback'].includes(location.pathname);
       
       // Allow access if we have stored user data, even during auth check
       const hasStoredUser = localStorage.getItem('trashdrop_user');
@@ -231,6 +232,7 @@ const AppContent = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/reset-password-confirm" element={<ResetPasswordConfirm />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             
             {/* Root route: if authenticated, go to dashboard; else login */}
             <Route

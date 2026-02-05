@@ -69,13 +69,14 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const [addressError, setAddressError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [gpsHint, setGpsHint] = useState(''); // Help text for poor GPS accuracy
 
   // Initialize form data with default values if not provided
   useEffect(() => {
     updateFormData({
       ...formData,
-      latitude: formData.latitude || position[0],
-      longitude: formData.longitude || position[1],
+      latitude: formData.latitude || (position ? position[0] : null),
+      longitude: formData.longitude || (position ? position[1] : null),
       address: formData.address || '',
       useCurrentLocation: formData.useCurrentLocation || false
     });
@@ -188,30 +189,79 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const reverseGeocode = async (latitude, longitude) => {
     try {
       console.log('[LocationStep] Reverse geocoding:', latitude, longitude);
-      // Note: User-Agent cannot be set in browser fetch (forbidden header)
-      // Use email parameter for identification per Nominatim usage policy
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@trashdrop.app`
-      );
       
-      console.log('[LocationStep] Nominatim response status:', response.status);
+      // Try multiple geocoding services for reliability
+      let addressFound = null;
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[LocationStep] Reverse geocoding result:', data);
-        if (data.display_name) {
-          setAddressInput(data.display_name);
-          updateFormData({ address: data.display_name });
-          console.log('[LocationStep] Address set to:', data.display_name);
-          return true;
+      // Try 1: Nominatim (OpenStreetMap)
+      try {
+        const nominatimResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@trashdrop.app`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        
+        if (nominatimResponse.ok) {
+          const data = await nominatimResponse.json();
+          console.log('[LocationStep] Nominatim result:', data);
+          
+          if (data.display_name) {
+            addressFound = data.display_name;
+          } else if (data.address) {
+            // Build address from parts
+            const parts = [];
+            if (data.address.road) parts.push(data.address.road);
+            if (data.address.suburb) parts.push(data.address.suburb);
+            if (data.address.city || data.address.town || data.address.village) {
+              parts.push(data.address.city || data.address.town || data.address.village);
+            }
+            if (data.address.country) parts.push(data.address.country);
+            if (parts.length > 0) {
+              addressFound = parts.join(', ');
+            }
+          }
+        }
+      } catch (nominatimError) {
+        console.warn('[LocationStep] Nominatim failed:', nominatimError.message);
+      }
+      
+      // Try 2: BigDataCloud (free, no API key needed)
+      if (!addressFound) {
+        try {
+          const bigDataResponse = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+          
+          if (bigDataResponse.ok) {
+            const data = await bigDataResponse.json();
+            console.log('[LocationStep] BigDataCloud result:', data);
+            
+            if (data.locality || data.city || data.principalSubdivision) {
+              const parts = [];
+              if (data.locality) parts.push(data.locality);
+              if (data.city && data.city !== data.locality) parts.push(data.city);
+              if (data.principalSubdivision) parts.push(data.principalSubdivision);
+              if (data.countryName) parts.push(data.countryName);
+              addressFound = parts.join(', ');
+            }
+          }
+        } catch (bigDataError) {
+          console.warn('[LocationStep] BigDataCloud failed:', bigDataError.message);
         }
       }
+      
+      if (addressFound) {
+        console.log('[LocationStep] Address found:', addressFound);
+        setAddressInput(addressFound);
+        updateFormData({ address: addressFound });
+        return true;
+      }
+      
     } catch (error) {
       console.warn('[LocationStep] Reverse geocoding error:', error);
     }
     
-    // Fallback to coordinates
-    const fallbackAddress = `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    // Fallback: Generate a meaningful location description
+    const fallbackAddress = `Near ${latitude.toFixed(4)}°N, ${Math.abs(longitude).toFixed(4)}°W`;
     setAddressInput(fallbackAddress);
     updateFormData({ address: fallbackAddress });
     console.log('[LocationStep] Using coordinate fallback:', fallbackAddress);
@@ -241,10 +291,9 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         throw new Error('Geolocation not supported');
       }
       
-      // STRICT GPS: High accuracy required, no caching
-      // Collectors need precise locations (≤5m accuracy)
+      // Request high accuracy GPS
       const locationResult = await GeolocationService.getCurrentPosition({
-        enableHighAccuracy: true, // REQUIRED for ≤5m accuracy
+        enableHighAccuracy: true,
         timeout: 30000, // 30 seconds to get GPS lock
         maximumAge: 0, // NO cached positions - always fresh GPS
         silentFallback: false
@@ -263,14 +312,21 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         // Reverse geocode to get address
         await reverseGeocode(latitude, longitude);
 
-        toastService.success(`Location obtained! (Accuracy: ${accuracy?.toFixed(1) || 'N/A'}m)`);
+        // Show hint if accuracy is poor, but still accept the reading
+        if (locationResult.accuracyWarning) {
+          setGpsHint(`GPS accuracy is ${accuracy?.toFixed(0)}m. For better accuracy, move to an open area away from buildings.`);
+          toastService.info(`Location captured (${accuracy?.toFixed(0)}m accuracy). Move outdoors for better precision.`);
+        } else {
+          setGpsHint('');
+          toastService.success(`Location obtained! (Accuracy: ${accuracy?.toFixed(1) || 'N/A'}m)`);
+        }
         setLoadingLocation(false);
         
       } else {
-        // GPS failed to meet accuracy requirements - show error
-        const errorMsg = locationResult.error?.message || 'Could not get precise GPS location';
+        // GPS completely failed - show error but don't block
+        const errorMsg = locationResult.error?.message || 'Could not get GPS location';
         console.error('[LocationStep] GPS failed:', errorMsg);
-        toastService.error(`GPS Error: ${errorMsg}. Please move to an open area and try again.`);
+        toastService.error(`GPS Error: ${errorMsg}`);
         updateFormData({ useCurrentLocation: false });
         setLoadingLocation(false);
       }
@@ -340,6 +396,14 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             Use my current location <span className="text-red-500">*</span>
           </label>
         </div>
+        {gpsHint && (
+          <p className="mt-2 text-sm text-amber-600 dark:text-amber-400 flex items-start">
+            <svg className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {gpsHint}
+          </p>
+        )}
       </div>
       
       <div className="mb-4">
@@ -365,7 +429,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </label>
         <div className="h-48 rounded-lg overflow-hidden border border-gray-300">
           <MapContainer 
-            center={position} 
+            center={position || [5.6037, -0.1870]} 
             zoom={13} 
             style={{ height: '100%', width: '100%' }}
             whenCreated={(map) => {

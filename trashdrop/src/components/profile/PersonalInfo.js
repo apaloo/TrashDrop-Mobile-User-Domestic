@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import { userService } from '../../services/userService.js';
 import supabase from '../../utils/supabaseClient.js';
+
+// Module-level cache to persist across remounts
+const profileCache = {
+  userId: null,
+  data: null,
+  loaded: false
+};
 
 /**
  * Personal Information tab component for the Profile page
@@ -9,6 +16,7 @@ import supabase from '../../utils/supabaseClient.js';
  */
 const PersonalInfo = () => {
   const { user } = useAuth();
+  const isMountedRef = useRef(true);
   
   // User data state
   const [userData, setUserData] = useState({
@@ -36,16 +44,38 @@ const PersonalInfo = () => {
     memberSince: ''
   });
 
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Load profile data from Supabase on component mount
   useEffect(() => {
     const loadProfileData = async () => {
       if (!user?.id) {
+        if (isMountedRef.current) setIsLoading(false);
+        return;
+      }
+      
+      // Use module-level cache to prevent reload on remount
+      // But invalidate if cache has empty names and user_metadata has full_name
+      const cacheHasEmptyNames = profileCache.data && !profileCache.data.firstName && !profileCache.data.lastName;
+      const userHasFullName = user.user_metadata?.full_name;
+      const shouldInvalidateCache = cacheHasEmptyNames && userHasFullName;
+      
+      if (profileCache.loaded && profileCache.userId === user.id && profileCache.data && !shouldInvalidateCache) {
+        console.log('[PersonalInfo] Using cached profile data');
+        setUserData(profileCache.data);
+        setFormData(profileCache.data);
         setIsLoading(false);
         return;
       }
       
       try {
-        setIsLoading(true);
+        if (isMountedRef.current) setIsLoading(true);
         console.log('[PersonalInfo] Loading profile for user:', user.id);
         
         // Fetch user profile from Supabase
@@ -79,6 +109,11 @@ const PersonalInfo = () => {
           setUserData(loadedData);
           setFormData(loadedData);
           
+          // Update module-level cache
+          profileCache.userId = user.id;
+          profileCache.data = loadedData;
+          profileCache.loaded = true;
+          
           // Also cache in localStorage for offline access
           localStorage.setItem(`profile_${user.id}`, JSON.stringify(loadedData));
           console.log('[PersonalInfo] Profile loaded successfully');
@@ -94,15 +129,26 @@ const PersonalInfo = () => {
               const fallbackData = { ...userData, ...parsedProfile, email: user.email };
               setUserData(fallbackData);
               setFormData(fallbackData);
+              
+              // Update module-level cache
+              profileCache.userId = user.id;
+              profileCache.data = fallbackData;
+              profileCache.loaded = true;
+              
               console.log('[PersonalInfo] Loaded from localStorage');
             } catch (err) {
               console.error('[PersonalInfo] Error parsing cached profile:', err);
             }
           } else {
-            // Set default data for new user
+            // Set default data for new user - use full_name from user_metadata if available
+            const fullName = user.user_metadata?.full_name || '';
+            const nameParts = fullName.trim().split(' ').filter(n => n);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+            
             const defaultData = {
-              firstName: '',
-              lastName: '',
+              firstName: firstName,
+              lastName: lastName,
               email: user.email || '',
               phone: '',
               address: '',
@@ -111,20 +157,30 @@ const PersonalInfo = () => {
             };
             setUserData(defaultData);
             setFormData(defaultData);
-            console.log('[PersonalInfo] Initialized with default data');
+            
+            // Update module-level cache with default data
+            profileCache.userId = user.id;
+            profileCache.data = defaultData;
+            profileCache.loaded = true;
+            
+            console.log('[PersonalInfo] Initialized with data from user_metadata:', { firstName, lastName });
           }
         }
       } catch (error) {
         console.error('[PersonalInfo] Error in loadProfileData:', error);
-        setSaveMessage({ type: 'error', text: 'Failed to load profile data' });
-        setTimeout(() => setSaveMessage(null), 3000);
+        if (isMountedRef.current) {
+          setSaveMessage({ type: 'error', text: 'Failed to load profile data' });
+          setTimeout(() => setSaveMessage(null), 3000);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     };
     
     loadProfileData();
-  }, [user]);
+  }, [user?.id]);
 
   // Handle form input changes
   const handleChange = (e) => {

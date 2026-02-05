@@ -73,7 +73,7 @@ const Preferences = () => {
     };
     
     loadPreferences();
-  }, [user]);
+  }, [user?.id]);
   
   // Handle toggle changes
   const handleToggleChange = (name) => {

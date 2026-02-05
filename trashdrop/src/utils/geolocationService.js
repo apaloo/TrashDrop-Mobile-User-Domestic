@@ -10,15 +10,15 @@ class GeolocationService {
   /**
    * NO DEFAULT LOCATION - Always require actual GPS data
    * Geolocation failures will return null coordinates
-   * Collectors need precise locations (≤5m accuracy)
    */
   static DEFAULT_LOCATION = null;
   
   /**
-   * Required GPS accuracy in meters
-   * Positions with accuracy > this value will be rejected
+   * Target GPS accuracy in meters
+   * Positions with accuracy > this value will show a hint to move outdoors
+   * 10m is ideal for precise bin location
    */
-  static REQUIRED_ACCURACY_METERS = 5;
+  static REQUIRED_ACCURACY_METERS = 10;
 
   /**
    * Get current user location with improved error handling and fallbacks
@@ -30,8 +30,8 @@ class GeolocationService {
    * @returns {Promise<Object>} Location data with success/error information
    */
   static async getCurrentPosition(options = {}) {
-    // STRICT GPS SETTINGS for ≤5m accuracy - NO CACHING
-    // Collectors need precise locations, so we enforce high accuracy
+    // GPS SETTINGS - request high accuracy but accept reasonable values
+    // 50m accuracy is sufficient for locating a house/building
     const attemptOptions = [
       // First attempt: High accuracy, no cache
       {
@@ -77,39 +77,59 @@ class GeolocationService {
     // Try multiple approaches in sequence
     let lastError = null;
 
-    // First try the browser's geolocation API with different options
+    // Try to get the best GPS reading we can
+    let bestPosition = null;
+    
     for (let i = 0; i < attemptOptions.length; i++) {
       try {
         console.log(`Geolocation attempt ${i+1} with options:`, attemptOptions[i]);
         const position = await this._getPositionPromise(attemptOptions[i]);
-        
-        // Check if accuracy meets our ≤5m requirement
         const accuracy = position.coords.accuracy;
-        console.log(`GPS accuracy: ${accuracy}m (required: ≤${this.REQUIRED_ACCURACY_METERS}m)`);
+        console.log(`GPS accuracy: ${accuracy}m (target: ≤${this.REQUIRED_ACCURACY_METERS}m)`);
         
-        if (accuracy > this.REQUIRED_ACCURACY_METERS) {
-          console.warn(`GPS accuracy ${accuracy}m exceeds ${this.REQUIRED_ACCURACY_METERS}m requirement, retrying...`);
-          lastError = { code: 'ACCURACY_TOO_LOW', message: `GPS accuracy ${accuracy.toFixed(1)}m is too low. Need ≤${this.REQUIRED_ACCURACY_METERS}m.` };
-          // Continue to next attempt for better accuracy
-          continue;
+        // Keep track of best position found
+        if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
         }
         
-        // Accuracy is acceptable
-        return {
-          coords: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: accuracy
-          },
-          timestamp: position.timestamp,
-          source: 'browser',
-          success: true
-        };
+        // If accuracy is good enough, return immediately
+        if (accuracy <= this.REQUIRED_ACCURACY_METERS) {
+          return {
+            coords: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: accuracy
+            },
+            timestamp: position.timestamp,
+            source: 'browser',
+            success: true,
+            accuracyWarning: false
+          };
+        }
+        
+        // Accuracy not ideal, but continue trying
+        console.log(`GPS accuracy ${accuracy}m exceeds target ${this.REQUIRED_ACCURACY_METERS}m, trying for better...`);
       } catch (error) {
         console.warn(`Geolocation attempt ${i+1} failed:`, error);
         lastError = error;
-        // Continue to next attempt
       }
+    }
+    
+    // If we have any position (even with poor accuracy), return it with a warning
+    if (bestPosition) {
+      const accuracy = bestPosition.coords.accuracy;
+      console.log(`Returning best available position with accuracy: ${accuracy}m`);
+      return {
+        coords: {
+          latitude: bestPosition.coords.latitude,
+          longitude: bestPosition.coords.longitude,
+          accuracy: accuracy
+        },
+        timestamp: bestPosition.timestamp,
+        source: 'browser',
+        success: true,
+        accuracyWarning: accuracy > this.REQUIRED_ACCURACY_METERS
+      };
     }
     
     // If we reach here, all browser geolocation attempts failed
@@ -147,10 +167,6 @@ class GeolocationService {
    * @returns {string} User-friendly error message
    */
   static _getErrorMessage(error) {
-    // Handle accuracy-specific errors
-    if (error.code === 'ACCURACY_TOO_LOW') {
-      return error.message;
-    }
     
     // Handle standard geolocation API errors
     if (error.code) {

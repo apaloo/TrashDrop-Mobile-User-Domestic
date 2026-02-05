@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import { useTheme } from '../context/ThemeContext.js';
@@ -24,6 +24,22 @@ const NavBar = () => {
   const navigate = useNavigate();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const dropdownRef = useRef(null);
+
+  // Get user initials from name
+  const getUserInitials = () => {
+    // Try user_metadata.full_name first
+    const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+    if (fullName) {
+      const names = fullName.trim().split(' ').filter(n => n);
+      if (names.length >= 2) {
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+      }
+      return names[0]?.[0]?.toUpperCase() || 'U';
+    }
+    // Fallback to email first letter
+    return user?.email?.[0]?.toUpperCase() || 'U';
+  };
 
   const handleSignOut = async () => {
     console.log('[NavBar] Sign out initiated');
@@ -53,6 +69,25 @@ const NavBar = () => {
   const toggleProfileDropdown = () => {
     setProfileDropdownOpen(!profileDropdownOpen);
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [profileDropdownOpen]);
 
   // Fetch unread notifications count
   useEffect(() => {
@@ -129,13 +164,13 @@ const NavBar = () => {
 
           {/* Mobile User Profile */}
           {isAuthenticated && (
-            <div className="md:hidden relative">
+            <div className="md:hidden relative" ref={dropdownRef}>
               <button 
                 onClick={toggleProfileDropdown}
                 className="flex items-center space-x-1 text-[#4CAF50] focus:outline-none"
               >
-                <div className="w-8 h-8 rounded-full bg-[#4CAF50] flex items-center justify-center text-white">
-                  {user?.name?.charAt(0) || 'U'}
+                <div className="w-8 h-8 rounded-full bg-[#4CAF50] flex items-center justify-center text-white text-sm font-medium">
+                  {getUserInitials()}
                 </div>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

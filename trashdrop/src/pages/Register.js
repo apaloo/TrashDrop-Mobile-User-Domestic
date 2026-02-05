@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
+import toastService from '../services/toastService.js';
 
 /**
  * Register page component for new user registration
  */
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 const Register = () => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
+  const isMountedRef = useRef(true);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -21,6 +25,13 @@ const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -30,6 +41,12 @@ const Register = () => {
   };
 
   const validateForm = () => {
+    // Email format validation
+    if (!EMAIL_REGEX.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    
     // Password validation
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters long');
@@ -69,18 +86,34 @@ const Register = () => {
       const { success, error, data } = await signUp(formData.email, formData.password, userData);
       
       if (success) {
-        setSuccessMessage('Registration successful! Please check your email for verification.');
+        toastService.success(
+          '🎉 Welcome to TrashDrop! Your account has been created successfully.',
+          { duration: 6000 }
+        );
+        setSuccessMessage(
+          'Registration successful! Here\'s what to do next:\n\n' +
+          '1. Check your email inbox (and spam folder) for a verification link\n' +
+          '2. Click the link to verify your email address\n' +
+          '3. Return to the app and sign in with your credentials\n\n' +
+          'Redirecting to login page...'
+        );
         setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+          if (isMountedRef.current) {
+            navigate('/login');
+          }
+        }, 5000);
       } else {
         setError(error || 'Failed to register');
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      if (isMountedRef.current) {
+        setError('An unexpected error occurred');
+      }
       console.error('Registration error:', err);
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -103,7 +136,8 @@ const Register = () => {
 
         {successMessage && (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{successMessage}</span>
+            <div className="font-semibold mb-2">✅ Registration Successful!</div>
+            <div className="text-sm whitespace-pre-line">{successMessage.replace('Registration successful! ', '')}</div>
           </div>
         )}
 

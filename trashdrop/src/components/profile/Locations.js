@@ -219,7 +219,7 @@ const Locations = () => {
     };
     
     loadLocations();
-  }, [user]);
+  }, [user?.id]);
 
   // Handle form input changes
   const handleChange = (e) => {

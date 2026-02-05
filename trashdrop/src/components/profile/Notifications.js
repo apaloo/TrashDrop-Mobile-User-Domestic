@@ -87,7 +87,7 @@ const Notifications = () => {
     };
     
     loadNotificationPreferences();
-  }, [user]);
+  }, [user?.id]);
   
   // Handle master toggle changes
   const handleMasterToggle = (type) => {

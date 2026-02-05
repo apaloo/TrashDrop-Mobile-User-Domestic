@@ -16,6 +16,7 @@ import ReviewStep from '../components/digitalBin/ReviewStep.js';
 import ScheduledQRTab from '../components/digitalBin/ScheduledQRTab.js';
 import { getCostBreakdown } from '../utils/costCalculator.js';
 import { prepareDigitalBinData } from '../services/digitalBinService.js';
+import useGpsRefinement from '../hooks/useGpsRefinement.js';
 
 
 /**
@@ -72,7 +73,29 @@ function DigitalBin() {
     
     // Internal state
     savedLocations: [],
-    isNewLocation: true
+    isNewLocation: true,
+    
+    // GPS accuracy tracking
+    gps_accuracy: null
+  });
+  
+  // Background GPS refinement - runs on pages 1-4, stops on summary page (5)
+  // This improves GPS precision while user fills out the form
+  const { bestPosition, isRefining, refinementCount } = useGpsRefinement({
+    isActive: viewMode === 'create' && currentStep < 5, // Active during form, stops on summary
+    initialLatitude: formData.latitude,
+    initialLongitude: formData.longitude,
+    initialAccuracy: formData.gps_accuracy,
+    pollInterval: 5000, // Check every 5 seconds
+    onImprovedPosition: (newPosition) => {
+      console.log(`[DigitalBin] GPS improved: ${newPosition.accuracy}m`);
+      setFormData(prev => ({
+        ...prev,
+        latitude: newPosition.latitude,
+        longitude: newPosition.longitude,
+        gps_accuracy: newPosition.accuracy
+      }));
+    }
   });
   
   // Progress indicator helper
@@ -193,6 +216,8 @@ function DigitalBin() {
             waste_type,
             bag_count,
             is_active,
+            status,
+            collected_at,
             expires_at,
             created_at,
             updated_at,
@@ -214,7 +239,9 @@ function DigitalBin() {
             ...pickup,
             location_name: pickup.bin_locations?.location_name,
             address: pickup.bin_locations?.address,
-            status: pickup.is_active ? 'active' : 'cancelled'
+            status: pickup.collected_at ? 'completed' : 
+                    (pickup.status === 'completed' || pickup.status === 'disposed') ? 'completed' :
+                    pickup.is_active ? 'active' : 'cancelled'
           };
           console.log(`[DigitalBin] Transformed bin:`, transformed);
           return transformed;
@@ -223,6 +250,8 @@ function DigitalBin() {
         // NO CACHING: Pure server-first approach
         console.log(`[DigitalBin] Server returned ${transformedBins.length} digital bins`);
         console.log(`[DigitalBin] Active bins: ${transformedBins.filter(b => b.status === 'active').length}`);
+        console.log(`[DigitalBin] Completed bins: ${transformedBins.filter(b => b.status === 'completed').length}`);
+        console.log(`[DigitalBin] Cancelled bins: ${transformedBins.filter(b => b.status === 'cancelled').length}`);
         
         setScheduledPickups(transformedBins);
         setLastUpdated(new Date());
@@ -986,6 +1015,19 @@ function DigitalBin() {
                       <span className="text-xs text-center hidden sm:block dark:text-gray-300">{getStepTitle(step)}</span>
                     </div>
                   ))}
+                </div>
+                
+                {/* GPS Accuracy Indicator - shows during pages 1-4 when we have coordinates */}
+                <div className={`mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-between text-sm ${currentStep < 5 && formData.latitude && formData.longitude ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-block w-2 h-2 rounded-full ${isRefining ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></span>
+                    <span className="text-blue-700 dark:text-blue-300">
+                      GPS Accuracy: {formData.gps_accuracy ? `${formData.gps_accuracy.toFixed(1)}m` : 'Measuring...'}
+                    </span>
+                  </div>
+                  <span className={`text-xs ${isRefining ? 'text-blue-600 dark:text-blue-400' : refinementCount > 0 ? 'text-green-600 dark:text-green-400' : 'hidden'}`}>
+                    {isRefining ? 'Refining...' : refinementCount > 0 ? `✓ Improved ${refinementCount}x` : ''}
+                  </span>
                 </div>
                 
                 {/* Form steps */}
