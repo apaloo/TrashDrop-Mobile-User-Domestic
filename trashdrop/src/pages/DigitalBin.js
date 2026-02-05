@@ -516,26 +516,18 @@ function DigitalBin() {
         
         console.log('Initial coordinates from formData:', { latitude, longitude });
         
-        // If coordinates are not available, use default location (Accra, Ghana)
+        // NO FALLBACK - require actual GPS coordinates
+        // Collectors need precise locations (≤5m accuracy), cannot accept default/approximate positions
         if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
-          console.log('No coordinates provided, using default location (Accra, Ghana)');
-          
-          try {
-            const defaultCoords = GeolocationService.DEFAULT_LOCATION;
-            console.log('GeolocationService default coords:', defaultCoords);
-            latitude = defaultCoords.latitude;
-            longitude = defaultCoords.longitude;
-          } catch (error) {
-            console.error('Error accessing GeolocationService.DEFAULT_LOCATION:', error);
-            throw new Error('Location coordinates are required. Please enable location services and try again.');
-          }
-          
-          // Final validation - ensure we have valid numbers
-          if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
-              isNaN(latitude) || isNaN(longitude)) {
-            console.error('Invalid coordinates detected'); 
-            throw new Error('Invalid location coordinates. Please enable location services and try again.');
-          }
+          console.error('[DigitalBin] No GPS coordinates provided - cannot proceed without precise location');
+          throw new Error('GPS location is required. Please enable location services, move to an open area, and try again.');
+        }
+        
+        // Validate coordinates are valid numbers
+        if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
+            isNaN(latitude) || isNaN(longitude)) {
+          console.error('[DigitalBin] Invalid coordinates detected:', { latitude, longitude }); 
+          throw new Error('Invalid GPS coordinates. Please get a fresh GPS reading and try again.');
         }
         
         console.log('Final coordinates for location creation:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });

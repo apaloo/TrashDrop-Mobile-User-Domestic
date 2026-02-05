@@ -57,13 +57,12 @@ const DraggableMarker = ({ position, setPosition }) => {
 const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const { user } = useAuth();
   
-  // Default location: Accra, Ghana (consistent with geolocationService)
-  const DEFAULT_LOCATION = [5.614736, -0.208811];
-  
+  // NO DEFAULT LOCATION - require actual GPS coordinates
+  // Start with null position until GPS provides real coordinates
   const [position, setPosition] = useState(
     formData.latitude && formData.longitude 
       ? [formData.latitude, formData.longitude] 
-      : DEFAULT_LOCATION
+      : null // No fallback - require real GPS
   );
   const [savedLocations, setSavedLocations] = useState([]);
   const [addressInput, setAddressInput] = useState(formData.address || '');
@@ -242,69 +241,47 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         throw new Error('Geolocation not supported');
       }
       
-      // Try a single, quick geolocation attempt with immediate fallback
-      const locationPromise = GeolocationService.getCurrentPosition({
-        enableHighAccuracy: false, // Never use high accuracy to avoid Google API
-        timeout: 2000, // Very short timeout - just 2 seconds
-        maximumAge: 600000, // 10 minutes - use cached positions aggressively
-        silentFallback: false // Don't use service's internal fallback, we'll handle it
+      // STRICT GPS: High accuracy required, no caching
+      // Collectors need precise locations (≤5m accuracy)
+      const locationResult = await GeolocationService.getCurrentPosition({
+        enableHighAccuracy: true, // REQUIRED for ≤5m accuracy
+        timeout: 30000, // 30 seconds to get GPS lock
+        maximumAge: 0, // NO cached positions - always fresh GPS
+        silentFallback: false
       });
-      
-      // Race the geolocation against a quick timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Quick timeout for immediate fallback')), 2500);
-      });
-      
-      const locationResult = await Promise.race([locationPromise, timeoutPromise]);
       
       console.log('Location result:', locationResult);
       
       if (locationResult.success && locationResult.coords) {
-        const { latitude, longitude } = locationResult.coords;
+        const { latitude, longitude, accuracy } = locationResult.coords;
+        
+        console.log(`[LocationStep] GPS obtained: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
         
         setPosition([latitude, longitude]);
-        updateFormData({ latitude, longitude });
+        updateFormData({ latitude, longitude, gps_accuracy: accuracy });
 
         // Reverse geocode to get address
         await reverseGeocode(latitude, longitude);
 
-        // Show success message based on source
-        if (locationResult.source === 'default') {
-          toastService.info('Using approximate location. You can adjust it on the map.');
-        } else {
-          toastService.success('Location obtained successfully!');
-        }
-        
+        toastService.success(`Location obtained! (Accuracy: ${accuracy?.toFixed(1) || 'N/A'}m)`);
         setLoadingLocation(false);
         
       } else {
-        // GeolocationService provided fallback coordinates - still try to reverse geocode
-        const { latitude, longitude } = locationResult.coords;
-        
-        setPosition([latitude, longitude]);
-        updateFormData({ latitude, longitude });
-        
-        // Try reverse geocoding for fallback too
-        await reverseGeocode(latitude, longitude);
-        
-        toastService.info('Using approximate location. You can adjust it on the map.');
+        // GPS failed to meet accuracy requirements - show error
+        const errorMsg = locationResult.error?.message || 'Could not get precise GPS location';
+        console.error('[LocationStep] GPS failed:', errorMsg);
+        toastService.error(`GPS Error: ${errorMsg}. Please move to an open area and try again.`);
+        updateFormData({ useCurrentLocation: false });
         setLoadingLocation(false);
       }
       
     } catch (error) {
       console.error('[LocationStep] GeolocationService error:', error);
       
-      // Use default location (Accra, Ghana) as fallback
-      const [defaultLat, defaultLng] = DEFAULT_LOCATION;
-      
-      setPosition(DEFAULT_LOCATION);
-      updateFormData({ latitude: defaultLat, longitude: defaultLng });
-      
-      // Try to reverse geocode even for default location
-      await reverseGeocode(defaultLat, defaultLng);
-      
-      toastService.info('Using default location. Please adjust the marker on the map to your actual location.');
-      
+      // NO FALLBACK - require actual GPS
+      // Collectors need precise locations, cannot accept approximate positions
+      toastService.error('Could not get GPS location. Please ensure location services are enabled and you are in an open area.');
+      updateFormData({ useCurrentLocation: false });
       setLoadingLocation(false);
     }
   };

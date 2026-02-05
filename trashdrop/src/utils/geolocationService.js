@@ -9,9 +9,16 @@ import appConfig from './app-config.js';
 class GeolocationService {
   /**
    * NO DEFAULT LOCATION - Always require actual GPS data
-   * geolocation failures will return null coordinates
+   * Geolocation failures will return null coordinates
+   * Collectors need precise locations (≤5m accuracy)
    */
   static DEFAULT_LOCATION = null;
+  
+  /**
+   * Required GPS accuracy in meters
+   * Positions with accuracy > this value will be rejected
+   */
+  static REQUIRED_ACCURACY_METERS = 5;
 
   /**
    * Get current user location with improved error handling and fallbacks
@@ -23,41 +30,35 @@ class GeolocationService {
    * @returns {Promise<Object>} Location data with success/error information
    */
   static async getCurrentPosition(options = {}) {
-    // Track attempts for retrying with progressive timeouts and options
+    // STRICT GPS SETTINGS for ≤5m accuracy - NO CACHING
+    // Collectors need precise locations, so we enforce high accuracy
     const attemptOptions = [
-      // First attempt: Quick attempt with cached position (reduced timeout for better UX)
-      {
-        enableHighAccuracy: false,
-        timeout: 5000, // Reduced from 10s to 5s for better user experience
-        maximumAge: 1200000, // 20 minutes - much longer to use cached positions
-      },
-      // Second attempt: Standard timeout
-      {
-        enableHighAccuracy: false,
-        timeout: 10000, // Reduced from 25s to 10s
-        maximumAge: 600000, // 10 minutes
-      },
-      // Third attempt: Medium timeout with high accuracy
+      // First attempt: High accuracy, no cache
       {
         enableHighAccuracy: true,
-        timeout: 15000, // Reduced from 40s to 15s
-        maximumAge: 300000, // 5 minutes
+        timeout: 15000, // 15 seconds for GPS lock
+        maximumAge: 0, // NO cached positions - always get fresh GPS
       },
-      // Last attempt: Longer timeout with any accuracy
+      // Second attempt: Longer timeout for difficult conditions
       {
-        enableHighAccuracy: false,
-        timeout: 20000, // Reduced from 60s to 20s for better user experience
-        maximumAge: 3600000, // Accept positions up to an hour old
+        enableHighAccuracy: true,
+        timeout: 30000, // 30 seconds
+        maximumAge: 0, // NO cached positions
+      },
+      // Third attempt: Even longer timeout
+      {
+        enableHighAccuracy: true,
+        timeout: 45000, // 45 seconds
+        maximumAge: 0, // NO cached positions
       }
     ];
     
-    // Override with user options if specified
-    if (options.timeout || options.enableHighAccuracy !== undefined || options.maximumAge) {
-      // Only override the first attempt but keep the fallback attempts
+    // Override timeout only - always enforce high accuracy and no cache
+    if (options.timeout) {
       attemptOptions[0] = {
-        enableHighAccuracy: options.enableHighAccuracy !== undefined ? options.enableHighAccuracy : false,
-        timeout: options.timeout || 15000,
-        maximumAge: options.maximumAge || 600000,
+        enableHighAccuracy: true, // ALWAYS high accuracy
+        timeout: options.timeout,
+        maximumAge: 0, // NEVER use cached positions
       };
     }
 
@@ -82,12 +83,23 @@ class GeolocationService {
         console.log(`Geolocation attempt ${i+1} with options:`, attemptOptions[i]);
         const position = await this._getPositionPromise(attemptOptions[i]);
         
-        // If we got here, geolocation succeeded
+        // Check if accuracy meets our ≤5m requirement
+        const accuracy = position.coords.accuracy;
+        console.log(`GPS accuracy: ${accuracy}m (required: ≤${this.REQUIRED_ACCURACY_METERS}m)`);
+        
+        if (accuracy > this.REQUIRED_ACCURACY_METERS) {
+          console.warn(`GPS accuracy ${accuracy}m exceeds ${this.REQUIRED_ACCURACY_METERS}m requirement, retrying...`);
+          lastError = { code: 'ACCURACY_TOO_LOW', message: `GPS accuracy ${accuracy.toFixed(1)}m is too low. Need ≤${this.REQUIRED_ACCURACY_METERS}m.` };
+          // Continue to next attempt for better accuracy
+          continue;
+        }
+        
+        // Accuracy is acceptable
         return {
           coords: {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
+            accuracy: accuracy
           },
           timestamp: position.timestamp,
           source: 'browser',
@@ -103,21 +115,10 @@ class GeolocationService {
     // If we reach here, all browser geolocation attempts failed
     console.warn('All browser geolocation attempts failed. Trying Google Maps API as backup.');
     
-    // Try Google Maps Geolocation API as backup if API key is available
-    if (appConfig.maps.googleApiKey) {
-      try {
-        const googleLocation = await this._getGoogleMapsLocation();
-        if (googleLocation && googleLocation.success) {
-          console.log('Successfully obtained location from Google Maps API');
-          return googleLocation;
-        }
-      } catch (googleError) {
-        console.warn('Google Maps Geolocation API failed:', googleError);
-        lastError = googleError;
-      }
-    } else {
-      console.warn('No Google Maps API key available for backup geolocation');
-    }
+    // Google Maps Geolocation API is NOT suitable for ≤5m accuracy
+    // It uses cell towers/WiFi/IP which gives 100-1000m+ accuracy
+    // Skip it entirely for precision requirements
+    console.warn('[GPSService] All browser GPS attempts failed. Google Maps API skipped (insufficient accuracy for ≤5m requirement).');
     
     // If we reach here, all attempts including Google Maps API failed
     console.error('All geolocation attempts failed. No default location available.');
@@ -146,32 +147,31 @@ class GeolocationService {
    * @returns {string} User-friendly error message
    */
   static _getErrorMessage(error) {
+    // Handle accuracy-specific errors
+    if (error.code === 'ACCURACY_TOO_LOW') {
+      return error.message;
+    }
+    
     // Handle standard geolocation API errors
     if (error.code) {
       switch(error.code) {
         case 1: // PERMISSION_DENIED
-          return '📍 Location permission denied. We\'re using an approximate location. You can adjust the position by tapping directly on the map.';
+          return 'Location permission denied. Please enable location services in your device settings and try again.';
         case 2: // POSITION_UNAVAILABLE
-          return '📡 GPS signal unavailable. We\'re using an approximate location. You can adjust the position by tapping directly on the map.';
+          return 'GPS signal unavailable. Please move to an open area with clear sky view and try again.';
         case 3: // TIMEOUT
-          return '⏱️ Location request timed out. We\'re using an approximate location. You can adjust the position by tapping directly on the map.';
+          return 'GPS signal too weak. Please move outdoors or to an area with better GPS reception.';
         default:
-          return error.message || 'Location error. Please tap on the map to set your position.';
+          return error.message || 'Could not get precise GPS location. Please try again in a different location.';
       }
-    }
-    
-    // Handle Google location provider specific errors that bubble up
-    if (error.message && (error.message.includes('Google') || error.message.includes('googleapis.com'))) {
-      console.warn('Google location service error:', error.message);
-      return '🗺️ Location service temporarily unavailable. You can tap on the map to set your exact position.';
     }
     
     // Handle network-related errors
     if (error.message && (error.message.includes('network') || error.message.includes('offline'))) {
-      return '📶 Network issue detecting location. You can tap on the map to set your position.';
+      return 'Network issue. Please check your internet connection and try again.';
     }
     
-    return error.message || '📍 Using approximate location. You can tap on the map to set your exact position.';
+    return error.message || 'Could not get precise GPS location. Please ensure location services are enabled and try again.';
   }
 
   /**

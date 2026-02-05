@@ -179,9 +179,9 @@ const DumpingReportForm = ({ onSuccess }) => {
         }
         
         const options = {
-          enableHighAccuracy: false, // Set to false to avoid Google API errors
-          timeout: 6000, // Shorter timeout for better user experience
-          maximumAge: 600000 // Accept cached positions up to 10 minutes old
+          enableHighAccuracy: true, // REQUIRED for ≤5m accuracy
+          timeout: 30000, // 30 seconds to get GPS lock
+          maximumAge: 0 // NO cached positions - always fresh GPS
         };
         
         navigator.geolocation.getCurrentPosition(
