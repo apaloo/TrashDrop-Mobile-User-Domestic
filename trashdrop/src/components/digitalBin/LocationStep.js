@@ -99,25 +99,43 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           setSavedLocations(parsedLocations);
         }
         
-        // Then fetch from Supabase to ensure we have the latest
-        const { data, error } = await supabase
+        // Fetch from bin_locations (primary table for digital bins)
+        const { data: binLocations, error: binError } = await supabase
+          .from('bin_locations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        // Also check legacy locations table for backward compatibility
+        const { data: legacyLocations, error: legacyError } = await supabase
           .from('locations')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (binError && legacyError) throw binError;
         
-        if (data && data.length > 0) {
+        // Combine locations from both tables, preferring bin_locations
+        const allLocations = [
+          ...(binLocations || []),
+          ...(legacyLocations || []).filter(legacy => 
+            !(binLocations || []).some(bin => 
+              bin.address === legacy.address && bin.location_name === legacy.name
+            )
+          )
+        ];
+        
+        if (allLocations.length > 0) {
           // Format locations to match component's expected structure
-          const formattedLocations = data.map(location => ({
+          const formattedLocations = allLocations.map(location => ({
             id: location.id,
-            name: location.name,
+            name: location.location_name || location.name,
             address: location.address || '',
             city: location.city || '',
             latitude: location.latitude,
             longitude: location.longitude,
-            synced: true
+            synced: true,
+            source: location.location_name ? 'bin_locations' : 'locations'
           }));
           
           console.log('Loaded user locations from Supabase in LocationStep:', formattedLocations);

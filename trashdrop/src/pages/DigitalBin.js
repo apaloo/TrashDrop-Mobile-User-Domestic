@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import { FaQrcode, FaPlus, FaSpinner, FaSync, FaTimes, FaPlusCircle } from 'react-icons/fa';
 import toastService from '../services/toastService.js';
+import debug from '../utils/debug.js';
 // QR storage removed - using server-first approach
 // Real-time and sync utilities removed - server-first approach only
 import GeolocationService from '../utils/geolocationService.js';
@@ -166,7 +167,7 @@ function DigitalBin() {
   const fetchData = async (showLoading = true) => {
     // Check if user is available before proceeding
     if (!user?.id) {
-      console.log('[DigitalBin] User not available, skipping data fetch');
+      debug.log('[DigitalBin] User not available, skipping data fetch');
       if (showLoading) {
         setIsLoading(false);
       }
@@ -202,7 +203,7 @@ function DigitalBin() {
   // Fetch scheduled pickups with location details for the current user - SERVER-FIRST APPROACH
   const fetchScheduledPickups = async (userId) => {
     try {
-      console.log('[DigitalBin] Fetching digital bins from server for user:', userId);
+      debug.log('[DigitalBin] Fetching digital bins from server for user:', userId);
 
       // SERVER-FIRST: Always fetch from server first
       try {
@@ -302,7 +303,7 @@ function DigitalBin() {
   useEffect(() => {
     // Don't redirect if auth is still loading
     if (authLoading) {
-      console.log('[DigitalBin] Auth is loading, waiting...');
+      debug.log('[DigitalBin] Auth is loading, waiting...');
       return;
     }
     
@@ -310,14 +311,14 @@ function DigitalBin() {
     if (process.env.NODE_ENV === 'development') {
       const hasStoredUser = localStorage.getItem('trashdrop_user');
       if (hasStoredUser && !user) {
-        console.log('[DigitalBin] Development mode - has stored user, waiting for auth to catch up');
+        debug.log('[DigitalBin] Development mode - has stored user, waiting for auth to catch up');
         return; // Don't redirect, let auth context catch up
       }
     }
     
     // Only redirect if auth is done loading and definitely no user
     if (!user && !authLoading) {
-      console.log('[DigitalBin] No user found after auth loading, redirecting to login');
+      debug.log('[DigitalBin] No user found after auth loading, redirecting to login');
       navigate('/login');
       return;
     }
@@ -334,7 +335,7 @@ function DigitalBin() {
   const loadData = async () => {
     // Check if user is available before proceeding
     if (!user?.id) {
-      console.log('[DigitalBin] User not available, skipping loadData');
+      debug.log('[DigitalBin] User not available, skipping loadData');
       setIsLoading(false);
       return;
     }
@@ -360,20 +361,14 @@ function DigitalBin() {
     }
   };
 
-  // Set up visibility change listener
+  // Set up visibility change listener (data loading handled by initial load effect)
   useEffect(() => {
-    // Load initial data only if user is available
-    if (user?.id) {
-      loadData();
-    }
-    
-    // Set up visibility change handler
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user?.id]); // Add user.id as dependency to re-run when user changes
+  }, []);
 
   // Handle data refresh when triggered
   useEffect(() => {
@@ -384,53 +379,42 @@ function DigitalBin() {
     }
   }, [refreshTrigger, user?.id]);
 
-  // Monitor route changes
+
+  // Set up online/offline listeners with proper closure handling
   useEffect(() => {
-    const checkRoute = () => {
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/digital-bin') {
-        navigate('/digital-bin');
+    const handleOnline = () => {
+      console.log('[Network] Online - fetching latest data');
+      if (user?.id) {
+        fetchData(false).catch(err => {
+          console.error('[Network] Error fetching data:', err);
+        });
       }
     };
 
-    // Set up route change handler
-    const handler = () => checkRoute();
-    window.addEventListener('popstate', handler);
-    return () => {
-      window.removeEventListener('popstate', handler);
+    const handleOffline = () => {
+      console.log('[Network] Offline - using localStorage cache');
+      // Don't call loadData() - it hits Supabase which fails offline
+      // Instead, rely on localStorage data already loaded in ScheduledQRTab
+      try {
+        const cached = localStorage.getItem('digitalBins');
+        if (cached) {
+          const bins = JSON.parse(cached);
+          console.log('[Network] Loaded', bins.length, 'bins from localStorage cache');
+          setScheduledPickups(bins);
+        }
+      } catch (err) {
+        console.error('[Network] Error loading cached data:', err);
+      }
     };
-  }, []);
-
-  // Handler for online events
-  const handleOnline = () => {
-    console.log('[Network] Online - fetching latest data');
-    if (user?.id) {
-      fetchData(false).catch(err => {
-        console.error('[Network] Error fetching data:', err);
-      });
-    }
-  };
-
-  const handleOffline = () => {
-    console.log('[Network] Offline - using cached data');
-    if (user?.id) {
-      loadData();
-    }
-  };
-
-  // Set up online/offline listeners
-  useEffect(() => {
-    const onlineHandler = () => handleOnline();
-    const offlineHandler = () => handleOffline();
     
-    window.addEventListener('online', onlineHandler);
-    window.addEventListener('offline', offlineHandler);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     
     return () => {
-      window.removeEventListener('online', onlineHandler);
-      window.removeEventListener('offline', offlineHandler);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-  }, []);  // Empty dependency array since handlers are stable
+  }, [user?.id]);  // Re-create handlers when user changes
 
   // Check if device is online
   const isOnline = () => {
@@ -474,10 +458,10 @@ function DigitalBin() {
           .single();
 
         if (!binLookupError && binLocation) {
-          console.log('[DigitalBin] Location found in bin_locations table:', binLocation);
+          debug.log('[DigitalBin] Location found in bin_locations table:', binLocation);
           locationId = binLocation.id;
         } else {
-          console.log('[DigitalBin] Location not found in bin_locations, checking locations table...');
+          debug.log('[DigitalBin] Location not found in bin_locations, checking locations table...');
           
           // Check if it exists in locations table
           const { data: legacyLocation, error: legacyLookupError } = await supabase
@@ -487,7 +471,7 @@ function DigitalBin() {
             .single();
 
           if (!legacyLookupError && legacyLocation) {
-            console.log('[DigitalBin] Location found in locations table, migrating to bin_locations:', legacyLocation);
+            debug.log('[DigitalBin] Location found in locations table, migrating to bin_locations:', legacyLocation);
             
             // Extract coordinates from PostGIS POINT format if separate lat/lng not available
             let latitude = legacyLocation.latitude;
@@ -499,7 +483,7 @@ function DigitalBin() {
               if (match) {
                 longitude = parseFloat(match[1]);
                 latitude = parseFloat(match[2]);
-                console.log('[DigitalBin] Parsed coordinates from PostGIS:', { latitude, longitude });
+                debug.log('[DigitalBin] Parsed coordinates from PostGIS:', { latitude, longitude });
               }
             }
             
@@ -520,19 +504,19 @@ function DigitalBin() {
                 .single();
                 
               if (!migrationError && newBinLocation) {
-                console.log('[DigitalBin] Successfully migrated location to bin_locations:', newBinLocation);
+                debug.log('[DigitalBin] Successfully migrated location to bin_locations:', newBinLocation);
                 locationId = newBinLocation.id;
               } else {
                 console.error('[DigitalBin] Failed to migrate location:', migrationError);
-                formData.location_id = null; // Clear invalid location_id, will create new
+                locationId = null; // Clear invalid location_id, will create new
               }
             } catch (migrationError) {
               console.error('[DigitalBin] Error during location migration:', migrationError);
-              formData.location_id = null; // Clear invalid location_id, will create new
+              locationId = null; // Clear invalid location_id, will create new
             }
           } else {
-            console.log('[DigitalBin] Location not found in either table, will create new one');
-            formData.location_id = null; // Clear invalid location_id
+            debug.log('[DigitalBin] Location not found in either table, will create new one');
+            locationId = null; // Clear invalid location_id
           }
         }
       }
@@ -583,7 +567,7 @@ function DigitalBin() {
         // First try 'bin_locations' table (as indicated by the foreign key error)
         try {
           console.log('Attempting to create location in bin_locations table');
-          console.log('[DigitalBin] Creating location with actual schema:', locationData);
+          debug.log('[DigitalBin] Creating location with actual schema:', locationData);
           
           // Try with timeout first
           let binLocationResult;
@@ -611,7 +595,7 @@ function DigitalBin() {
               throw new Error(`Failed to create location: ${insertOnlyResult.error.message}`);
             }
             
-            console.log('[DigitalBin] Insert succeeded without select, querying for location');
+            debug.log('[DigitalBin] Insert succeeded without select, querying for location');
             
             // Query for the location we just created
             const queryResult = await supabase
@@ -643,7 +627,7 @@ function DigitalBin() {
           }
           
           newLocation = binLocationResult.data;
-          console.log('[DigitalBin] Successfully created location:', newLocation);
+          debug.log('[DigitalBin] Successfully created location:', newLocation);
         } catch (binLocationError) {
           console.warn('bin_locations table completely failed, trying locations table:', binLocationError?.message || binLocationError);
           
@@ -784,9 +768,9 @@ function DigitalBin() {
       }
 
       // SERVER-FIRST: Always try to create in database first
-      console.log('[DigitalBin] Creating digital bin in database');
-      console.log('[DigitalBin] Location ID:', locationId);
-      console.log('[DigitalBin] User ID:', user.id);
+      debug.log('[DigitalBin] Creating digital bin in database');
+      debug.log('[DigitalBin] Location ID:', locationId);
+      debug.log('[DigitalBin] User ID:', user.id);
       
       // Prepare digital bin data with calculated fees
       // Ensure bag_count is always an integer
@@ -806,8 +790,8 @@ function DigitalBin() {
         longitude: formData.longitude
       });
       
-      console.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
-      console.log('[DigitalBin] Bag count being sent:', bagCount, '(from numberOfBags:', formData.numberOfBags, 'or bag_count:', formData.bag_count, ')');
+      debug.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
+      debug.log('[DigitalBin] Bag count being sent:', bagCount, '(from numberOfBags:', formData.numberOfBags, 'or bag_count:', formData.bag_count, ')');
       
       const { data: binData, error: binError} = await supabase
         .from('digital_bins')
@@ -825,10 +809,10 @@ function DigitalBin() {
         throw new Error('No data returned from digital bin creation');
       }
       
-      console.log('[DigitalBin] Successfully created digital bin:', binData);
+      debug.log('[DigitalBin] Successfully created digital bin:', binData);
 
       // SERVER-FIRST: Immediately refresh from server to get all bins
-      console.log('[DigitalBin] Digital bin created, refreshing from server');
+      debug.log('[DigitalBin] Digital bin created, refreshing from server');
       await fetchScheduledPickups(user.id);
 
       // Reset form and update UI
@@ -848,85 +832,41 @@ function DigitalBin() {
     }
   };
 
-  const createDigitalBin = async (locationData) => {
-    try {
-      // If locationData is just an ID, use it directly
-      let locationId = typeof locationData === 'string' ? locationData : null;
-      let location = null;
-
-      // If locationData is an object with full location details, create/update location first
-      if (!locationId && typeof locationData === 'object') {
-        const { data: locationResult, error: locationError } = await supabase
-          .from('locations')
-          .upsert({
-            user_id: user.id,
-            location_name: locationData.location_name,
-            address: locationData.address,
-            is_default: locationData.is_default
-          })
-          .select()
-          .single();
-
-        if (locationError) throw locationError;
-        location = locationResult;
-        locationId = location.id;
-      }
-
-      // Create digital bin with QR code
-      const qrCodeUrl = `https://trashdrop.app/bin/${locationId}`;
-      
-      // Prepare digital bin data with calculated fees
-      // Ensure bag_count is always an integer
-      const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
-      
-      const digitalBinData = await prepareDigitalBinData({
-        user_id: user.id,
-        location_id: locationId,
-        qr_code_url: qrCodeUrl,
-        frequency: formData.frequency,
-        waste_type: formData.waste_type || formData.wasteType,
-        bag_count: bagCount,
-        bin_size_liters: formData.bin_size_liters,
-        is_urgent: formData.is_urgent || false,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-        latitude: formData.latitude,
-        longitude: formData.longitude
-      });
-      
-      const { data: bin, error: binError } = await supabase
-        .from('digital_bins')
-        .insert(digitalBinData)
-        .select()
-        .single();
-
-      if (binError) {
-        throw new Error(`Error creating digital bin: ${binError.message}`);
-      }
-
-      return { location, bin };
-    } catch (error) {
-      console.error('Error creating digital bin:', error);
-      throw error;
-    }
-  };
-
   // Reset form helper
   const resetForm = () => {
     try {
       setFormData({
+        // Location details
         location_id: null,
         location_name: 'Home',
         address: '',
         latitude: null,
         longitude: null,
         is_default: true,
+        
+        // Schedule details
         frequency: 'one-time',
         startDate: '',
         preferredTime: 'morning',
+        
+        // Waste details (both UI and DB field names)
+        numberOfBags: 1,
         bag_count: 1,
+        wasteType: 'general',
         waste_type: 'general',
+        bin_size_liters: 120,
+        is_urgent: false,
+        
+        // Additional info
+        notes: '',
+        photos: [],
+        
+        // Internal state
         savedLocations: formData.savedLocations,
-        isNewLocation: true
+        isNewLocation: true,
+        
+        // GPS accuracy tracking
+        gps_accuracy: null
       });
 
       setCurrentStep(1);

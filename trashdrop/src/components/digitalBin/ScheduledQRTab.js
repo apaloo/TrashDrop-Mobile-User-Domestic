@@ -1,39 +1,40 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FaQrcode, FaPlus, FaSync } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext.js';
 import supabase from '../../utils/supabaseClient.js';
 import QRCodeList from './QRCodeList.js';
 import { subscribeToPickupUpdates, handlePickupUpdate } from '../../utils/realtime.js';
+import debug from '../../utils/debug.js';
 
 const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
 
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('active');
   const [localPickups, setLocalPickups] = useState([]);
-  const [subscription, setSubscription] = useState(null);
+  const subscriptionRef = useRef(null);  // Use ref to avoid stale closure in cleanup
   
   // Load persisted QR codes from localStorage on component mount
   useEffect(() => {
     const loadPersistedPickups = () => {
       try {
-        console.log('[ScheduledQRTab] Loading persisted pickups from localStorage');
+        debug.log('[ScheduledQRTab] Loading persisted pickups from localStorage');
         const storedPickups = localStorage.getItem('digitalBins');
-        console.log('[ScheduledQRTab] Raw localStorage data:', storedPickups);
+        debug.log('[ScheduledQRTab] Raw localStorage data:', storedPickups);
         
         if (storedPickups) {
           const parsedPickups = JSON.parse(storedPickups);
-          console.log('[ScheduledQRTab] Parsed pickups:', parsedPickups);
+          debug.log('[ScheduledQRTab] Parsed pickups:', parsedPickups);
           
           if (Array.isArray(parsedPickups)) {
             setLocalPickups(parsedPickups);
-            console.log('[ScheduledQRTab] Loaded', parsedPickups.length, 'digital bins from localStorage');
+            debug.log('[ScheduledQRTab] Loaded', parsedPickups.length, 'digital bins from localStorage');
             
             // Auto-select tab with most items or active tab by default
             const activeCount = parsedPickups.filter(p => p && (p.status === 'active' || p.status === 'in_service')).length;
             const completedCount = parsedPickups.filter(p => p && p.status === 'completed').length;
             const cancelledCount = parsedPickups.filter(p => p && p.status === 'cancelled').length;
             
-            console.log('[ScheduledQRTab] Counts - Active:', activeCount, 'Completed:', completedCount, 'Cancelled:', cancelledCount);
+            debug.log('[ScheduledQRTab] Counts - Active:', activeCount, 'Completed:', completedCount, 'Cancelled:', cancelledCount);
             
             // If there's a remembered tab in localStorage, use that
             const rememberedTab = localStorage.getItem('digitalBinActiveTab');
@@ -49,7 +50,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
             console.warn('[ScheduledQRTab] Parsed data is not an array:', parsedPickups);
           }
         } else {
-          console.log('[ScheduledQRTab] No stored pickups found in localStorage');
+          debug.log('[ScheduledQRTab] No stored pickups found in localStorage');
         }
       } catch (error) {
         console.error('[ScheduledQRTab] Error loading persisted digital bins:', error);
@@ -74,7 +75,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
           }
         );
         
-        setSubscription(binSubscription);
+        subscriptionRef.current = binSubscription;
       } catch (error) {
         console.error('Error setting up digital bin subscription:', error);
       }
@@ -83,9 +84,10 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
     setupSubscription();
     
     return () => {
-      // Clean up subscription when component unmounts
-      if (subscription) {
-        subscription.unsubscribe();
+      // Clean up subscription when component unmounts (using ref avoids stale closure)
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
       }
     };
   }, [user]);
@@ -103,8 +105,8 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
 
   // SERVER-FIRST: Use server data directly without complex merging
   useEffect(() => {
-    console.log('[ScheduledQRTab] Received scheduledPickups:', scheduledPickups);
-    console.log('[ScheduledQRTab] Valid pickups:', validPickups);
+    debug.log('[ScheduledQRTab] Received scheduledPickups:', scheduledPickups);
+    debug.log('[ScheduledQRTab] Valid pickups:', validPickups);
     
     if (validPickups && validPickups.length >= 0) {
       // Sort by creation date, newest first
@@ -112,7 +114,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       
-      console.log('[ScheduledQRTab] Setting localPickups to:', sortedBins);
+      debug.log('[ScheduledQRTab] Setting localPickups to:', sortedBins);
       setLocalPickups(sortedBins);
       
       // Update localStorage to match (server-first approach)
