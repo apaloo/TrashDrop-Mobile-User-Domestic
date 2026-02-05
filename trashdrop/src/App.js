@@ -44,6 +44,7 @@ import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
 import PwaInitializer from './components/PwaInitializer.js';
 import PwaRecovery from './components/PwaRecovery.js';
+import ForceInstallPrompt from './components/ForceInstallPrompt.js';
 
 // Styling
 import { CssBaseline, ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
@@ -370,6 +371,7 @@ const App = () => {
       <ThemeProvider>
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
+            <ForceInstallPrompt />
             <PwaInitializer />
             <PwaRecovery />
             <AuthErrorBoundary>
