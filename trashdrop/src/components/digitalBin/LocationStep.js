@@ -82,6 +82,64 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     });
   }, []);
 
+  // Auto-fetch current location on modal launch to center the map, fill address, and check checkbox
+  useEffect(() => {
+    const autoFetchLocation = async () => {
+      // Skip if we already have a position or if location was already fetched
+      if (position || formData.latitude || formData.longitude) return;
+      
+      setLoadingLocation(true);
+      
+      try {
+        console.log('[LocationStep] Auto-fetching current location on mount...');
+        
+        if (!navigator.geolocation) {
+          console.log('[LocationStep] Geolocation not supported');
+          setLoadingLocation(false);
+          return;
+        }
+        
+        const locationResult = await GeolocationService.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+          silentFallback: true
+        });
+        
+        if (locationResult.success && locationResult.coords) {
+          const { latitude, longitude, accuracy } = locationResult.coords;
+          
+          console.log(`[LocationStep] Auto-location obtained: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
+          
+          // Update map position to center on user's location
+          setPosition([latitude, longitude]);
+          
+          // Auto-check the checkbox and update form data
+          updateFormData({
+            latitude,
+            longitude,
+            gps_accuracy: accuracy,
+            useCurrentLocation: true
+          });
+          
+          // Reverse geocode to get address
+          await reverseGeocode(latitude, longitude);
+          
+          // Show accuracy hint if needed
+          if (locationResult.accuracyWarning) {
+            setGpsHint(`GPS accuracy is ${accuracy?.toFixed(0)}m. For better accuracy, move to an open area away from buildings.`);
+          }
+        }
+      } catch (error) {
+        console.warn('[LocationStep] Auto-fetch location failed:', error);
+      } finally {
+        setLoadingLocation(false);
+      }
+    };
+    
+    autoFetchLocation();
+  }, []);
+
   // Load saved locations from localStorage and Supabase
   useEffect(() => {
     const fetchSavedLocations = async () => {
