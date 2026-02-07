@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import supabase from '../../utils/supabaseClient.js';
+import appConfig from '../../utils/app-config.js';
 import { saveOfflineLocation, getOfflineLocations, isOnline } from '../../utils/offlineStorage.js';
 import { useAuth } from '../../context/AuthContext.js';
 
@@ -49,19 +50,6 @@ const LocationMarker = ({ position, setPosition }) => {
   ) : null;
 };
 
-// Component to center map view
-const MapCenterControl = ({ position }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (position && position[0] && position[1]) {
-      map.setView(position, 13);
-    }
-  }, [position, map]);
-  
-  return null;
-};
-
 const Locations = () => {
   const { user, getSession } = useAuth(); // Get session helper from useAuth
   const [locations, setLocations] = useState([]);
@@ -84,6 +72,13 @@ const Locations = () => {
   const [mapPosition, setMapPosition] = useState([51.505, -0.09]);
   const [userLocated, setUserLocated] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  // Keep map centered on the latest coordinates we have for the form
+  useEffect(() => {
+    if (newLocation.latitude && newLocation.longitude) {
+      setMapPosition([newLocation.latitude, newLocation.longitude]);
+    }
+  }, [newLocation.latitude, newLocation.longitude]);
   
   // Load locations primarily from local storage with optional Supabase sync
   useEffect(() => {
@@ -239,19 +234,167 @@ const Locations = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           console.log('Geolocation success:', position.coords);
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          
-          setMapPosition([lat, lng]);
+          const { latitude: lat, longitude: lng } = position.coords;
+
+          // Update state with new coordinates
           setNewLocation(prev => ({
             ...prev,
             latitude: lat,
-            longitude: lng
+            longitude: lng,
+            address: prev.address || `${lat.toFixed(6)}, ${lng.toFixed(6)}` // immediate prefill
           }));
+          setMapPosition([lat, lng]);
           setUserLocated(true);
           setIsGettingLocation(false);
           setSyncStatus('Location acquired successfully');
-          setTimeout(() => setSyncStatus(null), 2000);
+
+          // Reverse-geocode to auto-fill address from coordinates (non-blocking)
+          (async () => {
+            const fetchReverse = async (url, headers = {}) => fetch(url, {
+              method: 'GET',
+              mode: 'cors',
+              cache: 'no-store',
+              referrerPolicy: 'no-referrer-when-downgrade',
+              headers
+            });
+
+            const shouldReplaceAddress = (currentAddress) => {
+              if (!currentAddress) return true;
+              const coordString = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+              const trimmed = currentAddress.trim();
+              // Replace if the field currently just holds coordinate placeholders
+              const looksLikeCoords = trimmed === coordString || /^[\d.+-]+,\s*[\d.+-]+$/.test(trimmed);
+              return looksLikeCoords;
+            };
+
+            const tryGoogle = async () => {
+              if (!appConfig.maps.googleApiKey) return null;
+              try {
+                const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&location_type=ROOFTOP&result_type=street_address&language=en&key=${appConfig.maps.googleApiKey}`;
+                const res = await fetchReverse(googleUrl);
+                if (!res.ok) return null;
+                const data = await res.json();
+                return data?.results?.[0]?.formatted_address || null;
+              } catch (err) {
+                console.warn('Google reverse geocode failed:', err);
+                return null;
+              }
+            };
+
+            const tryNominatim = async () => {
+              try {
+                const headers = {
+                  'User-Agent': 'TrashDrop/1.0 (trashdrop.app)',
+                  'Accept-Language': 'en'
+                };
+                const primaryUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+                let response = await fetchReverse(primaryUrl, headers);
+                if (!response.ok) {
+                  console.warn('Reverse geocode primary failed with status:', response.status);
+                  const retryUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+                  response = await fetchReverse(retryUrl, headers);
+                }
+                if (!response.ok) return null;
+                const data = await response.json();
+                return data.display_name || null;
+              } catch (err) {
+                console.warn('Nominatim reverse geocode failed:', err);
+                return null;
+              }
+            };
+
+            const tryMapsCo = async () => {
+              try {
+                // Additional fallback service (no key required) to improve chance of a human-readable address
+                const mapsCoUrl = `https://geocode.maps.co/reverse?lat=${lat}&lon=${lng}`;
+                const res = await fetchReverse(mapsCoUrl);
+                if (!res.ok) return null;
+                const data = await res.json();
+                return data?.display_name || data?.address?.road || null;
+              } catch (err) {
+                console.warn('maps.co reverse geocode failed:', err);
+                return null;
+              }
+            };
+
+            const tryBigDataCloud = async () => {
+              try {
+                const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+                const res = await fetchReverse(url);
+                if (!res.ok) return null;
+                const data = await res.json();
+                const parts = [];
+                if (data.locality) parts.push(data.locality);
+                if (data.city && data.city !== data.locality) parts.push(data.city);
+                if (data.principalSubdivision) parts.push(data.principalSubdivision);
+                if (data.countryName) parts.push(data.countryName);
+                if (parts.length === 0) return null;
+                return parts.join(', ');
+              } catch (err) {
+                console.warn('BigDataCloud reverse geocode failed:', err);
+                return null;
+              }
+            };
+
+            try {
+              const addressFromGoogle = await tryGoogle();
+              if (addressFromGoogle) {
+                setNewLocation(prev => ({
+                  ...prev,
+                  address: shouldReplaceAddress(prev.address) ? addressFromGoogle : prev.address
+                }));
+                setSyncStatus('Address auto-filled from your location');
+                setTimeout(() => setSyncStatus(null), 2000);
+                return;
+              }
+
+              const addressFromNominatim = await tryNominatim();
+              if (addressFromNominatim) {
+                setNewLocation(prev => ({
+                  ...prev,
+                  address: shouldReplaceAddress(prev.address) ? addressFromNominatim : prev.address
+                }));
+                setSyncStatus('Address auto-filled from your location');
+                setTimeout(() => setSyncStatus(null), 2000);
+                return;
+              }
+
+              const addressFromMapsCo = await tryMapsCo();
+              if (addressFromMapsCo) {
+                setNewLocation(prev => ({
+                  ...prev,
+                  address: shouldReplaceAddress(prev.address) ? addressFromMapsCo : prev.address
+                }));
+                setSyncStatus('Address auto-filled from your location');
+                setTimeout(() => setSyncStatus(null), 2000);
+                return;
+              }
+
+              const addressFromBigDataCloud = await tryBigDataCloud();
+              if (addressFromBigDataCloud) {
+                setNewLocation(prev => ({
+                  ...prev,
+                  address: shouldReplaceAddress(prev.address) ? addressFromBigDataCloud : prev.address
+                }));
+                setSyncStatus('Address auto-filled from your location');
+                setTimeout(() => setSyncStatus(null), 2000);
+                return;
+              }
+
+              // Fallback: prefill with coordinates to avoid empty field
+              // This is already done immediately after geolocation success, so this is a safeguard
+              setSyncStatus('Could not auto-fill address. You can edit it manually.');
+              setTimeout(() => setSyncStatus(null), 2500);
+            } catch (geocodeError) {
+              console.warn('Reverse geocode failed:', geocodeError);
+              setNewLocation(prev => ({
+                ...prev,
+                address: shouldReplaceAddress(prev.address) ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : prev.address
+              }));
+              setSyncStatus('Could not auto-fill address. Prefilled with coordinates; you can edit it.');
+              setTimeout(() => setSyncStatus(null), 2500);
+            }
+          })();
         },
         (error) => {
           console.error('Geolocation error:', error);
@@ -698,6 +841,34 @@ const Locations = () => {
       ) : showAddForm ? (
         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6 border border-gray-200 dark:border-gray-600">
           <form onSubmit={handleSubmit}>
+            {/* Location actions (top): buttons above form fields for mobile and desktop */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-start gap-3 mb-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={getUserLocation}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Use My Current Location
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowManualCoords(!showManualCoords)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 flex items-center justify-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  {showManualCoords ? 'Hide Manual Entry' : 'Enter Coordinates Manually'}
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -739,6 +910,7 @@ const Locations = () => {
               </label>
               <div className="h-64 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
                 <MapContainer 
+                  key={`${mapPosition[0]}-${mapPosition[1]}`}
                   center={mapPosition} 
                   zoom={13} 
                   style={{ height: '100%', width: '100%' }}
@@ -757,107 +929,81 @@ const Locations = () => {
                       });
                     }}
                   />
-                  <MapCenterControl position={mapPosition} />
                 </MapContainer>
               </div>
               <p className="text-sm text-gray-500 mt-1">Click anywhere on the map to set location manually</p>
               
               <div className="mt-2 flex flex-col space-y-3 items-center">
-                <div className="flex space-x-2">
-                  <button
-                    type="button"
-                    onClick={getUserLocation}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Use My Current Location
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setShowManualCoords(!showManualCoords)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 flex items-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                    {showManualCoords ? 'Hide Manual Entry' : 'Enter Coordinates Manually'}
-                  </button>
-                </div>
-                
-                {showManualCoords && (
-                  <div className="w-full max-w-md p-4 border border-gray-300 rounded-md bg-gray-50">
-                    <h4 className="text-sm font-semibold mb-2">Manual Coordinate Entry</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs text-gray-600">Latitude</label>
-                        <input
-                          type="number"
-                          step="any"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={newLocation.latitude || ''}
-                          onChange={(e) => {
-                            const lat = parseFloat(e.target.value);
-                            setNewLocation(prev => ({
-                              ...prev,
-                              latitude: lat
-                            }));
-                            if (lat && newLocation.longitude) {
-                              setMapPosition([lat, newLocation.longitude]);
-                            }
-                          }}
-                          placeholder="e.g. 37.7749"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600">Longitude</label>
-                        <input
-                          type="number"
-                          step="any"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={newLocation.longitude || ''}
-                          onChange={(e) => {
-                            const lng = parseFloat(e.target.value);
-                            setNewLocation(prev => ({
-                              ...prev,
-                              longitude: lng
-                            }));
-                            if (lng && newLocation.latitude) {
-                              setMapPosition([newLocation.latitude, lng]);
-                            }
-                          }}
-                          placeholder="e.g. -122.4194"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                        onClick={() => {
-                          if (newLocation.latitude && newLocation.longitude) {
-                            setMapPosition([newLocation.latitude, newLocation.longitude]);
-                            setUserLocated(true);
-                            setSyncStatus('Using manually entered coordinates');
-                            setTimeout(() => setSyncStatus(null), 2000);
-                          } else {
-                            setSyncStatus('Please enter both latitude and longitude');
-                            setTimeout(() => setSyncStatus(null), 2000);
+              {showManualCoords && (
+                <div className="w-full max-w-md p-4 border border-gray-300 rounded-md bg-gray-50">
+                  <h4 className="text-sm font-semibold mb-2">Manual Coordinate Entry</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-600">Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={newLocation.latitude || ''}
+                        onChange={(e) => {
+                          const lat = parseFloat(e.target.value);
+                          setNewLocation(prev => ({
+                            ...prev,
+                            latitude: lat
+                          }));
+                          if (lat && newLocation.longitude) {
+                            setMapPosition([lat, newLocation.longitude]);
                           }
                         }}
-                      >
-                        Apply Coordinates
-                      </button>
+                        placeholder="e.g. 37.7749"
+                      />
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Enter decimal coordinates (e.g., 37.7749, -122.4194 for San Francisco)
-                    </p>
+                    <div>
+                      <label className="block text-xs text-gray-600">Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={newLocation.longitude || ''}
+                        onChange={(e) => {
+                          const lng = parseFloat(e.target.value);
+                          setNewLocation(prev => ({
+                            ...prev,
+                            longitude: lng
+                          }));
+                          if (lng && newLocation.latitude) {
+                            setMapPosition([newLocation.latitude, lng]);
+                          }
+                        }}
+                        placeholder="e.g. -122.4194"
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                      onClick={() => {
+                        if (newLocation.latitude && newLocation.longitude) {
+                          setMapPosition([newLocation.latitude, newLocation.longitude]);
+                          setUserLocated(true);
+                          setSyncStatus('Using manually entered coordinates');
+                          setTimeout(() => setSyncStatus(null), 2000);
+                        } else {
+                          setSyncStatus('Please enter both latitude and longitude');
+                          setTimeout(() => setSyncStatus(null), 2000);
+                        }
+                      }}
+                    >
+                      Apply Coordinates
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Enter decimal coordinates (e.g., 37.7749, -122.4194 for San Francisco)
+                  </p>
+                </div>
+              )}
+            </div>
             </div>
             
             <div className="mt-4 flex justify-end space-x-2">

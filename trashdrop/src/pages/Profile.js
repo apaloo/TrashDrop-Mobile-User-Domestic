@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import PersonalInfo from '../components/profile/PersonalInfo.js';
 import Locations from '../components/profile/Locations.js';
 import Preferences from '../components/profile/Preferences.js';
@@ -10,8 +11,7 @@ import Security from '../components/profile/Security.js';
  * with tab-based navigation between different sections
  */
 const Profile = () => {
-  // State to track the active tab
-  const [activeTab, setActiveTab] = useState('personal');
+  const location = useLocation();
 
   // Tab configuration
   const tabs = [
@@ -21,6 +21,22 @@ const Profile = () => {
     { id: 'notifications', label: 'Notifications' },
     { id: 'security', label: 'Security' }
   ];
+
+  // Determine initial tab from query string (?tab=locations) if present
+  const initialTab = useMemo(() => {
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      const tabFromUrl = searchParams.get('tab');
+      const isValidTab = tabs.some(tab => tab.id === tabFromUrl);
+      return isValidTab ? tabFromUrl : 'personal';
+    } catch (error) {
+      console.warn('[Profile] Unable to parse tab from URL:', error);
+      return 'personal';
+    }
+  }, [location.search, tabs]);
+
+  // State to track the active tab
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Render the tab content based on active tab
   const renderTabContent = () => {

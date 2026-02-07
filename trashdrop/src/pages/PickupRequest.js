@@ -781,7 +781,7 @@ const PickupRequest = () => {
                       <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.savedLocationId}</div>
                     )}
                     <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      You can select from your saved locations or <a href="/profile" className="text-blue-600 hover:underline">add new locations</a>
+                      You can select from your saved locations or <a href="/profile?tab=locations" className="text-blue-600 hover:underline">add new locations</a>
                     </div>
                   </div>
                   
