@@ -198,8 +198,14 @@ export const collectorService = {
       }
 
       // Update collector profile with real-time location
-      if (data.collector_id && location.latitude && location.longitude) {
-        await this.updateCollectorLocation(data.collector_id, location);
+      // Support both {lat, lng} and {latitude, longitude} formats
+      const lat = location.latitude || location.lat;
+      const lng = location.longitude || location.lng;
+      if (data.collector_id && lat && lng) {
+        await this.updateCollectorLocation(data.collector_id, {
+          latitude: lat,
+          longitude: lng
+        });
       }
 
       // Also update any active pickup requests

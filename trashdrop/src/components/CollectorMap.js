@@ -167,12 +167,19 @@ const CollectorMap = ({ pickupLocation, onCollectorLocationUpdate }) => {
           session = activeSession;
         }
 
-        // Update location
+        // Update location via session if available
         if (session) {
           await collectorService.updateLocation(session.id, userLocation);
-          if (onCollectorLocationUpdate) {
-            onCollectorLocationUpdate(userLocation);
-          }
+        }
+        
+        // Always update collector profile directly (bypasses session requirement)
+        await collectorService.updateCollectorLocation(user.id, {
+          latitude: userLocation.lat || userLocation.latitude,
+          longitude: userLocation.lng || userLocation.longitude
+        });
+        
+        if (onCollectorLocationUpdate) {
+          onCollectorLocationUpdate(userLocation);
         }
 
       } catch (err) {

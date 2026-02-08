@@ -375,9 +375,25 @@ const CollectorTracking = () => {
             status: profileData.status
           });
           
-          // Try current_location first (PostGIS geometry EWKB)
-          if (profileData.current_location) {
-            // Parse EWKB hex directly (skip RPC since it's missing)
+          // Priority 1: Try RPC function for consistent WKT format
+          try {
+            const { data: coordResult, error: rpcError } = await supabase
+              .rpc('get_collector_coordinates_wkt', { collector_user_id: activePickup.collector_id });
+            
+            if (!rpcError && coordResult) {
+              console.log('[CollectorTracking] 📍 RPC returned WKT:', coordResult);
+              const coords = parsePostGISPoint(coordResult);
+              if (coords) {
+                location = { lat: coords.lat, lng: coords.lng };
+                console.log('[CollectorTracking] ✅ Successfully parsed location from RPC WKT:', location);
+              }
+            }
+          } catch (rpcErr) {
+            console.warn('[CollectorTracking] RPC not available, falling back to EWKB parsing');
+          }
+          
+          // Priority 2: Try current_location (PostGIS geometry EWKB)
+          if (!location && profileData.current_location) {
             const coords = parsePostGISPoint(profileData.current_location);
             if (coords) {
               location = { lat: coords.lat, lng: coords.lng };
@@ -387,7 +403,7 @@ const CollectorTracking = () => {
             }
           }
           
-          // Fallback to current_latitude/current_longitude
+          // Priority 3: Fallback to current_latitude/current_longitude
           if (!location && profileData.current_latitude && profileData.current_longitude) {
             location = {
               lat: parseFloat(profileData.current_latitude),
@@ -397,8 +413,33 @@ const CollectorTracking = () => {
           }
           
           if (location) {
+            // Check if location is stale (> 5 minutes old)
+            const locationAge = profileData.location_updated_at 
+              ? Date.now() - new Date(profileData.location_updated_at).getTime()
+              : Infinity;
+            const isLocationStale = locationAge > 5 * 60 * 1000; // 5 minutes
+            const locationAgeMinutes = Math.round(locationAge / 60000);
+            
+            if (isLocationStale) {
+              console.warn('[CollectorTracking] ⚠️ STALE LOCATION: Last updated', locationAgeMinutes, 'minutes ago');
+              console.warn('[CollectorTracking] ⚠️ Collector may not be actively tracking. Location data is outdated.');
+            }
+            
+            // Validate coordinates are within reasonable Ghana bounds
+            // Ghana: lat 4.5-11.5°N, lng -3.5 to 1.5°E
+            const isInGhanaBounds = location.lat >= 4.0 && location.lat <= 12.0 && 
+                                    location.lng >= -4.0 && location.lng <= 2.0;
+            
+            if (!isInGhanaBounds) {
+              console.warn('[CollectorTracking] ⚠️ Collector location appears to be outside Ghana:', location);
+              console.warn('[CollectorTracking] ⚠️ This may indicate stale/incorrect location data in the database');
+            }
+            
+            // Determine actual online status based on recent location updates
+            const isActuallyOnline = profileData.is_online && !isLocationStale;
+            
             console.log('[CollectorTracking] Collector location fetched:', location, 
-              `(${profileData.is_online ? 'ONLINE' : 'OFFLINE - Last known location'})`);
+              `(${isActuallyOnline ? 'ONLINE - Live tracking' : isLocationStale ? 'STALE - ' + locationAgeMinutes + ' min old' : 'OFFLINE'})`);
             setCollectorLocation(location);
             
             // Calculate initial ETA if we have pickup location
@@ -425,6 +466,14 @@ const CollectorTracking = () => {
               if (etaData) {
                 console.log('[CollectorTracking] ETA calculated:', etaData, 
                   profileData.is_online ? '(LIVE)' : '(Based on last known location)');
+                
+                // Warn if distance is unreasonably large (> 100km indicates stale/wrong data)
+                if (etaData.distanceKm > 100) {
+                  console.warn('[CollectorTracking] ⚠️ Distance is very large:', etaData.distanceKm.toFixed(1), 'km');
+                  console.warn('[CollectorTracking] ⚠️ Collector location may be stale or incorrect');
+                  console.warn('[CollectorTracking] ⚠️ Collector coords:', collectorLoc, 'Pickup coords:', pickupLoc);
+                }
+                
                 setEta(etaData.eta);
                 setDistance(etaData.distance);
                 
