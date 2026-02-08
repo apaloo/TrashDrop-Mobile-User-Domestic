@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { processQRCode, updatePickupStatus, completePickup } from '../utils/qrScanner';
 import PaymentAndRating from '../components/collection/PaymentAndRating';
+import { collectorService } from '../services/collectorService';
+import GeolocationService from '../utils/geolocationService';
 import { 
   FaQrcode, 
   FaCheckCircle, 
@@ -235,6 +237,42 @@ const CollectorPickup = () => {
       }
     };
   }, []);
+
+  // Track collector location and update profile every 30 seconds
+  const locationIntervalRef = useRef(null);
+  useEffect(() => {
+    const updateCollectorLocation = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const locationResult = await GeolocationService.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 30000
+        });
+        
+        if (locationResult.success && locationResult.coords?.latitude && locationResult.coords?.longitude) {
+          console.log('[CollectorPickup] Updating collector location:', locationResult.coords);
+          await collectorService.updateCollectorLocation(user.id, {
+            latitude: locationResult.coords.latitude,
+            longitude: locationResult.coords.longitude
+          });
+        }
+      } catch (err) {
+        console.error('[CollectorPickup] Error updating location:', err);
+      }
+    };
+
+    // Update location immediately and every 30 seconds
+    updateCollectorLocation();
+    locationIntervalRef.current = setInterval(updateCollectorLocation, 30000);
+
+    return () => {
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+      }
+    };
+  }, [user?.id]);
 
   // Handle QR code scanning
   const handleScan = async (qrData) => {
