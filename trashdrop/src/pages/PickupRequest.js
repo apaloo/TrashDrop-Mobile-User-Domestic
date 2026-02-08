@@ -534,25 +534,29 @@ const PickupRequest = () => {
       console.log('[PickupRequest] 📝 Will save as POINT:', `POINT(${lng} ${lat})`);
       
       // Format the pickup data - generate UUID for id
-      const pickupData = {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        status: 'available',
-        bag_count: Number(values.numberOfBags),
-        waste_type: values.wasteType,
-        special_instructions: values.notes,
-        location: `POINT(${lng} ${lat})`,
-        coordinates: `POINT(${lng} ${lat})`,
-        fee: 0, // Default fee - can be updated later
-      };
+      const pickupId = crypto.randomUUID();
+      
+      // Get address from selected location
+      const selectedLocation = savedLocations.find(loc => loc.id === values.savedLocationId);
+      const address = selectedLocation?.address || values.location?.address || '';
 
-      // Submit directly to database (no localStorage)
-      console.log('XXXXXXXXXXXXXXXXXXXXXX [PickupRequest] Submitting pickup directly to database');
+      // Submit using RPC function that properly handles geography type
+      // This bypasses the buggy standardize_pickup_coordinates trigger
+      console.log('XXXXXXXXXXXXXXXXXXXXXX [PickupRequest] Submitting pickup via RPC');
       
       const { data, error } = await supabase
-        .from('pickup_requests')
-        .insert([pickupData])
-        .select('id')
+        .rpc('create_pickup_request', {
+          p_id: pickupId,
+          p_user_id: user.id,
+          p_status: 'available',
+          p_bag_count: Number(values.numberOfBags),
+          p_waste_type: values.wasteType,
+          p_special_instructions: values.notes || '',
+          p_longitude: lng,
+          p_latitude: lat,
+          p_fee: 0,
+          p_address: address
+        })
         .single();
 
       if (error) {
