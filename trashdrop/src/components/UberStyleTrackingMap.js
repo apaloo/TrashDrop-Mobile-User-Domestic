@@ -552,10 +552,10 @@ const UberStyleTrackingMap = ({
                     <span className="text-sm text-gray-600">{activePickup.collector.rating || '5.0'}</span>
                   </div>
                 </div>
-                {distance !== null && (
+                {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                   <div className="text-right">
                     <p className="text-xs text-gray-500">Distance</p>
-                    <p className="text-sm font-bold text-blue-600">{distance < 1000 ? `${distance}m` : `${distance}km`}</p>
+                    <p className="text-sm font-bold text-blue-600">{distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`}</p>
                   </div>
                 )}
               </div>

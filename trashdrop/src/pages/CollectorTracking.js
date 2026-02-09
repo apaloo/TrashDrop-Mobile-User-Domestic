@@ -480,8 +480,13 @@ const CollectorTracking = () => {
                   console.warn('[CollectorTracking] ⚠️ Collector coords:', collectorLoc, 'Pickup coords:', pickupLoc);
                 }
                 
-                setEta(etaData.eta);
-                setDistance(etaData.distance);
+                // Only update if values are valid numbers (cache last good values)
+                if (typeof etaData.eta === 'number' && !isNaN(etaData.eta) && isFinite(etaData.eta)) {
+                  setEta(etaData.eta);
+                }
+                if (typeof etaData.distance === 'number' && !isNaN(etaData.distance) && isFinite(etaData.distance)) {
+                  setDistance(etaData.distance);
+                }
                 
                 // Update status based on proximity (initial fetch)
                 if (etaData.distanceMeters !== undefined) {
@@ -490,14 +495,12 @@ const CollectorTracking = () => {
                   });
                 }
               } else {
-                console.warn('[CollectorTracking] Failed to calculate ETA');
-                setEta(null);
-                setDistance(null);
+                console.warn('[CollectorTracking] Failed to calculate ETA - keeping cached values');
+                // Don't clear cached values - keep showing last valid distance/ETA
               }
             } else {
               console.warn('[CollectorTracking] No pickup location available for ETA calculation');
-              setEta(null);
-              setDistance(null);
+              // Don't clear cached values - keep showing last valid distance/ETA
             }
           } else {
             console.warn('[CollectorTracking] No valid location data found for collector');
@@ -625,8 +628,13 @@ const CollectorTracking = () => {
                 currentStatus: activePickup.status
               });
               
-              setEta(newEta);
-              setDistance(newDistance);
+              // Only update if values are valid numbers (cache last good values)
+              if (typeof newEta === 'number' && !isNaN(newEta) && isFinite(newEta)) {
+                setEta(newEta);
+              }
+              if (typeof newDistance === 'number' && !isNaN(newDistance) && isFinite(newDistance)) {
+                setDistance(newDistance);
+              }
               
               // Always check proximity and update status (real-time callback)
               updateStatusBasedOnProximity(distanceMeters, activePickup.status).catch(err => {

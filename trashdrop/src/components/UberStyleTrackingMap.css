@@ -3,24 +3,24 @@
  * Enhances the collector tracking experience with smooth animations
  */
 
-/* Pulsing ring animation for collector marker */
+/* Professional glow animation for collector marker - no bouncing/scaling */
 .collector-marker-animated {
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: filter;
 }
 
-@keyframes pulse-ring {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
-}
-
-/* Add drop shadow to collector marker for depth */
+/* Smooth pulsing glow effect using box-shadow */
 .collector-marker-animated img {
   filter: drop-shadow(0 4px 6px rgba(59, 130, 246, 0.4));
+  animation: marker-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes marker-glow {
+  0%, 100% {
+    filter: drop-shadow(0 4px 8px rgba(59, 130, 246, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 4px 20px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 30px rgba(59, 130, 246, 0.3));
+  }
 }
 
 /* Animated dashed line for route */
@@ -56,10 +56,10 @@
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Collector marker hover effect */
+/* Collector marker hover effect - glow instead of scale to prevent bouncing */
 .leaflet-marker-icon.collector-marker-animated:hover {
-  transform: scale(1.1);
-  transition: transform 0.2s ease-in-out;
+  filter: drop-shadow(0 4px 24px rgba(59, 130, 246, 0.9));
+  transition: filter 0.2s ease-in-out;
 }
 
 /* Add breathing animation to the top ETA badge */
