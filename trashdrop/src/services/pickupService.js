@@ -82,7 +82,7 @@ export const pickupService = {
       const { data: oneTimeData, error: oneTimeError } = await supabase
         .from('pickup_requests')
         .select(`
-          id, location, fee, status, collector_id,
+          id, location, fee, status, collector_id, address,
           accepted_at, picked_up_at, disposed_at, created_at, updated_at,
           waste_type, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
@@ -270,8 +270,20 @@ export const pickupService = {
           user_id: userId,
           collector_id: activePickup.collector_id,
           collector: activePickup.collector || null, // Include collector profile data
+          collector_name: activePickup.collector
+            ? `${activePickup.collector.first_name || ''} ${activePickup.collector.last_name || ''}`.trim()
+            : null,
           status: activePickup.status,
           location: location || activePickup.location,
+          address: activePickup.address || location?.address || activePickup.location?.address || (() => {
+            // Fallback: parse coordinates to show lat/lng when no address stored
+            const coordStr = activePickup.coordinates || activePickup.location;
+            if (coordStr && typeof coordStr === 'string') {
+              const parsed = parsePostGISPoint(coordStr);
+              if (parsed) return `${parsed.latitude.toFixed(5)}, ${parsed.longitude.toFixed(5)}`;
+            }
+            return null;
+          })(),
           coordinates: activePickup.coordinates,
           fee: activePickup.fee || 0,
           bags: activePickup.bag_count || 0,

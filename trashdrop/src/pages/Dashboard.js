@@ -1220,7 +1220,7 @@ const Dashboard = () => {
                       </span>
                     )}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name || 'Waiting...'}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name || (activePickups[0].collector ? `${activePickups[0].collector.first_name || ''} ${activePickups[0].collector.last_name || ''}`.trim() : null) || 'Waiting...'}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Location: {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
                   </p>
