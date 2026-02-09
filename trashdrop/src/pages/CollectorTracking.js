@@ -682,24 +682,23 @@ const CollectorTracking = () => {
     if (!eta || !distance || !activePickup || !collectorLocation) return;
     
     // Get pickup location from activePickup data
+    // Prioritize coordinates field (correct WKT POINT(lng lat)) over location field (non-standard POINT(lat lng))
     let pickupLoc = null;
-    if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
-      pickupLoc = {
-        latitude: activePickup.location.latitude,
-        longitude: activePickup.location.longitude
-      };
-    } else if (typeof activePickup?.location === 'string') {
-      // Parse PostGIS POINT string
-      const parsed = parsePostGISPoint(activePickup.location);
+    if (typeof activePickup?.coordinates === 'string') {
+      const parsed = parsePostGISPoint(activePickup.coordinates);
       if (parsed) {
         pickupLoc = {
           latitude: parsed.lat,
           longitude: parsed.lng
         };
       }
-    } else if (typeof activePickup?.coordinates === 'string') {
-      // Parse PostGIS POINT string
-      const parsed = parsePostGISPoint(activePickup.coordinates);
+    } else if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
+      pickupLoc = {
+        latitude: activePickup.location.latitude,
+        longitude: activePickup.location.longitude
+      };
+    } else if (typeof activePickup?.location === 'string') {
+      const parsed = parsePostGISPoint(activePickup.location);
       if (parsed) {
         pickupLoc = {
           latitude: parsed.lat,
@@ -722,10 +721,20 @@ const CollectorTracking = () => {
     
     const countdownInterval = setInterval(() => {
       // Recalculate ETA every 30 seconds
-      const etaData = calculateETA(pickupLoc, collectorLocation);
+      // collectorLocation is {lat, lng} format - convert to {latitude, longitude} for calculateETA
+      const collectorLoc = {
+        latitude: collectorLocation.lat,
+        longitude: collectorLocation.lng
+      };
+      const etaData = calculateETA(pickupLoc, collectorLoc);
       if (etaData) {
-        setEta(etaData.eta);
-        setDistance(etaData.distance);
+        // Only update if values are valid numbers (cache last good values)
+        if (typeof etaData.eta === 'number' && !isNaN(etaData.eta) && isFinite(etaData.eta)) {
+          setEta(etaData.eta);
+        }
+        if (typeof etaData.distance === 'number' && !isNaN(etaData.distance) && isFinite(etaData.distance)) {
+          setDistance(etaData.distance);
+        }
       }
     }, 30000); // Update every 30 seconds
     
