@@ -38,9 +38,9 @@ DECLARE
   v_location TEXT;
   v_coordinates GEOGRAPHY;
 BEGIN
-  -- Create WKT format location string as POINT(latitude longitude)
-  -- This matches how the app expects to parse coordinates
-  v_location := 'POINT(' || p_latitude || ' ' || p_longitude || ')';
+  -- Create WKT format location string as POINT(longitude latitude)
+  -- WKT standard format: POINT(lng lat)
+  v_location := 'POINT(' || p_longitude || ' ' || p_latitude || ')';
   
   -- Create geography from coordinates using ST_SetSRID and ST_MakePoint
   -- ST_MakePoint uses standard (longitude, latitude) order
