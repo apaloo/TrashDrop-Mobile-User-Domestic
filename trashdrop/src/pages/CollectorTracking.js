@@ -809,7 +809,7 @@ const CollectorTracking = () => {
       </button>
 
       {/* Full-Screen Uber-Style Tracking Map */}
-      <div className="fixed inset-0 top-16 z-0">
+      <div className="fixed inset-0 top-16 bottom-16 z-[60]">
         <UberStyleTrackingMap 
           collectorLocation={collectorLocation}
           collectorData={collectorProfile}

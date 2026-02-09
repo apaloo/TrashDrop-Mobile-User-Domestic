@@ -445,7 +445,7 @@ const UberStyleTrackingMap = ({
         }
         
         return (
-          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-3 z-[1000] min-w-[260px] max-w-[90vw]">
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-3 z-[1000] min-w-[260px] max-w-[90vw]">
             <div className="flex items-center space-x-3">
               {/* Collector Avatar */}
               <div className="flex-shrink-0">
