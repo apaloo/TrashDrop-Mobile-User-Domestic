@@ -444,7 +444,13 @@ const CollectorTracking = () => {
             
             // Calculate initial ETA if we have pickup location
             let pickupLoc = null;
-            if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
+            // Prioritize coordinates field (correct WKT POINT(lng lat)) over location field (non-standard POINT(lat lng))
+            if (typeof activePickup?.coordinates === 'string') {
+              const parsed = parsePostGISPoint(activePickup.coordinates);
+              if (parsed) {
+                pickupLoc = { latitude: parsed.lat, longitude: parsed.lng };
+              }
+            } else if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
               pickupLoc = {
                 latitude: activePickup.location.latitude,
                 longitude: activePickup.location.longitude
@@ -545,24 +551,23 @@ const CollectorTracking = () => {
     }
 
     // Get pickup location from activePickup data
+    // Prioritize coordinates field (correct WKT POINT(lng lat)) over location field (non-standard POINT(lat lng))
     let pickupLoc = null;
-    if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
-      pickupLoc = {
-        latitude: activePickup.location.latitude,
-        longitude: activePickup.location.longitude
-      };
-    } else if (typeof activePickup?.location === 'string') {
-      // Parse PostGIS POINT string
-      const parsed = parsePostGISPoint(activePickup.location);
+    if (typeof activePickup?.coordinates === 'string') {
+      const parsed = parsePostGISPoint(activePickup.coordinates);
       if (parsed) {
         pickupLoc = {
           latitude: parsed.lat,
           longitude: parsed.lng
         };
       }
-    } else if (typeof activePickup?.coordinates === 'string') {
-      // Parse PostGIS POINT string
-      const parsed = parsePostGISPoint(activePickup.coordinates);
+    } else if (activePickup?.location?.latitude && activePickup?.location?.longitude) {
+      pickupLoc = {
+        latitude: activePickup.location.latitude,
+        longitude: activePickup.location.longitude
+      };
+    } else if (typeof activePickup?.location === 'string') {
+      const parsed = parsePostGISPoint(activePickup.location);
       if (parsed) {
         pickupLoc = {
           latitude: parsed.lat,
