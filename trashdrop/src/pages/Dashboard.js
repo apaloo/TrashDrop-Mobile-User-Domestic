@@ -378,6 +378,36 @@ const Dashboard = () => {
         
         refreshActivities();
       })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'pickup_requests',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        if (!mountedRef.current) return;
+        
+        console.log('[Dashboard] Pickup request status updated:', payload.new?.status);
+        
+        // Update active pickup card in real-time
+        setActivePickups(prev => {
+          if (!prev || prev.length === 0) return prev;
+          if (prev[0].id === payload.new.id) {
+            return [{
+              ...prev[0],
+              status: payload.new.status,
+              collector_id: payload.new.collector_id,
+              updated_at: payload.new.updated_at,
+              collected_at: payload.new.collected_at
+            }];
+          }
+          return prev;
+        });
+        
+        // If collector was just assigned, re-fetch to get collector details
+        if (payload.new.collector_id && payload.new.status === 'accepted') {
+          loadDashboardData();
+        }
+      })
       .subscribe();
 
     return () => {
@@ -487,10 +517,32 @@ const Dashboard = () => {
           
           console.log('[Dashboard] Pickup status changed:', { oldStatus, newStatus });
 
+          // Always update the active pickup card with the latest status
+          setActivePickups(prev => {
+            if (!prev || prev.length === 0) return prev;
+            if (prev[0].id === payload.new.id) {
+              return [{
+                ...prev[0],
+                status: newStatus,
+                collector_id: payload.new.collector_id,
+                updated_at: payload.new.updated_at,
+                collected_at: payload.new.collected_at
+              }];
+            }
+            return prev;
+          });
+
+          // Re-fetch full data when collector is first assigned (to get collector profile)
+          if (payload.new.collector_id && newStatus === 'accepted') {
+            loadDashboardData();
+          }
+
           // Auto-navigate when pickup is accepted or collector is en route
           if (
+            (oldStatus === 'available' && newStatus === 'accepted') ||
             (oldStatus === 'pending' && newStatus === 'accepted') ||
             (oldStatus === 'accepted' && newStatus === 'en_route') ||
+            (oldStatus === 'available' && newStatus === 'collector_assigned') ||
             (oldStatus === 'pending' && newStatus === 'collector_assigned')
           ) {
             console.log('[Dashboard] Auto-navigating to tracking page');
@@ -515,7 +567,7 @@ const Dashboard = () => {
       console.log('[Dashboard] Cleaning up pickup status subscription');
       supabase.removeChannel(pickupStatusSubscription);
     };
-  }, [user?.id, navigate]);
+  }, [user?.id, navigate, loadDashboardData]);
 
   // Optimistic bag updates from scanner
   useEffect(() => {

@@ -1,52 +1,8 @@
 import supabase from './supabaseClient.js';
+import { parsePostGISPoint } from './geoUtils.js';
 
 // Keep track of active subscriptions to prevent duplicate subscriptions
 const activeSubscriptions = {};
-
-/**
- * Parse PostGIS EWKB hex format to lat/lng coordinates
- * @param {string} ewkbHex - EWKB hex string from PostGIS
- * @returns {object|null} - { latitude, longitude } or null if parsing fails
- */
-function parseLocationFromEWKB(ewkbHex) {
-  if (!ewkbHex || typeof ewkbHex !== 'string') return null;
-  
-  // Check if it's EWKB hex format (starts with 0101000020)
-  if (ewkbHex.match(/^0101000020/i)) {
-    try {
-      // EWKB format: 01 (little endian) 01000000 (point) 20 (has SRID) E6100000 (SRID 4326) + coordinates
-      // Skip to coordinate data (after SRID): 01 01000000 20 E6100000 = 18 chars
-      const coordHex = ewkbHex.substring(18);
-      
-      // Extract longitude (8 bytes = 16 hex chars)
-      const lngHex = coordHex.substring(0, 16);
-      // Extract latitude (next 8 bytes = 16 hex chars)
-      const latHex = coordHex.substring(16, 32);
-      
-      // Convert hex to double (little endian)
-      const lngBuffer = new ArrayBuffer(8);
-      const lngView = new DataView(lngBuffer);
-      for (let i = 0; i < 8; i++) {
-        lngView.setUint8(i, parseInt(lngHex.substring(i * 2, i * 2 + 2), 16));
-      }
-      const longitude = lngView.getFloat64(0, true); // true = little endian
-      
-      const latBuffer = new ArrayBuffer(8);
-      const latView = new DataView(latBuffer);
-      for (let i = 0; i < 8; i++) {
-        latView.setUint8(i, parseInt(latHex.substring(i * 2, i * 2 + 2), 16));
-      }
-      const latitude = latView.getFloat64(0, true);
-      
-      return { latitude, longitude };
-    } catch (err) {
-      console.error('[Realtime] Error parsing EWKB:', err);
-      return null;
-    }
-  }
-  
-  return null;
-}
 
 /**
  * Subscribe to real-time updates for scheduled pickups
@@ -672,7 +628,7 @@ export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpd
               
               // Try to parse current_location (EWKB format)
               if (profileData.current_location) {
-                location = parseLocationFromEWKB(profileData.current_location);
+                location = parsePostGISPoint(profileData.current_location);
               }
               
               // Fallback to lat/lng fields

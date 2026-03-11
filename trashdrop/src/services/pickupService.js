@@ -4,62 +4,7 @@
  */
 
 import supabase from '../utils/supabaseClient.js';
-
-/**
- * Parse PostGIS POINT format to {latitude, longitude}
- * @param {string} pointString - PostGIS POINT string like "POINT(lng lat)" or EWKB hex
- * @returns {Object|null} - {latitude, longitude} or null
- */
-const parsePostGISPoint = (pointString) => {
-  if (!pointString || typeof pointString !== 'string') return null;
-  
-  // Check if it's EWKB hex format (starts with 0101000020)
-  if (pointString.match(/^0101000020/i)) {
-    try {
-      // EWKB format: 01 (little endian) 01000000 (point) 20 (has SRID) E6100000 (SRID 4326) + coordinates
-      // Skip to coordinate data (after SRID): 01 01000000 20 E6100000 = 18 chars
-      const coordHex = pointString.substring(18);
-      
-      // Extract longitude (8 bytes = 16 hex chars)
-      const lngHex = coordHex.substring(0, 16);
-      // Extract latitude (next 8 bytes = 16 hex chars)
-      const latHex = coordHex.substring(16, 32);
-      
-      // Convert hex to double (little endian)
-      const lngBuffer = new ArrayBuffer(8);
-      const lngView = new DataView(lngBuffer);
-      for (let i = 0; i < 8; i++) {
-        lngView.setUint8(i, parseInt(lngHex.substring(i * 2, i * 2 + 2), 16));
-      }
-      const longitude = lngView.getFloat64(0, true); // true = little endian
-      
-      const latBuffer = new ArrayBuffer(8);
-      const latView = new DataView(latBuffer);
-      for (let i = 0; i < 8; i++) {
-        latView.setUint8(i, parseInt(latHex.substring(i * 2, i * 2 + 2), 16));
-      }
-      const latitude = latView.getFloat64(0, true);
-      
-      console.log('[parsePostGISPoint] Parsed EWKB:', { longitude, latitude });
-      
-      return { longitude, latitude };
-    } catch (err) {
-      console.error('[parsePostGISPoint] Error parsing EWKB:', err);
-      return null;
-    }
-  }
-  
-  // Match WKT POINT(lng lat) format
-  const match = pointString.match(/POINT\s*\(\s*([+-]?\d+\.?\d*)\s+([+-]?\d+\.?\d*)\s*\)/i);
-  if (match) {
-    return {
-      longitude: parseFloat(match[1]),
-      latitude: parseFloat(match[2])
-    };
-  }
-  
-  return null;
-};
+import { parsePostGISPoint } from '../utils/geoUtils.js';
 
 export const pickupService = {
   /**
@@ -76,7 +21,7 @@ export const pickupService = {
       console.log('[PickupService] Fetching active pickup for user:', userId);
 
       // Check both one-time and scheduled pickups
-      const activeStatuses = ['accepted', 'in_transit', 'available'];
+      const activeStatuses = ['available', 'accepted', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up'];
       
       // Check one-time pickups
       const { data: oneTimeData, error: oneTimeError } = await supabase

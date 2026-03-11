@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './UberStyleTrackingMap.css';
+import { formatDistance } from '../utils/geoUtils.js';
 
 // Fix default Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -210,6 +211,20 @@ const UberStyleTrackingMap = ({
   const [routeLine, setRouteLine] = useState([]);
   const [isCardExpanded, setIsCardExpanded] = useState(true);
 
+  // Compute display status once — for digital bins in initial tracking phase,
+  // override with distance-based visual status; otherwise use actual DB status.
+  const displayStatus = useMemo(() => {
+    let status = activePickup?.status;
+    if (activePickup?.is_digital_bin && typeof distance === 'number') {
+      const isInitialTrackingPhase = status === 'accepted' || status === 'active';
+      if (isInitialTrackingPhase) {
+        if (distance <= 50) status = 'arrived';
+        else if (distance <= 500) status = 'en_route';
+      }
+    }
+    return status;
+  }, [activePickup?.status, activePickup?.is_digital_bin, distance]);
+
   // Debug logging for incoming props
   useEffect(() => {
     console.log('[UberStyleTrackingMap] Props received:', {
@@ -403,31 +418,6 @@ const UberStyleTrackingMap = ({
 
       {/* Bottom Floating info card - Uber style */}
       {isValidLocation(collectorLocation) && (() => {
-        // Check if collector is actually online and moving (same logic as progress bar)
-        const isCollectorOnline = collectorData?.is_online === true || collectorData?.status === 'online';
-        const hasRecentLocation = collectorData?.location_updated_at ? 
-          (new Date() - new Date(collectorData.location_updated_at)) < 300000 : false; // 5 minutes
-        
-        // For digital bins, use distance-based visual status ONLY for initial tracking
-        // Once collector takes action (picked_up, collected, etc.), use real status
-        // For pickup requests, always use actual database status
-        let displayStatus = activePickup?.status;
-        if (activePickup?.is_digital_bin && typeof distance === 'number') {
-          // Only override status if it's still in initial "accepted" state
-          // Once collector updates to picked_up, collected, etc., show real status
-          const isInitialTrackingPhase = displayStatus === 'accepted' || displayStatus === 'active';
-          if (isInitialTrackingPhase) {
-            // Visual status based on proximity for digital bins
-            if (distance <= 50) {
-              displayStatus = 'arrived';
-            } else if (distance <= 500) {
-              displayStatus = 'en_route';
-            }
-          }
-          // else: use real database status (picked_up, collected, etc.)
-        }
-        
-        // Determine display text based on status
         const isActuallyArrived = displayStatus === 'arrived' || displayStatus === 'collecting';
         const isEnRoute = displayStatus === 'en_route' || displayStatus === 'in_transit';
         const isPickingUp = displayStatus === 'picked_up';
@@ -491,7 +481,7 @@ const UberStyleTrackingMap = ({
                     <svg className="w-4 h-4 text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     </svg>
-                    <span className="text-sm text-gray-600">{distance < 1000 ? `${distance}m` : `${distance}km`}</span>
+                    <span className="text-sm text-gray-600">{formatDistance(distance)}</span>
                   </div>
                 )}
               </div>
@@ -555,7 +545,7 @@ const UberStyleTrackingMap = ({
                 {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                   <div className="text-right">
                     <p className="text-xs text-gray-500">Distance</p>
-                    <p className="text-sm font-bold text-blue-600">{distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`}</p>
+                    <p className="text-sm font-bold text-blue-600">{formatDistance(distance)}</p>
                   </div>
                 )}
               </div>
@@ -597,19 +587,6 @@ const UberStyleTrackingMap = ({
                       </div>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${(() => {
-                      // For digital bins, use distance-based visual status ONLY for initial tracking
-                      let displayStatus = activePickup.status;
-                      if (activePickup.is_digital_bin && typeof distance === 'number') {
-                        const isInitialTrackingPhase = displayStatus === 'accepted' || displayStatus === 'active';
-                        if (isInitialTrackingPhase) {
-                          if (distance <= 50) {
-                            displayStatus = 'arrived';
-                          } else if (distance <= 500) {
-                            displayStatus = 'en_route';
-                          }
-                        }
-                      }
-                      
                       if (displayStatus === 'accepted' || displayStatus === 'active') return 'bg-blue-100 text-blue-700';
                       if (displayStatus === 'in_transit' || displayStatus === 'en_route') return 'bg-purple-100 text-purple-700';
                       if (displayStatus === 'arrived') return 'bg-green-100 text-green-700';
@@ -617,21 +594,7 @@ const UberStyleTrackingMap = ({
                       if (displayStatus === 'collected' || displayStatus === 'completed') return 'bg-emerald-100 text-emerald-700';
                       return 'bg-yellow-100 text-yellow-700';
                     })()}`}>
-                      {(() => {
-                        // For digital bins, use distance-based visual status ONLY for initial tracking
-                        let displayStatus = activePickup.status;
-                        if (activePickup.is_digital_bin && typeof distance === 'number') {
-                          const isInitialTrackingPhase = displayStatus === 'accepted' || displayStatus === 'active';
-                          if (isInitialTrackingPhase) {
-                            if (distance <= 50) {
-                              return 'ARRIVED';
-                            } else if (distance <= 500) {
-                              return 'EN ROUTE';
-                            }
-                          }
-                        }
-                        return activePickup.status?.replace('_', ' ').toUpperCase();
-                      })()}
+                      {displayStatus?.replace('_', ' ').toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -645,7 +608,7 @@ const UberStyleTrackingMap = ({
                     {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                       <div>
                         <p className="text-[10px] text-blue-200 mb-0.5">Distance</p>
-                        <p className="text-lg font-bold">{distance < 1000 ? `${distance}m` : `${distance}km`}</p>
+                        <p className="text-lg font-bold">{formatDistance(distance)}</p>
                       </div>
                     )}
                     {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0 && (
@@ -668,25 +631,11 @@ const UberStyleTrackingMap = ({
                     className="absolute top-4 left-4 h-0.5 bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500"
                     style={{ 
                       width: `${(() => {
-                        // For digital bins, use distance-based visual status ONLY for initial tracking
-                        // For pickup requests, use actual database status
-                        let status = activePickup.status;
-                        if (activePickup.is_digital_bin && typeof distance === 'number') {
-                          const isInitialTrackingPhase = status === 'accepted' || status === 'active';
-                          if (isInitialTrackingPhase) {
-                            if (distance <= 50) {
-                              status = 'arrived';
-                            } else if (distance <= 500) {
-                              status = 'en_route';
-                            }
-                          }
-                        }
-                        
-                        if (status === 'available') return '0%';
-                        if (status === 'accepted' || status === 'active') return '25%';
-                        if (status === 'en_route' || status === 'in_transit') return '50%';
-                        if (status === 'arrived') return '75%';
-                        if (status === 'collecting' || status === 'picked_up') return '90%';
+                        if (displayStatus === 'available') return '0%';
+                        if (displayStatus === 'accepted' || displayStatus === 'active') return '25%';
+                        if (displayStatus === 'en_route' || displayStatus === 'in_transit') return '50%';
+                        if (displayStatus === 'arrived') return '75%';
+                        if (displayStatus === 'collecting' || displayStatus === 'picked_up') return '90%';
                         return '100%';
                       })()}` 
                     }}
@@ -695,19 +644,7 @@ const UberStyleTrackingMap = ({
                   {/* Progress Stages */}
                   <div className="relative flex justify-between">
                     {['accepted', 'en_route', 'arrived', 'collecting', 'complete'].map((stage, index) => {
-                      // For digital bins, use distance-based visual status ONLY for initial tracking
-                      // For pickup requests, use actual database status
-                      let currentStatus = activePickup.status;
-                      if (activePickup.is_digital_bin && typeof distance === 'number') {
-                        const isInitialTrackingPhase = currentStatus === 'accepted' || currentStatus === 'active';
-                        if (isInitialTrackingPhase) {
-                          if (distance <= 50) {
-                            currentStatus = 'arrived';
-                          } else if (distance <= 500) {
-                            currentStatus = 'en_route';
-                          }
-                        }
-                      }
+                      const currentStatus = displayStatus;
                       
                       const stageStatuses = {
                         accepted: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed'],
@@ -798,17 +735,29 @@ const UberStyleTrackingMap = ({
                   </button>
                   
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      // Chat feature coming soon
-                      alert('Chat feature coming soon! For now, please use the Call button to contact the collector.');
+                      if (window.confirm('Are you sure you want to cancel this pickup?')) {
+                        try {
+                          const { pickupService } = await import('../services/pickupService.js');
+                          const { error: cancelError } = await pickupService.cancelPickupRequest(activePickup.id, 'Cancelled by user');
+                          if (cancelError) {
+                            alert(`Failed to cancel: ${cancelError.message}`);
+                          } else {
+                            alert('Pickup cancelled successfully.');
+                            window.location.href = '/dashboard';
+                          }
+                        } catch (err) {
+                          alert(`Error: ${err.message}`);
+                        }
+                      }
                     }}
-                    className="flex flex-col items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-xl p-3 transition-colors shadow-md"
+                    className="flex flex-col items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-xl p-3 transition-colors shadow-md"
                   >
                     <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    <span className="text-xs font-semibold">Chat</span>
+                    <span className="text-xs font-semibold">Cancel</span>
                   </button>
                   
                   <button
