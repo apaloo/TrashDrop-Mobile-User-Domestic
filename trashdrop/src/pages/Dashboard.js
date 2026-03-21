@@ -4,8 +4,17 @@ import appConfig from '../utils/app-config.js';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import DashboardOptimizer from '../components/DashboardOptimizer.js';
+import OnboardingFlow from '../components/OnboardingFlow.js';
 import { userService, pickupService } from '../services/index.js';
 import { notificationService } from '../services/notificationService.js';
+import onboardingService from '../services/onboardingService.js';
+
+// For development: expose cleanup function
+if (process.env.NODE_ENV === 'development') {
+  window.clearOnboardingTestData = (userId) => {
+    return onboardingService.clearTestData(userId);
+  };
+}
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
 import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
 
@@ -78,6 +87,86 @@ const Dashboard = () => {
   const bagsPulseTimerRef = useRef(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userOnboardingState, setUserOnboardingState] = useState(null);
+  const [nextAction, setNextAction] = useState(null);
+  
+  // Check onboarding status and show appropriate UI
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      if (!user?.id) return;
+      
+      try {
+        // Check if returning from onboarding location setup
+        const urlParams = new URLSearchParams(window.location.search);
+        const source = urlParams.get('source');
+        const action = urlParams.get('action');
+        
+        console.log('[Dashboard] Checking URL params - source:', source, 'action:', action, 'full search:', window.location.search);
+        
+        if (source === 'onboarding' && action === 'location-saved') {
+          console.log('[Dashboard] Returning from onboarding location setup - reopening onboarding');
+          setShowOnboarding(true);
+          // Clear URL parameters
+          window.history.replaceState({}, '', window.location.pathname);
+          return;
+        }
+        
+        if (source === 'onboarding' && action === 'qr-scanned') {
+          console.log('[Dashboard] Returning from QR scan - reopening onboarding');
+          
+          // Get QR code from URL parameters
+          const qrCode = urlParams.get('qr_code');
+          console.log('[Dashboard] QR code scanned:', qrCode);
+          
+          // Process the QR scan through onboarding service
+          if (qrCode) {
+            try {
+              await onboardingService.processQRScan(user.id, qrCode);
+              console.log('[Dashboard] QR scan processed successfully');
+            } catch (error) {
+              console.error('[Dashboard] Error processing QR scan:', error);
+            }
+          }
+          
+          setShowOnboarding(true);
+          // Clear URL parameters
+          window.history.replaceState({}, '', window.location.pathname);
+          return;
+        }
+        
+        // Test if onboardingService is imported correctly
+        console.log('[Dashboard] onboardingService imported:', !!onboardingService);
+        console.log('[Dashboard] shouldShowOnboarding method exists:', !!onboardingService.shouldShowOnboarding);
+        
+        // Check if user should see onboarding
+        console.log('[Dashboard] Checking onboarding for user:', user.id);
+        try {
+          const shouldShow = await onboardingService.shouldShowOnboarding(user.id);
+          console.log('[Dashboard] shouldShowOnboarding result:', shouldShow);
+          
+          if (shouldShow) {
+            setShowOnboarding(true);
+            console.log('[Dashboard] Showing onboarding popup');
+            return; // Exit early if showing onboarding
+          }
+        } catch (error) {
+          console.error('[Dashboard] Error checking onboarding:', error);
+        }
+        
+        console.log('[Dashboard] Not showing onboarding popup');
+        setNextAction(nextAction);
+        
+      } catch (error) {
+        console.error('[Dashboard] Error checking onboarding status:', error);
+        console.error('[Dashboard] Error details:', error.stack);
+      }
+    };
+    
+    checkOnboardingStatus();
+  }, [user?.id]);
+
   // Load recent activities from all activity sources (pickup_requests, illegal_dumping_mobile, digital_bins, user_activity)
   const getDatabaseActivities = useCallback(async (limit = 5) => {
     if (!user?.id) return [];
@@ -1062,8 +1151,45 @@ const Dashboard = () => {
     return <DashboardSkeleton />;
   }
 
+  // Handle onboarding completion
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    // Refresh user state and stats after onboarding
+    loadDashboardData();
+    // Re-check onboarding status
+    const checkOnboardingStatus = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const shouldShow = await onboardingService.shouldShowOnboarding(user.id);
+        if (!shouldShow) {
+          const state = await onboardingService.getUserState(user.id);
+          setUserOnboardingState(state);
+          const action = await onboardingService.getNextAction(user.id);
+          setNextAction(action);
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error re-checking onboarding status:', error);
+      }
+    };
+    checkOnboardingStatus();
+  };
+
+  // Handle onboarding close
+  const handleOnboardingClose = () => {
+    setShowOnboarding(false);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-900">
+      {/* Onboarding Flow */}
+      {showOnboarding && (
+        <OnboardingFlow 
+          onComplete={handleOnboardingComplete}
+          onClose={handleOnboardingClose}
+        />
+      )}
+      
       <DashboardOptimizer />
       {/* Sticky Stats Cards - Horizontal scroll only */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2" style={{position: "fixed", top: "65px", width: "100%"}}>
@@ -1203,6 +1329,62 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+      {/* Onboarding Progress Banner - Show when user needs guidance */}
+      {!showOnboarding && nextAction && userOnboardingState?.state !== 'READY_FOR_PICKUP' && (
+        <div className="mx-4 mt-4 mb-2 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900 dark:to-green-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                Complete Your First Cleanup
+              </h3>
+              <p className="text-blue-700 dark:text-blue-300 text-sm">
+                Get started in under 60 seconds
+              </p>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center text-sm">
+                  <span className={`w-4 h-4 rounded-full mr-2 ${
+                    userOnboardingState?.location_count > 0 ? 'bg-green-500' : 'bg-gray-300'
+                  }`}>
+                    {userOnboardingState?.location_count > 0 && '✓'}
+                  </span>
+                  <span className={userOnboardingState?.location_count > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-blue-700 dark:text-blue-300'}>
+                    Set location
+                  </span>
+                </div>
+                <div className="flex items-center text-sm">
+                  <span className={`w-4 h-4 rounded-full mr-2 ${
+                    userOnboardingState?.total_bags_scanned > 0 ? 'bg-green-500' : 'bg-gray-300'
+                  }`}>
+                    {userOnboardingState?.total_bags_scanned > 0 && '✓'}
+                  </span>
+                  <span className={userOnboardingState?.total_bags_scanned > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-blue-700 dark:text-blue-300'}>
+                    Scan QR code or choose service
+                  </span>
+                </div>
+                <div className="flex items-center text-sm">
+                  <span className={`w-4 h-4 rounded-full mr-2 ${
+                    userOnboardingState?.available_bags > 0 ? 'bg-green-500' : 'bg-gray-300'
+                  }`}>
+                    {userOnboardingState?.available_bags > 0 && '✓'}
+                  </span>
+                  <span className={userOnboardingState?.available_bags > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-blue-700 dark:text-blue-300'}>
+                    Request pickup
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <button
+                onClick={() => setShowOnboarding(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold"
+              >
+                {nextAction.title}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sticky Action Buttons - Sticks below stats cards */}
       <div className="sticky top-[152px] z-10 bg-white dark:bg-gray-900 px-4 pb-4" style={{position: "fixed", top: "230px", width: "96%"}}>

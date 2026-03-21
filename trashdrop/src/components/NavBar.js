@@ -44,16 +44,20 @@ const NavBar = () => {
   const handleSignOut = async () => {
     console.log('[NavBar] Sign out initiated');
     try {
-      const result = await signOut();
-      if (result?.success) {
-        console.log('[NavBar] Sign out successful, redirecting to login');
-        // Force navigation to login page
-        navigate('/login', { replace: true });
-      }
+      // Force immediate redirect first, then handle sign out in background
+      console.log('[NavBar] Force redirecting to login immediately');
+      window.location.href = '/login';
+      
+      // Handle sign out in background (won't block redirect)
+      signOut().catch(error => {
+        console.error('[NavBar] Background sign out error:', error);
+      });
+      
     } catch (error) {
       console.error('[NavBar] Sign out error:', error);
       // Force navigation anyway
-      navigate('/login', { replace: true });
+      console.log('[NavBar] Force redirecting to login due to error');
+      window.location.href = '/login';
     }
   };
 

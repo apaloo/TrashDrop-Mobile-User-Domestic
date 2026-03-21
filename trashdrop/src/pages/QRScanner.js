@@ -1,5 +1,5 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import BatchQRScanner from '../components/BatchQRScanner.js';
 
 /**
@@ -8,11 +8,22 @@ import BatchQRScanner from '../components/BatchQRScanner.js';
  */
 const QRScanner = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const autoStart = searchParams.get('auto_start') === 'true';
 
   const handleScanComplete = (batchDetails) => {
     console.log('Batch scanned successfully:', batchDetails);
-    // Navigate to a success page or show details
-    // For now, just stay on the scanner
+    
+    // Check if we came from onboarding
+    const source = searchParams.get('source');
+    if (source === 'onboarding') {
+      // For onboarding, we need to return to dashboard with QR code info
+      // The onboarding flow will handle the QR code processing
+      navigate('/dashboard?source=onboarding&action=qr-scanned&qr_code=' + (batchDetails.batchId || 'scanned'));
+    } else {
+      // Normal flow - navigate to dashboard
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -26,7 +37,7 @@ const QRScanner = () => {
 
       {/* Scanner Section */}
       <div className="px-6 py-4">
-        <BatchQRScanner onScanComplete={handleScanComplete} />
+        <BatchQRScanner onScanComplete={handleScanComplete} autoStart={autoStart} />
       </div>
 
       {/* How to Use Section */}

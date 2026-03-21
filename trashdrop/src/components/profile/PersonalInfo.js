@@ -78,12 +78,19 @@ const PersonalInfo = () => {
         if (isMountedRef.current) setIsLoading(true);
         console.log('[PersonalInfo] Loading profile for user:', user.id);
         
-        // Fetch user profile from Supabase
-        const { data: profileData, error } = await supabase
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile loading timeout')), 5000)
+        );
+        
+        // Fetch user profile from Supabase with timeout
+        const fetchPromise = supabase
           .from('profiles')
           .select('id, email, first_name, last_name, phone, address, avatar_url, created_at')
           .eq('id', user.id)
           .maybeSingle();
+        
+        const { data: profileData, error } = await Promise.race([fetchPromise, timeoutPromise]);
         
         if (error && error.code !== 'PGRST116') {
           console.error('[PersonalInfo] Error loading profile:', error);
@@ -168,9 +175,35 @@ const PersonalInfo = () => {
         }
       } catch (error) {
         console.error('[PersonalInfo] Error in loadProfileData:', error);
-        if (isMountedRef.current) {
+        
+        // Handle timeout specifically
+        if (error.message === 'Profile loading timeout') {
+          console.log('[PersonalInfo] Profile loading timed out, using fallback');
+          // Use user metadata as fallback
+          const fullName = user.user_metadata?.full_name || '';
+          const nameParts = fullName.trim().split(' ').filter(n => n);
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+          
+          const fallbackData = {
+            firstName: firstName,
+            lastName: lastName,
+            email: user.email || '',
+            phone: '',
+            address: '',
+            profileImage: null,
+            memberSince: 'Recently'
+          };
+          
+          if (isMountedRef.current) {
+            setUserData(fallbackData);
+            setFormData(fallbackData);
+            setSaveMessage({ type: 'error', text: 'Profile loading timed out, showing basic info' });
+            setTimeout(() => setSaveMessage(null), 3000);
+          }
+        } else if (isMountedRef.current) {
           setSaveMessage({ type: 'error', text: 'Failed to load profile data' });
-          setTimeout(() => setSaveMessage(null), 3000);
+          setTimeout(() => setSaveMessage(null), 5000);
         }
       } finally {
         if (isMountedRef.current) {

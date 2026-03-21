@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { useLocation } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import supabase from '../../utils/supabaseClient.js';
@@ -52,6 +53,7 @@ const LocationMarker = ({ position, setPosition }) => {
 
 const Locations = () => {
   const { user, getSession } = useAuth(); // Get session helper from useAuth
+  const location = useLocation(); // Get React Router location
   const [locations, setLocations] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLocation, setNewLocation] = useState({
@@ -514,6 +516,108 @@ const Locations = () => {
     getUserLocation();
   }, []);
 
+  // Save process helper function
+  const performSaveProcess = async (locationToSave, updatedLocations, newLocationId, cacheKey, newLocation, mapPosition) => {
+    const online = isOnline();
+    
+    if (online) {
+      // Online: Save to Supabase
+      setSyncStatus('Saving location to server...');
+      
+      // Try to get a valid session with token
+      try {
+        // Refresh the session first to ensure we have a valid token
+        const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+        
+        if (sessionError) {
+          console.error('Error refreshing session:', sessionError);
+          // Fall back to offline saving on auth error
+          await saveOfflineLocation(locationToSave);
+          setSyncStatus('Authentication issue. Location saved offline and will sync later.');
+        } else {
+          if (!sessionData || !sessionData.session) {
+            console.warn('No valid session available after refresh');
+            await saveOfflineLocation(locationToSave);
+            setSyncStatus('Authentication issue. Location saved offline and will sync later.');
+          } else {
+            // By now we've confirmed we have a valid session
+            // Validate coordinates
+            const lat = locationToSave.latitude;
+            const lng = locationToSave.longitude;
+            
+            if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+              throw new Error('Invalid coordinates. Please use the map or enter valid coordinates.');
+            }
+            
+            console.log('[Locations] Saving location with coordinates:', { lat, lng });
+            
+            // Proceed with API call using separate latitude/longitude columns
+            console.log('[Locations] Attempting to save to Supabase...');
+            
+            // Add timeout to prevent hanging
+            const savePromise = supabase
+              .from('locations')
+              .insert({
+                user_id: user.id,
+                location_name: newLocation.name,  // Column is 'location_name' not 'name'
+                address: newLocation.address,
+                latitude: lat,
+                longitude: lng,
+                created_at: new Date().toISOString()
+              })
+              .select();
+            
+            // Add timeout wrapper
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Save timeout')), 5000); // 5 second timeout
+            });
+            
+            try {
+              const { data, error } = await Promise.race([savePromise, timeoutPromise]);
+              
+              if (error) {
+                console.error('Error saving location to Supabase:', error);
+                
+                // Fall back to offline saving
+                await saveOfflineLocation(locationToSave);
+                setSyncStatus('Server error. Location saved offline and will sync later.');
+              } else {
+                // If we got here, the location was saved successfully to Supabase
+                console.log('Location saved to Supabase:', data);
+                setSyncStatus('Location saved to server successfully');
+                
+                // Update the ID in local state and localStorage to match the one from Supabase
+                if (data && data[0]) {
+                  const supabaseLocationId = data[0].id;
+                  const updatedWithServerIds = updatedLocations.map(loc => 
+                    loc.id === newLocationId ? { ...loc, id: supabaseLocationId, synced: true } : loc
+                  );
+                  
+                  setLocations(updatedWithServerIds);
+                  localStorage.setItem(cacheKey, JSON.stringify(updatedWithServerIds));
+                }
+              }
+            } catch (timeoutError) {
+              console.error('Save timeout or error:', timeoutError);
+              // Fall back to offline saving on timeout
+              await saveOfflineLocation(locationToSave);
+              setSyncStatus('Save timeout. Location saved offline and will sync later.');
+            }
+          }
+        }
+      } catch (authError) {
+        console.warn('Auth error, saving offline instead:', authError);
+        await saveOfflineLocation(locationToSave);
+        setSyncStatus('Authentication issue. Location saved offline and will sync later.');
+      }
+    } else {
+      // Offline: Save to IndexedDB
+      console.log('Saving location offline');
+      await saveOfflineLocation(locationToSave);
+      setSyncStatus('Saving location offline. Will sync when online.');
+    }
+  };
+
   // Handle form submission with online/offline support
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -547,6 +651,7 @@ const Locations = () => {
     }
     
     try {
+      console.log('[Locations] Starting location save process...');
       // Set loading status
       setSyncStatus('Saving location...');
       
@@ -579,87 +684,23 @@ const Locations = () => {
       const online = isOnline();
       console.log('Online status:', online);
       
-      if (online) {
-        // Online: Save to Supabase
-        setSyncStatus('Saving location to server...');
-        
-        // Try to get a valid session with token
-        try {
-          // Refresh the session first to ensure we have a valid token
-          const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
-          
-          if (sessionError) {
-            console.error('Error refreshing session:', sessionError);
-            // Fall back to offline saving on auth error
-            await saveOfflineLocation(locationToSave);
-            setSyncStatus('Authentication issue. Location saved offline and will sync later.');
-            return;
-          }
-          
-          if (!sessionData || !sessionData.session) {
-            console.warn('No valid session available after refresh');
-            await saveOfflineLocation(locationToSave);
-            setSyncStatus('Authentication issue. Location saved offline and will sync later.');
-            return;
-          }
-        
-          // By now we've confirmed we have a valid session
-          // Validate coordinates
-          const lat = locationToSave.latitude;
-          const lng = locationToSave.longitude;
-          
-          if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-            throw new Error('Invalid coordinates. Please use the map or enter valid coordinates.');
-          }
-          
-          console.log('[Locations] Saving location with coordinates:', { lat, lng });
-          
-          // Proceed with API call using separate latitude/longitude columns
-          const { data, error } = await supabase
-            .from('locations')
-            .insert({
-              user_id: user.id,
-              location_name: newLocation.name,  // Column is 'location_name' not 'name'
-              address: newLocation.address,
-              latitude: lat,
-              longitude: lng,
-              created_at: new Date().toISOString()
-            })
-            .select();
-            
-          if (error) {
-            console.error('Error saving location to Supabase:', error);
-            
-            // Fall back to offline saving
-            await saveOfflineLocation(locationToSave);
-            setSyncStatus('Server error. Location saved offline and will sync later.');
-          } else {
-            // If we got here, the location was saved successfully to Supabase
-            console.log('Location saved to Supabase:', data);
-            setSyncStatus('Location saved to server successfully');
-            
-            // Update the ID in local state and localStorage to match the one from Supabase
-            if (data && data[0]) {
-              const supabaseLocationId = data[0].id;
-              const updatedWithServerIds = updatedLocations.map(loc => 
-                loc.id === newLocationId ? { ...loc, id: supabaseLocationId, synced: true } : loc
-              );
-              
-              setLocations(updatedWithServerIds);
-              localStorage.setItem(cacheKey, JSON.stringify(updatedWithServerIds));
-            }
-          }
-        } catch (authError) {
-          console.warn('Auth error, saving offline instead:', authError);
-          await saveOfflineLocation(locationToSave);
-          setSyncStatus('Authentication issue. Location saved offline and will sync later.');
-        }
-      } else {
-        // Offline: Save to IndexedDB
-        console.log('Saving location offline');
+      // Add overall timeout to prevent hanging
+      const saveProcessPromise = performSaveProcess(locationToSave, updatedLocations, newLocationId, cacheKey, newLocation, mapPosition);
+      const overallTimeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Overall save process timeout')), 8000); // 8 second overall timeout
+      });
+      
+      try {
+        await Promise.race([saveProcessPromise, overallTimeoutPromise]);
+        console.log('[Locations] Save process completed successfully');
+      } catch (timeoutError) {
+        console.error('[Locations] Save process timeout or error:', timeoutError);
+        // Ensure location is saved offline as fallback
         await saveOfflineLocation(locationToSave);
-        setSyncStatus('Saving location offline. Will sync when online.');
+        setSyncStatus('Save process timed out. Location saved offline and will sync later.');
       }
+      
+      console.log('[Locations] About to execute redirect logic...');
       
       // Reset form and hide it
       setNewLocation({
@@ -669,6 +710,21 @@ const Locations = () => {
         longitude: null
       });
       setShowAddForm(false);
+      
+      console.log('[Locations] Form reset completed, checking for onboarding redirect');
+      
+      // Check if this is from onboarding and redirect back
+      const urlParams = new URLSearchParams(location.search);
+      const source = urlParams.get('source');
+      console.log('[Locations] Checking redirect logic - source:', source, 'full search:', location.search);
+      if (source === 'onboarding') {
+        console.log('[Locations] Location saved from onboarding, redirecting back to dashboard');
+        // Use React Router's navigate instead of window.location
+        window.location.assign('/dashboard?source=onboarding&action=location-saved');
+        return;
+      } else {
+        console.log('[Locations] Not from onboarding, continuing normally');
+      }
       
       // Clear status after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000);

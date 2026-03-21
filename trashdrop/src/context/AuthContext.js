@@ -238,14 +238,6 @@ export const AuthProvider = ({ children }) => {
     });
     
     try {
-      // Force signOut to clean up any lingering session data
-      const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' });
-      
-      if (signOutError) {
-        console.error('[Auth] Error during sign out:', signOutError);
-        // Even if sign out fails, we've already cleared local data
-      }
-      
       // Clear any remaining Supabase-related data
       if (typeof window !== 'undefined') {
         // Clear any session storage that might be used by Supabase
@@ -890,19 +882,22 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('[Auth] Sign out error:', error);
-        return handleAuthError(error, 'sign_out');
+        // Continue with reset even if sign out fails
       }
       
       // Clear all auth data
       await resetAuthState();
       console.log('[Auth] Sign out successful');
+      
       return { success: true };
       
     } catch (error) {
       console.error('[Auth] Unexpected error during sign out:', error);
-      return handleAuthError(error, 'sign_out');
+      // Still try to reset
+      await resetAuthState();
+      return { success: true }; // Return success so redirect happens
     }
-  }, [resetAuthState, handleAuthError, updateAuthState]);
+  }, [resetAuthState, updateAuthState]);
 
   const resetPassword = useCallback(async (email) => {
     console.log('[Auth] Requesting password reset for:', email);

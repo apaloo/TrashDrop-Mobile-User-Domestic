@@ -8,9 +8,9 @@ import offlineStorageAPI from '../utils/offlineStorage.js';
 import realTableInspector from '../utils/realTableInspector.js';
  
 
-const BatchQRScanner = ({ onScanComplete }) => {
+const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
   const { user, session, loading: authLoading, status } = useAuth();
-  const [scanning, setScanning] = useState(false);
+  const [scanning, setScanning] = useState(autoStart); // Start with autoStart value
   const [error, setError] = useState(null);
   const [scanResult, setScanResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -20,6 +20,14 @@ const BatchQRScanner = ({ onScanComplete }) => {
   const [lastScan, setLastScan] = useState({ value: '', ts: 0 });
   const [hasSupaSession, setHasSupaSession] = useState(false);
   const cancelRef = useRef({ canceled: false });
+
+  // Auto-start scanning if autoStart prop is true
+  useEffect(() => {
+    if (autoStart && !scanning && !loading) {
+      console.log('[BatchQRScanner] Auto-starting scanning...');
+      startScanning();
+    }
+  }, [autoStart, scanning, loading]);
 
   // Lightweight check for Supabase session presence to drive UI enablement
   useEffect(() => {
