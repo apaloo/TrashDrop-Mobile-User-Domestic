@@ -150,6 +150,11 @@ BEGIN
   FROM user_stats
   WHERE user_id = user_uuid;
   
+  -- Handle case where no user_stats record exists
+  IF available_bags IS NULL THEN
+    available_bags := 0;
+  END IF;
+  
   -- For onboarding, total_bags_scanned is the same as available_bags
   total_bags_scanned := available_bags;
   

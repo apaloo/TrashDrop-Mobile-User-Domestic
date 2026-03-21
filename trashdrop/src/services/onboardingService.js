@@ -426,7 +426,9 @@ export const onboardingService = {
       const state = await this.getUserState(userId);
       console.log('[Onboarding] User state for shouldShowOnboarding:', state);
       
-      const shouldShow = state.available_bags === 0 && state.total_bags_scanned === 0;
+      const shouldShow = (state.available_bags === 0 || state.available_bags === null) && 
+                         (state.total_bags_scanned === 0 || state.total_bags_scanned === null) && 
+                         !hasDismissed;
       
       console.log('[Onboarding] shouldShowOnboarding check:', {
         userId,
