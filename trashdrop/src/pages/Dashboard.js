@@ -95,7 +95,11 @@ const Dashboard = () => {
   // Check onboarding status and show appropriate UI
   useEffect(() => {
     const checkOnboardingStatus = async () => {
-      if (!user?.id) return;
+      console.log('[Dashboard] checkOnboardingStatus called, user.id:', user?.id);
+      if (!user?.id) {
+        console.log('[Dashboard] No user ID, skipping onboarding check');
+        return;
+      }
       
       try {
         // Check if returning from onboarding location setup
@@ -136,12 +140,11 @@ const Dashboard = () => {
           return;
         }
         
-        // Test if onboardingService is imported correctly
+        // Check if user should see onboarding
+        console.log('[Dashboard] Checking onboarding for user:', user.id);
         console.log('[Dashboard] onboardingService imported:', !!onboardingService);
         console.log('[Dashboard] shouldShowOnboarding method exists:', !!onboardingService.shouldShowOnboarding);
         
-        // Check if user should see onboarding
-        console.log('[Dashboard] Checking onboarding for user:', user.id);
         try {
           const shouldShow = await onboardingService.shouldShowOnboarding(user.id);
           console.log('[Dashboard] shouldShowOnboarding result:', shouldShow);
@@ -153,6 +156,7 @@ const Dashboard = () => {
           }
         } catch (error) {
           console.error('[Dashboard] Error checking onboarding:', error);
+          console.error('[Dashboard] Error details:', error.stack);
         }
         
         console.log('[Dashboard] Not showing onboarding popup');
@@ -1184,10 +1188,13 @@ const Dashboard = () => {
     <div className="bg-white dark:bg-gray-900">
       {/* Onboarding Flow */}
       {showOnboarding && (
-        <OnboardingFlow 
-          onComplete={handleOnboardingComplete}
-          onClose={handleOnboardingClose}
-        />
+        <>
+          {console.log('[Dashboard] Rendering OnboardingFlow component')}
+          <OnboardingFlow 
+            onComplete={handleOnboardingComplete}
+            onClose={handleOnboardingClose}
+          />
+        </>
       )}
       
       <DashboardOptimizer />
