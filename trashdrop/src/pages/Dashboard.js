@@ -8,6 +8,8 @@ import OnboardingFlow from '../components/OnboardingFlow.js';
 import { userService, pickupService } from '../services/index.js';
 import { notificationService } from '../services/notificationService.js';
 import onboardingService from '../services/onboardingService.js';
+import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
+import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
 
 // For development: expose cleanup function
 if (process.env.NODE_ENV === 'development') {
@@ -15,8 +17,6 @@ if (process.env.NODE_ENV === 'development') {
     return onboardingService.clearTestData(userId);
   };
 }
-import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
-import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
 
 // Skeleton component to prevent CLS
 const DashboardSkeleton = () => (
