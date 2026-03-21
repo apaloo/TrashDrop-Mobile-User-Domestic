@@ -139,6 +139,7 @@ DECLARE
   state TEXT;
   available_bags INTEGER;
   total_bags_scanned INTEGER;
+  has_bags_selection BOOLEAN;
 BEGIN
   -- Count locations from bin_locations table
   SELECT COUNT(*) INTO location_count
@@ -158,6 +159,16 @@ BEGIN
   -- For onboarding, total_bags_scanned is the same as available_bags
   total_bags_scanned := available_bags;
   
+  -- Check if user has made a "has bags" selection
+  -- Look for recent has_bags activity
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid 
+    AND activity_type IN ('has_bags_true', 'has_bags_false')
+    ORDER BY created_at DESC
+    LIMIT 1
+  ) INTO has_bags_selection;
+  
   -- Determine state
   IF total_bags_scanned > 0 THEN
     state := 'READY_FOR_PICKUP';
@@ -171,7 +182,8 @@ BEGIN
     'state', state,
     'available_bags', available_bags,
     'total_bags_scanned', total_bags_scanned,
-    'location_count', location_count
+    'location_count', location_count,
+    'has_bags_selection', has_bags_selection
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -231,6 +243,39 @@ BEGIN
   RETURN JSON_BUILD_OBJECT('status', 'success', 'pickup_id', pickup_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. GET USER'S "HAS BAGS" SELECTION
+-- Returns the user's most recent "has bags" selection from user_activity
+CREATE OR REPLACE FUNCTION get_user_has_bags_selection(user_uuid UUID)
+RETURNS JSON AS $$
+DECLARE
+  has_bags BOOLEAN;
+  activity_record RECORD;
+BEGIN
+  -- Get the most recent has_bags activity
+  SELECT * INTO activity_record
+  FROM user_activity
+  WHERE user_id = user_uuid 
+    AND activity_type IN ('has_bags_true', 'has_bags_false')
+  ORDER BY created_at DESC
+  LIMIT 1;
+  
+  IF activity_record IS NULL THEN
+    RETURN JSON_BUILD_OBJECT('has_bags', NULL, 'selection_made', false);
+  END IF;
+  
+  has_bags := activity_record.activity_type = 'has_bags_true';
+  
+  RETURN JSON_BUILD_OBJECT(
+    'has_bags', has_bags,
+    'selection_made', true,
+    'selected_at', activity_record.created_at
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant permission for the new function
+GRANT EXECUTE ON FUNCTION get_user_has_bags_selection TO authenticated;
 
 -- Grant permissions to authenticated users
 GRANT EXECUTE ON FUNCTION start_onboarding TO authenticated;

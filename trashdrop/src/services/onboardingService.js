@@ -407,6 +407,30 @@ export const onboardingService = {
   },
 
   /**
+   * Get user's "has bags" selection from user_activity
+   * Returns the most recent has_bags selection made by the user
+   */
+  async getUserHasBagsSelection(userId) {
+    try {
+      console.log('[Onboarding] getUserHasBagsSelection called for userId:', userId);
+      
+      const { data, error } = await supabase
+        .rpc('get_user_has_bags_selection', { user_uuid: userId });
+      
+      if (error) {
+        console.error('[Onboarding] Error getting user bags selection:', error);
+        throw error;
+      }
+      
+      console.log('[Onboarding] User bags selection from RPC:', data);
+      return data;
+    } catch (error) {
+      console.error('[Onboarding] Error getting user bags selection:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Check if user should see onboarding
    * Entry condition: available_bags = 0 AND total_bags_scanned = 0 AND not dismissed
    */

@@ -53,12 +53,38 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         if (state.state === 'NEW_USER') {
           setCurrentStep('welcome');
         } else if (state.state === 'LOCATION_SET') {
-          // Check if user has completed onboarding before
-          // If they have locations but 0 bags scanned, they might still need the welcome step
-          if (state.total_bags_scanned === 0 && state.available_bags === 0) {
-            setCurrentStep('welcome'); // Still show welcome for users who haven't started the flow
+          // User has a location but no bags yet
+          // Check if they're returning from location setup
+          const urlParams = new URLSearchParams(window.location.search);
+          const source = urlParams.get('source');
+          const action = urlParams.get('action');
+          
+          if (source === 'onboarding' && action === 'location-saved') {
+            // User just saved a location, continue to next step
+            // Check their "has bags" selection from database
+            try {
+              const { data: bagsSelection } = await onboardingService.getUserHasBagsSelection(user.id);
+              console.log('[Onboarding] User bags selection:', bagsSelection);
+              
+              if (bagsSelection?.selection_made) {
+                setHasBags(bagsSelection.has_bags);
+                setCurrentStep(bagsSelection.has_bags ? 'scan_qr' : 'digital_bin');
+              } else {
+                // No selection made, default to welcome step
+                setCurrentStep('welcome');
+              }
+            } catch (error) {
+              console.error('[Onboarding] Error getting bags selection:', error);
+              // Default to welcome step on error
+              setCurrentStep('welcome');
+            }
           } else {
-            setCurrentStep('scan_qr'); // Users who have started the flow go to QR scan
+            // Regular initialization - still show welcome for users who haven't started the flow
+            if (state.total_bags_scanned === 0 && state.available_bags === 0) {
+              setCurrentStep('welcome');
+            } else {
+              setCurrentStep('scan_qr');
+            }
           }
         } else if (state.state === 'READY_FOR_PICKUP') {
           setCurrentStep('request_pickup');
