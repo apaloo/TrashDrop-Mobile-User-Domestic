@@ -61,7 +61,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
           
           if (source === 'onboarding' && action === 'location-saved') {
             // User just saved a location, continue to next step
-            // Check their "has bags" selection from database
+            // Try to get their "has bags" selection from database
             try {
               const { data: bagsSelection } = await onboardingService.getUserHasBagsSelection(user.id);
               console.log('[Onboarding] User bags selection:', bagsSelection);
@@ -70,13 +70,27 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
                 setHasBags(bagsSelection.has_bags);
                 setCurrentStep(bagsSelection.has_bags ? 'scan_qr' : 'digital_bin');
               } else {
-                // No selection made, default to welcome step
-                setCurrentStep('welcome');
+                // No selection made, check if we can determine from localStorage
+                const hasBagsLocal = localStorage.getItem(`trashdrop_has_bags_${user.id}`);
+                if (hasBagsLocal !== null) {
+                  setHasBags(hasBagsLocal === 'true');
+                  setCurrentStep(hasBagsLocal === 'true' ? 'scan_qr' : 'digital_bin');
+                } else {
+                  // Default to welcome step
+                  setCurrentStep('welcome');
+                }
               }
             } catch (error) {
               console.error('[Onboarding] Error getting bags selection:', error);
-              // Default to welcome step on error
-              setCurrentStep('welcome');
+              // Network error - check localStorage as fallback
+              const hasBagsLocal = localStorage.getItem(`trashdrop_has_bags_${user.id}`);
+              if (hasBagsLocal !== null) {
+                setHasBags(hasBagsLocal === 'true');
+                setCurrentStep(hasBagsLocal === 'true' ? 'scan_qr' : 'digital_bin');
+              } else {
+                // Default to welcome step
+                setCurrentStep('welcome');
+              }
             }
           } else {
             // Regular initialization - still show welcome for users who haven't started the flow
@@ -105,6 +119,9 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     try {
       setIsLoading(true);
       setHasBags(hasBags);
+      
+      // Save to localStorage as fallback for network issues
+      localStorage.setItem(`trashdrop_has_bags_${user.id}`, hasBags.toString());
       
       await onboardingService.setHasBags(user.id, hasBags);
       
