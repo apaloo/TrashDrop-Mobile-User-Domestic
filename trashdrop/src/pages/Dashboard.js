@@ -112,6 +112,8 @@ const Dashboard = () => {
         if (source === 'onboarding' && action === 'location-saved') {
           console.log('[Dashboard] Returning from onboarding location setup - reopening onboarding');
           setShowOnboarding(true);
+          // Store location saved state to pass to OnboardingFlow
+          localStorage.setItem('trashdrop_location_saved', 'true');
           // Clear URL parameters
           window.history.replaceState({}, '', window.location.pathname);
           return;

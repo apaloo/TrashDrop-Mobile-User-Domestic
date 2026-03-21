@@ -45,22 +45,77 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         // Start onboarding tracking
         await onboardingService.startOnboarding(user.id);
         
-        // Get current user state
-        const state = await onboardingService.getUserState(user.id);
-        setUserState(state);
+        // Check if user is returning from location setup (check first!)
+        const locationSaved = localStorage.getItem('trashdrop_location_saved');
         
-        // Determine starting step
-        if (state.state === 'NEW_USER') {
-          setCurrentStep('welcome');
-        } else if (state.state === 'LOCATION_SET') {
-          // User has a location but no bags yet
-          // Check if they're returning from location setup
-          const urlParams = new URLSearchParams(window.location.search);
-          const source = urlParams.get('source');
-          const action = urlParams.get('action');
+        if (locationSaved === 'true') {
+          // User just saved a location, continue to next step
+          // Clear the flag
+          localStorage.removeItem('trashdrop_location_saved');
           
-          if (source === 'onboarding' && action === 'location-saved') {
-            // User just saved a location, continue to next step
+          // First, ensure a location is actually saved in the database
+          try {
+            console.log('[Onboarding] Processing location-saved action');
+            
+            // Check if user already has locations
+            const { data: existingLocations } = await supabase
+              .from('bin_locations')
+              .select('id')
+              .eq('user_id', user.id)
+              .limit(1);
+            
+            if (!existingLocations || existingLocations.length === 0) {
+              console.log('[Onboarding] No locations found, creating default location');
+              // Create a default location since none exists
+              await onboardingService.addUserLocation(
+                user.id,
+                'Home',
+                'Default location from onboarding',
+                0, // Default coordinates
+                0
+              );
+            }
+            
+            // Try to get their "has bags" selection from database
+            const { data: bagsSelection } = await onboardingService.getUserHasBagsSelection(user.id);
+            console.log('[Onboarding] User bags selection:', bagsSelection);
+            
+            if (bagsSelection?.selection_made) {
+              setHasBags(bagsSelection.has_bags);
+              setCurrentStep(bagsSelection.has_bags ? 'scan_qr' : 'digital_bin');
+            } else {
+              // No selection made, check if we can determine from localStorage
+              const hasBagsLocal = localStorage.getItem(`trashdrop_has_bags_${user.id}`);
+              if (hasBagsLocal !== null) {
+                setHasBags(hasBagsLocal === 'true');
+                setCurrentStep(hasBagsLocal === 'true' ? 'scan_qr' : 'digital_bin');
+              } else {
+                // Default to welcome step
+                setCurrentStep('welcome');
+              }
+            }
+          } catch (error) {
+            console.error('[Onboarding] Error processing location-saved:', error);
+            // Network error - check localStorage as fallback
+            const hasBagsLocal = localStorage.getItem(`trashdrop_has_bags_${user.id}`);
+            if (hasBagsLocal !== null) {
+              setHasBags(hasBagsLocal === 'true');
+              setCurrentStep(hasBagsLocal === 'true' ? 'scan_qr' : 'digital_bin');
+            } else {
+              // Default to welcome step
+              setCurrentStep('welcome');
+            }
+          }
+        } else {
+          // Normal flow - get current user state
+          const state = await onboardingService.getUserState(user.id);
+          setUserState(state);
+          
+          // Determine starting step
+          if (state.state === 'NEW_USER') {
+            setCurrentStep('welcome');
+          } else if (state.state === 'LOCATION_SET') {
+            // User has a location but no bags yet
             // Try to get their "has bags" selection from database
             try {
               const { data: bagsSelection } = await onboardingService.getUserHasBagsSelection(user.id);
@@ -92,16 +147,16 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
                 setCurrentStep('welcome');
               }
             }
+          } else if (state.state === 'BAGS_READY') {
+            // User has bags and location, ready for QR scan
+            setCurrentStep('scan_qr');
+          } else if (state.state === 'QR_SCANNED') {
+            // User has completed QR scan
+            setCurrentStep('digital_bin');
           } else {
-            // Regular initialization - still show welcome for users who haven't started the flow
-            if (state.total_bags_scanned === 0 && state.available_bags === 0) {
-              setCurrentStep('welcome');
-            } else {
-              setCurrentStep('scan_qr');
-            }
+            // Default to welcome
+            setCurrentStep('welcome');
           }
-        } else if (state.state === 'READY_FOR_PICKUP') {
-          setCurrentStep('request_pickup');
         }
         
       } catch (error) {
