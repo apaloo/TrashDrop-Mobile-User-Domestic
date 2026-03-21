@@ -479,7 +479,19 @@ const LocationStep = ({ onLocationSet, isLoading }) => {
       </button>
       
       <div className="mt-4 text-center">
-        <button className="text-blue-600 hover:text-blue-700 text-sm">
+        <button 
+          onClick={() => {
+            // Create a fallback location for manual entry
+            const locationData = {
+              name: 'Home',
+              address: 'Manual entry - Please update in profile',
+              latitude: 0, // Default coordinates
+              longitude: 0
+            };
+            onLocationSet(locationData);
+          }}
+          className="text-blue-600 hover:text-blue-700 text-sm"
+        >
           Enter Location Manually
         </button>
       </div>

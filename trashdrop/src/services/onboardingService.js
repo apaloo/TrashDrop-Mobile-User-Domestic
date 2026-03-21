@@ -8,15 +8,24 @@ import supabase from '../utils/supabaseClient.js';
 export const onboardingService = {
   /**
    * Get user's current onboarding state
-   * Uses our fixed frontend logic instead of RPC to ensure consistency
+   * Uses RPC function for consistent database state
    */
   async getUserState(userId) {
     console.log('[Onboarding] getUserState called for userId:', userId);
     
     try {
-      // Use our fixed frontend calculation for consistency
-      return await this.calculateUserState(userId);
-      // return data;
+      // Use RPC function for consistent database state
+      const { data, error } = await supabase
+        .rpc('get_user_onboarding_state', { user_uuid: userId });
+      
+      if (error) {
+        console.error('[Onboarding] RPC error getting user state:', error);
+        // Fallback to manual calculation
+        return this.calculateUserState(userId);
+      }
+      
+      console.log('[Onboarding] User state from RPC:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error getting user state:', error);
       // Fallback to manual calculation
@@ -241,19 +250,22 @@ export const onboardingService = {
 
   /**
    * Start onboarding process
-   * Disabled RPC calls to prevent interference with frontend logic
+   * Uses RPC function to track onboarding start
    */
   async startOnboarding(userId) {
     try {
       console.log('[Onboarding] Start onboarding called for user:', userId);
-      // Skip RPC call to prevent interference with frontend logic
-      // const { data, error } = await supabase
-      //   .rpc('start_onboarding', { user_uuid: userId });
       
-      // if (error) throw error;
-      // return data;
+      const { data, error } = await supabase
+        .rpc('start_onboarding', { user_uuid: userId });
       
-      return { success: true };
+      if (error) {
+        console.error('[Onboarding] Error starting onboarding:', error);
+        throw error;
+      }
+      
+      console.log('[Onboarding] Onboarding started successfully:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error starting onboarding:', error);
       throw error;
@@ -262,19 +274,22 @@ export const onboardingService = {
 
   /**
    * Set whether user has bags
-   * Disabled RPC calls to prevent interference with frontend logic
+   * Uses RPC function to record user selection
    */
   async setHasBags(userId, hasBags) {
     try {
       console.log('[Onboarding] setHasBags called:', { userId, hasBags });
-      // Skip RPC call to prevent interference with frontend logic
-      // const { data, error } = await supabase
-      //   .rpc('set_has_bags', { user_uuid: userId, has_bags: hasBags });
       
-      // if (error) throw error;
-      // return data;
+      const { data, error } = await supabase
+        .rpc('set_has_bags', { user_uuid: userId, has_bags: hasBags });
       
-      return { success: true };
+      if (error) {
+        console.error('[Onboarding] Error setting has bags:', error);
+        throw error;
+      }
+      
+      console.log('[Onboarding] Has bags set successfully:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error setting has bags:', error);
       throw error;
@@ -283,26 +298,28 @@ export const onboardingService = {
 
   /**
    * Add user location
-   * Disabled RPC calls to prevent interference with frontend logic
+   * Uses RPC function to create location in bin_locations table
    */
   async addUserLocation(userId, name, address, latitude, longitude) {
     try {
       console.log('[Onboarding] addUserLocation called:', { userId, name, address, latitude, longitude });
-      // Skip RPC call to prevent interference with frontend logic
-      // const { data, error } = await supabase
-      //   .rpc('add_user_location', {
-      //     user_uuid: userId,
-      //     name: name,
-      //     address: address,
-      //     latitude: latitude,
-      //     longitude: longitude
-      //   });
       
-      // if (error) throw error;
-      // return data;
+      const { data, error } = await supabase
+        .rpc('add_user_location', {
+          user_uuid: userId,
+          name: name,
+          address: address,
+          lat: latitude,
+          lng: longitude
+        });
       
-      // Return a mock location ID for testing
-      return 'mock-location-id-' + Date.now();
+      if (error) {
+        console.error('[Onboarding] Error adding user location:', error);
+        throw error;
+      }
+      
+      console.log('[Onboarding] Location added successfully:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error adding user location:', error);
       throw error;
@@ -311,31 +328,22 @@ export const onboardingService = {
 
   /**
    * Process QR code scan
-   * Disabled RPC calls to prevent interference with frontend logic
+   * Uses RPC function to activate batch and update user stats
    */
   async processQRScan(userId, qrCode) {
     try {
       console.log('[Onboarding] processQRScan called:', { userId, qrCode });
       
-      // Store QR scan in localStorage for state calculation
-      const qrScanKey = `trashdrop_qr_scan_${userId}`;
-      const qrScanData = {
-        qrCode: qrCode,
-        scannedAt: new Date().toISOString(),
-        processed: true
-      };
-      localStorage.setItem(qrScanKey, JSON.stringify(qrScanData));
+      const { data, error } = await supabase
+        .rpc('process_qr_scan', { user_uuid: userId, qr: qrCode });
       
-      console.log('[Onboarding] QR scan stored in localStorage:', qrScanData);
+      if (error) {
+        console.error('[Onboarding] Error processing QR scan:', error);
+        throw error;
+      }
       
-      // Skip RPC call to prevent interference with frontend logic
-      // const { data, error } = await supabase
-      //   .rpc('process_qr_scan', { user_uuid: userId, qr: qrCode });
-      
-      // if (error) throw error;
-      // return data;
-      
-      return { success: true, bagId: 'mock-bag-id-' + Date.now() };
+      console.log('[Onboarding] QR scan processed successfully:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error processing QR scan:', error);
       throw error;
@@ -344,23 +352,26 @@ export const onboardingService = {
 
   /**
    * Create digital bin
-   * Disabled RPC calls to prevent interference with frontend logic
+   * Uses RPC function to create digital bin with proper expiration
    */
   async createDigitalBin(userId, locationId, fee) {
     try {
       console.log('[Onboarding] createDigitalBin called:', { userId, locationId, fee });
-      // Skip RPC call to prevent interference with frontend logic
-      // const { data, error } = await supabase
-      //   .rpc('create_digital_bin', {
-      //     user_uuid: userId,
-      //     location_id: locationId,
-      //     fee: fee
-      //   });
       
-      // if (error) throw error;
-      // return data;
+      const { data, error } = await supabase
+        .rpc('create_digital_bin', {
+          user_uuid: userId,
+          location_id: locationId,
+          fee: fee
+        });
       
-      return { success: true, binId: 'mock-bin-id-' + Date.now() };
+      if (error) {
+        console.error('[Onboarding] Error creating digital bin:', error);
+        throw error;
+      }
+      
+      console.log('[Onboarding] Digital bin created successfully:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error creating digital bin:', error);
       throw error;
@@ -369,23 +380,26 @@ export const onboardingService = {
 
   /**
    * Create onboarding pickup request
-   * Disabled RPC calls to prevent interference with frontend logic
+   * Uses RPC function to create pickup request in pickup_requests table
    */
   async createOnboardingPickup(userId, locationId, bagCount = 1) {
     try {
       console.log('[Onboarding] createOnboardingPickup called:', { userId, locationId, bagCount });
-      // Skip RPC call to prevent interference with frontend logic
-      // const { data, error } = await supabase
-      //   .rpc('create_onboarding_pickup', {
-      //     user_uuid: userId,
-      //     location_id: locationId,
-      //     bag_count: bagCount
-      //   });
       
-      // if (error) throw error;
-      // return data;
+      const { data, error } = await supabase
+        .rpc('create_onboarding_pickup', {
+          user_uuid: userId,
+          location_id: locationId,
+          bag_count: bagCount
+        });
       
-      return { success: true, pickupId: 'mock-pickup-id-' + Date.now() };
+      if (error) {
+        console.error('[Onboarding] Error creating pickup:', error);
+        throw error;
+      }
+      
+      console.log('[Onboarding] Pickup created successfully:', data);
+      return data;
     } catch (error) {
       console.error('[Onboarding] Error creating pickup:', error);
       throw error;
@@ -400,25 +414,6 @@ export const onboardingService = {
     console.log('[Onboarding] shouldShowOnboarding called with userId:', userId);
     
     try {
-      // TEMPORARY FIX: Clear any existing QR scan data for new users
-      // This prevents old test data from blocking onboarding
-      const qrScanKey = `trashdrop_qr_scan_${userId}`;
-      const qrScanData = JSON.parse(localStorage.getItem(qrScanKey) || 'null');
-      
-      if (qrScanData && qrScanData.processed) {
-        console.log('[Onboarding] WARNING: Found old QR scan data, clearing it for new user onboarding');
-        localStorage.removeItem(qrScanKey);
-      }
-      
-      // ALSO clear any cached location data for new users
-      const locationKey = `trashdrop_locations_${userId}`;
-      const cachedLocations = JSON.parse(localStorage.getItem(locationKey) || '[]');
-      
-      if (cachedLocations.length > 0) {
-        console.log('[Onboarding] WARNING: Found old cached location data, clearing it for new user onboarding');
-        localStorage.removeItem(locationKey);
-      }
-      
       // Check if user has dismissed onboarding
       const dismissedKey = `trashdrop_onboarding_dismissed_${userId}`;
       const hasDismissed = localStorage.getItem(dismissedKey);
