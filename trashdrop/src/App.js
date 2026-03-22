@@ -188,6 +188,12 @@ const AppContent = () => {
       });
       
       if (isPublicRoute) {
+        // If authenticated user is on login/register, redirect to dashboard
+        if (isAuthenticated && (location.pathname === '/login' || location.pathname === '/register')) {
+          console.log('[App] Authenticated user on public route, redirecting to dashboard');
+          navigate('/dashboard', { replace: true });
+          return;
+        }
         console.log('[App] Skipping auth check - public route');
         return;
       }
