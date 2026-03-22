@@ -182,6 +182,10 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       await onboardingService.setHasBags(user.id, hasBags);
       
       if (hasBags) {
+        // Dismiss onboarding since user is proceeding to profile
+        if (user?.id) {
+          onboardingService.dismissOnboarding(user.id);
+        }
         // Navigate to Profile & Settings page, locations tab
         navigate('/profile?tab=locations&source=onboarding');
         onComplete(); // Close onboarding modal
@@ -250,6 +254,11 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     try {
       setIsLoading(true);
       setSelectedService(service);
+      
+      // Dismiss onboarding since user is proceeding to a service
+      if (user?.id) {
+        onboardingService.dismissOnboarding(user.id);
+      }
       
       if (service === 'digital_bin') {
         // Navigate to the actual Digital Bin page
@@ -329,6 +338,10 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
   };
 
   const handleComplete = () => {
+    console.log('[OnboardingFlow] User completed onboarding, dismissing permanently');
+    if (user?.id) {
+      onboardingService.dismissOnboarding(user.id);
+    }
     onComplete();
     navigate('/dashboard');
   };
