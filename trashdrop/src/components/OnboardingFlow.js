@@ -47,6 +47,9 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         
         // Check if user is returning from location setup (check first!)
         const locationSaved = localStorage.getItem('trashdrop_location_saved');
+        console.log('[Onboarding] DEBUG: Checking locationSaved flag:', locationSaved);
+        console.log('[Onboarding] DEBUG: Current URL:', window.location.href);
+        console.log('[Onboarding] DEBUG: User ID:', user?.id);
         
         if (locationSaved === 'true') {
           // User just saved a location, continue to next step

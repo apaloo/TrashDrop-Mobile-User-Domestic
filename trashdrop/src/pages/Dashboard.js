@@ -110,12 +110,16 @@ const Dashboard = () => {
         console.log('[Dashboard] Checking URL params - source:', source, 'action:', action, 'full search:', window.location.search);
         
         if (source === 'onboarding' && action === 'location-saved') {
+          console.log('[Dashboard] DEBUG: Found location-saved params');
+          console.log('[Dashboard] DEBUG: Setting localStorage flag');
           console.log('[Dashboard] Returning from onboarding location setup - reopening onboarding');
           setShowOnboarding(true);
           // Store location saved state to pass to OnboardingFlow
           localStorage.setItem('trashdrop_location_saved', 'true');
+          console.log('[Dashboard] DEBUG: localStorage flag set successfully');
           // Clear URL parameters
           window.history.replaceState({}, '', window.location.pathname);
+          console.log('[Dashboard] DEBUG: URL params cleared');
           return;
         }
         
