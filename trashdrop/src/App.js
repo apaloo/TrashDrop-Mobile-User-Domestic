@@ -20,6 +20,10 @@ const CollectionTestFlow = process.env.NODE_ENV === 'development'
   ? React.lazy(() => import('./tests/CollectionTestFlow.js'))
   : () => null;
 
+const CollectionFlowTest = process.env.NODE_ENV === 'development'
+  ? React.lazy(() => import('./tests/CollectionFlowTest.js'))
+  : () => null;
+
 // Regular imports for common components
 import Login from './pages/Login.js';
 import Register from './pages/Register.js';
