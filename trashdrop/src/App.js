@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext.js';
+import { useAuth, AuthProvider } from './context/AuthContext.js';
 import { ThemeProvider } from './context/ThemeContext.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import PrivateRoute from './components/PrivateRoute.js';
