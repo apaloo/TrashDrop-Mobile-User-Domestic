@@ -103,7 +103,9 @@ const Register = () => {
           }
         }, 5000);
       } else {
-        setError(error || 'Failed to register');
+        // Handle error object or string
+        const errorMessage = typeof error === 'object' ? error.message : error;
+        setError(errorMessage || 'Failed to register');
       }
     } catch (err) {
       if (isMountedRef.current) {
