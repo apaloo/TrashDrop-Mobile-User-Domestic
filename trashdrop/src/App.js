@@ -42,7 +42,6 @@ import PaymentMethods from './pages/PaymentMethods.js';
 import Notifications from './pages/Notifications.js';
 import CollectorTracking from './pages/CollectorTracking.js';
 import ToastTest from './pages/ToastTest.js';
-import CollectionFlowTest from './pages/CollectionFlowTest.js';
 import ResetPassword from './pages/ResetPassword.js';
 import ResetPasswordConfirm from './pages/ResetPasswordConfirm.js';
 import AuthCallback from './pages/AuthCallback.js';
