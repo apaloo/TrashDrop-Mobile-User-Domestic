@@ -606,6 +606,17 @@ export const AuthProvider = ({ children }) => {
       if (refreshError) {
         console.warn('[Auth] Session refresh failed:', refreshError.message);
         
+        // Handle refresh_token_not_found specifically - this is normal when token expires
+        if (refreshError.message.includes('refresh_token_not_found') || 
+            refreshError.message.includes('Invalid Refresh Token')) {
+          console.log('[Auth] Refresh token expired (normal behavior), cleaning up gracefully');
+          await resetAuthState({
+            message: 'Your session has expired. Please sign in again.',
+            code: 'REFRESH_TOKEN_EXPIRED'
+          });
+          return { success: false, error: { message: 'Session expired' } };
+        }
+        
         // Handle auth session missing specifically to prevent infinite loading
         if (refreshError.message.includes('Auth session missing')) {
           console.log('[Auth] No existing session to refresh, cleaning up and updating state');
@@ -1248,30 +1259,33 @@ export const AuthProvider = ({ children }) => {
     const watchdogTimeout = setTimeout(() => {
       console.error('[Auth] WATCHDOG TIMEOUT: Still in LOADING state after 3s, forcing resolution');
       
-      // Force exit from LOADING state
-      const storedUser = getStoredUser();
-      const storedToken = localStorage.getItem('trashdrop_auth_token');
-      
-      if (storedUser && storedToken) {
-        console.log('[Auth] Watchdog using cached credentials');
-        setAuthState({
-          status: AUTH_STATES.AUTHENTICATED,
-          user: storedUser,
-          session: { access_token: storedToken },
-          lastAction: 'watchdog_timeout_cached',
-          error: null,
-          retryCount: 0
-        });
-      } else {
-        console.log('[Auth] Watchdog forcing UNAUTHENTICATED (no cached credentials)');
-        setAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          user: null,
-          session: null,
-          lastAction: 'watchdog_timeout_unauthenticated',
-          error: null,
-          retryCount: 0
-        });
+      // Only force resolution if we haven't already resolved through normal means
+      if (authState.status === AUTH_STATES.LOADING) {
+        // Force exit from LOADING state
+        const storedUser = getStoredUser();
+        const storedToken = localStorage.getItem('trashdrop_auth_token');
+        
+        if (storedUser && storedToken) {
+          console.log('[Auth] Watchdog using cached credentials');
+          setAuthState({
+            status: AUTH_STATES.AUTHENTICATED,
+            user: storedUser,
+            session: { access_token: storedToken },
+            lastAction: 'watchdog_timeout_cached',
+            error: null,
+            retryCount: 0
+          });
+        } else {
+          console.log('[Auth] Watchdog forcing UNAUTHENTICATED (no cached credentials)');
+          setAuthState({
+            status: AUTH_STATES.UNAUTHENTICATED,
+            user: null,
+            session: null,
+            lastAction: 'watchdog_timeout_unauthenticated',
+            error: null,
+            retryCount: 0
+          });
+        }
       }
     }, 3000); // 3 seconds max in LOADING state
     
