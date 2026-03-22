@@ -256,8 +256,12 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       setSelectedService(service);
       
       if (service === 'digital_bin') {
-        // Stay in onboarding flow and go to digital bin step
-        setCurrentStep('digital_bin');
+        // Navigate to Digital Bin page and dismiss onboarding
+        if (user?.id) {
+          onboardingService.dismissOnboarding(user.id);
+        }
+        navigate('/digital-bin?source=onboarding');
+        onComplete();
       } else if (service === 'buy_bags') {
         // Navigate to bag purchase
         if (user?.id) {
