@@ -432,7 +432,7 @@ export const onboardingService = {
 
   /**
    * Check if user should see onboarding
-   * Entry condition: available_bags = 0 AND total_bags_scanned = 0 AND not dismissed
+   * Entry condition: available_bags = 0 AND total_bags_scanned = 0 AND not dismissed AND state is NEW_USER
    */
   async shouldShowOnboarding(userId) {
     console.log('[Onboarding] shouldShowOnboarding called with userId:', userId);
@@ -450,17 +450,27 @@ export const onboardingService = {
       const state = await this.getUserState(userId);
       console.log('[Onboarding] User state for shouldShowOnboarding:', state);
       
-      const shouldShow = (state.available_bags === 0 || state.available_bags === null) && 
+      // Only show onboarding if user is truly new (NEW_USER state) and has no bags/scans
+      // Users who have reached LOCATION_SET or beyond should not see onboarding again
+      const shouldShow = state.state === 'NEW_USER' && 
+                         (state.available_bags === 0 || state.available_bags === null) && 
                          (state.total_bags_scanned === 0 || state.total_bags_scanned === null) && 
                          !hasDismissed;
       
       console.log('[Onboarding] shouldShowOnboarding check:', {
         userId,
+        state: state.state,
         available_bags: state.available_bags,
         total_bags_scanned: state.total_bags_scanned,
         hasDismissed: !!hasDismissed,
         shouldShow
       });
+      
+      // Auto-dismiss if user has progressed beyond NEW_USER state
+      if (!shouldShow && state.state !== 'NEW_USER' && !hasDismissed) {
+        console.log('[Onboarding] Auto-dismissing onboarding for user who has progressed');
+        this.dismissOnboarding(userId);
+      }
       
       return shouldShow;
     } catch (error) {
