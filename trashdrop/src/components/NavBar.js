@@ -11,6 +11,7 @@ import supabase from '../utils/supabaseClient.js';
  */
 const NavBar = () => {
   const { isAuthenticated, signOut, user } = useAuth();
+  const navigate = useNavigate();
   // ThemeProvider temporarily disabled - use fallback
   let theme = 'light';
   let toggleTheme = () => {};
@@ -21,7 +22,6 @@ const NavBar = () => {
   } catch (e) {
     // ThemeProvider not available, use defaults
   }
-  const navigate = useNavigate();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
@@ -44,20 +44,24 @@ const NavBar = () => {
   const handleSignOut = async () => {
     console.log('[NavBar] Sign out initiated');
     try {
-      // Force immediate redirect first, then handle sign out in background
-      console.log('[NavBar] Force redirecting to login immediately');
-      window.location.href = '/login';
+      // Call signOut from AuthContext to properly clean up state
+      const result = await signOut();
       
-      // Handle sign out in background (won't block redirect)
-      signOut().catch(error => {
-        console.error('[NavBar] Background sign out error:', error);
-      });
+      if (result.success) {
+        console.log('[NavBar] Sign out successful, navigating to login');
+        // Use React Router navigation instead of hard redirect
+        navigate('/login', { replace: true });
+      } else {
+        console.error('[NavBar] Sign out failed:', result.error);
+        // Still navigate to login even if sign out fails
+        navigate('/login', { replace: true });
+      }
       
     } catch (error) {
       console.error('[NavBar] Sign out error:', error);
       // Force navigation anyway
-      console.log('[NavBar] Force redirecting to login due to error');
-      window.location.href = '/login';
+      console.log('[NavBar] Force navigating to login due to error');
+      navigate('/login', { replace: true });
     }
   };
 
