@@ -42,9 +42,6 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       try {
         setIsLoading(true);
         
-        // Start onboarding tracking
-        await onboardingService.startOnboarding(user.id);
-        
         // Check if user is returning from location setup (check first!)
         const locationSaved = localStorage.getItem('trashdrop_location_saved');
         console.log('[Onboarding] DEBUG: Checking locationSaved flag:', locationSaved);
@@ -110,7 +107,8 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
             }
           }
         } else {
-          // Normal flow - get current user state
+          // Normal flow - start onboarding tracking and get current user state
+          await onboardingService.startOnboarding(user.id);
           const state = await onboardingService.getUserState(user.id);
           setUserState(state);
           
