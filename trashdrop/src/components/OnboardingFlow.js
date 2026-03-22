@@ -255,21 +255,21 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       setIsLoading(true);
       setSelectedService(service);
       
-      // Dismiss onboarding since user is proceeding to a service
-      if (user?.id) {
-        onboardingService.dismissOnboarding(user.id);
-      }
-      
       if (service === 'digital_bin') {
-        // Navigate to the actual Digital Bin page
-        navigate('/digital-bin?source=onboarding');
-        onComplete();
+        // Stay in onboarding flow and go to digital bin step
+        setCurrentStep('digital_bin');
       } else if (service === 'buy_bags') {
         // Navigate to bag purchase
+        if (user?.id) {
+          onboardingService.dismissOnboarding(user.id);
+        }
         navigate('/bags?source=onboarding');
         onComplete();
       } else if (service === 'report') {
         // Navigate to reporting
+        if (user?.id) {
+          onboardingService.dismissOnboarding(user.id);
+        }
         navigate('/report?source=onboarding');
         onComplete();
       }
@@ -297,6 +297,12 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       );
       
       console.log('[Onboarding] Digital bin created successfully:', binId);
+      
+      // Dismiss onboarding since digital bin creation is complete
+      if (user?.id) {
+        onboardingService.dismissOnboarding(user.id);
+      }
+      
       setCurrentStep('success');
       
     } catch (error) {
