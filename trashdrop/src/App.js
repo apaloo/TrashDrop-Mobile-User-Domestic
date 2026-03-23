@@ -13,23 +13,6 @@ const importTestPickupFlow = () => import('./tests/TestPickupFlow.js');
 const importCollectionTestFlow = () => import('./tests/CollectionTestFlow.js');
 const importCollectionFlowTest = () => import('./tests/CollectionFlowTest.js');
 
-// Lazy load components using the dynamic imports
-const DebugConfig = process.env.NODE_ENV === 'development' 
-  ? React.lazy(importDebugConfig) 
-  : () => null;
-
-const TestPickupFlow = process.env.NODE_ENV === 'development'
-  ? React.lazy(importTestPickupFlow)
-  : () => null;
-
-const CollectionTestFlow = process.env.NODE_ENV === 'development'
-  ? React.lazy(importCollectionTestFlow)
-  : () => null;
-
-const CollectionFlowTest = process.env.NODE_ENV === 'development'
-  ? React.lazy(importCollectionFlowTest)
-  : () => null;
-
 // Regular imports for common components
 import Login from './pages/Login.js';
 import Register from './pages/Register.js';
@@ -68,6 +51,23 @@ import { themeOptions } from './theme/theme.js';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { enGB } from 'date-fns/locale';
+
+// Lazy load components using the dynamic imports
+const DebugConfig = process.env.NODE_ENV === 'development' 
+  ? React.lazy(importDebugConfig) 
+  : () => null;
+
+const TestPickupFlow = process.env.NODE_ENV === 'development'
+  ? React.lazy(importTestPickupFlow)
+  : () => null;
+
+const CollectionTestFlow = process.env.NODE_ENV === 'development'
+  ? React.lazy(importCollectionTestFlow)
+  : () => null;
+
+const CollectionFlowTest = process.env.NODE_ENV === 'development'
+  ? React.lazy(importCollectionFlowTest)
+  : () => null;
 
 // Initialize the theme
 const theme = createTheme(themeOptions);
