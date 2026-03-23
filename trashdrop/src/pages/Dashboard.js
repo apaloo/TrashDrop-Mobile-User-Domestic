@@ -61,6 +61,9 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  console.log('[Dashboard] Dashboard component rendering, user:', user?.id);
+  console.log('[Dashboard] Dashboard component - user object:', user);
+  
   // Stats state with database table field mappings:
   // points: profiles.points (user profile table)
   // pickups: COUNT(pickup_requests) + COUNT(digital_bins) WHERE user_id = user.id (both requests and digital bins)
@@ -94,8 +97,13 @@ const Dashboard = () => {
   
   // Check onboarding status and show appropriate UI
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      console.log('[Dashboard] checkOnboardingStatus called, user.id:', user?.id);
+    console.log('[Dashboard] Onboarding useEffect triggered, user.id:', user?.id);
+    console.log('[Dashboard] Onboarding useEffect - user exists:', !!user);
+    console.log('[Dashboard] Onboarding useEffect - user.id type:', typeof user?.id);
+    
+    try {
+      const checkOnboardingStatus = async () => {
+        console.log('[Dashboard] checkOnboardingStatus called, user.id:', user?.id);
       if (!user?.id) {
         console.log('[Dashboard] No user ID, skipping onboarding check');
         return;
@@ -175,7 +183,12 @@ const Dashboard = () => {
     };
     
     checkOnboardingStatus();
-  }, [user?.id]);
+    } catch (error) {
+      console.error('[Dashboard] Error in onboarding useEffect:', error);
+      console.error('[Dashboard] useEffect error details:', error.stack);
+    }
+    
+      }, [user?.id]);
 
   // Load recent activities from all activity sources (pickup_requests, illegal_dumping_mobile, digital_bins, user_activity)
   const getDatabaseActivities = useCallback(async (limit = 5) => {
@@ -1542,6 +1555,20 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <OnboardingFlow
+          onComplete={() => {
+            console.log('[Dashboard] Onboarding completed');
+            setShowOnboarding(false);
+          }}
+          onClose={() => {
+            console.log('[Dashboard] Onboarding closed');
+            setShowOnboarding(false);
+          }}
+        />
+      )}
     </div>
   );
 };

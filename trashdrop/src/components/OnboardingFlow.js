@@ -13,11 +13,29 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  console.log('[OnboardingFlow] Component rendering, user:', user?.id);
+  console.log('[OnboardingFlow] Component props:', { onComplete: !!onComplete, onClose: !!onClose });
+  
   // Flow state
   const [currentStep, setCurrentStep] = useState('welcome');
   const [userState, setUserState] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Track progress milestones to prevent initialization from overriding
+  const [progressMilestones, setProgressMilestones] = useState({
+    hasCompletedWelcome: false,
+    hasCompletedHasBags: false,
+    hasCompletedLocation: false,
+    hasCompletedQR: false,
+    hasCompletedDigitalBin: false,
+    hasCompletedPickupRequest: false
+  });
+
+  // Debug: Log milestone changes
+  useEffect(() => {
+    console.log('[Onboarding] Progress milestones updated:', progressMilestones);
+  }, [progressMilestones]);
   
   // Handle dismissing onboarding permanently
   const handleDismiss = () => {
@@ -38,6 +56,13 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
   useEffect(() => {
     const initializeOnboarding = async () => {
       if (!user?.id) return;
+      
+      // Don't reset progress if user has already advanced in the flow
+      const hasAdvancedProgress = Object.values(progressMilestones).some(milestone => milestone === true);
+      if (hasAdvancedProgress) {
+        console.log('[Onboarding] User has advanced progress, skipping initialization reset', progressMilestones);
+        return;
+      }
       
       try {
         setIsLoading(true);
@@ -107,55 +132,35 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
             }
           }
         } else {
-          // Normal flow - start onboarding tracking and get current user state
-          await onboardingService.startOnboarding(user.id);
-          const state = await onboardingService.getUserState(user.id);
-          setUserState(state);
+          // Normal flow - use comprehensive completion status to determine starting step
+          console.log('[Onboarding] Using completion-based step determination');
           
-          // Determine starting step
-          if (state.state === 'NEW_USER') {
-            setCurrentStep('welcome');
-          } else if (state.state === 'LOCATION_SET') {
-            // User has a location but no bags yet
-            // Try to get their "has bags" selection from database
-            try {
-              const { data: bagsSelection } = await onboardingService.getUserHasBagsSelection(user.id);
-              console.log('[Onboarding] User bags selection:', bagsSelection);
-              
-              if (bagsSelection?.selection_made) {
-                setHasBags(bagsSelection.has_bags);
-                setCurrentStep(bagsSelection.has_bags ? 'scan_qr' : 'digital_bin');
-              } else {
-                // No selection made, check if we can determine from localStorage
-                const hasBagsLocal = localStorage.getItem(`trashdrop_has_bags_${user.id}`);
-                if (hasBagsLocal !== null) {
-                  setHasBags(hasBagsLocal === 'true');
-                  setCurrentStep(hasBagsLocal === 'true' ? 'scan_qr' : 'digital_bin');
-                } else {
-                  // Default to welcome step
-                  setCurrentStep('welcome');
-                }
+          try {
+            const startingStep = await onboardingService.getStartingStep(user.id);
+            console.log('[Onboarding] Determined starting step:', startingStep);
+            
+            // Check if force parameter is being used
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceParam = urlParams.get('force');
+            
+            // Set the current step based on completion status
+            setCurrentStep(startingStep);
+            
+            // If starting step is success, check if we should force onboarding
+            if (startingStep === 'success' && !forceParam) {
+              console.log('[Onboarding] User has completed onboarding, dismissing');
+              if (user?.id) {
+                onboardingService.dismissOnboarding(user.id);
               }
-            } catch (error) {
-              console.error('[Onboarding] Error getting bags selection:', error);
-              // Network error - check localStorage as fallback
-              const hasBagsLocal = localStorage.getItem(`trashdrop_has_bags_${user.id}`);
-              if (hasBagsLocal !== null) {
-                setHasBags(hasBagsLocal === 'true');
-                setCurrentStep(hasBagsLocal === 'true' ? 'scan_qr' : 'digital_bin');
-              } else {
-                // Default to welcome step
-                setCurrentStep('welcome');
-              }
+              onComplete();
+              return;
+            } else if (startingStep === 'success' && forceParam) {
+              console.log('[Onboarding] User completed onboarding but force parameter detected, starting from welcome');
+              setCurrentStep('welcome');
             }
-          } else if (state.state === 'BAGS_READY') {
-            // User has bags and location, ready for QR scan
-            setCurrentStep('scan_qr');
-          } else if (state.state === 'QR_SCANNED') {
-            // User has completed QR scan
-            setCurrentStep('digital_bin');
-          } else {
-            // Default to welcome
+          } catch (error) {
+            console.error('[Onboarding] Error determining starting step:', error);
+            // Fallback to welcome
             setCurrentStep('welcome');
           }
         }
@@ -176,6 +181,13 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       setIsLoading(true);
       setHasBags(hasBags);
       
+      // Mark milestones - welcome is completed and hasBags decision is made
+      setProgressMilestones(prev => ({ 
+        ...prev, 
+        hasCompletedWelcome: true,
+        hasCompletedHasBags: true 
+      }));
+      
       // Save to localStorage as fallback for network issues
       localStorage.setItem(`trashdrop_has_bags_${user.id}`, hasBags.toString());
       
@@ -195,7 +207,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       
     } catch (error) {
       console.error('[Onboarding] Error setting has bags:', error);
-      setError('Failed to save selection');
+      setError('Failed to save preference');
     } finally {
       setIsLoading(false);
     }
@@ -205,6 +217,9 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     try {
       setIsLoading(true);
       setLocation(locationData);
+      
+      // Mark milestone
+      setProgressMilestones(prev => ({ ...prev, hasCompletedLocation: true }));
       
       const locationId = await onboardingService.addUserLocation(
         user.id,
@@ -223,6 +238,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     } catch (error) {
       console.error('[Onboarding] Error setting location:', error);
       setError('Failed to save location');
+      setProgressMilestones(prev => ({ ...prev, hasCompletedLocation: false })); // Reset on error
     } finally {
       setIsLoading(false);
     }
@@ -233,10 +249,14 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       setIsLoading(true);
       setQrCode(scannedCode);
       
+      // Mark milestone
+      setProgressMilestones(prev => ({ ...prev, hasCompletedQR: true }));
+      
       const result = await onboardingService.processQRScan(user.id, scannedCode);
       
       if (result.error) {
         setError('Invalid QR code. Please try again.');
+        setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false })); // Reset on error
         return;
       }
       
@@ -245,6 +265,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     } catch (error) {
       console.error('[Onboarding] Error processing QR:', error);
       setError('Failed to process QR code');
+      setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false })); // Reset on error
     } finally {
       setIsLoading(false);
     }
@@ -270,7 +291,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         navigate('/bags?source=onboarding');
         onComplete();
       } else if (service === 'report') {
-        // Navigate to reporting
+        // Navigate to Report Illegal Dumping page
         if (user?.id) {
           onboardingService.dismissOnboarding(user.id);
         }
@@ -286,18 +307,18 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     }
   };
 
-  const handleDigitalBinCreation = async (fee) => {
+  const handleDigitalBinCreation = async () => {
     try {
       setIsLoading(true);
-      console.log('[Onboarding] Creating digital bin with fee:', fee);
+      console.log('[Onboarding] Creating digital bin');
       
-      // Use default location if no location is set (for simplified onboarding flow)
-      const locationId = location?.id || 'default-location-id';
+      // Mark milestone
+      setProgressMilestones(prev => ({ ...prev, hasCompletedDigitalBin: true }));
       
+      // For simplified flow, create digital bin without requiring location
       const binId = await onboardingService.createDigitalBin(
         user.id,
-        locationId,
-        fee
+        null // No location required for simplified flow
       );
       
       console.log('[Onboarding] Digital bin created successfully:', binId);
@@ -312,6 +333,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     } catch (error) {
       console.error('[Onboarding] Error creating digital bin:', error);
       setError('Failed to create digital bin');
+      setProgressMilestones(prev => ({ ...prev, hasCompletedDigitalBin: false })); // Reset on error
     } finally {
       setIsLoading(false);
     }
@@ -321,32 +343,28 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
     try {
       setIsLoading(true);
       
-      // Check if user is available
-      if (!user?.id) {
-        throw new Error('User not authenticated');
+      // Mark milestone
+      setProgressMilestones(prev => ({ ...prev, hasCompletedPickupRequest: true }));
+      
+      // Dismiss onboarding and navigate to Request Pickup page
+      if (user?.id) {
+        onboardingService.dismissOnboarding(user.id);
       }
       
-      // Check if location is available
-      if (!location?.id) {
-        throw new Error('Location not selected');
-      }
-      
-      await onboardingService.createOnboardingPickup(
-        user.id,
-        location.id,
-        1 // Default bag count for onboarding
-      );
-      
-      setCurrentStep('success');
+      // Navigate to Request Pickup page with source parameter
+      navigate('/pickup-request?source=onboarding');
+      onComplete();
       
     } catch (error) {
-      console.error('[Onboarding] Error creating pickup:', error);
-      setError(error.message || 'Failed to request pickup');
+      console.error('[Onboarding] Error handling pickup request:', error);
+      setError(error.message || 'Failed to navigate to pickup');
+      setProgressMilestones(prev => ({ ...prev, hasCompletedPickupRequest: false })); // Reset on error
     } finally {
       setIsLoading(false);
     }
   };
 
+// ...
   const handleComplete = () => {
     console.log('[OnboardingFlow] User completed onboarding, dismissing permanently');
     if (user?.id) {
@@ -371,7 +389,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         return <QRScanStep onScanComplete={handleQRScan} isLoading={isLoading} />;
         
       case 'digital_bin':
-        return <DigitalBinStep onBinCreate={handleDigitalBinCreation} location={location} isLoading={isLoading} />;
+        return <DigitalBinStep onBinCreate={handleDigitalBinCreation} isLoading={isLoading} />;
         
       case 'request_pickup':
         return <PickupRequestStep onPickupRequest={handlePickupRequest} isLoading={isLoading} />;
@@ -468,7 +486,9 @@ const WelcomeStep = ({ onHasBags, onServiceSelect, isLoading }) => (
       <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <span className="text-3xl">🗑️</span>
       </div>
-      <h3 className="text-lg font-semibold mb-2 text-gray-900 antialiased">Start Your First Cleanup</h3>
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          Start Your First TrashDrop Service
+        </h2>
       <p className="text-gray-600 antialiased leading-relaxed">Do you have TrashDrop bags ready to use?</p>
     </div>
     
@@ -490,19 +510,7 @@ const WelcomeStep = ({ onHasBags, onServiceSelect, isLoading }) => (
       </button>
     </div>
     
-    <div className="mt-6 pt-6 border-t">
-      <p className="text-sm text-gray-500 mb-3 antialiased">Other options:</p>
-      <div className="space-y-2">
-        <button 
-          onClick={() => onServiceSelect('report')}
-          disabled={isLoading}
-          className="w-full px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 font-medium antialiased"
-        >
-          Report Illegal Dumping
-        </button>
       </div>
-    </div>
-  </div>
 );
 
 const ChooseServiceStep = ({ onServiceSelect, isLoading }) => (
@@ -668,21 +676,18 @@ const QRScanStep = ({ onScanComplete, isLoading }) => {
   );
 };
 
-const DigitalBinStep = ({ onBinCreate, location, isLoading }) => {
-  const [fee, setFee] = useState(30); // Default fee
-  
+const DigitalBinStep = ({ onBinCreate, isLoading }) => {
   return (
     <div>
       <h3 className="text-lg font-semibold mb-4">Create Digital Bin</h3>
-      <p className="text-gray-600 mb-2">Location: {location?.name || 'Default Location'}</p>
-      <p className="text-gray-600 mb-6">Service fee: ₵{fee}</p>
+      <p className="text-gray-600 mb-6">Get instant access to digital bin service for waste pickup</p>
       
       <button
-        onClick={() => onBinCreate(fee)}
+        onClick={() => onBinCreate()}
         disabled={isLoading}
         className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
       >
-        Create Digital Bin - ₵{fee}
+        Create Digital Bin
       </button>
     </div>
   );

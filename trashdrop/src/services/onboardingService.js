@@ -7,6 +7,109 @@ import supabase from '../utils/supabaseClient.js';
 
 export const onboardingService = {
   /**
+   * Get the appropriate starting step based on user's onboarding state
+   * Uses existing get_user_onboarding_state RPC function
+   */
+  async getStartingStep(userId) {
+    console.log('[Onboarding] getStartingStep called for userId:', userId);
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_user_onboarding_state', { user_uuid: userId });
+      
+      if (error) {
+        console.error('[Onboarding] Error getting user state for starting step:', error);
+        console.log('[Onboarding] Falling back to getUserState for starting step');
+        return this.fallbackGetStartingStep(userId);
+      }
+      
+      console.log('[Onboarding] User state for starting step:', data);
+      
+      // Check if user has made bags selection
+      const bagsSelection = await this.getUserHasBagsSelection(userId);
+      console.log('[Onboarding] User bags selection for starting step:', bagsSelection);
+      
+      // Check if force parameter is being used (for testing)
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceParam = urlParams.get('force');
+      
+      // Determine starting step based on state and bags selection
+      if (data.state === 'NEW_USER') {
+        return 'welcome';
+      } else if (data.state === 'LOCATION_SET') {
+        // Check if user has bags selection
+        if (bagsSelection.selection_made) {
+          return bagsSelection.has_bags ? 'scan_qr' : 'digital_bin';
+        }
+        return 'welcome'; // Back to welcome for bags selection
+      } else if (data.state === 'READY_FOR_PICKUP') {
+        // If force parameter is used, return appropriate step for testing
+        if (forceParam) {
+          console.log('[Onboarding] Force parameter detected for READY_FOR_PICKUP user');
+          // User has bags and locations, skip to request pickup step
+          return 'request_pickup';
+        }
+        return 'success'; // Already completed
+      }
+      
+      return 'welcome'; // Default to welcome
+    } catch (error) {
+      console.error('[Onboarding] Error in getStartingStep:', error);
+      console.log('[Onboarding] Falling back to getUserState for starting step');
+      return this.fallbackGetStartingStep(userId);
+    }
+  },
+
+  /**
+   * Fallback method for getStartingStep using existing getUserState logic
+   */
+  async fallbackGetStartingStep(userId) {
+    console.log('[Onboarding] Using fallback getStartingStep logic');
+    
+    try {
+      const state = await this.getUserState(userId);
+      console.log('[Onboarding] User state for fallback starting step:', state);
+      
+      // Check if force parameter is being used (for testing)
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceParam = urlParams.get('force');
+      
+      // Map state to starting step
+      if (state.state === 'NEW_USER') {
+        return 'welcome';
+      } else if (state.state === 'LOCATION_SET') {
+        // Check if user has bags selection
+        try {
+          const { data: bagsSelection } = await this.getUserHasBagsSelection(userId);
+          if (bagsSelection?.selection_made) {
+            return bagsSelection.has_bags ? 'scan_qr' : 'digital_bin';
+          }
+        } catch (error) {
+          console.error('[Onboarding] Error getting bags selection for fallback:', error);
+        }
+        return 'welcome'; // Default to welcome if no bags selection
+      } else if (state.state === 'BAGS_READY') {
+        return 'scan_qr';
+      } else if (state.state === 'QR_SCANNED') {
+        return 'digital_bin';
+      } else if (state.state === 'READY_FOR_PICKUP') {
+        // If force parameter is used, return appropriate step for testing
+        if (forceParam) {
+          console.log('[Onboarding] Force parameter detected for READY_FOR_PICKUP user (fallback)');
+          // User has bags and locations, skip to request pickup step
+          return 'request_pickup';
+        }
+        return 'success'; // Already completed
+      } else {
+        return 'welcome';
+      }
+    } catch (error) {
+      console.error('[Onboarding] Error in fallback getStartingStep:', error);
+      return 'welcome';
+    }
+  },
+
+  /**
    * Get user's current onboarding state
    * Uses RPC function for consistent database state
    */
@@ -354,15 +457,14 @@ export const onboardingService = {
    * Create digital bin
    * Uses RPC function to create digital bin with proper expiration
    */
-  async createDigitalBin(userId, locationId, fee) {
+  async createDigitalBin(userId, locationId) {
     try {
-      console.log('[Onboarding] createDigitalBin called:', { userId, locationId, fee });
+      console.log('[Onboarding] createDigitalBin called:', { userId, locationId });
       
       const { data, error } = await supabase
         .rpc('create_digital_bin', {
           user_uuid: userId,
-          location_id: locationId,
-          fee: fee
+          location_id: locationId
         });
       
       if (error) {
@@ -431,13 +533,22 @@ export const onboardingService = {
   },
 
   /**
-   * Check if user should see onboarding
-   * Entry condition: available_bags = 0 AND total_bags_scanned = 0 AND not dismissed AND state is NEW_USER
+   * Check if onboarding should be shown based on user's onboarding state
+   * Uses existing get_user_onboarding_state RPC function
    */
   async shouldShowOnboarding(userId) {
     console.log('[Onboarding] shouldShowOnboarding called with userId:', userId);
     
     try {
+      // Check for force parameter in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceOnboarding = urlParams.get('force') === 'true' || urlParams.get('reset') === 'true';
+      
+      if (forceOnboarding) {
+        console.log('[Onboarding] Force parameter detected, showing onboarding regardless of state');
+        return true;
+      }
+      
       // Check if user has dismissed onboarding
       const dismissedKey = `trashdrop_onboarding_dismissed_${userId}`;
       const hasDismissed = localStorage.getItem(dismissedKey);
@@ -447,34 +558,69 @@ export const onboardingService = {
         return false;
       }
       
+      // Use existing get_user_onboarding_state RPC function
+      console.log('[Onboarding] Calling get_user_onboarding_state RPC...');
+      const { data, error } = await supabase
+        .rpc('get_user_onboarding_state', { user_uuid: userId });
+      
+      if (error) {
+        console.error('[Onboarding] Error getting user onboarding state:', error);
+        console.log('[Onboarding] RPC error details:', error.message, error.code, error.hint);
+        console.log('[Onboarding] Falling back to original shouldShowOnboarding logic');
+        return this.fallbackShouldShowOnboarding(userId);
+      }
+      
+      console.log('[Onboarding] User onboarding state:', data);
+      
+      // Show onboarding if user is NEW_USER
+      if (data.state === 'NEW_USER') {
+        console.log('[Onboarding] User is NEW_USER, showing onboarding');
+        return true;
+      }
+      
+      // Also show onboarding if user has no bags selection made
+      const bagsSelection = await this.getUserHasBagsSelection(userId);
+      if (!bagsSelection.selection_made) {
+        console.log('[Onboarding] User has not made bags selection, showing onboarding');
+        return true;
+      }
+      
+      console.log('[Onboarding] User has completed onboarding, not showing');
+      return false;
+    } catch (error) {
+      console.error('[Onboarding] Error in shouldShowOnboarding:', error);
+      // Fallback to old method
+      return this.fallbackShouldShowOnboarding(userId);
+    }
+  },
+
+  /**
+   * Fallback method for shouldShowOnboarding (original logic)
+   */
+  async fallbackShouldShowOnboarding(userId) {
+    console.log('[Onboarding] Using fallback shouldShowOnboarding logic');
+    
+    try {
       const state = await this.getUserState(userId);
-      console.log('[Onboarding] User state for shouldShowOnboarding:', state);
+      console.log('[Onboarding] User state for fallback shouldShowOnboarding:', state);
       
       // Only show onboarding if user is truly new (NEW_USER state) and has no bags/scans
       // Users who have reached LOCATION_SET or beyond should not see onboarding again
       const shouldShow = state.state === 'NEW_USER' && 
                          (state.available_bags === 0 || state.available_bags === null) && 
-                         (state.total_bags_scanned === 0 || state.total_bags_scanned === null) && 
-                         !hasDismissed;
+                         (state.total_bags_scanned === 0 || state.total_bags_scanned === null);
       
-      console.log('[Onboarding] shouldShowOnboarding check:', {
+      console.log('[Onboarding] Fallback shouldShowOnboarding check:', {
         userId,
         state: state.state,
         available_bags: state.available_bags,
         total_bags_scanned: state.total_bags_scanned,
-        hasDismissed: !!hasDismissed,
         shouldShow
       });
       
-      // Auto-dismiss if user has progressed beyond NEW_USER state
-      if (!shouldShow && state.state !== 'NEW_USER' && !hasDismissed) {
-        console.log('[Onboarding] Auto-dismissing onboarding for user who has progressed');
-        this.dismissOnboarding(userId);
-      }
-      
       return shouldShow;
     } catch (error) {
-      console.error('[Onboarding] Error checking shouldShowOnboarding:', error);
+      console.error('[Onboarding] Error in fallback shouldShowOnboarding:', error);
       return false;
     }
   },
