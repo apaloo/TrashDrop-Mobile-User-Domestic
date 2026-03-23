@@ -7,21 +7,27 @@ import PrivateRoute from './components/PrivateRoute.js';
 import Layout from './components/Layout.js';
 import InstallPrompt from './components/InstallPrompt.js';
 
-// Lazy load components
+// Dynamic imports for lazy loading (moved to top)
+const importDebugConfig = () => import('./components/DebugConfig.js');
+const importTestPickupFlow = () => import('./tests/TestPickupFlow.js');
+const importCollectionTestFlow = () => import('./tests/CollectionTestFlow.js');
+const importCollectionFlowTest = () => import('./tests/CollectionFlowTest.js');
+
+// Lazy load components using the dynamic imports
 const DebugConfig = process.env.NODE_ENV === 'development' 
-  ? React.lazy(() => import('./components/DebugConfig.js')) 
+  ? React.lazy(importDebugConfig) 
   : () => null;
 
 const TestPickupFlow = process.env.NODE_ENV === 'development'
-  ? React.lazy(() => import('./tests/TestPickupFlow.js'))
+  ? React.lazy(importTestPickupFlow)
   : () => null;
 
 const CollectionTestFlow = process.env.NODE_ENV === 'development'
-  ? React.lazy(() => import('./tests/CollectionTestFlow.js'))
+  ? React.lazy(importCollectionTestFlow)
   : () => null;
 
 const CollectionFlowTest = process.env.NODE_ENV === 'development'
-  ? React.lazy(() => import('./tests/CollectionFlowTest.js'))
+  ? React.lazy(importCollectionFlowTest)
   : () => null;
 
 // Regular imports for common components
