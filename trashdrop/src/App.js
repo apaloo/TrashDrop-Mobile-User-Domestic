@@ -7,12 +7,6 @@ import PrivateRoute from './components/PrivateRoute.js';
 import Layout from './components/Layout.js';
 import InstallPrompt from './components/InstallPrompt.js';
 
-// Dynamic imports for lazy loading (moved to top)
-const importDebugConfig = () => import('./components/DebugConfig.js');
-const importTestPickupFlow = () => import('./tests/TestPickupFlow.js');
-const importCollectionTestFlow = () => import('./tests/CollectionTestFlow.js');
-const importCollectionFlowTest = () => import('./tests/CollectionFlowTest.js');
-
 // Regular imports for common components
 import Login from './pages/Login.js';
 import Register from './pages/Register.js';
@@ -51,6 +45,12 @@ import { themeOptions } from './theme/theme.js';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { enGB } from 'date-fns/locale';
+
+// Dynamic imports for lazy loading (moved after all imports)
+const importDebugConfig = () => import('./components/DebugConfig.js');
+const importTestPickupFlow = () => import('./tests/TestPickupFlow.js');
+const importCollectionTestFlow = () => import('./tests/CollectionTestFlow.js');
+const importCollectionFlowTest = () => import('./tests/CollectionFlowTest.js');
 
 // Lazy load components using the dynamic imports
 const DebugConfig = process.env.NODE_ENV === 'development' 
