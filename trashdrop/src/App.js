@@ -6,6 +6,7 @@ import LoadingSpinner from './components/LoadingSpinner.js';
 import PrivateRoute from './components/PrivateRoute.js';
 import Layout from './components/Layout.js';
 import InstallPrompt from './components/InstallPrompt.js';
+import NetworkStatusRibbon from './components/NetworkStatusRibbon.js';
 
 // Regular imports for common components
 import Login from './pages/Login.js';
@@ -28,6 +29,7 @@ import ToastTest from './pages/ToastTest.js';
 import ResetPassword from './pages/ResetPassword.js';
 import ResetPasswordConfirm from './pages/ResetPasswordConfirm.js';
 import AuthCallback from './pages/AuthCallback.js';
+import NetworkTest from './pages/NetworkTest.js';
 
 // Performance and error handling
 import AppPerformanceProvider from './components/AppPerformanceProvider.js';
@@ -45,6 +47,9 @@ import { themeOptions } from './theme/theme.js';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { enGB } from 'date-fns/locale';
+
+// Import network test utility for development
+import './utils/networkTest.js';
 
 // Dynamic imports for lazy loading (moved after all imports)
 const importDebugConfig = () => import('./components/DebugConfig.js');
@@ -138,6 +143,7 @@ const AppContent = () => {
   // Render normal app routes when authenticated
   return (
     <>
+      <NetworkStatusRibbon />
       <InstallPrompt />
       <Routes>
         {/* Public routes */}
@@ -245,6 +251,11 @@ const AppContent = () => {
           <Route path="/toast-test" element={
             <PrivateRoute>
               <ToastTest />
+            </PrivateRoute>
+          } />
+          <Route path="/network-test" element={
+            <PrivateRoute>
+              <NetworkTest />
             </PrivateRoute>
           } />
           <Route path="/test-pickup" element={

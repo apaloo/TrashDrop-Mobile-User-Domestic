@@ -403,9 +403,9 @@ export const AuthProvider = ({ children }) => {
     ) {
       errorCode = 'INVALID_TOKEN';
       errorMessage = 'Your authentication token is invalid. Please sign in again.';
-    } else if (!navigator.onLine || error?.message?.includes('network')) {
+    } else if (!navigator.onLine || error?.message?.includes('network') || error?.message === 'Failed to fetch' || error?.message?.includes('Failed to fetch')) {
       errorCode = 'NETWORK_ERROR';
-      errorMessage = 'A network error occurred. Please check your connection and try again.';
+      errorMessage = 'You are not connected to the internet. Please ensure you are connected to the internet and try again.';
       errorCategory = ERROR_CATEGORIES.NETWORK;
     } else if (error?.message?.includes('rate limit')) {
       errorCode = 'RATE_LIMIT';
@@ -734,26 +734,34 @@ export const AuthProvider = ({ children }) => {
         // Provide user-friendly error messages for common authentication errors
         let userMessage = error.message || 'Failed to sign in';
         
-        switch (error.message) {
-          case 'Email not confirmed':
-            userMessage = 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
-            break;
-          case 'Invalid login credentials':
-            userMessage = 'Invalid email or password. Please check your credentials and try again.';
-            break;
-          case 'User not found':
-            userMessage = 'No account found with this email address.';
-            break;
-          case 'Email rate limit exceeded':
-            userMessage = 'Too many login attempts. Please wait a few minutes and try again.';
-            break;
-          default:
-            // For other errors, try to extract a cleaner message
-            if (error.message.includes('email_not_confirmed')) {
+        // Handle network errors specifically
+        if (error.message === 'Failed to fetch' || 
+            error.message?.includes('Failed to fetch') ||
+            error.message?.includes('fetch') ||
+            !navigator.onLine) {
+          userMessage = 'You are not connected to the internet. Please ensure you are connected to the internet and try again.';
+        } else {
+          switch (error.message) {
+            case 'Email not confirmed':
               userMessage = 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
-            } else if (error.message.includes('invalid')) {
+              break;
+            case 'Invalid login credentials':
               userMessage = 'Invalid email or password. Please check your credentials and try again.';
-            }
+              break;
+            case 'User not found':
+              userMessage = 'No account found with this email address.';
+              break;
+            case 'Email rate limit exceeded':
+              userMessage = 'Too many login attempts. Please wait a few minutes and try again.';
+              break;
+            default:
+              // For other errors, try to extract a cleaner message
+              if (error.message.includes('email_not_confirmed')) {
+                userMessage = 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
+              } else if (error.message.includes('invalid')) {
+                userMessage = 'Invalid email or password. Please check your credentials and try again.';
+              }
+          }
         }
         
         // Set error state directly
@@ -837,11 +845,20 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('[Auth] Unexpected error during sign-in:', error);
       
+      // Handle network errors in catch block as well
+      let errorMessage = error.message || 'An unexpected error occurred during sign-in';
+      if (error.message === 'Failed to fetch' || 
+          error.message?.includes('Failed to fetch') ||
+          error.message?.includes('fetch') ||
+          !navigator.onLine) {
+        errorMessage = 'You are not connected to the internet. Please ensure you are connected to the internet and try again.';
+      }
+      
       setAuthState({
         status: AUTH_STATES.ERROR,
         user: null,
         error: {
-          message: error.message || 'An unexpected error occurred during sign-in',
+          message: errorMessage,
           code: 'UNEXPECTED_ERROR'
         },
         lastAction: 'sign_in_error'
@@ -850,7 +867,7 @@ export const AuthProvider = ({ children }) => {
       return { 
         success: false, 
         error: { 
-          message: error.message || 'An unexpected error occurred during sign-in', 
+          message: errorMessage, 
           code: 'UNEXPECTED_ERROR' 
         } 
       };
