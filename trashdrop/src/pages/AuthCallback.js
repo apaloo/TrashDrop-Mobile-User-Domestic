@@ -37,14 +37,28 @@ const AuthCallback = () => {
       // The onAuthStateChange listener in AuthContext will handle the session
       const timeout = setTimeout(() => {
         if (!isAuthenticated && !isLoading) {
-          // If still not authenticated after timeout, show success anyway
-          // (email is verified but user needs to log in)
-          setStatus('success');
-          toastService.success(
-            '✅ Email verified successfully! Please sign in to continue.',
-            { duration: 5000 }
-          );
-          setTimeout(() => navigate('/login'), 2000);
+          // If still not authenticated after timeout, check if this was email verification
+          const isEmailVerification = urlParams.get('type') === 'signup' || 
+                                     window.location.hash.includes('access_token') ||
+                                     window.location.hash.includes('refresh_token');
+          
+          if (isEmailVerification) {
+            // Email verified but user needs to log in - show success and redirect to login
+            setStatus('success');
+            toastService.success(
+              '✅ Email verified successfully! Please sign in to continue.',
+              { duration: 5000 }
+            );
+            setTimeout(() => navigate('/login'), 2000);
+          } else {
+            // Regular auth flow - show success
+            setStatus('success');
+            toastService.success(
+              '✅ Authentication successful! Please sign in to continue.',
+              { duration: 5000 }
+            );
+            setTimeout(() => navigate('/login'), 2000);
+          }
         }
       }, 3000);
       
@@ -52,7 +66,7 @@ const AuthCallback = () => {
     };
     
     handleCallback();
-  }, [isLoading]);
+  }, [isLoading, isAuthenticated, navigate]);
 
   useEffect(() => {
     // If user becomes authenticated, redirect to dashboard

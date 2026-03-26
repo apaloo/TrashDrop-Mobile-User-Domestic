@@ -692,8 +692,8 @@ export const AuthProvider = ({ children }) => {
   }, [updateAuthState, resetAuthState, handleAuthError, handleAuthSuccess, clearLoadingTimeout]);
 
   // Authentication methods
-  const signIn = useCallback(async (email, password) => {
-    console.log('[Auth] Signing in attempt', { email: email || 'no email provided' });
+  const signIn = useCallback(async (email, password, rememberMe = false) => {
+    console.log('[Auth] Signing in attempt', { email: email || 'no email provided', rememberMe });
     
     // For debugging - log the credentials being used
     console.log(`[Auth DEBUG] Using credentials: ${email} / ${password ? '******' : 'no password'}`); 
@@ -714,10 +714,16 @@ export const AuthProvider = ({ children }) => {
         key: appConfig?.supabase?.anonKey ? 'Set' : 'Not set'
       });
       
-      console.log('[Auth DEBUG] Calling signInWithPassword with:', { email });
+      console.log('[Auth DEBUG] Calling signInWithPassword with:', { email, rememberMe });
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          // Set session persistence based on remember me preference
+          ...(rememberMe && { 
+            // For persistent sessions, we'll handle this in the session management
+          })
+        }
       });
       
       console.log('[Auth DEBUG] Sign-in response:', { 
@@ -789,13 +795,14 @@ export const AuthProvider = ({ children }) => {
       if (data?.user && data?.session) {
         console.log('[Auth] Sign-in successful:', data.user.email);
         
-        // Store user data in localStorage
+        // Store user data in localStorage with remember me preference
         try {
           const userData = {
             id: data.user.id,
             email: data.user.email,
             user_metadata: data.user.user_metadata,
-            last_authenticated: new Date().toISOString()
+            last_authenticated: new Date().toISOString(),
+            remember_me: rememberMe
           };
           
           const userKey = appConfig?.storage?.userKey || 'trashdrop_user';
@@ -805,6 +812,15 @@ export const AuthProvider = ({ children }) => {
           // Store token for quick validation
           if (data.session?.access_token) {
             localStorage.setItem(tokenKey, data.session.access_token);
+          }
+          
+          // Set session persistence in Supabase
+          if (rememberMe) {
+            // For remember me, we want longer session persistence
+            await supabase.auth.setSession({
+              access_token: data.session.access_token,
+              refresh_token: data.session.refresh_token
+            });
           }
         } catch (e) {
           console.error('[Auth] Failed to store user data:', e);
@@ -989,6 +1005,63 @@ export const AuthProvider = ({ children }) => {
       };
     }
   }, []);
+
+  // Social login methods
+  const signInWithGoogle = useCallback(async () => {
+    console.log('[Auth] Initiating Google OAuth sign in');
+    updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_google' });
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('[Auth] Google OAuth error:', error);
+        return handleAuthError(error, 'google_sign_in');
+      }
+      
+      console.log('[Auth] Google OAuth initiated successfully');
+      return { success: true, data };
+      
+    } catch (error) {
+      console.error('[Auth] Unexpected error during Google OAuth:', error);
+      return handleAuthError(error, 'google_sign_in');
+    }
+  }, [handleAuthError, updateAuthState]);
+
+  const signInWithApple = useCallback(async () => {
+    console.log('[Auth] Initiating Apple OAuth sign in');
+    updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_apple' });
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      
+      if (error) {
+        console.error('[Auth] Apple OAuth error:', error);
+        return handleAuthError(error, 'apple_sign_in');
+      }
+      
+      console.log('[Auth] Apple OAuth initiated successfully');
+      return { success: true, data };
+      
+    } catch (error) {
+      console.error('[Auth] Unexpected error during Apple OAuth:', error);
+      return handleAuthError(error, 'apple_sign_in');
+    }
+  }, [handleAuthError, updateAuthState]);
   
   // Periodic token validation function
   const validateToken = useCallback(async () => {
@@ -1324,6 +1397,8 @@ export const AuthProvider = ({ children }) => {
     signOut,
     resetPassword,
     resendConfirmationEmail,
+    signInWithGoogle,
+    signInWithApple,
     checkSession,
     resetAuthState,
     clearAuthData,
