@@ -6,10 +6,14 @@ import supabase from '../utils/supabaseClient.js';
 import DashboardOptimizer from '../components/DashboardOptimizer.js';
 import OnboardingFlow from '../components/OnboardingFlow.js';
 import { userService, pickupService } from '../services/index.js';
+import userServiceOptimized from '../services/userServiceOptimized.js';
 import { notificationService } from '../services/notificationService.js';
 import onboardingService from '../services/onboardingService.js';
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
 import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
+import realtimeManager from '../utils/realtimeOptimized.js';
+import seamlessDashboardService from '../services/seamlessDashboardService.js';
+import DataFreshnessIndicator from '../components/DataFreshnessIndicator.js';
 
 // For development: expose cleanup function
 if (process.env.NODE_ENV === 'development') {
@@ -83,12 +87,14 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false); // Start with false to improve LCP
   const [isRefreshingActivities, setIsRefreshingActivities] = useState(false); // Track activity refresh state
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
-  const [dataSource, setDataSource] = useState('loading'); // 'network', 'loading'
+  const [dataSource, setDataSource] = useState('seamless'); // 'seamless', 'network', 'loading'
+  const [updateType, setUpdateType] = useState('initial'); // Track update type for visual feedback
   const sessionRefreshRef = useRef(null);
   const mountedRef = useRef(true);
   const [bagsPulse, setBagsPulse] = useState(false);
   const bagsPulseTimerRef = useRef(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const seamlessSubscriptionsRef = useRef({});
   
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -363,175 +369,192 @@ const Dashboard = () => {
     };
   }, []);
 
-  // Direct database loading function with caching and offline support
-  const loadDashboardData = useCallback(async () => {
+  // Progressive loading function with priority-based data fetching
+  const loadDashboardDataProgressive = useCallback(async () => {
     if (!user?.id) {
       setIsLoading(false);
       return;
     }
 
     try {
-      setIsLoading(true);
-      console.log('[Dashboard] Loading fresh data directly from database...');
+      console.log('[Dashboard] 🚀 Progressive loading started for user:', user.id);
       
-      // If we're online, fetch fresh data in parallel
-      if (isOnlineStatus) {
-        setDataSource('network');
-        
-        try {
-          // Parallel data fetching for better performance
-          const [statsResult, pickupResult] = await Promise.allSettled([
-            userService.getUserStats(user.id),
-            pickupService.getActivePickup(user.id)
-          ]);
-          
-          // Handle stats result - direct database data only
-          if (statsResult.status === 'fulfilled' && statsResult.value?.data) {
-            const freshStats = statsResult.value.data;
-            console.log('[Dashboard] Fresh stats from database:', freshStats);
-            setStats(freshStats);
-            setDataSource('network');
-          } else {
-            console.warn('Failed to fetch fresh stats:', statsResult.reason);
-          }
-          
-          // Load recent activities from pickup_requests table
-          setIsRefreshingActivities(true);
-          const recentActivities = await getDatabaseActivities(5);
-          console.log(`[Dashboard] 📝 SETTING ${recentActivities.length} activities in React state`);
-          setRecentActivities(recentActivities);
-          setIsRefreshingActivities(false);
-          console.log(`[Dashboard] ✅ COMPLETED: ${recentActivities.length} activities loaded from pickup_requests`);
-          
-          // Handle active pickups result
-          if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
-            setActivePickups([pickupResult.value.data]);
-          } else {
-            setActivePickups([]);
-          }
-          
-        } catch (networkError) {
-          console.error('Failed to fetch dashboard data:', networkError);
-          // Always try to get fresh data - no fallback to cache
-        }
+      // Phase 1: Critical stats (LCP optimization) - Load immediately
+      console.log('[Dashboard] 📊 Phase 1: Loading critical stats');
+      const criticalStatsPromise = userServiceOptimized.getCriticalStats(user.id);
+      const criticalStats = await criticalStatsPromise;
+      
+      if (criticalStats) {
+        setStats(criticalStats);
+        console.log('[Dashboard] ⚡ Critical stats loaded for instant UI');
       }
       
-    } catch (error) {
-      console.error('Error in loadDashboardData:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id, isOnlineStatus, mergeRecentActivities]);
-
-  // Set up real-time subscriptions for stats updates
-  useEffect(() => {
-    if (!user?.id) return;
-
-    console.log('[Dashboard] Setting up real-time stats subscription');
-    const statsSubscription = subscribeToStatsUpdates(user.id, (tableType, payload) => {
-      if (!mountedRef.current) return;
-
-      console.log(`[Dashboard] Real-time ${tableType} update received`, payload?.new);      
-      handleStatsUpdate(payload, loadDashboardData);
-    });
-
-    // Subscribe to dumping reports for real-time activity updates
-    const dumpingSubscription = subscribeToDumpingReports(user.id, (payload) => {
-      if (!mountedRef.current) return;
+      // Phase 2: Active pickups (user action items) - Load immediately after stats
+      console.log('[Dashboard] 📦 Phase 2: Loading active pickups');
+      const activePickupPromise = pickupService.getActivePickup(user.id);
+      const activePickup = await activePickupPromise;
       
-      handleDumpingReportUpdate(payload, async () => {
-        // Reload dashboard data to get updated stats
-        if (mountedRef.current) {
-          loadDashboardData();
-          
-          // Also refresh recent activities to include new dumping report
-          try {
-            setIsRefreshingActivities(true);
-            const freshActivities = await getDatabaseActivities(5);
-            setRecentActivities(freshActivities);
-            setIsRefreshingActivities(false);
-          } catch (error) {
-            console.warn('[Dashboard] Error refreshing activities after dumping report:', error);
-            setIsRefreshingActivities(false);
-          }
+      if (activePickup?.data) {
+        setActivePickups([activePickup.data]);
+        console.log('[Dashboard] ✅ Active pickup loaded');
+      } else {
+        setActivePickups([]);
+      }
+      
+      // Phase 3: Recent activities (deferred loading) - Use requestIdleCallback
+      console.log('[Dashboard] 📝 Phase 3: Deferring recent activities loading');
+      const loadActivitiesDeferred = () => {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(async () => {
+            try {
+              console.log('[Dashboard] 📝 Loading recent activities in idle time');
+              setIsRefreshingActivities(true);
+              const activities = await getDatabaseActivities(5);
+              setRecentActivities(activities);
+              setIsRefreshingActivities(false);
+              console.log('[Dashboard] ✅ Recent activities loaded');
+            } catch (error) {
+              console.warn('[Dashboard] Error loading deferred activities:', error);
+              setIsRefreshingActivities(false);
+            }
+          });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(async () => {
+            try {
+              console.log('[Dashboard] 📝 Loading recent activities (fallback)');
+              setIsRefreshingActivities(true);
+              const activities = await getDatabaseActivities(5);
+              setRecentActivities(activities);
+              setIsRefreshingActivities(false);
+            } catch (error) {
+              console.warn('[Dashboard] Error loading fallback activities:', error);
+              setIsRefreshingActivities(false);
+            }
+          }, 100);
         }
-      });
-    });
-
-    // Subscribe to pickup requests for real-time activity updates
-    const pickupSubscription = supabase
-      .channel(`pickup_requests_${user.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'pickup_requests',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        if (!mountedRef.current) return;
-        
-        console.log('[Dashboard] New pickup request detected:', payload);
-        
-        // Refresh recent activities to include the new pickup request
-        const refreshActivities = async () => {
+      };
+      
+      loadActivitiesDeferred();
+      
+      // Phase 4: Background refresh (non-blocking) - Update cache
+      if (isOnlineStatus) {
+        console.log('[Dashboard] 🔄 Phase 4: Background refresh');
+        const backgroundRefresh = async () => {
           try {
-            setIsRefreshingActivities(true);
-            const localActivities = await getDatabaseActivities(5);
-            const mergedActivities = await mergeRecentActivities([], 5);
-            setRecentActivities(mergedActivities);
-            setIsRefreshingActivities(false);
+            // Use optimized service for complete data
+            const completeData = await userServiceOptimized.getDashboardDataOptimized(user.id);
             
-            // Also refresh stats to reflect bag count changes
-            loadDashboardData();
+            if (completeData?.stats) {
+              setStats(prevStats => {
+                const hasChanges = JSON.stringify(prevStats) !== JSON.stringify(completeData.stats);
+                if (hasChanges) {
+                  cacheUserStats(user.id, completeData.stats);
+                  return completeData.stats;
+                }
+                return prevStats;
+              });
+            }
+            
+            if (completeData?.activities) {
+              setRecentActivities(completeData.activities);
+            }
+            
+            console.log('[Dashboard] ✅ Background refresh completed');
           } catch (error) {
-            console.warn('[Dashboard] Error refreshing activities after pickup request:', error);
-            setIsRefreshingActivities(false);
+            console.warn('[Dashboard] Background refresh failed:', error);
           }
         };
         
-        refreshActivities();
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'pickup_requests',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        if (!mountedRef.current) return;
-        
-        console.log('[Dashboard] Pickup request status updated:', payload.new?.status);
-        
-        // Update active pickup card in real-time
+        // Run background refresh without blocking
+        backgroundRefresh();
+      }
+      
+      setIsLoading(false);
+      console.log('[Dashboard] 🎉 Progressive loading completed');
+      
+    } catch (error) {
+      console.error('[Dashboard] Error in progressive loading:', error);
+      setIsLoading(false);
+    }
+  }, [user?.id, isOnlineStatus, getDatabaseActivities]);
+
+  // Optimized consolidated real-time subscription
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('[Dashboard] 🚀 Setting up optimized real-time subscription');
+    
+    // Prepare callbacks for the consolidated subscription
+    const callbacks = {
+      // Stats update callback
+      prevStats: stats,
+      callback: (updatedStats) => {
+        setStats(updatedStats);
+      },
+      
+      // Activity update callbacks
+      addActivity: (activity) => {
+        setRecentActivities(prev => [activity, ...prev.slice(0, 4)]);
+      },
+      refreshStats: () => {
+        loadDashboardDataProgressive();
+      },
+      updateActivePickup: (updatedPickup) => {
         setActivePickups(prev => {
           if (!prev || prev.length === 0) return prev;
-          if (prev[0].id === payload.new.id) {
+          if (prev[0].id === updatedPickup.id) {
             return [{
               ...prev[0],
-              status: payload.new.status,
-              collector_id: payload.new.collector_id,
-              updated_at: payload.new.updated_at,
-              collected_at: payload.new.collected_at
+              status: updatedPickup.status,
+              collector_id: updatedPickup.collector_id,
+              updated_at: updatedPickup.updated_at,
+              collected_at: updatedPickup.collected_at
             }];
           }
           return prev;
         });
-        
-        // If collector was just assigned, re-fetch to get collector details
-        if (payload.new.collector_id && payload.new.status === 'accepted') {
-          loadDashboardData();
+      },
+      handlePickupAccepted: (pickup) => {
+        const shouldNavigate = pickup.status === 'accepted' || pickup.status === 'en_route' || pickup.status === 'collector_assigned';
+        if (shouldNavigate) {
+          console.log('[Dashboard] Auto-navigating to tracking page');
+          
+          // Show notification
+          const notification = document.createElement('div');
+          notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
+          notification.innerHTML = '🎉 Collector accepted! Taking you to live tracking...';
+          document.body.appendChild(notification);
+          
+          // Navigate after 2 seconds
+          setTimeout(() => {
+            notification.remove();
+            navigate(`/collector-tracking?pickupId=${pickup.id}`);
+          }, 2000);
         }
-      })
-      .subscribe();
-
-    return () => {
-      try {
-        statsSubscription?.unsubscribe?.();
-        dumpingSubscription?.unsubscribe?.();
-        pickupSubscription?.unsubscribe?.();
-      } catch (error) {
-        console.warn('[Dashboard] Error unsubscribing from real-time updates:', error);
+      },
+      updateNotificationCount: (delta) => {
+        setUnreadNotifications(prev => Math.max(0, prev + delta));
       }
     };
-  }, [user?.id, stats, getDatabaseActivities, mergeRecentActivities, loadDashboardData]);
+
+    // Set up single optimized subscription
+    const cleanup = realtimeManager.setupOptimizedSubscription(
+      user.id,
+      callbacks,
+      callbacks,
+      mountedRef
+    );
+
+    // Log performance improvement
+    console.log('[Dashboard] ✅ Optimized subscription active (1 channel instead of 4+)');
+    console.log('[Dashboard] 📊 Real-time stats:', realtimeManager.getStats());
+
+    return () => {
+      console.log('[Dashboard] 🧹 Cleaning up optimized subscription');
+      cleanup();
+    };
+  }, [user?.id, stats, loadDashboardDataProgressive, navigate, mountedRef]);
 
   // Online status listener
   useEffect(() => {
@@ -539,7 +562,7 @@ const Dashboard = () => {
       setIsOnlineStatus(isOnline());
       if (isOnline() && user?.id) {
         console.log('[Dashboard] Back online, refreshing data');
-        loadDashboardData();
+        loadDashboardDataProgressive();
       }
     };
 
@@ -550,7 +573,7 @@ const Dashboard = () => {
       window.removeEventListener('online', handleOnlineStatus);
       window.removeEventListener('offline', handleOnlineStatus);
     };
-  }, [user?.id, loadDashboardData]);
+  }, [user?.id, loadDashboardDataProgressive]);
 
   // Fetch unread notifications count and subscribe to updates
   useEffect(() => {
@@ -606,80 +629,24 @@ const Dashboard = () => {
     };
   }, [user?.id]);
 
-  // Auto-navigate to tracking page when pickup is accepted
+  // Fetch unread notifications count and subscribe to updates
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log('[Dashboard] Setting up pickup status tracking subscription');
-
-    // Subscribe to pickup status changes
-    const pickupStatusSubscription = supabase
-      .channel(`pickup_status_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'pickup_requests',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          const newStatus = payload.new.status;
-          const oldStatus = payload.old.status;
-          
-          console.log('[Dashboard] Pickup status changed:', { oldStatus, newStatus });
-
-          // Always update the active pickup card with the latest status
-          setActivePickups(prev => {
-            if (!prev || prev.length === 0) return prev;
-            if (prev[0].id === payload.new.id) {
-              return [{
-                ...prev[0],
-                status: newStatus,
-                collector_id: payload.new.collector_id,
-                updated_at: payload.new.updated_at,
-                collected_at: payload.new.collected_at
-              }];
-            }
-            return prev;
-          });
-
-          // Re-fetch full data when collector is first assigned (to get collector profile)
-          if (payload.new.collector_id && newStatus === 'accepted') {
-            loadDashboardData();
-          }
-
-          // Auto-navigate when pickup is accepted or collector is en route
-          if (
-            (oldStatus === 'available' && newStatus === 'accepted') ||
-            (oldStatus === 'pending' && newStatus === 'accepted') ||
-            (oldStatus === 'accepted' && newStatus === 'en_route') ||
-            (oldStatus === 'available' && newStatus === 'collector_assigned') ||
-            (oldStatus === 'pending' && newStatus === 'collector_assigned')
-          ) {
-            console.log('[Dashboard] Auto-navigating to tracking page');
-            
-            // Show a brief notification before navigating
-            const notification = document.createElement('div');
-            notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
-            notification.innerHTML = '🎉 Collector accepted! Taking you to live tracking...';
-            document.body.appendChild(notification);
-            
-            // Navigate after 2 seconds
-            setTimeout(() => {
-              notification.remove();
-              navigate(`/collector-tracking?pickupId=${payload.new.id}`);
-            }, 2000);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('[Dashboard] Cleaning up pickup status subscription');
-      supabase.removeChannel(pickupStatusSubscription);
+    const fetchUnreadCount = async () => {
+      try {
+        const { data } = await notificationService.getUserNotifications(user.id, {
+          status: 'unread',
+          limit: 100
+        });
+        setUnreadNotifications(data?.length || 0);
+      } catch (err) {
+        console.error('[Dashboard] Error fetching unread notifications:', err);
+      }
     };
-  }, [user?.id, navigate, loadDashboardData]);
+
+    fetchUnreadCount();
+  }, [user?.id]);
 
   // Optimistic bag updates from scanner
   useEffect(() => {
@@ -703,136 +670,125 @@ const Dashboard = () => {
     return () => window.removeEventListener('trashdrop:bags-updated', onBagsUpdated);
   }, [user?.id]);
 
-  // Initial data load and periodic refresh
-  useEffect(() => {
+  // Seamless data loading with background caching
+  const loadDashboardDataSeamless = useCallback(async () => {
     if (!user?.id) return;
 
-    const initialLoadTimeout = setTimeout(() => {
-      loadDashboardData();
-    }, 500); // Longer delay to ensure LCP is captured first
+    try {
+      console.log('[Dashboard] 🚀 Seamless data loading started for user:', user.id);
+      setUpdateType('initial');
+      setIsLoading(true);
 
-    return () => clearTimeout(initialLoadTimeout);
-  }, [user?.id, loadDashboardData]);
+      // Load all data using seamless service (no visual data loss)
+      const [statsData, activitiesData, pickupsData] = await Promise.all([
+        seamlessDashboardService.getUserStats(user.id),
+        seamlessDashboardService.getRecentActivities(user.id, 5),
+        seamlessDashboardService.getActivePickups(user.id)
+      ]);
 
-  // Set up real-time subscriptions for stats updates
-  useEffect(() => {
-    if (!user?.id) return;
-
-    console.log('[Dashboard] Setting up real-time stats subscription');
-    const statsSubscription = subscribeToStatsUpdates(user.id, (tableType, payload) => {
-      if (!mountedRef.current) return;
-
-      console.log(`[Dashboard] Real-time ${tableType} update received`, payload?.new);      
-      
-      // Detailed logging for batch/bag updates
-      if (tableType === 'user_stats' && payload?.new) {
-        const newData = payload.new;
-        console.log(`[Dashboard] Batch/Bag update: total_batches=${newData.total_batches}, available_bags=${newData.available_bags}, total_bags=${newData.total_bags}`);
-      }
-      
-      // Update stats based on real-time payload
-      setStats(prevStats => {
-        const updatedStats = handleStatsUpdate(tableType, payload, prevStats);
-        
-        // Log state changes for debugging
-        if (tableType === 'user_stats') {
-          console.log('[Dashboard] Stats before update:', {
-            batches: prevStats.batches || 0,
-            totalBags: prevStats.totalBags || 0,
-            available_bags: prevStats.available_bags || 0
-          });
-          console.log('[Dashboard] Stats after update:', {
-            batches: updatedStats.batches || 0,
-            totalBags: updatedStats.totalBags || 0,
-            available_bags: updatedStats.available_bags || 0
-          });
-        }
-        
-        return updatedStats;
-      });
-      
-      // For activity updates, we might need to update the recent activity list
-      if (tableType === 'user_activity' && payload.eventType === 'INSERT') {
-        setRecentActivities(prev => {
-          const newRecord = payload.new;
-          if (!newRecord) return prev;
-          return [newRecord, ...prev.slice(0, prev.length > 4 ? 4 : prev.length - 1)];
+      if (mountedRef.current) {
+        // Update state immediately - data is already cached or fresh
+        setStats(statsData || {
+          points: 0,
+          pickups: 0,
+          reports: 0,
+          batches: 0,
+          totalBags: 0,
+          available_bags: 0
         });
+        setRecentActivities(activitiesData || []);
+        setActivePickups(pickupsData || []);
+        setDataSource('seamless');
+        setIsLoading(false);
+        
+        console.log('[Dashboard] ✅ Seamless data loading complete');
       }
-    });
 
-    // Subscribe to dumping reports for real-time stats updates
-    const dumpingSubscription = subscribeToDumpingReports(user.id, (payload) => {
-      if (!mountedRef.current) return;
-      
-      handleDumpingReportUpdate(payload, async () => {
-        // Reload dashboard data to get updated stats
-        if (mountedRef.current) {
-          loadDashboardData();
-          
-          // Also refresh recent activities to include new dumping report
-          try {
-            setIsRefreshingActivities(true);
-            const freshActivities = await getDatabaseActivities(5);
-            setRecentActivities(freshActivities);
-            setIsRefreshingActivities(false);
-          } catch (error) {
-            console.warn('[Dashboard] Error refreshing activities after dumping report:', error);
-            setIsRefreshingActivities(false);
-          }
-        }
-      });
-    });
+    } catch (error) {
+      console.error('[Dashboard] ❌ Error in seamless data loading:', error);
+      if (mountedRef.current) {
+        setIsLoading(false);
+        setDataSource('error');
+      }
+    }
+  }, [user?.id]);
 
-    // Subscribe to pickup requests for real-time activity updates
-    const pickupSubscription = supabase
-      .channel(`pickup_requests_${user.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'pickup_requests',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
+  // Setup seamless subscriptions for real-time updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('[Dashboard] 🚀 Setting up seamless subscriptions');
+
+    const callbacks = {
+      onStatsUpdate: (data, type) => {
         if (!mountedRef.current) return;
         
-        console.log('[Dashboard] New pickup request detected:', payload);
+        console.log(`[Dashboard] 📊 Stats update received: ${type}`);
+        setStats(data);
+        setUpdateType(type);
         
-        // Refresh recent activities to include the new pickup request
-        const refreshActivities = async () => {
-          try {
-            setIsRefreshingActivities(true);
-            const localActivities = await getDatabaseActivities(5);
-            const mergedActivities = await mergeRecentActivities([], 5);
-            setRecentActivities(mergedActivities);
-            setIsRefreshingActivities(false);
-            
-            // Also refresh stats to reflect bag count changes
-            loadDashboardData();
-          } catch (error) {
-            console.warn('[Dashboard] Error refreshing activities after pickup request:', error);
-            setIsRefreshingActivities(false);
-          }
-        };
+        // Clear update type after a short delay
+        setTimeout(() => setUpdateType('stable'), 1000);
+      },
+      onActivitiesUpdate: (data, type) => {
+        if (!mountedRef.current) return;
         
-        refreshActivities();
-      })
-      .subscribe();
-
-    return () => {
-      try {
-        statsSubscription?.unsubscribe?.();
-        dumpingSubscription?.unsubscribe?.();
-        supabase.removeChannel(pickupSubscription);
-      } catch (error) {
-        console.warn('[Dashboard] Error unsubscribing from real-time updates:', error);
+        console.log(`[Dashboard] 📝 Activities update received: ${type}`);
+        setRecentActivities(data);
+        setUpdateType(type);
+        
+        // Clear update type after a short delay
+        setTimeout(() => setUpdateType('stable'), 1000);
+      },
+      onPickupsUpdate: (data, type) => {
+        if (!mountedRef.current) return;
+        
+        console.log(`[Dashboard] 📦 Pickups update received: ${type}`);
+        setActivePickups(data);
+        setUpdateType(type);
+        
+        // Clear update type after a short delay
+        setTimeout(() => setUpdateType('stable'), 1000);
       }
     };
-  }, [user?.id, stats, getDatabaseActivities, mergeRecentActivities, loadDashboardData]);
 
-  // Online status listener
+    // Subscribe to seamless updates
+    const subscriptions = seamlessDashboardService.subscribeToUpdates(user.id, callbacks);
+    seamlessSubscriptionsRef.current = subscriptions;
+
+    return () => {
+      console.log('[Dashboard] 🧹 Cleaning up seamless subscriptions');
+      Object.values(subscriptions).forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+    };
+  }, [user?.id]);
+
+  // Preload data in background for faster navigation
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Preload dashboard data after initial load
+    const preloadTimeout = setTimeout(() => {
+      seamlessDashboardService.preloadDashboardData(user.id);
+    }, 2000);
+
+    return () => clearTimeout(preloadTimeout);
+  }, [user?.id]);
+
+  // Online status listener with seamless cache refresh
   useEffect(() => {
     const handleOnlineStatusChange = () => {
-      setIsOnlineStatus(isOnline());
+      const online = isOnline();
+      setIsOnlineStatus(online);
+      
+      if (online && user?.id) {
+        console.log('[Dashboard] 🌐 Back online, refreshing seamless cache');
+        // Refresh data when coming back online
+        seamlessDashboardService.forceRefresh(user.id);
+      }
     };
 
     window.addEventListener('online', handleOnlineStatusChange);
@@ -842,7 +798,43 @@ const Dashboard = () => {
       window.removeEventListener('online', handleOnlineStatusChange);
       window.removeEventListener('offline', handleOnlineStatusChange);
     };
-  }, []);
+  }, [user?.id]);
+
+  // Manual refresh with seamless caching
+  const handleManualRefresh = useCallback(async () => {
+    if (!user?.id) return;
+    
+    if (!isOnlineStatus) {
+      console.log('[Dashboard] Cannot refresh while offline');
+      return;
+    }
+    
+    console.log('[Dashboard] 🔄 Manual seamless refresh');
+    setUpdateType('manual');
+    
+    try {
+      await seamlessDashboardService.forceRefresh(user.id);
+      setUpdateType('refreshed');
+      
+      // Clear update type after delay
+      setTimeout(() => setUpdateType('stable'), 1000);
+    } catch (error) {
+      console.error('[Dashboard] Manual refresh failed:', error);
+      setUpdateType('error');
+      setTimeout(() => setUpdateType('stable'), 1000);
+    }
+  }, [user?.id, isOnlineStatus]);
+
+  // Initial data load using seamless approach
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const initialLoadTimeout = setTimeout(() => {
+      loadDashboardDataSeamless();
+    }, 100); // Faster initial load with seamless caching
+
+    return () => clearTimeout(initialLoadTimeout);
+  }, [user?.id, loadDashboardDataSeamless]);
 
   // Optimized session refresh function with caching
   const getValidSession = useCallback(async () => {
@@ -867,72 +859,74 @@ const Dashboard = () => {
     }
   }, [user]);
 
-  // Optimized user stats loading with parallel requests and prioritized cache
+  // Optimized user stats loading with cache-first approach and stale-while-revalidate
   const loadUserStats = useCallback(async () => {
+    if (!user?.id) return;
+
     try {
-      // Start network request immediately but don't wait for it
-      let networkPromise;
-      if (isOnlineStatus && user?.id) {
-        networkPromise = userService.getUserStats(user.id)
-          .then(statsData => {
-            if (statsData) {
-              // Only update UI if it provides new data vs. cache
-              cacheUserStats(statsData); // Update cache in background
-              setStats(prevStats => {
-                // Only update if there are actual changes to avoid re-renders
-                const hasChanges = JSON.stringify(prevStats) !== JSON.stringify(statsData);
-                if (hasChanges) {
-                  return statsData;
-                }
-                return prevStats;
-              });
-              setDataSource('network');
-              return statsData;
-            }
-          })
-          .catch(err => console.error('Network stats fetch error:', err));
+      console.log('[Dashboard] 🚀 Smart cache-first loading for user:', user.id);
+      
+      // 1. Show cached data immediately for instant UI
+      const cachedStats = await getCachedUserStats(user.id);
+      if (cachedStats && Object.keys(cachedStats).length > 0) {
+        console.log('[Dashboard] ⚡ Using cached stats for instant UI');
+        setStats(cachedStats);
+        setDataSource('cache');
+        setIsLoading(false);
       }
       
-      // If we don't already have stats data from initialization
-      if (Object.keys(stats).length === 0) {
+      // 2. Background refresh with 30s stale window
+      const cacheAge = Date.now() - (cachedStats?.cached_at || 0);
+      const shouldRefresh = !cachedStats || cacheAge > 30000; // 30 seconds
+      
+      if (shouldRefresh && isOnlineStatus) {
+        console.log('[Dashboard] 🔄 Background refresh needed, cache age:', Math.round(cacheAge/1000), 'seconds');
+        
         try {
-          const cachedStats = getCachedUserStats();
-          if (cachedStats && Object.keys(cachedStats).length > 0) {
-            setStats(cachedStats);
-            setDataSource('cache');
+          const freshStats = await userService.getUserStats(user.id);
+          if (freshStats?.data) {
+            console.log('[Dashboard] ✅ Fresh stats loaded, updating UI');
+            const statsData = freshStats.data;
+            
+            // Only update if there are actual changes to avoid re-renders
+            const hasChanges = JSON.stringify(statsData) !== JSON.stringify(cachedStats);
+            if (hasChanges) {
+              setStats(statsData);
+              cacheUserStats(user.id, statsData); // Update cache in background
+              setDataSource('network');
+              console.log('[Dashboard] 📊 Stats updated with fresh data');
+            } else {
+              console.log('[Dashboard] 📊 No changes detected, keeping cache');
+            }
           }
-        } catch (err) {
-          console.warn('Cache read error:', err);
+        } catch (networkError) {
+          console.warn('[Dashboard] Network refresh failed, keeping cache:', networkError);
+          // Keep cached data, no error state for user
         }
+      } else {
+        console.log('[Dashboard] 📊 Cache is fresh, no refresh needed');
+        setIsLoading(false);
       }
 
-      // Wait for network if we're online, but not too long
-      if (networkPromise) {
-        // Set a timeout to ensure we don't wait forever
-        const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2500));
-        await Promise.race([networkPromise, timeoutPromise]);
-      }
-
-      setIsLoading(false);
     } catch (error) {
-      console.error('Error loading user stats:', error);
+      console.error('[Dashboard] Error in smart stats loading:', error);
       setIsLoading(false);
     }
-  }, [user?.id, isOnlineStatus, stats]);
+  }, [user?.id, isOnlineStatus]);
 
 
-  // Call loadDashboardData when dependencies change and setup auto-refresh
+  // Call loadDashboardDataProgressive when dependencies change and setup auto-refresh
   useEffect(() => {
     // More aggressive LCP optimization - defer initial load longer
     const initialLoadTimeout = setTimeout(() => {
-      loadDashboardData();
+      loadDashboardDataProgressive();
     }, 500); // Longer delay to ensure LCP is captured first
     
     // Set up auto-refresh interval when online
     const autoRefreshInterval = setInterval(() => {
       if (isOnlineStatus && mountedRef.current) {
         console.log('[Dashboard] Auto-refreshing data...');
-        loadDashboardData();
+        loadDashboardDataProgressive();
       }
     }, 30000); // Auto-refresh every 30 seconds when online
     
@@ -940,29 +934,25 @@ const Dashboard = () => {
       clearTimeout(initialLoadTimeout);
       clearInterval(autoRefreshInterval);
     };
-  }, [loadDashboardData, isOnlineStatus]);
+  }, [loadDashboardDataProgressive, isOnlineStatus]);
 
-  // Refresh recent activity immediately when a local activity is recorded
+  // Handle local activity updates with seamless optimistic updates
   useEffect(() => {
-    const handleActivityUpdate = (event) => {
+    const handleActivityUpdate = async (event) => {
       const { userId, activity } = event.detail || {};
       if (userId === user.id && activity) {
-        console.log('[Dashboard] Local activity detected, refreshing recent activities');
-        const refreshActivities = async () => {
-          try {
-            const localActivities = await getDatabaseActivities(5);
-            const mergedActivities = await mergeRecentActivities([], 5);
-            setRecentActivities(mergedActivities);
-          } catch (error) {
-            console.warn('[Dashboard] Error refreshing activities:', error);
-          }
-        };
-        refreshActivities();
+        console.log('[Dashboard] 📝 Local activity detected, updating seamlessly');
         
-        // If it's a pickup request, also refresh stats to show updated bag count
-        if (activity.activity_type === 'pickup_request') {
-          console.log('[Dashboard] Pickup request activity detected, refreshing stats');
-          loadDashboardData();
+        // Use optimistic update for instant UI feedback
+        try {
+          await seamlessDashboardService.optimisticAddActivity(userId, activity);
+          
+          // If it's a pickup request, also update stats optimistically
+          if (activity.activity_type === 'pickup_request') {
+            await seamlessDashboardService.optimisticUpdateStats(userId, 'pickup_request', activity);
+          }
+        } catch (error) {
+          console.warn('[Dashboard] Error with optimistic update:', error);
         }
       }
     };
@@ -972,7 +962,7 @@ const Dashboard = () => {
     return () => {
       window.removeEventListener('trashdrop:activity-updated', handleActivityUpdate);
     };
-  }, [user?.id, getDatabaseActivities, mergeRecentActivities, loadDashboardData]);
+  }, [user?.id]);
 
   // Cypress test hook to simulate realtime stats updates (test-only)
   useEffect(() => {
@@ -1046,57 +1036,10 @@ const Dashboard = () => {
     );
   };
 
-  // Manual refresh function for pull-to-refresh functionality
-  const handleManualRefresh = useCallback(() => {
-    if (!isOnlineStatus) {
-      // If offline, just show a toast or alert
-      console.log('Cannot refresh while offline');
-      return;
-    }
-    
-    // Don't set isLoading true here to avoid skeleton flash
-    setDataSource('loading'); // Just indicate refresh is happening
-    
-    // Clear all promises and start fresh
-    const statsPromise = userService.getUserStats(user.id);
-    
-    Promise.all([statsPromise])
-      .then(([statsResult]) => {
-        if (!mountedRef.current) return;
-        
-        // Handle stats update
-        if (!statsResult.error) {
-          const statsData = statsResult.data;
-          setStats({
-            points: statsData?.points || 0,
-            pickups: statsData?.pickups || 0,
-            reports: statsData?.reports || 0,
-            batches: statsData?.batches || 0,
-            totalBags: statsData?.totalBags || 0,
-          });
-          setDataSource('network');
-          // Cache the refreshed data
-          cacheUserStats(user.id, statsData);
-        }
-        
-        // Load recent activities from pickup_requests
-        getDatabaseActivities(5).then(activities => {
-          if (mountedRef.current) {
-            setRecentActivities(activities);
-          }
-        }).catch(error => {
-          console.error('Error loading activities during refresh:', error);
-        });
-      })
-      .catch(error => {
-        console.error('Error during manual refresh:', error);
-      })
-      .finally(() => {
-        if (mountedRef.current) {
-          setDataSource('network'); // Ensure we clear the loading state
-        }
-      });
-  }, [user?.id, isOnlineStatus]);
+  // Manual refresh function for pull-to-refresh functionality (replaced by seamless version)
+  // const handleManualRefresh = useCallback(() => {
+  //   // This function is now replaced by handleManualRefresh with seamless caching
+  // }, [user?.id, isOnlineStatus]);
   
   // Performance optimization: Only show skeleton if we truly have no data
   // Memoize non-critical UI elements to avoid unnecessary re-renders
@@ -1178,7 +1121,7 @@ const Dashboard = () => {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
     // Refresh user state and stats after onboarding
-    loadDashboardData();
+    loadDashboardDataProgressive();
     // Re-check onboarding status
     const checkOnboardingStatus = async () => {
       if (!user?.id) return;
@@ -1205,6 +1148,13 @@ const Dashboard = () => {
 
   return (
     <div className="bg-white dark:bg-gray-900">
+      {/* Data Freshness Indicator */}
+      <DataFreshnessIndicator 
+        dataSource={dataSource}
+        updateType={updateType}
+        lastUpdate={Date.now()}
+      />
+      
       {/* Onboarding Flow */}
       {showOnboarding && (
         <>
@@ -1248,11 +1198,15 @@ const Dashboard = () => {
                   <div className="flex items-center justify-around">
                     <div className="text-center">
                       <p className="text-emerald-600 text-xs mb-1">Batches</p>
-                      <p className="text-emerald-700 text-3xl font-bold">{stats.batches || 0}</p>
+                      <p className={`text-emerald-700 text-3xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
+                        {stats.batches || 0}
+                      </p>
                     </div>
                     <div className="text-center">
                       <p className="text-emerald-600 text-xs mb-1">Bags</p>
-                      <p className="text-emerald-700 text-3xl font-bold">{stats.totalBags || 0}</p>
+                      <p className={`text-emerald-700 text-3xl font-bold ${bagsPulse ? 'animate-pulse' : ''}`}>
+                        {stats.totalBags || 0}
+                      </p>
                     </div>
                   </div>
                   
@@ -1294,7 +1248,9 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="text-center mb-4">
-                    <p className="text-teal-700 text-4xl font-bold">{stats.pickups || 0}</p>
+                    <p className={`text-teal-700 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
+                      {stats.pickups || 0}
+                    </p>
                   </div>
                   
                   {/* Progress Bar */}
@@ -1335,7 +1291,9 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="text-center mb-4">
-                    <p className="text-amber-700 text-4xl font-bold">{stats.reports || 0}</p>
+                    <p className={`text-amber-700 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
+                      {stats.reports || 0}
+                    </p>
                   </div>
                   
                   {/* Progress Bar */}
