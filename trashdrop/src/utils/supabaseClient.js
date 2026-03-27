@@ -329,6 +329,18 @@ const initSupabase = () => {
         }
       }
     };
+    
+    // Suppress expected refresh token errors in development
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      const message = args[0];
+      if (typeof message === 'string' && 
+          (message.includes('refresh_token_not_found') || 
+           message.includes('Invalid Refresh Token'))) {
+        return; // Suppress these expected errors
+      }
+      originalConsoleError.apply(console, args);
+    };
   }
 
   const client = createClient(supabaseUrl, supabaseAnonKey, clientOptions);
