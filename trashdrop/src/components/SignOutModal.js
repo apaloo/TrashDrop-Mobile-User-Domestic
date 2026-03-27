@@ -7,7 +7,6 @@ import React from 'react';
 const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut }) => {
   if (!isOpen) return null;
 
-  alert('DEBUG: SignOutModal is now rendering!');
   console.log('[SignOutModal] Rendering modal, isOpen:', isOpen);
 
   return (

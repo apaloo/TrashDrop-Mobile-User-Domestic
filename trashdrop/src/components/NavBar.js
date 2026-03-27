@@ -45,7 +45,6 @@ const NavBar = () => {
   };
 
   const handleSignOut = () => {
-    alert('DEBUG: handleSignOut called - this should show the modal');
     console.log('[NavBar] handleSignOut called, setting modal to true');
     // Show custom modal instead of browser confirm
     setShowSignOutModal(true);
