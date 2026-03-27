@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.js';
 import { useTheme } from '../context/ThemeContext.js';
 import { notificationService } from '../services/notificationService.js';
 import supabase from '../utils/supabaseClient.js';
+import SignOutModal from './SignOutModal.js';
 
 /**
  * Main navigation component for the application
@@ -24,6 +25,8 @@ const NavBar = () => {
   }
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const dropdownRef = useRef(null);
 
   // Get user initials from name
@@ -41,8 +44,16 @@ const NavBar = () => {
     return user?.email?.[0]?.toUpperCase() || 'U';
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
+    console.log('[NavBar] handleSignOut called, setting modal to true');
+    // Show custom modal instead of browser confirm
+    setShowSignOutModal(true);
+  };
+
+  const handleSignOutConfirm = async () => {
     console.log('[NavBar] Sign out initiated');
+    setIsSigningOut(true);
+    
     try {
       // Call signOut from AuthContext to properly clean up state
       const result = await signOut();
@@ -53,16 +64,26 @@ const NavBar = () => {
         navigate('/login', { replace: true });
       } else {
         console.error('[NavBar] Sign out failed:', result.error);
-        // Still navigate to login even if sign out fails
+        // Show error to user but still navigate to login
+        alert('There was an issue signing out, but you will be redirected to the login page.');
         navigate('/login', { replace: true });
       }
       
     } catch (error) {
       console.error('[NavBar] Sign out error:', error);
-      // Force navigation anyway
+      // Show error to user but still navigate to login
+      alert('An unexpected error occurred during sign out. You will be redirected to the login page.');
       console.log('[NavBar] Force navigating to login due to error');
       navigate('/login', { replace: true });
+    } finally {
+      setIsSigningOut(false);
+      setShowSignOutModal(false);
     }
+  };
+
+  const handleSignOutCancel = () => {
+    console.log('[NavBar] handleSignOutCancel called, setting modal to false');
+    setShowSignOutModal(false);
   };
 
   // Active link style
@@ -175,27 +196,45 @@ const NavBar = () => {
             <div className="md:hidden relative" ref={dropdownRef}>
               <button 
                 onClick={toggleProfileDropdown}
-                className="flex items-center space-x-1 text-[#4CAF50] focus:outline-none"
+                className="flex items-center space-x-2 p-2 text-[#4CAF50] focus:outline-none focus:ring-2 focus:ring-[#4CAF50] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                aria-label="Profile menu"
               >
-                <div className="w-8 h-8 rounded-full bg-[#4CAF50] flex items-center justify-center text-white text-sm font-medium">
+                <div className="w-10 h-10 rounded-full bg-[#4CAF50] flex items-center justify-center text-white text-sm font-medium">
                   {getUserInitials()}
                 </div>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
               
               {/* Mobile Profile Dropdown */}
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 z-60">
-                  <NavLink to="/profile" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-700 rounded-md shadow-lg py-2 z-60 border border-gray-200 dark:border-gray-600">
+                  <NavLink to="/profile" className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
                     Your Profile
                   </NavLink>
+                  <div className="border-t border-gray-200 dark:border-gray-600"></div>
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    disabled={isSigningOut}
+                    className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center min-h-[44px]"
                   >
-                    Sign Out
+                    {isSigningOut ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Signing out...
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign Out
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -289,9 +328,25 @@ const NavBar = () => {
                 </NavLink>
                 <button
                   onClick={handleSignOut}
-                  className="px-3 py-2 rounded-md text-sm font-medium text-white bg-primary hover:bg-primary-dark transition-colors"
+                  disabled={isSigningOut}
+                  className="px-3 py-2 rounded-md text-sm font-medium text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  Sign Out
+                  {isSigningOut ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sign Out
+                    </>
+                  )}
                 </button>
               </>
             ) : (
@@ -400,6 +455,21 @@ const NavBar = () => {
             </div>
           </nav>
           {/* <div className="pb-16 md:pb-0"></div> */}
+        </div>
+      )}
+      
+      {/* Sign Out Modal */}
+      <SignOutModal
+        isOpen={showSignOutModal}
+        onClose={handleSignOutCancel}
+        onConfirm={handleSignOutConfirm}
+        isSigningOut={isSigningOut}
+      />
+      
+      {/* Debug info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-black text-white p-2 text-xs z-[10000]">
+          Modal State: {showSignOutModal ? 'OPEN' : 'CLOSED'}
         </div>
       )}
     </>
