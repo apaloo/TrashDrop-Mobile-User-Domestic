@@ -95,10 +95,16 @@ const AuthErrorBoundary = ({ children }) => {
   const { signOut } = useAuth();
   
   const handleSignOut = async () => {
+    alert('DEBUG: AuthErrorBoundary sign out called - this should NOT bypass modal');
+    console.log('[AuthErrorBoundary] Direct sign out called - this should use modal instead');
     try {
-      await signOut();
-      // Force a full page reload to ensure clean state
-      window.location.href = '/login';
+      // For error boundary, we might want to sign out immediately
+      // but let's add a confirmation first
+      const confirmed = window.confirm('An error occurred. Would you like to sign out?');
+      if (confirmed) {
+        await signOut();
+        window.location.href = '/login';
+      }
     } catch (error) {
       console.error('Error during sign out:', error);
       window.location.href = '/login';
