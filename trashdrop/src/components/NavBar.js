@@ -327,13 +327,7 @@ const NavBar = () => {
                   Profile
                 </NavLink>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    alert('DEBUG: Desktop Sign Out button clicked!');
-                    console.log('[NavBar] Desktop Sign Out button clicked');
-                    handleSignOut();
-                  }}
+                  onClick={handleSignOut}
                   disabled={isSigningOut}
                   className="px-3 py-2 rounded-md text-sm font-medium text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
