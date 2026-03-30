@@ -29,7 +29,7 @@ export const userServiceOptimized = {
           .from('user_stats_dashboard')
           .select('*')
           .eq('user_id', userId)
-          .single();
+          .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows
 
         if (error) {
           console.error('[UserServiceOptimized] Error fetching optimized stats:', error);
@@ -37,8 +37,27 @@ export const userServiceOptimized = {
         }
 
         if (!data) {
-          console.log('[UserServiceOptimized] No stats found for user:', userId);
-          return { data: null, error: null };
+          console.log('[UserServiceOptimized] No stats found for user:', userId, 'Creating default stats');
+          // Return default stats for new users
+          return {
+            data: {
+              points: 0,
+              pickups: 0,
+              reports: 0,
+              batches: 0,
+              totalBags: 0,
+              available_bags: 0,
+              level: 'Eco Starter',
+              email: '',
+              firstName: '',
+              lastName: '',
+              avatar: '',
+              last_updated: new Date().toISOString(),
+              _source: 'default_created',
+              _query_count: 1
+            },
+            error: null
+          };
         }
 
         // Transform data to match expected format
@@ -154,26 +173,27 @@ export const userServiceOptimized = {
 
       console.log('[UserServiceOptimized] ⚡ Fetching critical stats for instant UI:', userId);
 
-      // First try materialized view for fastest response
-      let { data, error } = await supabase
-        .from('user_stats_aggregated')
-        .select('user_id, total_pickups, total_points, total_bags, total_batches, last_activity_at')
+      // Use main view instead of materialized view to include reports field
+      const { data, error } = await supabase
+        .from('user_stats_dashboard')
+        .select('user_id, pickups, total_pickups, reports, batches, total_bags, total_points, available_bags, last_updated')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows
 
-      // If materialized view is empty, fall back to main view
-      if (error && error.code === 'PGRST116') {
-        console.log('[UserServiceOptimized] Materialized view empty, falling back to main view');
+      // If main view is empty, fall back to optimized service
+      if (!data) {
+        console.log('[UserServiceOptimized] Main view empty, falling back to optimized service');
         const result = await this.getUserStatsOptimized(userId);
         if (result.data) {
           return {
             data: {
               points: result.data.points || 0,
               pickups: result.data.pickups || 0,
+              reports: result.data.reports || 0,
               batches: result.data.batches || 0,
               totalBags: result.data.totalBags || 0,
               available_bags: result.data.available_bags || 0,
-              _source: 'main_view_fallback',
+              _source: 'optimized_service_fallback',
               _query_count: 1
             },
             error: null
@@ -191,14 +211,16 @@ export const userServiceOptimized = {
       const criticalStats = data ? {
         points: data.total_points || 0,
         pickups: data.total_pickups || 0,
-        batches: data.total_batches || 0,
+        reports: data.reports || 0,
+        batches: data.batches || 0,
         totalBags: data.total_bags || 0,
-        _source: 'materialized_view',
+        _source: 'main_view',
         _query_count: 1,
-        last_activity: data.last_activity_at
+        last_activity: data.last_updated
       } : {
         points: 0,
         pickups: 0,
+        reports: 0,
         batches: 0,
         totalBags: 0,
         _source: 'default',
@@ -214,6 +236,7 @@ export const userServiceOptimized = {
       return {
         points: 0,
         pickups: 0,
+        reports: 0,
         batches: 0,
         totalBags: 0,
         _source: 'fallback',
@@ -317,7 +340,7 @@ export const userServiceOptimized = {
         .from('user_stats_dashboard')
         .select('last_updated')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         return true; // No data, need refresh
