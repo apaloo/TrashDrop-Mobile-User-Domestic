@@ -1,8 +1,19 @@
--- Onboarding RPC Functions for TrashDrop
--- Updated to use actual database schema (bin_locations, not locations)
--- Updated to use actual pickup_requests table structure
+-- Fix onboarding RPC functions - Clean version
+-- This script drops existing functions and recreates them with correct signatures
+
+-- Drop existing functions to avoid naming conflicts
+DROP FUNCTION IF EXISTS start_onboarding(UUID);
+DROP FUNCTION IF EXISTS set_has_bags(UUID, BOOLEAN);
+DROP FUNCTION IF EXISTS add_user_location(UUID, TEXT, TEXT, NUMERIC, NUMERIC);
+DROP FUNCTION IF EXISTS process_qr_scan(UUID, TEXT);
+DROP FUNCTION IF EXISTS create_digital_bin(UUID, UUID, NUMERIC);
+DROP FUNCTION IF EXISTS create_digital_bin(UUID, UUID);
+DROP FUNCTION IF EXISTS get_user_onboarding_state(UUID);
+DROP FUNCTION IF EXISTS create_onboarding_pickup(UUID, UUID, INTEGER);
+DROP FUNCTION IF EXISTS get_user_has_bags_selection(UUID);
 
 -- 1. START ONBOARDING
+-- Tracks when user begins onboarding process
 CREATE OR REPLACE FUNCTION start_onboarding(user_uuid UUID)
 RETURNS JSON AS $$
 BEGIN
@@ -14,6 +25,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 2. SET HAS BAGS
+-- Records user's response to "Do you have bags?" question
 CREATE OR REPLACE FUNCTION set_has_bags(user_uuid UUID, has_bags BOOLEAN)
 RETURNS JSON AS $$
 BEGIN
@@ -104,7 +116,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 5. CREATE DIGITAL BIN
--- Creates digital bin with QR URL and 7-day expiration
+-- Creates digital bin with QR URL and 7-day expiration (updated signature)
 CREATE OR REPLACE FUNCTION create_digital_bin(
   user_uuid UUID,
   location_id UUID
@@ -141,7 +153,6 @@ DECLARE
   state TEXT;
   available_bags INTEGER;
   total_bags_scanned INTEGER;
-  has_bags_selection BOOLEAN;
 BEGIN
   -- Count locations from locations table
   SELECT COUNT(*) INTO location_count
@@ -153,23 +164,8 @@ BEGIN
   FROM user_stats
   WHERE user_id = user_uuid;
   
-  -- Handle case where no user_stats record exists
-  IF available_bags IS NULL THEN
-    available_bags := 0;
-  END IF;
-  
   -- For onboarding, total_bags_scanned is the same as available_bags
   total_bags_scanned := available_bags;
-  
-  -- Check if user has made a "has bags" selection
-  -- Look for recent has_bags activity
-  SELECT EXISTS(
-    SELECT 1 FROM user_activity 
-    WHERE user_id = user_uuid 
-    AND activity_type IN ('has_bags_true', 'has_bags_false')
-    ORDER BY created_at DESC
-    LIMIT 1
-  ) INTO has_bags_selection;
   
   -- Determine state
   IF total_bags_scanned > 0 THEN
@@ -184,8 +180,7 @@ BEGIN
     'state', state,
     'available_bags', available_bags,
     'total_bags_scanned', total_bags_scanned,
-    'location_count', location_count,
-    'has_bags_selection', has_bags_selection
+    'location_count', location_count
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -276,15 +271,3 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Grant permission for the new function
-GRANT EXECUTE ON FUNCTION get_user_has_bags_selection TO authenticated;
-
--- Grant permissions to authenticated users
-GRANT EXECUTE ON FUNCTION start_onboarding TO authenticated;
-GRANT EXECUTE ON FUNCTION set_has_bags TO authenticated;
-GRANT EXECUTE ON FUNCTION add_user_location TO authenticated;
-GRANT EXECUTE ON FUNCTION process_qr_scan TO authenticated;
-GRANT EXECUTE ON FUNCTION create_digital_bin TO authenticated;
-GRANT EXECUTE ON FUNCTION get_user_onboarding_state TO authenticated;
-GRANT EXECUTE ON FUNCTION create_onboarding_pickup TO authenticated;

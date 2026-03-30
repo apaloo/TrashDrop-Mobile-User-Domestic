@@ -70,6 +70,7 @@ export const prepareDigitalBinData = async ({
     is_urgent,
     expires_at,
     is_active: true,
+    status: 'pending', // Set initial status to comply with constraint
     
     // Fee fields (SOP v4.5.6 compliant)
     fee: costBreakdown.total.toFixed(2),

@@ -290,6 +290,12 @@ export const AuthProvider = ({ children }) => {
 
   // Handle successful authentication
   const handleAuthSuccess = useCallback((user, session) => {
+    // Prevent duplicate authentication for the same user
+    if (authState.user?.id === user?.id && authState.status === AUTH_STATES.AUTHENTICATED) {
+      console.log('[Auth] Skipping duplicate auth success for same user');
+      return { success: true, user, session };
+    }
+    
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
     console.log("[Auth] Standalone/PWA mode detection:", isStandalone ? "YES" : "NO");
     if (isStandalone) {
@@ -304,35 +310,40 @@ export const AuthProvider = ({ children }) => {
     console.log('[Auth Theme] 🔥 IMMEDIATE THEME CHECK, user:', user);
     console.log('[Auth Theme] 🔥 user?.id:', user?.id);
     if (user?.id) {
-      console.log('[Auth Theme] 🎨 Loading theme for authenticated user:', user.id);
-      supabase
-        .from('profiles')
-        .select('dark_mode')
-        .eq('id', user.id)
-        .maybeSingle()
-        .then(({ data: profileData, error }) => {
-          if (error) {
-            console.error('[Auth Theme] ❌ Error loading theme:', error);
-            return;
-          }
-          
-          const isDark = profileData?.dark_mode || false;
-          console.log('[Auth Theme] 📦 Theme from database:', isDark ? 'DARK' : 'LIGHT', profileData);
-          
-          // Apply theme globally
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.body.classList.add('dark');
-            console.log('[Auth Theme] ✅ DARK MODE APPLIED to documentElement and body');
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.body.classList.remove('dark');
-            console.log('[Auth Theme] ✅ LIGHT MODE APPLIED to documentElement and body');
-          }
-        })
-        .catch((error) => {
-          console.error('[Auth Theme] ❌ Exception loading theme:', error);
-        });
+      // Only load theme if user ID has changed (prevent duplicate theme loads)
+      if (authState.user?.id !== user.id) {
+        console.log('[Auth Theme] 🎨 Loading theme for authenticated user:', user.id);
+        supabase
+          .from('profiles')
+          .select('dark_mode')
+          .eq('id', user.id)
+          .maybeSingle()
+          .then(({ data: profileData, error }) => {
+            if (error) {
+              console.error('[Auth Theme] ❌ Error loading theme:', error);
+              return;
+            }
+            
+            const isDark = profileData?.dark_mode || false;
+            console.log('[Auth Theme] 📦 Theme from database:', isDark ? 'DARK' : 'LIGHT', profileData);
+            
+            // Apply theme globally
+            if (isDark) {
+              document.documentElement.classList.add('dark');
+              document.body.classList.add('dark');
+              console.log('[Auth Theme] ✅ DARK MODE APPLIED to documentElement and body');
+            } else {
+              document.documentElement.classList.remove('dark');
+              document.body.classList.remove('dark');
+              console.log('[Auth Theme] ✅ LIGHT MODE APPLIED to documentElement and body');
+            }
+          })
+          .catch((error) => {
+            console.error('[Auth Theme] ❌ Exception loading theme:', error);
+          });
+      } else {
+        console.log('[Auth Theme] ⏭️ Skipping theme load - same user already authenticated');
+      }
     } else {
       console.log('[Auth Theme] ⚠️ No user ID found, skipping theme load');
     }
@@ -373,7 +384,7 @@ export const AuthProvider = ({ children }) => {
     });
     
     return { success: true, user, session };
-  }, [updateAuthState]);
+  }, [updateAuthState, authState.user?.id, authState.status]);
 
   /**
    * Handle authentication errors
@@ -470,6 +481,12 @@ export const AuthProvider = ({ children }) => {
     if (!force && authState.status === AUTH_STATES.LOADING) {
       console.log('[Auth] Already in loading state, skipping...');
       return { success: false, error: { message: 'Already in loading state' } };
+    }
+
+    // Skip if already authenticated and not forcing (prevent unnecessary refreshes)
+    if (!force && authState.status === AUTH_STATES.AUTHENTICATED && authState.user) {
+      console.log('[Auth] Already authenticated, skipping session check');
+      return { success: true, user: authState.user, session: authState.session };
     }
 
     isCheckingSession.current = true;
@@ -1293,8 +1310,18 @@ export const AuthProvider = ({ children }) => {
     const setupVisibilityListener = () => {
       const handleVisibilityChange = async () => {
         if (document.visibilityState === 'visible' && authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] App became visible, checking session');
-          await checkSession();
+          // Only check session if it's been more than 5 minutes since last check
+          const lastCheck = localStorage.getItem('trashdrop_last_session_check');
+          const now = Date.now();
+          const fiveMinutes = 5 * 60 * 1000;
+          
+          if (!lastCheck || (now - parseInt(lastCheck)) > fiveMinutes) {
+            console.log('[Auth] App became visible and 5+ minutes passed, checking session');
+            await checkSession();
+            localStorage.setItem('trashdrop_last_session_check', now.toString());
+          } else {
+            console.log('[Auth] App became visible but recent check, skipping');
+          }
         }
       };
       
@@ -1306,8 +1333,18 @@ export const AuthProvider = ({ children }) => {
     const setupFocusListener = () => {
       const handleFocus = async () => {
         if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Window focused, checking session');
-          await checkSession();
+          // Only check session if it's been more than 5 minutes since last check
+          const lastCheck = localStorage.getItem('trashdrop_last_session_check');
+          const now = Date.now();
+          const fiveMinutes = 5 * 60 * 1000;
+          
+          if (!lastCheck || (now - parseInt(lastCheck)) > fiveMinutes) {
+            console.log('[Auth] Window focused and 5+ minutes passed, checking session');
+            await checkSession();
+            localStorage.setItem('trashdrop_last_session_check', now.toString());
+          } else {
+            console.log('[Auth] Window focused but recent check, skipping');
+          }
         }
       };
       

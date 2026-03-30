@@ -176,7 +176,7 @@ const NavBar = () => {
   
   return (
     <>
-      <nav className="bg-white dark:bg-gray-800 py-3 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
+      <nav className="bg-white dark:bg-gray-800 py-2 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
         <div className="container mx-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
           <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] dark:text-[#66BB6A] text-2xl font-bold">
@@ -399,7 +399,7 @@ const NavBar = () => {
       {isAuthenticated && (
         <div className="mobile-bottom-nav-container">
           <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg z-50">
-            <div className="flex justify-between items-center px-4 py-2">
+            <div className="container mx-auto flex justify-between items-center px-4 py-2">
               <NavLink 
                 to="/dashboard" 
                 className={({ isActive }) => `

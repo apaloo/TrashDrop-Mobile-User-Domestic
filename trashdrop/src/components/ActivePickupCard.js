@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 // Dynamic import for leaflet-routing-machine to prevent SSR issues
 import supabase from '../utils/supabaseClient.js';
-import { FaQrcode, FaTimes } from 'react-icons/fa';
+import { FaQrcode, FaTimes, FaMapMarkerAlt, FaPhone, FaStar } from 'react-icons/fa';
 import { QRCodeSVG } from 'qrcode.react';
 import { createPortal } from 'react-dom';
 import { subscribeToCollectorLocation, calculateETA } from '../utils/realtime.js';
+import { statusService } from '../services/statusService.js';
 
 // Component to update the map view when position changes
 const MapUpdater = ({ position }) => {
@@ -112,9 +114,10 @@ const PickupMap = ({ userLocation, collectorLocation }) => {
 
 /**
  * ActivePickupCard component - Shows real-time updates for an active pickup request
- * Supports offline functionality with cached data
+ * Uses unified status service and provides smart action buttons
  */
 const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
+  const navigate = useNavigate();
   const [etaMinutes, setEtaMinutes] = useState(null);
   const [distance, setDistance] = useState(null);
   const [collectorLocation, setCollectorLocation] = useState(null);
@@ -123,6 +126,11 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
 
   // Handle offline functionality by checking navigator.onLine
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Get status configuration using unified status service
+  const statusConfig = statusService.getStatusConfig(activePickup?.status);
+  const availableActions = statusService.getAvailableActions(activePickup?.status);
+  const isTrackingAvailable = statusService.isTrackingAvailable(activePickup?.status);
 
   // Add online/offline event listeners
   useEffect(() => {
@@ -242,19 +250,41 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
 
   if (!activePickup) return null;
 
-  // Helper function to render status badge
+  // Helper function to render status badge using unified status service
   const renderStatusBadge = (status) => {
-    switch (status) {
-      case 'waiting_for_collector':
-        return <span className="px-3 py-1 bg-yellow-400 dark:bg-yellow-500 text-yellow-800 dark:text-yellow-100 rounded-full font-medium flex items-center justify-center text-center">Waiting for collector</span>;
-      case 'collector_assigned':
-        return <span className="px-3 py-1 bg-blue-400 dark:bg-blue-500 text-blue-800 dark:text-blue-100 rounded-full font-medium flex items-center justify-center text-center">Collector assigned</span>;
-      case 'en_route':
-        return <span className="px-3 py-1 bg-blue-400 dark:bg-blue-500 text-blue-800 dark:text-blue-100 rounded-full font-medium flex items-center justify-center text-center">En route</span>;
-      case 'arrived':
-        return <span className="px-3 py-1 bg-green-400 dark:bg-green-500 text-green-800 dark:text-green-100 rounded-full font-medium flex items-center justify-center text-center">Collector arrived</span>;
+    const config = statusService.getStatusConfig(status);
+    return (
+      <span 
+        className="px-3 py-1 rounded-full font-medium flex items-center justify-center text-center"
+        style={{ 
+          backgroundColor: config.color + '20', 
+          color: config.color 
+        }}
+      >
+        <span className="mr-1">{config.icon}</span>
+        {config.display}
+      </span>
+    );
+  };
+
+  // Handle action buttons based on available actions
+  const handleAction = (action) => {
+    switch (action) {
+      case 'track':
+        navigate(`/collector-tracking?pickupId=${activePickup.id}`);
+        break;
+      case 'contact':
+        if (activePickup.collector?.phone) {
+          window.location.href = `tel:${activePickup.collector.phone}`;
+        }
+        break;
+      case 'cancel':
+        if (window.confirm('Are you sure you want to cancel this pickup request?')) {
+          onCancel && onCancel(activePickup.id);
+        }
+        break;
       default:
-        return <span className="px-3 py-1 bg-gray-400 dark:bg-gray-500 text-gray-800 dark:text-gray-100 rounded-full font-medium flex items-center justify-center text-center">{status}</span>;
+        console.log(`Action ${action} not implemented yet`);
     }
   };
 
@@ -543,20 +573,46 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
           <FaQrcode size={20} />
         </button>
       </div>
-      {/* Cancel button */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-700 flex justify-end">
-        <button 
-          onClick={() => {
-            if (window.confirm('Are you sure you want to cancel this pickup request?')) {
-              console.log('Cancelling pickup request with ID:', activePickup.id);
-              onCancel && onCancel(activePickup.id);
-            }
-          }}
-          className="px-4 py-2 bg-red-500 text-white font-medium rounded-md hover:bg-red-600 transition-colors"
-          disabled={!activePickup.id}
-        >
-          Cancel Request
-        </button>
+      {/* Smart Action Buttons - Based on available actions */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-700">
+        <div className="flex flex-wrap gap-2 justify-end">
+          {availableActions.includes('track') && (
+            <button
+              onClick={() => handleAction('track')}
+              className="px-4 py-2 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-colors flex items-center"
+            >
+              <FaMapMarkerAlt className="mr-2" />
+              Track Collector
+            </button>
+          )}
+          
+          {availableActions.includes('contact') && activePickup.collector?.phone && (
+            <button
+              onClick={() => handleAction('contact')}
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center"
+            >
+              <FaPhone className="mr-2" />
+              Call Collector
+            </button>
+          )}
+          
+          {availableActions.includes('cancel') && (
+            <button
+              onClick={() => handleAction('cancel')}
+              className="px-4 py-2 bg-red-500 text-white font-medium rounded-md hover:bg-red-600 transition-colors"
+              disabled={!activePickup.id}
+            >
+              Cancel Request
+            </button>
+          )}
+        </div>
+        
+        {/* Status description */}
+        <div className="mt-3 text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {statusConfig.description}
+          </p>
+        </div>
       </div>
     </div>
   );

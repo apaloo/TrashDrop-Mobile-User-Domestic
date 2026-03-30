@@ -5,10 +5,13 @@ import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import DashboardOptimizer from '../components/DashboardOptimizer.js';
 import OnboardingFlow from '../components/OnboardingFlow.js';
+import NavigationChoiceModal from '../components/NavigationChoiceModal.js';
 import { userService, pickupService } from '../services/index.js';
 import userServiceOptimized from '../services/userServiceOptimized.js';
 import { notificationService } from '../services/notificationService.js';
 import onboardingService from '../services/onboardingService.js';
+import { statusService } from '../services/statusService.js';
+import smartNotificationService from '../services/smartNotificationService.js';
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
 import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
 import realtimeManager from '../utils/realtimeOptimized.js';
@@ -100,6 +103,10 @@ const Dashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userOnboardingState, setUserOnboardingState] = useState(null);
   const [nextAction, setNextAction] = useState(null);
+  
+  // Navigation choice modal state
+  const [showNavigationModal, setShowNavigationModal] = useState(false);
+  const [navigationPickup, setNavigationPickup] = useState(null);
   
   // Check onboarding status and show appropriate UI
   useEffect(() => {
@@ -516,21 +523,32 @@ const Dashboard = () => {
         });
       },
       handlePickupAccepted: (pickup) => {
-        const shouldNavigate = pickup.status === 'accepted' || pickup.status === 'en_route' || pickup.status === 'collector_assigned';
-        if (shouldNavigate) {
-          console.log('[Dashboard] Auto-navigating to tracking page');
+        // Use unified status service to check if tracking should be available
+        const isTrackingAvailable = statusService.isTrackingAvailable(pickup.status);
+        const availableActions = statusService.getAvailableActions(pickup.status);
+        
+        console.log('[Dashboard] Pickup accepted:', {
+          status: pickup.status,
+          isTrackingAvailable,
+          availableActions,
+          pickupId: pickup.id
+        });
+        
+        // Show navigation choice modal instead of forced navigation
+        if (availableActions.includes('track')) {
+          setNavigationPickup(pickup);
+          setShowNavigationModal(true);
           
-          // Show notification
-          const notification = document.createElement('div');
-          notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
-          notification.innerHTML = '🎉 Collector accepted! Taking you to live tracking...';
-          document.body.appendChild(notification);
-          
-          // Navigate after 2 seconds
-          setTimeout(() => {
-            notification.remove();
-            navigate(`/collector-tracking?pickupId=${pickup.id}`);
-          }, 2000);
+          // Send smart notification
+          smartNotificationService.sendStatusNotification({
+            userId: user.id,
+            pickupId: pickup.id,
+            oldStatus: 'pending',
+            newStatus: pickup.status,
+            collectorName: pickup.collector?.first_name ? 
+              `${pickup.collector.first_name} ${pickup.collector.last_name}` : 
+              'Your collector'
+          });
         }
       },
       updateNotificationCount: (delta) => {
@@ -1431,13 +1449,25 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Status: <span className="text-green-600 dark:text-green-400">{activePickups[0].status}</span>
-                    {activePickups[0].is_digital_bin && activePickups[0].frequency && (
-                      <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2 py-1 rounded">
-                        {activePickups[0].frequency}
-                      </span>
-                    )}
+                    Status: 
+                    <span 
+                      className="ml-1 px-2 py-1 rounded-full text-xs font-medium"
+                      style={{ 
+                        backgroundColor: statusService.getStatusConfig(activePickups[0].status).color + '20', 
+                        color: statusService.getStatusConfig(activePickups[0].status).color 
+                      }}
+                    >
+                      <span className="mr-1">{statusService.getStatusIcon(activePickups[0].status)}</span>
+                      {statusService.getStatusDisplay(activePickups[0].status)}
+                    </span>
                   </p>
+                  {activePickups[0].is_digital_bin && activePickups[0].frequency && (
+                    <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2 py-1 rounded">
+                      {activePickups[0].frequency}
+                    </span>
+                  )}
+                </div>
+                <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name || (activePickups[0].collector ? `${activePickups[0].collector.first_name || ''} ${activePickups[0].collector.last_name || ''}`.trim() : null) || 'Waiting...'}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Location: {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
@@ -1449,67 +1479,72 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            {/* Action Buttons - Conditional layout based on pickup status */}
-            {activePickups[0].status === 'accepted' || 
-             activePickups[0].status === 'en_route' || 
-             activePickups[0].status === 'collector_assigned' ||
-             activePickups[0].status === 'in_transit' ||
-             activePickups[0].status === 'arrived' ? (
-              // Show both buttons when collector is assigned/accepted
-              <div className="grid grid-cols-2 gap-3">
-                {/* Track Collector Button */}
-                <Link 
-                  to={`/collector-tracking?pickupId=${activePickups[0].id}`}
-                  className="flex items-center justify-center bg-blue-500 hover:bg-blue-600 rounded-lg p-3 transition-colors cursor-pointer shadow-md"
-                >
-                  <div className="flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-white font-medium text-sm">Track Collector</span>
-                  </div>
-                </Link>
+            <div className="mt-4">
+              {/* Action Buttons - Using unified status service */}
+              {(() => {
+                const availableActions = statusService.getAvailableActions(activePickups[0].status);
+                const isTrackingAvailable = statusService.isTrackingAvailable(activePickups[0].status);
+                
+                if (isTrackingAvailable) {
+                  return (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Track Collector Button */}
+                      <Link 
+                        to={`/collector-tracking?pickupId=${activePickups[0].id}`}
+                        className="flex items-center justify-center bg-blue-500 hover:bg-blue-600 rounded-lg p-3 transition-colors cursor-pointer shadow-md"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="text-white font-medium text-sm">Track Collector</span>
+                        </div>
+                      </Link>
 
-                {/* Alerts/Notifications Button */}
-                <Link 
-                  to="/notifications" 
-                  className="flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-lg p-3 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center space-x-2 relative">
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Alerts</span>
-                    {unreadNotifications > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              </div>
-            ) : (
-              // Show only Alerts button when pickup is pending
-              <div className="flex justify-center">
-                <Link 
-                  to="/notifications" 
-                  className="flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer w-full"
-                >
-                  <div className="flex items-center space-x-2 relative">
-                    <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    <span className="text-purple-700 dark:text-purple-300 font-medium">Waiting for Collector... Check Alerts</span>
-                    {unreadNotifications > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              </div>
-            )}
+                      {/* Alerts/Notifications Button */}
+                      <Link 
+                        to="/notifications" 
+                        className="flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-lg p-3 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center space-x-2 relative">
+                          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                          </svg>
+                          <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Alerts</span>
+                          {unreadNotifications > 0 && (
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                              {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="flex justify-center">
+                      <Link 
+                        to="/notifications" 
+                        className="flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer w-full"
+                      >
+                        <div className="flex items-center space-x-2 relative">
+                          <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                          </svg>
+                          <span className="text-purple-700 dark:text-purple-300 font-medium">Waiting for Collector... Check Alerts</span>
+                          {unreadNotifications > 0 && (
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                              {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
           </div>
         )}
       </div>
@@ -1524,6 +1559,28 @@ const Dashboard = () => {
           onClose={() => {
             console.log('[Dashboard] Onboarding closed');
             setShowOnboarding(false);
+          }}
+        />
+      )}
+      
+      {/* Navigation Choice Modal */}
+      {showNavigationModal && (
+        <NavigationChoiceModal
+          pickup={navigationPickup}
+          isVisible={showNavigationModal}
+          onClose={() => setShowNavigationModal(false)}
+          onChoice={(choice) => {
+            console.log('[Dashboard] User navigation choice:', choice);
+            
+            if (choice === 'track') {
+              // User chose to track - navigate to tracking page
+              navigate(`/collector-tracking?pickupId=${navigationPickup.id}`);
+            } else if (choice === 'stay') {
+              // User chose to stay - do nothing, just close modal
+              console.log('[Dashboard] User chose to stay on dashboard');
+            }
+            
+            setShowNavigationModal(false);
           }}
         />
       )}

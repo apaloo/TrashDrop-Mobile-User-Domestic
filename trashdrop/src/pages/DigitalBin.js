@@ -792,6 +792,7 @@ function DigitalBin() {
       
       debug.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
       debug.log('[DigitalBin] Bag count being sent:', bagCount, '(from numberOfBags:', formData.numberOfBags, 'or bag_count:', formData.bag_count, ')');
+      debug.log('[DigitalBin] Status being sent:', digitalBinData.status);
       
       const { data: binData, error: binError} = await supabase
         .from('digital_bins')

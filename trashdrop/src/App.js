@@ -53,25 +53,10 @@ import './utils/networkTest.js';
 
 // Dynamic imports for lazy loading (moved after all imports)
 const importDebugConfig = () => import('./components/DebugConfig.js');
-const importTestPickupFlow = () => import('./tests/TestPickupFlow.js');
-const importCollectionTestFlow = () => import('./tests/CollectionTestFlow.js');
-const importCollectionFlowTest = () => import('./tests/CollectionFlowTest.js');
 
 // Lazy load components using the dynamic imports
 const DebugConfig = process.env.NODE_ENV === 'development' 
   ? React.lazy(importDebugConfig) 
-  : () => null;
-
-const TestPickupFlow = process.env.NODE_ENV === 'development'
-  ? React.lazy(importTestPickupFlow)
-  : () => null;
-
-const CollectionTestFlow = process.env.NODE_ENV === 'development'
-  ? React.lazy(importCollectionTestFlow)
-  : () => null;
-
-const CollectionFlowTest = process.env.NODE_ENV === 'development'
-  ? React.lazy(importCollectionFlowTest)
   : () => null;
 
 // Initialize the theme
@@ -256,21 +241,6 @@ const AppContent = () => {
           <Route path="/network-test" element={
             <PrivateRoute>
               <NetworkTest />
-            </PrivateRoute>
-          } />
-          <Route path="/test-pickup" element={
-            <PrivateRoute>
-              <TestPickupFlow />
-            </PrivateRoute>
-          } />
-          <Route path="/test-collection" element={
-            <PrivateRoute>
-              <CollectionTestFlow />
-            </PrivateRoute>
-          } />
-          <Route path="/test-collection-flow" element={
-            <PrivateRoute>
-              <CollectionFlowTest />
             </PrivateRoute>
           } />
         </Route>

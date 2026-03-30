@@ -100,6 +100,9 @@ try {
   
   logAppDebug("React render complete");
   
+  // Mark app as loaded for theme context
+  document.documentElement.classList.add('app-loaded');
+  
   // Track successful render
   if (window.appState) {
     window.appState.reactRendered = true;

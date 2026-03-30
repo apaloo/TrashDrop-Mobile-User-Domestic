@@ -43,105 +43,53 @@ export const ThemeProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Load theme when user ID changes
-    // Check if running in standalone PWA mode
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                        window.navigator.standalone === true;
+    // Load theme when user ID changes - simplified version
+    if (!userId) return;
     
-    let retryCount = 0;
-    const MAX_RETRIES = 30; // Max 3 seconds wait (30 * 100ms)
+    // Prevent multiple simultaneous loads
+    if (isInitialized) return;
     
     const loadTheme = async () => {
-      console.log('[ThemeContext] loadTheme triggered, userId:', userId, 'standalone:', isStandalone, 'retry:', retryCount);
+      console.log('[ThemeContext] Loading theme for user:', userId);
       
-      // In standalone mode, skip the app-loaded check entirely
-      if (!isStandalone) {
-        // Wait for app to be loaded, but with a maximum retry limit (browser mode only)
-        if (!document.documentElement.classList.contains('app-loaded')) {
-          if (retryCount < MAX_RETRIES) {
-            console.log('[ThemeContext] App not loaded yet, waiting... (attempt', retryCount + 1, 'of', MAX_RETRIES, ')');
-            retryCount++;
-            setTimeout(() => loadTheme(), 100);
-            return;
-          } else {
-            console.warn('[ThemeContext] Max retries reached, proceeding with theme load anyway');
+      let themeToApply = 'light'; // Default theme
+      
+      try {
+        // Try to load from database first
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('dark_mode')
+            .eq('id', userId)
+            .maybeSingle();
+          
+          if (!error && profileData) {
+            themeToApply = profileData.dark_mode ? 'dark' : 'light';
+            console.log('[ThemeContext] Theme from database:', themeToApply);
           }
         }
-      } else {
-        console.log('[ThemeContext] Running in standalone mode - skipping app-loaded check, loading immediately');
+      } catch (error) {
+        console.error('[ThemeContext] Database query failed:', error);
       }
       
-      let themeToApply = 'light';
-      
-      // Try to load from database first if user is logged in
-      if (userId) {
-        try {
-          console.log('[ThemeContext] Loading theme from database for user:', userId);
-          
-          // Check if we have a valid session before querying database
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (!session) {
-            console.warn('[ThemeContext] No active session, skipping database query');
-            // Fall through to localStorage
-          } else {
-            // Add timeout protection for database query (max 3 seconds in standalone, 5 seconds in browser)
-            const timeoutDuration = isStandalone ? 3000 : 5000;
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Database query timeout')), timeoutDuration)
-            );
-            
-            const queryPromise = supabase
-              .from('profiles')
-              .select('dark_mode')
-              .eq('id', userId)
-              .maybeSingle();
-            
-            const { data: profileData, error } = await Promise.race([
-              queryPromise,
-              timeoutPromise
-            ]);
-            
-            if (!error && profileData) {
-              themeToApply = profileData.dark_mode ? 'dark' : 'light';
-              console.log('[ThemeContext] Loaded theme from database:', themeToApply);
-            } else {
-              console.log('[ThemeContext] No theme in database, using fallback');
-            }
-          }
-        } catch (error) {
-          console.error('[ThemeContext] Error loading theme from database:', error);
-          console.warn('[ThemeContext] Falling back to localStorage due to database error');
-          // Continue with localStorage fallback below
-        }
-      }
-      
-      // Fallback to localStorage if no database theme or no user
-      if (!userId || themeToApply === 'light') {
+      // Fallback to localStorage if database query failed or returned no data
+      if (themeToApply === 'light') {
         const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
         if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
           themeToApply = savedTheme;
-          console.log('[ThemeContext] Loaded theme from localStorage:', themeToApply);
-        } else {
-          // Always default to light theme to prevent dark screen issues
-          themeToApply = 'light';
-          console.log('[ThemeContext] Using default light theme');
+          console.log('[ThemeContext] Theme from localStorage:', themeToApply);
         }
       }
       
-      // CRITICAL: In standalone mode on relaunch, ensure we don't hang
-      // Force light theme if initialization takes too long
-      if (isStandalone) {
-        console.log('[ThemeContext] Standalone relaunch - ensuring theme is set immediately');
-      }
-      
-      console.log('[ThemeContext] Final theme to apply:', themeToApply);
+      console.log('[ThemeContext] Final theme applied:', themeToApply);
       setTheme(themeToApply);
       setIsInitialized(true);
     };
     
     loadTheme();
-  }, [userId]);
+  }, [userId]); // Only depend on userId
 
   useEffect(() => {
     // Only apply theme after initialization

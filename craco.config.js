@@ -5,7 +5,7 @@ module.exports = {
       webpackConfig.resolve = {
         ...webpackConfig.resolve,
         extensions: ['.js', '.jsx', '.json'],
-        modules: ['node_modules', 'src']
+        modules: ['node_modules', 'trashdrop/src']
       };
 
       // Ensure proper module handling

@@ -375,3 +375,117 @@ BEGIN
   RETURN deleted_count;
 END;
 $$;
+
+-- 8. CHECK ONBOARDING COMPLETION STATUS
+CREATE OR REPLACE FUNCTION check_onboarding_completion(user_uuid UUID)
+RETURNS JSON AS $$
+DECLARE
+  onboarding_started BOOLEAN := FALSE;
+  has_bags_selected BOOLEAN := FALSE;
+  location_added BOOLEAN := FALSE;
+  qr_scanned BOOLEAN := FALSE;
+  digital_bin_created BOOLEAN := FALSE;
+  pickup_requested BOOLEAN := FALSE;
+  completion_percentage NUMERIC := 0;
+  is_complete BOOLEAN := FALSE;
+  next_required_step TEXT;
+BEGIN
+  -- Check if onboarding was started
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid AND activity_type = 'onboarding_started'
+  ) INTO onboarding_started;
+  
+  -- Check if bags selection was made
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid AND activity_type IN ('has_bags_true', 'has_bags_false')
+  ) INTO has_bags_selected;
+  
+  -- Check if location was added
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid AND activity_type = 'location_added'
+  ) INTO location_added;
+  
+  -- Check if QR was scanned (through qr_scan activity or having batches)
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid AND activity_type = 'qr_scan'
+  ) INTO qr_scanned;
+  
+  -- If no QR scan activity, check if user has batches
+  IF NOT qr_scanned THEN
+    SELECT EXISTS(
+      SELECT 1 FROM batches 
+      WHERE created_by = user_uuid AND status = 'active'
+    ) INTO qr_scanned;
+  END IF;
+  
+  -- Check if digital bin was created
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid AND activity_type = 'digital_bin_requested'
+  ) INTO digital_bin_created;
+  
+  -- Check if pickup was requested
+  SELECT EXISTS(
+    SELECT 1 FROM user_activity 
+    WHERE user_id = user_uuid AND activity_type = 'pickup_requested'
+  ) INTO pickup_requested;
+  
+  -- Calculate completion percentage
+  completion_percentage := 
+    (CASE WHEN onboarding_started THEN 20 ELSE 0 END) +
+    (CASE WHEN has_bags_selected THEN 20 ELSE 0 END) +
+    (CASE WHEN location_added THEN 20 ELSE 0 END) +
+    (CASE WHEN qr_scanned THEN 20 ELSE 0 END) +
+    (CASE WHEN digital_bin_created OR pickup_requested THEN 20 ELSE 0 END);
+  
+  -- Determine if onboarding is complete
+  is_complete := onboarding_started AND 
+                has_bags_selected AND 
+                location_added AND 
+                (qr_scanned OR (NOT has_bags_selected AND (digital_bin_created OR pickup_requested)));
+  
+  -- Determine next required step
+  IF NOT onboarding_started THEN
+    next_required_step := 'start_onboarding';
+  ELSIF NOT has_bags_selected THEN
+    next_required_step := 'select_bags';
+  ELSIF NOT location_added THEN
+    next_required_step := 'add_location';
+  ELSIF has_bags_selected AND NOT qr_scanned THEN
+    next_required_step := 'scan_qr';
+  ELSIF NOT has_bags_selected AND NOT digital_bin_created AND NOT pickup_requested THEN
+    next_required_step := 'choose_service';
+  ELSE
+    next_required_step := 'complete';
+  END IF;
+  
+  RETURN JSON_BUILD_OBJECT(
+    'is_complete', is_complete,
+    'completion_percentage', completion_percentage,
+    'next_required_step', next_required_step,
+    'onboarding_started', onboarding_started,
+    'has_bags_selected', has_bags_selected,
+    'location_added', location_added,
+    'qr_scanned', qr_scanned,
+    'digital_bin_created', digital_bin_created,
+    'pickup_requested', pickup_requested
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant permission to authenticated users
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.role_usage_grants 
+    WHERE grantee = 'authenticated' 
+    AND object_schema = 'public' 
+    AND object_name = 'check_onboarding_completion'
+  ) THEN
+    GRANT EXECUTE ON FUNCTION check_onboarding_completion TO authenticated;
+  END IF;
+END $$;
