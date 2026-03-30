@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner.js';
 import appConfig from '../utils/app-config.js';
 import GeolocationService from '../utils/geolocationService.js';
 import { subscribeToStatsUpdates } from '../utils/realtime.js';
+import { userServiceOptimized } from '../services/userServiceOptimized.js';
 
 // Component to handle map view updates when position changes
 const MapViewController = ({ position }) => {
@@ -291,39 +292,26 @@ const PickupRequest = () => {
     // Only watch for changes to savedLocationId and savedLocations
   }, [formData.savedLocationId, savedLocations]);
 
-  // Fetch user stats to check available bags
+  // Fetch user stats to check available bags using the same optimized service as dashboard
   useEffect(() => {
     const fetchUserStats = async () => {
       if (user && user.id) {
         try {
-          const { data: statsData, error: statsError } = await supabase
-            .from('user_stats')
-            .select('*')
-            .eq('user_id', user.id)
-            .maybeSingle();
+          // Use the same optimized service as dashboard for consistency
+          const { data: statsData, error: statsError } = await userServiceOptimized.getUserStatsOptimized(user.id);
             
           if (statsError) throw statsError;
           
           if (statsData) {
             console.log('[PickupRequest] fetchUserStats loaded', statsData);
-            const scannedLen = Array.isArray(statsData.scanned_batches) ? statsData.scanned_batches.length : undefined;
-            const totalBagsVal = (statsData.available_bags !== undefined)
-              ? statsData.available_bags
-              : ((statsData.total_bags !== undefined)
-                  ? statsData.total_bags
-                  : (statsData.total_bags_scanned !== undefined ? statsData.total_bags_scanned : (scannedLen !== undefined ? scannedLen : 0)));
-            const totalBatchesVal = (statsData.total_batches !== undefined)
-              ? statsData.total_batches
-              : (scannedLen !== undefined ? scannedLen : 0);
-
-            const mergedTotalBags = (statsData.total_bags !== undefined)
-              ? statsData.total_bags
-              : (scannedLen !== undefined ? scannedLen : 0);
+            // userServiceOptimized returns a different structure: totalBags, batches, etc.
+            const totalBagsVal = statsData.totalBags || 0;
+            const totalBatchesVal = statsData.batches || 0;
 
             // Avoid clobbering optimistic increases from 'trashdrop:bags-updated'
             setUserStats(prev => {
-              const next = { totalBags: mergedTotalBags, batches: totalBatchesVal };
-              setInsufficientBags(mergedTotalBags <= 0);
+              const next = { totalBags: totalBagsVal, batches: totalBatchesVal };
+              setInsufficientBags(totalBagsVal <= 0);
               return next;
             });
           }
@@ -342,13 +330,13 @@ const PickupRequest = () => {
       if (!user || !user.id) return;
       
       try {
-        // Fetch all active pickup requests (available, pending, scheduled, accepted, in_transit)
-        // Exclude: completed, cancelled, disposed
+        // Fetch all active pickup requests (pending, accepted, en_route)
+        // Exclude: completed, cancelled
         const { data: pickupsData, error: pickupsError } = await supabase
           .from('pickup_requests')
           .select('bag_count')
           .eq('user_id', user.id)
-          .in('status', ['available', 'pending', 'scheduled', 'accepted', 'in_transit']);
+          .in('status', ['pending', 'accepted', 'en_route']);
         
         if (pickupsError) throw pickupsError;
         
@@ -548,7 +536,7 @@ const PickupRequest = () => {
         .rpc('create_pickup_request', {
           p_id: pickupId,
           p_user_id: user.id,
-          p_status: 'available',
+          p_status: 'pending',
           p_bag_count: Number(values.numberOfBags),
           p_waste_type: values.wasteType,
           p_special_instructions: values.notes || '',
