@@ -1441,45 +1441,79 @@ const Dashboard = () => {
 
         {/* Active Pickup Card */}
         {activePickups && activePickups.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6 mt-6">
-            <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold mb-4">
-              {activePickups[0].is_digital_bin ? 'Active Digital Bin' : 'Active Pickup'}
-            </h3>
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden mt-6">
+            {/* Card Header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-gray-50 dark:bg-gray-700/60">
+              <h3 className="text-gray-900 dark:text-gray-100 text-base font-bold">
+                {activePickups[0].is_digital_bin ? 'Active Digital Bin' : 'Active Pickup'}
+              </h3>
+              <span 
+                className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+                style={{ 
+                  backgroundColor: statusService.getStatusConfig(activePickups[0].status).color + '20', 
+                  color: statusService.getStatusConfig(activePickups[0].status).color 
+                }}
+              >
+                {statusService.getStatusIcon(activePickups[0].status)}
+                {statusService.getStatusDisplay(activePickups[0].status)}
+              </span>
+            </div>
+
+            {/* Card Body */}
+            <div className="px-5 py-4 space-y-3">
+              {/* Row 1: Collector + Bags/Points */}
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Status: 
-                    <span 
-                      className="ml-1 px-2 py-1 rounded-full text-xs font-medium"
-                      style={{ 
-                        backgroundColor: statusService.getStatusConfig(activePickups[0].status).color + '20', 
-                        color: statusService.getStatusConfig(activePickups[0].status).color 
-                      }}
-                    >
-                      <span className="mr-1">{statusService.getStatusIcon(activePickups[0].status)}</span>
-                      {statusService.getStatusDisplay(activePickups[0].status)}
-                    </span>
-                  </p>
-                  {activePickups[0].is_digital_bin && activePickups[0].frequency && (
-                    <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2 py-1 rounded">
-                      {activePickups[0].frequency}
-                    </span>
-                  )}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Collector</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                      {activePickups[0].collector_name || (activePickups[0].collector ? `${activePickups[0].collector.first_name || ''} ${activePickups[0].collector.last_name || ''}`.trim() : null) || 'Waiting...'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Collector: {activePickups[0].collector_name || (activePickups[0].collector ? `${activePickups[0].collector.first_name || ''} ${activePickups[0].collector.last_name || ''}`.trim() : null) || 'Waiting...'}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Location: {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-900 dark:text-gray-100">{activePickups[0].bag_count || activePickups[0].number_of_bags} bags</p>
-                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">+{activePickups[0].points_earned || activePickups[0].points || 0} pts</p>
+                <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                  <div className="text-center px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                    <p className="text-base font-bold text-gray-900 dark:text-gray-100">{activePickups[0].bag_count || activePickups[0].number_of_bags || 0}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Bags</p>
+                  </div>
+                  <div className="text-center px-3 py-1 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                    <p className="text-base font-bold text-green-600 dark:text-green-400">+{activePickups[0].points_earned || activePickups[0].points || 0}</p>
+                    <p className="text-[10px] text-green-600 dark:text-green-400 uppercase tracking-wide">Pts</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Row 2: Location */}
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Pickup Location</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
+                    {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Digital bin frequency badge */}
+              {activePickups[0].is_digital_bin && activePickups[0].frequency && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2.5 py-1 rounded-full font-medium">
+                    {activePickups[0].frequency}
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="mt-4">
+            <div className="px-5 pb-4">
               {/* Action Buttons - Using unified status service */}
               {(() => {
                 const availableActions = statusService.getAvailableActions(activePickups[0].status);
