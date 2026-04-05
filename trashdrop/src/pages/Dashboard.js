@@ -1131,6 +1131,19 @@ const Dashboard = () => {
     );
   }, [recentActivities, isRefreshingActivities]); // Re-render when activities change or refresh state changes
 
+  // Auto-switch tab based on active pickup state
+  useEffect(() => {
+    const collectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
+    if (collectorAssigned) {
+      setDashboardTab('pickup');
+    } else {
+      setDashboardTab('activity');
+    }
+  }, [activePickups]);
+
+  // Calculate hasCollectorAssigned for rendering
+  const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
+
   // Early return if user is not loaded yet (after all hooks)
   if (!user?.id) {
     return <DashboardSkeleton />;
@@ -1164,19 +1177,6 @@ const Dashboard = () => {
   const handleOnboardingClose = () => {
     setShowOnboarding(false);
   };
-
-  // Auto-switch tab based on active pickup state
-  useEffect(() => {
-    const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
-    if (hasCollectorAssigned) {
-      setDashboardTab('pickup');
-    } else {
-      setDashboardTab('activity');
-    }
-  }, [activePickups]);
-
-  // Calculate hasCollectorAssigned for rendering
-  const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
 
   return (
     <div className="bg-white dark:bg-gray-900">
