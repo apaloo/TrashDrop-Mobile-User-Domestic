@@ -1166,14 +1166,17 @@ const Dashboard = () => {
   };
 
   // Auto-switch tab based on active pickup state
-  const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0].status !== 'pending';
   useEffect(() => {
+    const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
     if (hasCollectorAssigned) {
       setDashboardTab('pickup');
     } else {
       setDashboardTab('activity');
     }
-  }, [hasCollectorAssigned]);
+  }, [activePickups]);
+
+  // Calculate hasCollectorAssigned for rendering
+  const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
 
   return (
     <div className="bg-white dark:bg-gray-900">
