@@ -87,6 +87,7 @@ const Dashboard = () => {
   });
   const [recentActivities, setRecentActivities] = useState([]); // Always initialize as empty array
   const [activePickups, setActivePickups] = useState([]);
+  const [dashboardTab, setDashboardTab] = useState('activity'); // 'activity' | 'pickup'
   const [isLoading, setIsLoading] = useState(false); // Start with false to improve LCP
   const [isRefreshingActivities, setIsRefreshingActivities] = useState(false); // Track activity refresh state
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
@@ -1164,6 +1165,16 @@ const Dashboard = () => {
     setShowOnboarding(false);
   };
 
+  // Auto-switch tab based on active pickup state
+  const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0].status !== 'pending';
+  useEffect(() => {
+    if (hasCollectorAssigned) {
+      setDashboardTab('pickup');
+    } else {
+      setDashboardTab('activity');
+    }
+  }, [hasCollectorAssigned]);
+
   return (
     <div className="bg-white dark:bg-gray-900">
       {/* Data Freshness Indicator */}
@@ -1415,9 +1426,42 @@ const Dashboard = () => {
           </div>
         </div>
 
-      {/* Scrollable Content - Recent Activity and Active Pickup */}
-      <div className="px-4 pb-4 space-y-6" style={{marginTop: "325px" }}>
-        {/* Recent Activity */}
+      {/* Segmented Control - Only visible when active pickup with collector */}
+      {hasCollectorAssigned && (
+        <div className="px-4 pb-3" style={{position: "fixed", top: "380px", width: "96%", zIndex: 10, backgroundColor: "inherit"}}>
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1 flex">
+            <button
+              onClick={() => setDashboardTab('activity')}
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all duration-200 ${
+                dashboardTab === 'activity'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              Recent Activity
+            </button>
+            <button
+              onClick={() => setDashboardTab('pickup')}
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                dashboardTab === 'pickup'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              Active Pickup
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scrollable Content - Tab-based: Recent Activity or Active Pickup */}
+      <div className="px-4 pb-4 space-y-6" style={{marginTop: hasCollectorAssigned ? "375px" : "325px" }}>
+        {/* Recent Activity - shown when activity tab selected or no active pickup */}
+        {dashboardTab === 'activity' && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
@@ -1438,9 +1482,10 @@ const Dashboard = () => {
           </div>
           {ActivitySection}
         </div>
+        )}
 
-        {/* Active Pickup Card */}
-        {activePickups && activePickups.length > 0 && (
+        {/* Active Pickup Card - shown when pickup tab selected */}
+        {dashboardTab === 'pickup' && activePickups && activePickups.length > 0 && (
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden mt-6">
             {/* Card Header */}
             <div className="flex items-center justify-between px-5 py-3 bg-gray-50 dark:bg-gray-700/60">

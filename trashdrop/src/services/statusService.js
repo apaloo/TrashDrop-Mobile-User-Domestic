@@ -25,7 +25,7 @@ export const PICKUP_STATES = {
     next: ['en_route', 'cancelled'],
     notifications: { toast: true, alert: true, push: true },
     actions: ['track', 'cancel'],
-    tracking: false,
+    tracking: true,
     showCollectorInfo: true
   },
   en_route: {
