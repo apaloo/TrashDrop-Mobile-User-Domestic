@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BatchQRScanner from '../components/BatchQRScanner.js';
 
@@ -10,20 +10,27 @@ const QRScanner = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const autoStart = searchParams.get('auto_start') === 'true';
+  const source = searchParams.get('source');
+  const isOnboarding = source === 'onboarding';
+
+  // Store batch details so we can show them before navigating back
+  const [scannedBatch, setScannedBatch] = useState(null);
 
   const handleScanComplete = (batchDetails) => {
     console.log('Batch scanned successfully:', batchDetails);
     
-    // Check if we came from onboarding
-    const source = searchParams.get('source');
-    if (source === 'onboarding') {
-      // For onboarding, we need to return to dashboard with QR code info
-      // The onboarding flow will handle the QR code processing
-      navigate('/dashboard?source=onboarding&action=qr-scanned&qr_code=' + (batchDetails.batchId || 'scanned'));
-    } else {
-      // Normal flow - navigate to dashboard
-      navigate('/dashboard');
+    if (isOnboarding) {
+      // Store details — let BatchQRScanner show its result card first
+      // User will tap "Continue Setup" to go back to onboarding
+      setScannedBatch(batchDetails);
     }
+    // Normal flow: stay on scan page so user can see the batch details card
+  };
+
+  const handleContinueOnboarding = () => {
+    const batchId = scannedBatch?.batch_id || scannedBatch?.batchId || 'scanned';
+    const bagCount = scannedBatch?.bag_count || scannedBatch?.bags_added || scannedBatch?.total_bags_count || 0;
+    navigate(`/dashboard?source=onboarding&action=qr-scanned&qr_code=${batchId}&bag_count=${bagCount}`);
   };
 
   return (
@@ -39,6 +46,18 @@ const QRScanner = () => {
       <div className="px-6 py-4">
         <BatchQRScanner onScanComplete={handleScanComplete} autoStart={autoStart} />
       </div>
+
+      {/* Continue Setup button — visible after scan when coming from onboarding */}
+      {isOnboarding && scannedBatch && (
+        <div className="px-6 pb-4">
+          <button
+            onClick={handleContinueOnboarding}
+            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors text-lg"
+          >
+            Continue Setup
+          </button>
+        </div>
+      )}
 
       {/* How to Use Section */}
       <div className="px-6 py-4">
