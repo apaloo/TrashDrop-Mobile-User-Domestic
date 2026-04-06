@@ -3,13 +3,14 @@
  * Implements the complete onboarding experience using existing infrastructure
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import onboardingService from '../services/onboardingService.js';
+import batchService from '../services/batchService.js';
 import supabase from '../utils/supabaseClient.js';
 
-const OnboardingFlow = ({ onComplete, onClose }) => {
+const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -51,11 +52,21 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
   const [location, setLocation] = useState(null);
   const [qrCode, setQrCode] = useState('');
   const [selectedService, setSelectedService] = useState(null);
+  const [scanBatchDetails, setScanBatchDetails] = useState(null);
+
+  // Guard ref to prevent double initialization from auth re-renders
+  const initDoneRef = useRef(false);
 
   // Initialize onboarding
   useEffect(() => {
     const initializeOnboarding = async () => {
       if (!user?.id) return;
+      
+      // Prevent double initialization (auth state changes cause re-renders)
+      if (initDoneRef.current) {
+        console.log('[Onboarding] Init already completed, skipping duplicate');
+        return;
+      }
       
       // Don't reset progress if user has already advanced in the flow
       const hasAdvancedProgress = Object.values(progressMilestones).some(milestone => milestone === true);
@@ -67,11 +78,37 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       try {
         setIsLoading(true);
         
-        // Check if user is returning from location setup (check first!)
-        const locationSaved = localStorage.getItem('trashdrop_location_saved');
-        console.log('[Onboarding] DEBUG: Checking locationSaved flag:', locationSaved);
+        // Check if user is returning from QR scanner (check first!)
+        const qrScanned = localStorage.getItem('trashdrop_qr_scanned');
+        console.log('[Onboarding] DEBUG: Checking qrScanned flag:', qrScanned);
         console.log('[Onboarding] DEBUG: Current URL:', window.location.href);
         console.log('[Onboarding] DEBUG: User ID:', user?.id);
+        
+        if (qrScanned === 'true') {
+          // User just scanned a QR code — show batch details before request_pickup
+          localStorage.removeItem('trashdrop_qr_scanned');
+          const batchId = localStorage.getItem('trashdrop_qr_batch_id') || '';
+          const bagCount = localStorage.getItem('trashdrop_qr_bag_count') || '0';
+          localStorage.removeItem('trashdrop_qr_batch_id');
+          localStorage.removeItem('trashdrop_qr_bag_count');
+          console.log('[Onboarding] QR scan completed, showing scan result:', { batchId, bagCount });
+          setScanBatchDetails({ batchId, bagCount: Number(bagCount) });
+          setProgressMilestones(prev => ({
+            ...prev,
+            welcomeComplete: true,
+            hasBagsSelected: true,
+            locationSet: true,
+            qrScanned: true
+          }));
+          setHasBags(true);
+          setCurrentStep('scan_result');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Check if user is returning from location setup
+        const locationSaved = localStorage.getItem('trashdrop_location_saved');
+        console.log('[Onboarding] DEBUG: Checking locationSaved flag:', locationSaved);
         
         if (locationSaved === 'true') {
           // User just saved a location, continue to next step
@@ -132,36 +169,54 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
             }
           }
         } else {
-          // Normal flow - use comprehensive completion status to determine starting step
-          console.log('[Onboarding] Using completion-based step determination');
-          
-          try {
-            const startingStep = await onboardingService.getStartingStep(user.id);
-            console.log('[Onboarding] Determined starting step:', startingStep);
+          // Normal flow - use initialStep prop if provided (from Dashboard consolidated check)
+          if (initialStep) {
+            console.log('[Onboarding] Using initialStep from Dashboard prop:', initialStep);
             
-            // Check if force parameter is being used
-            const urlParams = new URLSearchParams(window.location.search);
-            const forceParam = urlParams.get('force');
-            
-            // Set the current step based on completion status
-            setCurrentStep(startingStep);
-            
-            // If starting step is success, check if we should force onboarding
-            if (startingStep === 'success' && !forceParam) {
-              console.log('[Onboarding] User has completed onboarding, dismissing');
-              if (user?.id) {
-                onboardingService.dismissOnboarding(user.id);
-              }
+            if (initialStep === 'success') {
+              // Should not happen (Dashboard wouldn't show modal), but handle gracefully
+              console.log('[Onboarding] initialStep is success, dismissing');
+              if (user?.id) onboardingService.dismissOnboarding(user.id);
               onComplete();
               return;
-            } else if (startingStep === 'success' && forceParam) {
-              console.log('[Onboarding] User completed onboarding but force parameter detected, starting from welcome');
+            }
+            
+            // If initialStep is scan_result, populate batch details from localStorage
+            if (initialStep === 'scan_result') {
+              const batchId = localStorage.getItem('trashdrop_qr_batch_id') || '';
+              const bagCount = localStorage.getItem('trashdrop_qr_bag_count') || '0';
+              localStorage.removeItem('trashdrop_qr_batch_id');
+              localStorage.removeItem('trashdrop_qr_bag_count');
+              setScanBatchDetails({ batchId, bagCount: Number(bagCount) });
+            }
+            
+            setCurrentStep(initialStep);
+          } else {
+            // Fallback: determine step via RPC (e.g. when opened via URL params without consolidated check)
+            console.log('[Onboarding] No initialStep prop, using getStartingStep RPC');
+            
+            try {
+              const startingStep = await onboardingService.getStartingStep(user.id);
+              console.log('[Onboarding] Determined starting step:', startingStep);
+              
+              const urlParams = new URLSearchParams(window.location.search);
+              const forceParam = urlParams.get('force');
+              
+              setCurrentStep(startingStep);
+              
+              if (startingStep === 'success' && !forceParam) {
+                console.log('[Onboarding] User has completed onboarding, dismissing');
+                if (user?.id) onboardingService.dismissOnboarding(user.id);
+                onComplete();
+                return;
+              } else if (startingStep === 'success' && forceParam) {
+                console.log('[Onboarding] Force detected, starting from welcome');
+                setCurrentStep('welcome');
+              }
+            } catch (error) {
+              console.error('[Onboarding] Error determining starting step:', error);
               setCurrentStep('welcome');
             }
-          } catch (error) {
-            console.error('[Onboarding] Error determining starting step:', error);
-            // Fallback to welcome
-            setCurrentStep('welcome');
           }
         }
         
@@ -169,6 +224,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         console.error('[Onboarding] Initialization error:', error);
         setError('Failed to initialize onboarding');
       } finally {
+        initDoneRef.current = true;
         setIsLoading(false);
       }
     };
@@ -252,20 +308,36 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
       // Mark milestone
       setProgressMilestones(prev => ({ ...prev, hasCompletedQR: true }));
       
-      const result = await onboardingService.processQRScan(user.id, scannedCode);
+      // Use batchService (same path as BatchQRScanner) so stats refresh
+      // and cache invalidation work correctly
+      console.log('[Onboarding] Manual QR entry — activating via batchService:', scannedCode);
+      const result = await batchService.verifyBatchAndUpdateUser(scannedCode, user.id);
       
       if (result.error) {
-        setError('Invalid QR code. Please try again.');
-        setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false })); // Reset on error
+        setError(result.error.message || 'Invalid QR code. Please try again.');
+        setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false }));
         return;
       }
       
-      setCurrentStep('request_pickup');
+      const bagCount = result.data?.bag_count || result.data?.bags_added || 0;
+      
+      // Dispatch cache invalidation event (same as BatchQRScanner)
+      if (!result.data?.alreadyActivated && bagCount > 0) {
+        try {
+          window.dispatchEvent(new CustomEvent('trashdrop:bags-updated', {
+            detail: { userId: user.id, deltaBags: bagCount, source: 'onboarding-manual' }
+          }));
+        } catch (_) {}
+      }
+      
+      // Show scan result step with batch details (matches button flow)
+      setScanBatchDetails({ batchId: result.data?.batch_id || scannedCode, bagCount });
+      setCurrentStep('scan_result');
       
     } catch (error) {
       console.error('[Onboarding] Error processing QR:', error);
       setError('Failed to process QR code');
-      setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false })); // Reset on error
+      setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false }));
     } finally {
       setIsLoading(false);
     }
@@ -387,6 +459,9 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
         
       case 'scan_qr':
         return <QRScanStep onScanComplete={handleQRScan} isLoading={isLoading} />;
+
+      case 'scan_result':
+        return <ScanResultStep batchDetails={scanBatchDetails} onContinue={() => setCurrentStep('request_pickup')} isLoading={isLoading} />;
         
       case 'digital_bin':
         return <DigitalBinStep onBinCreate={handleDigitalBinCreation} isLoading={isLoading} />;
@@ -460,7 +535,7 @@ const OnboardingFlow = ({ onComplete, onClose }) => {
                   ['location'].includes(currentStep) ? 'bg-blue-600' : 'bg-gray-200'
                 }`} />
                 <div className={`flex-1 h-2 rounded-full ${
-                  ['scan_qr', 'digital_bin'].includes(currentStep) ? 'bg-blue-600' : 'bg-gray-200'
+                  ['scan_qr', 'scan_result', 'digital_bin'].includes(currentStep) ? 'bg-blue-600' : 'bg-gray-200'
                 }`} />
                 <div className={`flex-1 h-2 rounded-full ml-1 ${
                   ['request_pickup', 'success'].includes(currentStep) ? 'bg-blue-600' : 'bg-gray-200'
@@ -692,6 +767,44 @@ const DigitalBinStep = ({ onBinCreate, isLoading }) => {
     </div>
   );
 };
+
+const ScanResultStep = ({ batchDetails, onContinue, isLoading }) => (
+  <div className="antialiased">
+    <div className="text-center mb-4">
+      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <span className="text-3xl">✅</span>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 antialiased">Batch Scanned Successfully!</h3>
+    </div>
+    
+    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+      <div className="space-y-2">
+        {batchDetails?.batchId && batchDetails.batchId !== 'scanned' && (
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600 antialiased">Batch ID:</span>
+            <span className="text-sm font-mono text-gray-900 antialiased">{batchDetails.batchId.substring(0, 8)}...</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-sm text-gray-600 antialiased">Total Bags:</span>
+          <span className="text-lg font-bold text-green-700 antialiased">{batchDetails?.bagCount || 0}</span>
+        </div>
+      </div>
+    </div>
+
+    <p className="text-gray-600 text-center mb-4 antialiased leading-relaxed">
+      Your bags have been loaded. You can now request a pickup!
+    </p>
+    
+    <button
+      onClick={onContinue}
+      disabled={isLoading}
+      className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium antialiased"
+    >
+      Continue to Request Pickup
+    </button>
+  </div>
+);
 
 const PickupRequestStep = ({ onPickupRequest, isLoading }) => (
   <div className="text-center">
