@@ -6,6 +6,7 @@
 
 import seamlessCache from '../utils/seamlessCache.js';
 import userServiceOptimized from './userServiceOptimized.js';
+import requestDeduplicator from '../utils/requestDeduplication.js';
 import supabase from '../utils/supabaseClient.js';
 
 class SeamlessDashboardService {
@@ -306,22 +307,38 @@ class SeamlessDashboardService {
    * Setup optimistic update handlers for real-time events
    */
   setupOptimisticHandlers() {
-    // Listen for local activity events
-    if (typeof window !== 'undefined') {
-      window.addEventListener('trashdrop:activity-updated', async (event) => {
-        const { userId, activity } = event.detail || {};
-        if (userId && activity) {
-          await this.optimisticAddActivity(userId, activity);
-        }
-      });
-      
-      window.addEventListener('trashdrop:bags-updated', async (event) => {
-        const { userId, deltaBags } = event.detail || {};
-        if (userId) {
-          await this.optimisticUpdateStats(userId, 'qr_scan', { bag_count: deltaBags });
-        }
-      });
+    if (typeof window === 'undefined') return;
+
+    // Remove any previous listeners (prevents HMR duplicates)
+    if (SeamlessDashboardService._activityHandler) {
+      window.removeEventListener('trashdrop:activity-updated', SeamlessDashboardService._activityHandler);
     }
+    if (SeamlessDashboardService._bagsHandler) {
+      window.removeEventListener('trashdrop:bags-updated', SeamlessDashboardService._bagsHandler);
+    }
+
+    // Create named handlers stored on the class so they can be removed later
+    SeamlessDashboardService._activityHandler = async (event) => {
+      const { userId, activity } = event.detail || {};
+      if (userId && activity) {
+        await this.optimisticAddActivity(userId, activity);
+      }
+    };
+
+    SeamlessDashboardService._bagsHandler = async (event) => {
+      const { userId } = event.detail || {};
+      if (userId) {
+        // RPC already recalculated user_stats from actual batch data (COUNT/SUM).
+        // Optimistic +1/+bags is always wrong because the RPC recalculates from scratch.
+        // Just invalidate caches so dashboard fetches fresh data on next mount.
+        seamlessCache.invalidate(this.cacheKeys.stats(userId));
+        requestDeduplicator.clearCache('getUserStats');
+        console.log('[SeamlessDashboard] 🔄 Caches invalidated after batch scan — fresh fetch on next load');
+      }
+    };
+
+    window.addEventListener('trashdrop:activity-updated', SeamlessDashboardService._activityHandler);
+    window.addEventListener('trashdrop:bags-updated', SeamlessDashboardService._bagsHandler);
   }
 
   /**

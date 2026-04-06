@@ -37,8 +37,42 @@ export const userServiceOptimized = {
         }
 
         if (!data) {
-          console.log('[UserServiceOptimized] No stats found for user:', userId, 'Creating default stats');
-          // Return default stats for new users
+          console.log('[UserServiceOptimized] No stats from view for user:', userId, '— trying direct user_stats table');
+          // View may return nothing if profiles row is missing; query user_stats directly
+          try {
+            const { data: directStats } = await supabase
+              .from('user_stats')
+              .select('*')
+              .eq('user_id', userId)
+              .maybeSingle();
+            if (directStats) {
+              console.log('[UserServiceOptimized] Found direct user_stats:', directStats);
+              return {
+                data: {
+                  points: 0,
+                  pickups: 0,
+                  reports: 0,
+                  batches: directStats.total_batches || 0,
+                  totalBags: directStats.total_bags || directStats.available_bags || 0,
+                  available_bags: directStats.available_bags || 0,
+                  level: 'Eco Starter',
+                  email: '',
+                  firstName: '',
+                  lastName: '',
+                  avatar: '',
+                  last_updated: directStats.created_at || new Date().toISOString(),
+                  _source: 'direct_user_stats',
+                  _query_count: 2
+                },
+                error: null
+              };
+            }
+          } catch (directErr) {
+            console.warn('[UserServiceOptimized] Direct user_stats query failed:', directErr?.message);
+          }
+
+          // No data anywhere — return defaults for truly new user
+          console.log('[UserServiceOptimized] No stats found anywhere, returning defaults');
           return {
             data: {
               points: 0,
@@ -66,7 +100,7 @@ export const userServiceOptimized = {
           pickups: data.total_pickups || 0,
           reports: data.reports || 0,
           batches: data.batches || 0,
-          totalBags: data.total_bags || 0,
+          totalBags: data.total_bags || data.available_bags || 0,
           available_bags: data.available_bags || 0,
           level: data.level || 'Eco Starter',
           email: data.email || '',
@@ -180,26 +214,41 @@ export const userServiceOptimized = {
         .eq('user_id', userId)
         .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows
 
-      // If main view is empty, fall back to optimized service
+      // If main view is empty (e.g. user has no profiles row), read user_stats table directly
       if (!data) {
-        console.log('[UserServiceOptimized] Main view empty, falling back to optimized service');
-        const result = await this.getUserStatsOptimized(userId);
-        if (result.data) {
-          return {
-            data: {
-              points: result.data.points || 0,
-              pickups: result.data.pickups || 0,
-              reports: result.data.reports || 0,
-              batches: result.data.batches || 0,
-              totalBags: result.data.totalBags || 0,
-              available_bags: result.data.available_bags || 0,
-              _source: 'optimized_service_fallback',
-              _query_count: 1
-            },
-            error: null
-          };
+        console.log('[UserServiceOptimized] Main view empty, querying user_stats table directly');
+        try {
+          const { data: directStats } = await supabase
+            .from('user_stats')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (directStats) {
+            console.log('[UserServiceOptimized] Found direct user_stats:', directStats);
+            return {
+              points: 0,
+              pickups: 0,
+              reports: 0,
+              batches: directStats.total_batches || 0,
+              totalBags: directStats.total_bags || directStats.available_bags || 0,
+              available_bags: directStats.available_bags || 0,
+              _source: 'direct_user_stats',
+              _query_count: 2
+            };
+          }
+        } catch (directErr) {
+          console.warn('[UserServiceOptimized] Direct user_stats query failed:', directErr?.message);
         }
-        return result;
+        // No data anywhere — return defaults
+        return {
+          points: 0,
+          pickups: 0,
+          reports: 0,
+          batches: 0,
+          totalBags: 0,
+          _source: 'fallback_default',
+          _query_count: 0
+        };
       }
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -213,7 +262,7 @@ export const userServiceOptimized = {
         pickups: data.total_pickups || 0,
         reports: data.reports || 0,
         batches: data.batches || 0,
-        totalBags: data.total_bags || 0,
+        totalBags: data.total_bags || data.available_bags || 0,
         _source: 'main_view',
         _query_count: 1,
         last_activity: data.last_updated

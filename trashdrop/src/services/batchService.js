@@ -62,16 +62,11 @@ export const batchService = {
         console.warn('[BatchService] Error fetching current user_stats:', fetchError);
       }
       
-      // Prepare update with all necessary fields
+      // Only use columns that exist in user_stats table: user_id, total_batches, available_bags
       const statsUpdate = {
         user_id: userId,
-        updated_at: new Date().toISOString(),
-        // Increment total_batches by 1
         total_batches: ((currentStats?.total_batches || 0) + 1),
-        // Add the new bags to available_bags
         available_bags: ((currentStats?.available_bags || 0) + Number(bagsToAdd || 0)),
-        // Also update total_bags as a fallback field
-        total_bags: ((currentStats?.total_bags || 0) + Number(bagsToAdd || 0)),
       };
       
       console.log('[BatchService] Updating user_stats with:', statsUpdate);
@@ -530,6 +525,18 @@ export const batchService = {
         owner_id: batch.owner_id ?? null
       };
       
+      // Early return for already-used batches — no ownership check needed (read-only)
+      // But still update the scanning user's stats so dashboard reflects the bags
+      const statusValEarly = String(batch.status || '').toLowerCase();
+      const alreadyUsed = ['activated', 'used', 'scanned', 'completed'].includes(statusValEarly);
+      if (alreadyUsed) {
+        console.log('[BatchService] Batch already used/activated, returning info without ownership check');
+        const bagCount = batch.bag_count || batch.total_bags_count || 0;
+        // Stats were already updated during first activation — do NOT re-increment here
+        // (Dashboard reads from user_stats directly as fallback when the view is empty)
+        return { data: { alreadyActivated: true, batch_id: batch.id, bag_count: bagCount, status: batch.status, created_at: batch.created_at, batch_number: batch.batch_number }, error: null };
+      }
+
       // Log the ownership validation attempt
       try {
         console.log('[BatchService][Ownership] Checking batch ownership', {
@@ -640,13 +647,8 @@ export const batchService = {
 
 
 
-      // Prevent double-activation/scan and enforce active status for new schema
+      // Enforce active status for new schema (alreadyUsed already handled above)
       const statusVal = String(batch.status || '').toLowerCase();
-      const alreadyUsed = ['activated', 'used', 'scanned', 'completed'].includes(statusVal);
-      
-      if (alreadyUsed) {
-        return { data: { alreadyActivated: true }, error: null };
-      }
       
       if (source === 'batches' && statusVal && statusVal !== 'active') {
         return { data: null, error: { message: 'Batch is not active', code: 'BATCH_INACTIVE' } };
@@ -696,32 +698,17 @@ export const batchService = {
       try { await offlineStorageAPI.cacheBatch(batch); await offlineStorageAPI.cacheBags(batch.id, bagsList); } catch (_) {}
 
 
-      // Use database function to activate batch (bypasses RLS issues)
-      console.log('[BatchService] Activating batch via database function:', { batchId: batch.id, currentStatus: batch.status, userId });
-
-      await supabase.rpc('refresh_all_user_stats');
-
-      // Update user_stats for Dashboard realtime
-      // Use schema-flexible updater that avoids hardcoded columns like total_bags
-      let acctUpdate = null;
+      // Ensure user_stats is recalculated — the RPC's internal stats update
+      // may silently fail (EXCEPTION WHEN OTHERS), so call refresh explicitly
       try {
-        const res = await this.updateUserAccountAfterBatch(userId, batch.id, bagCount);
-        acctUpdate = res?.data || null;
-      } catch (e) {
-        console.warn('[BatchService] Failed to update user account after batch (non-fatal):', e?.message || e);
+        const { data: refreshResult } = await supabase.rpc('refresh_all_user_stats');
+        console.log('[BatchService] user_stats refreshed after activation:', refreshResult);
+      } catch (refreshErr) {
+        console.warn('[BatchService] refresh_all_user_stats failed (non-fatal):', refreshErr?.message);
       }
-
-      console.log('[BatchService] Activated batch and updated account (flex):', { user_id: userId, bags_added: bagCount });
-      // Broadcast realtime-like UI update to decouple from schema fields
-      try {
-        if (typeof window !== 'undefined') {
-          const evt = new CustomEvent('trashdrop:bags-updated', {
-            detail: { userId, deltaBags: bagCount, source: 'batch-scan' }
-          });
-          window.dispatchEvent(evt);
-        }
-      } catch (_) {}
-      return { data: { activated: true, bags_added: bagCount, bags: bagsList, batch_id: batch.id, account: acctUpdate }, error: null };
+      console.log('[BatchService] Batch activated successfully via RPC.');
+      // Note: UI event dispatch (trashdrop:bags-updated) is handled by BatchQRScanner component
+      return { data: { activated: true, bags_added: bagCount, bag_count: bagCount, bags: bagsList, batch_id: batch.id }, error: null };
 
     } catch (error) {
       console.error('[BatchService] Error in activateBatchForUser:', error);

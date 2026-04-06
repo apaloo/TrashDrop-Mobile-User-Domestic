@@ -102,6 +102,8 @@ const Dashboard = () => {
   
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStartingStep, setOnboardingStartingStep] = useState(null);
+  const onboardingSetByUrlRef = useRef(false); // Guard: URL-param-triggered onboarding survives re-renders
   const [userOnboardingState, setUserOnboardingState] = useState(null);
   const [nextAction, setNextAction] = useState(null);
   
@@ -112,8 +114,6 @@ const Dashboard = () => {
   // Check onboarding status and show appropriate UI
   useEffect(() => {
     console.log('[Dashboard] Onboarding useEffect triggered, user.id:', user?.id);
-    console.log('[Dashboard] Onboarding useEffect - user exists:', !!user);
-    console.log('[Dashboard] Onboarding useEffect - user.id type:', typeof user?.id);
     
     try {
       const checkOnboardingStatus = async () => {
@@ -131,64 +131,55 @@ const Dashboard = () => {
         
         console.log('[Dashboard] Checking URL params - source:', source, 'action:', action, 'full search:', window.location.search);
         
+        // If a previous run already set onboarding via URL params, don't override
+        if (onboardingSetByUrlRef.current) {
+          console.log('[Dashboard] Onboarding already set by URL params, skipping re-check');
+          return;
+        }
+        
         if (source === 'onboarding' && action === 'location-saved') {
-          console.log('[Dashboard] DEBUG: Found location-saved params');
-          console.log('[Dashboard] DEBUG: Setting localStorage flag');
           console.log('[Dashboard] Returning from onboarding location setup - reopening onboarding');
-          setShowOnboarding(true);
-          // Store location saved state to pass to OnboardingFlow
           localStorage.setItem('trashdrop_location_saved', 'true');
-          console.log('[Dashboard] DEBUG: localStorage flag set successfully');
-          // Clear URL parameters
+          setOnboardingStartingStep('scan_qr');
+          setShowOnboarding(true);
+          onboardingSetByUrlRef.current = true;
           window.history.replaceState({}, '', window.location.pathname);
-          console.log('[Dashboard] DEBUG: URL params cleared');
           return;
         }
         
         if (source === 'onboarding' && action === 'qr-scanned') {
           console.log('[Dashboard] Returning from QR scan - reopening onboarding');
-          
-          // Get QR code from URL parameters
+          localStorage.setItem('trashdrop_qr_scanned', 'true');
+          // Store batch details so OnboardingFlow can display them
           const qrCode = urlParams.get('qr_code');
-          console.log('[Dashboard] QR code scanned:', qrCode);
-          
-          // Process the QR scan through onboarding service
-          if (qrCode) {
-            try {
-              await onboardingService.processQRScan(user.id, qrCode);
-              console.log('[Dashboard] QR scan processed successfully');
-            } catch (error) {
-              console.error('[Dashboard] Error processing QR scan:', error);
-            }
-          }
-          
+          const bagCount = urlParams.get('bag_count');
+          if (qrCode) localStorage.setItem('trashdrop_qr_batch_id', qrCode);
+          if (bagCount) localStorage.setItem('trashdrop_qr_bag_count', bagCount);
+          setOnboardingStartingStep('scan_result');
           setShowOnboarding(true);
-          // Clear URL parameters
+          onboardingSetByUrlRef.current = true;
           window.history.replaceState({}, '', window.location.pathname);
           return;
         }
         
-        // Check if user should see onboarding
+        // Check if user should see onboarding (consolidated — 2 RPCs instead of 4)
         console.log('[Dashboard] Checking onboarding for user:', user.id);
-        console.log('[Dashboard] onboardingService imported:', !!onboardingService);
-        console.log('[Dashboard] shouldShowOnboarding method exists:', !!onboardingService.shouldShowOnboarding);
         
         try {
-          const shouldShow = await onboardingService.shouldShowOnboarding(user.id);
-          console.log('[Dashboard] shouldShowOnboarding result:', shouldShow);
+          const onboardingResult = await onboardingService.checkOnboardingStatus(user.id);
+          console.log('[Dashboard] checkOnboardingStatus result:', JSON.stringify(onboardingResult));
           
-          if (shouldShow) {
+          if (onboardingResult.show) {
+            setOnboardingStartingStep(onboardingResult.startingStep);
             setShowOnboarding(true);
-            console.log('[Dashboard] Showing onboarding popup');
-            return; // Exit early if showing onboarding
+            console.log('[Dashboard] Showing onboarding at step:', onboardingResult.startingStep);
+            return;
           }
         } catch (error) {
           console.error('[Dashboard] Error checking onboarding:', error);
-          console.error('[Dashboard] Error details:', error.stack);
         }
         
         console.log('[Dashboard] Not showing onboarding popup');
-        setNextAction(nextAction);
         
       } catch (error) {
         console.error('[Dashboard] Error checking onboarding status:', error);
@@ -1194,6 +1185,7 @@ const Dashboard = () => {
           <OnboardingFlow 
             onComplete={handleOnboardingComplete}
             onClose={handleOnboardingClose}
+            initialStep={onboardingStartingStep}
           />
         </>
       )}
@@ -1630,20 +1622,6 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-      
-      {/* Onboarding Modal */}
-      {showOnboarding && (
-        <OnboardingFlow
-          onComplete={() => {
-            console.log('[Dashboard] Onboarding completed');
-            setShowOnboarding(false);
-          }}
-          onClose={() => {
-            console.log('[Dashboard] Onboarding closed');
-            setShowOnboarding(false);
-          }}
-        />
-      )}
       
       {/* Navigation Choice Modal */}
       {showNavigationModal && (
