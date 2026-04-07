@@ -325,7 +325,7 @@ const ReviewStep = ({ formData, prevStep, handleSubmit }) => {
               Processing...
             </>
           ) : (
-            'Get Digital Bin'
+            'Request Bin Pickup'
           )}
         </button>
       </div>

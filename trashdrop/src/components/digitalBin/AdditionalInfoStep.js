@@ -52,7 +52,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
 
   const handleNext = () => {
     if (photos.length === 0) {
-      toastService.warning('Please take at least one photo of your digital bin area');
+      toastService.warning('Please take at least one photo of your waste bin');
       return;
     }
     nextStep();
@@ -60,15 +60,15 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Digital Bin Area Photos</h2>
+      <h2 className="text-xl font-semibold mb-4 text-gray-900">Waste Bin Photos</h2>
       
       {/* Photo Capture Section */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-900 mb-1">
-          Photos of Digital Bin Area (Required)
+          Photos of waste Bin (Required)
         </label>
         <p className="text-sm text-gray-600 mb-3">
-          Take photos of where you'll place your digital bin for service. This helps our collectors locate and service your bin efficiently.
+          Take photos of your filled up waste bin for service. This helps our collectors locate and service your bin efficiently.
         </p>
 
         {/* Camera Button */}
@@ -109,7 +109,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
                 <div key={index} className="relative group">
                   <img 
                     src={photo} 
-                    alt={`Digital Bin Area ${index + 1}`}
+                    alt={`Waste Bin ${index + 1}`}
                     className="w-full h-24 object-cover rounded-lg border border-gray-200"
                   />
                   <button
@@ -138,7 +138,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           id="notes"
           value={formData.notes}
           onChange={handleNotesChange}
-          placeholder="Any special instructions for servicing your digital bin?"
+          placeholder="Any special instructions for servicing your waste bin?"
           rows={3}
           className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
           style={{color: '#333'}}

@@ -136,7 +136,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
       {/* Start Date */}
       <div className="mb-5">
         <label htmlFor="startDate" className="block text-sm font-medium text-gray-900 mb-1">
-          Start Date
+          Pickup Date
         </label>
         <div className="relative">
           <input
@@ -160,7 +160,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
       {/* Preferred Time - Horizontal Scrollable Cards */}
       <div className="mb-5">
         <label className="block text-sm font-medium text-gray-900 mb-2">
-          Preferred Service Time (not guaranteed)
+          Preferred Pickup Time (not guaranteed)
         </label>
         
         {/* Horizontal scrollable container */}
