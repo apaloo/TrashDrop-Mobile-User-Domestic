@@ -602,7 +602,7 @@ const ChooseServiceStep = ({ onServiceSelect, isLoading }) => (
         <div className="flex items-center h-full">
           <span className="text-2xl mr-3">🗑️</span>
           <div>
-            <h4 className="font-semibold text-gray-900 antialiased">Create Digital Bin</h4>
+            <h4 className="font-semibold text-gray-900 antialiased">Request Bin Pickup</h4>
             <p className="text-sm text-gray-600 antialiased">Request for waste pickup instantly or on schedule</p>
           </div>
         </div>
@@ -754,7 +754,7 @@ const QRScanStep = ({ onScanComplete, isLoading }) => {
 const DigitalBinStep = ({ onBinCreate, isLoading }) => {
   return (
     <div>
-      <h3 className="text-lg font-semibold mb-4">Create Digital Bin</h3>
+      <h3 className="text-lg font-semibold mb-4">Request Bin Pickup</h3>
       <p className="text-gray-600 mb-6">Get instant access to digital bin service for waste pickup</p>
       
       <button
@@ -762,7 +762,7 @@ const DigitalBinStep = ({ onBinCreate, isLoading }) => {
         disabled={isLoading}
         className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
       >
-        Create Digital Bin
+        Request Bin Pickup
       </button>
     </div>
   );

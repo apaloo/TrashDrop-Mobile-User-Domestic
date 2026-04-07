@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import supabase from '../../utils/supabaseClient.js';
@@ -54,6 +54,7 @@ const LocationMarker = ({ position, setPosition }) => {
 const Locations = () => {
   const { user, getSession } = useAuth(); // Get session helper from useAuth
   const location = useLocation(); // Get React Router location
+  const navigate = useNavigate();
   const [locations, setLocations] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLocation, setNewLocation] = useState({
@@ -719,8 +720,8 @@ const Locations = () => {
       console.log('[Locations] Checking redirect logic - source:', source, 'full search:', location.search);
       if (source === 'onboarding') {
         console.log('[Locations] Location saved from onboarding, redirecting back to dashboard');
-        // Use React Router's navigate instead of window.location
-        window.location.assign('/dashboard?source=onboarding&action=location-saved');
+        // Use React Router navigate to avoid full page reload
+        navigate('/dashboard?source=onboarding&action=location-saved');
         return;
       } else {
         console.log('[Locations] Not from onboarding, continuing normally');

@@ -20,6 +20,8 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
   const [lastScan, setLastScan] = useState({ value: '', ts: 0 });
   const [hasSupaSession, setHasSupaSession] = useState(false);
   const cancelRef = useRef({ canceled: false });
+  const processingRef = useRef(false);
+  const lastScanRef = useRef({ value: '', ts: 0 });
 
   // Auto-start scanning if autoStart prop is true
   useEffect(() => {
@@ -46,7 +48,8 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
   // UI enablement is driven by loading states; startScanning will enforce user presence
 
   const processBatchId = async (batchId) => {
-    if (!batchId || loading) return;
+    if (!batchId || processingRef.current) return;
+    processingRef.current = true;
     setLoading(true);
     setLoadingMessage('Checking batches table...');
     setError(null);
@@ -101,18 +104,19 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
       //   throw new Error(`Batch found but activation failed. Status: ${verifyRes.data?.status || 'unknown'}`);
       // }
 
-      const bagsAdded = verifyRes.data?.bagsAdded || verifyRes.data?.total_bags_count || 0;
+      const bagsAdded = verifyRes.data?.bags_added || verifyRes.data?.bag_count || verifyRes.data?.total_bags_count || 0;
       const returnedBags = Array.isArray(verifyRes.data?.bags) ? verifyRes.data.bags : null;
-      if(bagsAdded){
-        setScanResult({
-          batch_qr_code: verifyRes.data?.batch_id || batchId,
-          status: verifyRes.data?.status || 'activated', // Use actual status from database
-          created_at: verifyRes.data?.created_at || new Date().toISOString(),
-          bag_count: verifyRes.data?.bag_count || verifyRes.data?.total_bags_count || bagsAdded,
-          bags: returnedBags ?? Array(bagsAdded).fill({}).map((_, i) => ({ id: `virtual-${i+1}` })),
-          activated_at: verifyRes.data?.activated_at, // Show when activation occurred
-        });
-      }
+      const displayBagCount = verifyRes.data?.bag_count || verifyRes.data?.total_bags_count || bagsAdded;
+      const displayCount = displayBagCount > 0 ? displayBagCount : bagsAdded;
+      setScanResult({
+        batch_qr_code: verifyRes.data?.batch_id || batchId,
+        status: verifyRes.data?.alreadyActivated ? 'already scanned' : (verifyRes.data?.status || 'activated'),
+        created_at: verifyRes.data?.created_at || new Date().toISOString(),
+        bag_count: displayCount,
+        bags: returnedBags ?? (displayCount > 0 ? Array(displayCount).fill({}).map((_, i) => ({ id: `virtual-${i+1}` })) : []),
+        activated_at: verifyRes.data?.activated_at,
+        alreadyActivated: verifyRes.data?.alreadyActivated || false,
+      });
       setScanning(false);
 
       // Skip notification creation to avoid console errors
@@ -120,13 +124,16 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
       console.log('[BatchQRScanner] Skipping notification - service has schema incompatibilities');
 
       // Broadcast optimistic bag update for other views (dashboard, pickup form)
-      try {
-        const evt = new CustomEvent('trashdrop:bags-updated', {
-          detail: { userId: user.id, deltaBags: bagsAdded, source: 'batch-scan' }
-        });
-        window.dispatchEvent(evt);
-      } catch (_) {
-        // no-op if CustomEvent not available
+      // Only for fresh activations — already-activated batches were already counted
+      if (!verifyRes.data?.alreadyActivated && bagsAdded > 0) {
+        try {
+          const evt = new CustomEvent('trashdrop:bags-updated', {
+            detail: { userId: user.id, deltaBags: bagsAdded, source: 'batch-scan' }
+          });
+          window.dispatchEvent(evt);
+        } catch (_) {
+          // no-op if CustomEvent not available
+        }
       }
 
       if (onScanComplete) onScanComplete(verifyRes.data);
@@ -157,6 +164,7 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
     } finally {
       setLoading(false);
       setAttempt(0);
+      processingRef.current = false;
     }
   };
 
@@ -167,9 +175,11 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
     const batchId = String(raw).trim();
     console.log('[BatchQRScanner] Scanned raw:', raw, '-> batchId:', batchId);
 
-    // Throttle duplicate scans within 2s or identical value
+    // Throttle duplicate scans — use ref for synchronous check (React state is async)
     const now = Date.now();
-    if (lastScan.value === batchId && now - lastScan.ts < 2000) return;
+    if (lastScanRef.current.value === batchId && now - lastScanRef.current.ts < 10000) return;
+    if (processingRef.current) return;
+    lastScanRef.current = { value: batchId, ts: now };
     setLastScan({ value: batchId, ts: now });
 
     // Basic sanity check to avoid spurious calls
@@ -349,11 +359,12 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
           border: '1px solid #4caf50',
           color: 'black'
         }}>
-          <h3>✅ Batch Scanned Successfully!</h3>
+          <h3>{scanResult.alreadyActivated ? '⚠️ Batch Already Scanned' : '✅ Batch Scanned Successfully!'}</h3>
           <p><strong>Batch ID:</strong> {scanResult.batch_qr_code || scanResult.batch_id}</p>
           <p><strong>Total Bags:</strong> {scanResult.bag_count || 0}</p>
           <p><strong>Status:</strong> {scanResult.status}</p>
           <p><strong>Created:</strong> {scanResult.created_at ? new Date(scanResult.created_at).toLocaleDateString() : 'Unknown'}</p>
+          {scanResult.alreadyActivated && <p style={{ color: '#856404', marginTop: '8px' }}>This batch was previously scanned and activated.</p>}
         </div>
       )}
       

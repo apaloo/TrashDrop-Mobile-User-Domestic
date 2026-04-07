@@ -677,7 +677,7 @@ const PickupRequest = () => {
                 className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
                 onClick={() => navigate('/digital-bin')}
               >
-                Digital Bin
+                Request Bin Pickup
               </button>
             </div>
           </div>
@@ -854,7 +854,7 @@ const PickupRequest = () => {
                             className="bg-green-500 text-white px-3 py-1.5 rounded-md text-sm hover:bg-green-600 transition-colors"
                             onClick={() => navigate('/digital-bin')}
                           >
-                            Digital Bin
+                            Request Bin Pickup
                           </button>
                         </div>
                       </>

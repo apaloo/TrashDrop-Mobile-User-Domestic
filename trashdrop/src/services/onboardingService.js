@@ -23,11 +23,11 @@ export const onboardingService = {
         return this.fallbackGetStartingStep(userId);
       }
       
-      console.log('[Onboarding] User state for starting step:', data);
+      console.log('[Onboarding] User state for starting step:', JSON.stringify(data));
       
       // Check if user has made bags selection
       const bagsSelection = await this.getUserHasBagsSelection(userId);
-      console.log('[Onboarding] User bags selection for starting step:', bagsSelection);
+      console.log('[Onboarding] User bags selection for starting step:', JSON.stringify(bagsSelection));
       
       // Check if force parameter is being used (for testing)
       const urlParams = new URLSearchParams(window.location.search);
@@ -46,10 +46,15 @@ export const onboardingService = {
         // If force parameter is used, return appropriate step for testing
         if (forceParam) {
           console.log('[Onboarding] Force parameter detected for READY_FOR_PICKUP user');
-          // User has bags and locations, skip to request pickup step
           return 'request_pickup';
         }
-        return 'success'; // Already completed
+        // Only mark as completed if user actually went through onboarding
+        if (bagsSelection?.selection_made) {
+          return 'success'; // Actually completed onboarding
+        }
+        // User has bags/batches but never completed onboarding flow
+        console.log('[Onboarding] READY_FOR_PICKUP but no bags selection — routing to request_pickup');
+        return 'request_pickup';
       }
       
       return 'welcome'; // Default to welcome
@@ -80,7 +85,7 @@ export const onboardingService = {
       } else if (state.state === 'LOCATION_SET') {
         // Check if user has bags selection
         try {
-          const { data: bagsSelection } = await this.getUserHasBagsSelection(userId);
+          const bagsSelection = await this.getUserHasBagsSelection(userId);
           if (bagsSelection?.selection_made) {
             return bagsSelection.has_bags ? 'scan_qr' : 'digital_bin';
           }
@@ -96,10 +101,20 @@ export const onboardingService = {
         // If force parameter is used, return appropriate step for testing
         if (forceParam) {
           console.log('[Onboarding] Force parameter detected for READY_FOR_PICKUP user (fallback)');
-          // User has bags and locations, skip to request pickup step
           return 'request_pickup';
         }
-        return 'success'; // Already completed
+        // Only mark as completed if user actually went through onboarding
+        try {
+          const bagsSelectionFb = await this.getUserHasBagsSelection(userId);
+          if (bagsSelectionFb?.selection_made) {
+            return 'success'; // Actually completed onboarding
+          }
+        } catch (e) {
+          console.error('[Onboarding] Error checking bags selection in fallback:', e);
+        }
+        // User has bags/batches but never completed onboarding flow
+        console.log('[Onboarding] READY_FOR_PICKUP but no bags selection (fallback) — routing to request_pickup');
+        return 'request_pickup';
       } else {
         return 'welcome';
       }
@@ -533,65 +548,124 @@ export const onboardingService = {
   },
 
   /**
-   * Check if onboarding should be shown based on user's onboarding state
-   * Uses existing get_user_onboarding_state RPC function
+   * Combined check: should onboarding show AND what step to start on.
+   * Single call replaces separate shouldShowOnboarding + getStartingStep,
+   * cutting RPC calls from 4 to 2.
+   * Returns { show: boolean, startingStep: string|null }
    */
-  async shouldShowOnboarding(userId) {
-    console.log('[Onboarding] shouldShowOnboarding called with userId:', userId);
+  async checkOnboardingStatus(userId) {
+    console.log('[Onboarding] checkOnboardingStatus called for userId:', userId);
     
     try {
       // Check for force parameter in URL
       const urlParams = new URLSearchParams(window.location.search);
       const forceOnboarding = urlParams.get('force') === 'true' || urlParams.get('reset') === 'true';
+      const forceParam = urlParams.get('force');
       
-      if (forceOnboarding) {
-        console.log('[Onboarding] Force parameter detected, showing onboarding regardless of state');
-        return true;
+      if (!forceOnboarding) {
+        // Check if user has dismissed onboarding
+        const dismissedKey = `trashdrop_onboarding_dismissed_${userId}`;
+        const hasDismissed = localStorage.getItem(dismissedKey);
+        if (hasDismissed) {
+          console.log('[Onboarding] User has dismissed onboarding, not showing');
+          return { show: false, startingStep: null };
+        }
+      } else {
+        console.log('[Onboarding] Force parameter detected, showing onboarding regardless');
       }
       
-      // Check if user has dismissed onboarding
-      const dismissedKey = `trashdrop_onboarding_dismissed_${userId}`;
-      const hasDismissed = localStorage.getItem(dismissedKey);
-      
-      if (hasDismissed) {
-        console.log('[Onboarding] User has dismissed onboarding, not showing');
-        return false;
-      }
-      
-      // Use existing get_user_onboarding_state RPC function
+      // Single RPC call for state
       console.log('[Onboarding] Calling get_user_onboarding_state RPC...');
       const { data, error } = await supabase
         .rpc('get_user_onboarding_state', { user_uuid: userId });
       
       if (error) {
-        console.error('[Onboarding] Error getting user onboarding state:', error);
-        console.log('[Onboarding] RPC error details:', error.message, error.code, error.hint);
-        console.log('[Onboarding] Falling back to original shouldShowOnboarding logic');
-        return this.fallbackShouldShowOnboarding(userId);
+        console.error('[Onboarding] RPC error:', error.message, error.code);
+        return this.fallbackCheckOnboarding(userId, forceOnboarding, forceParam);
       }
       
-      console.log('[Onboarding] User onboarding state:', data);
+      console.log('[Onboarding] User onboarding state:', JSON.stringify(data));
       
-      // Show onboarding if user is NEW_USER
-      if (data.state === 'NEW_USER') {
-        console.log('[Onboarding] User is NEW_USER, showing onboarding');
-        return true;
-      }
-      
-      // Also show onboarding if user has no bags selection made
+      // Single RPC call for bags selection
       const bagsSelection = await this.getUserHasBagsSelection(userId);
-      if (!bagsSelection.selection_made) {
-        console.log('[Onboarding] User has not made bags selection, showing onboarding');
-        return true;
+      console.log('[Onboarding] Bags selection:', JSON.stringify(bagsSelection));
+      
+      // --- Determine show + step in one pass ---
+      const hasBagsSelection = bagsSelection?.selection_made === true;
+      
+      if (data.state === 'NEW_USER') {
+        console.log('[Onboarding] NEW_USER — show onboarding at welcome');
+        return { show: true, startingStep: 'welcome' };
       }
       
-      console.log('[Onboarding] User has completed onboarding, not showing');
-      return false;
+      if (data.state === 'LOCATION_SET') {
+        if (hasBagsSelection) {
+          const step = bagsSelection.has_bags ? 'scan_qr' : 'digital_bin';
+          console.log('[Onboarding] LOCATION_SET + bags selection — step:', step);
+          return { show: true, startingStep: step };
+        }
+        console.log('[Onboarding] LOCATION_SET, no bags selection — welcome');
+        return { show: true, startingStep: 'welcome' };
+      }
+      
+      if (data.state === 'READY_FOR_PICKUP') {
+        if (forceParam) {
+          console.log('[Onboarding] READY_FOR_PICKUP + force — request_pickup');
+          return { show: true, startingStep: 'request_pickup' };
+        }
+        if (hasBagsSelection) {
+          console.log('[Onboarding] READY_FOR_PICKUP + completed — not showing');
+          return { show: false, startingStep: 'success' };
+        }
+        console.log('[Onboarding] READY_FOR_PICKUP but no bags selection — request_pickup');
+        return { show: true, startingStep: 'request_pickup' };
+      }
+      
+      // Unknown state — show onboarding from welcome
+      if (!hasBagsSelection && !forceOnboarding) {
+        return { show: true, startingStep: 'welcome' };
+      }
+      return { show: false, startingStep: null };
     } catch (error) {
-      console.error('[Onboarding] Error in shouldShowOnboarding:', error);
-      // Fallback to old method
-      return this.fallbackShouldShowOnboarding(userId);
+      console.error('[Onboarding] Error in checkOnboardingStatus:', error);
+      return this.fallbackCheckOnboarding(userId, false, null);
     }
+  },
+
+  /**
+   * Fallback for checkOnboardingStatus
+   */
+  async fallbackCheckOnboarding(userId, forceOnboarding, forceParam) {
+    console.log('[Onboarding] Using fallback checkOnboarding');
+    try {
+      const state = await this.getUserState(userId);
+      const bagsSelection = await this.getUserHasBagsSelection(userId).catch(() => null);
+      const hasBagsSelection = bagsSelection?.selection_made === true;
+      
+      if (state.state === 'NEW_USER') {
+        return { show: true, startingStep: 'welcome' };
+      }
+      if (state.state === 'READY_FOR_PICKUP') {
+        if (forceParam) return { show: true, startingStep: 'request_pickup' };
+        if (hasBagsSelection) return { show: false, startingStep: 'success' };
+        return { show: true, startingStep: 'request_pickup' };
+      }
+      if (!hasBagsSelection) {
+        return { show: true, startingStep: 'welcome' };
+      }
+      return { show: false, startingStep: null };
+    } catch (error) {
+      console.error('[Onboarding] Fallback checkOnboarding error:', error);
+      return { show: false, startingStep: null };
+    }
+  },
+
+  /**
+   * Check if onboarding should be shown (legacy — calls consolidated method)
+   */
+  async shouldShowOnboarding(userId) {
+    const result = await this.checkOnboardingStatus(userId);
+    return result.show;
   },
 
   /**

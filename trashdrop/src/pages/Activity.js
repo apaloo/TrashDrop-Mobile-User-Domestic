@@ -408,7 +408,7 @@ const Activity = () => {
             date: new Date(activity.created_at).toLocaleDateString(),
             points: 15, // Digital bins earn 15 points
             related_id: activity.id,
-            description: `Digital bin (${activity.frequency})`,
+            description: `Request Bin Pickup (${activity.frequency})`,
             address: locationName,
             created_at: activity.created_at
           };
@@ -639,7 +639,7 @@ const Activity = () => {
                   {activity.type === 'pickup_request' ? 'Waste Pickup' : 
                    activity.type === 'dumping_report' ? 'Dumping Report' : 
                    activity.type === 'qr_scan' ? 'QR Code Scan' : 
-                   activity.type === 'digital_bin' ? 'Digital Bin' : 'Reward Redemption'}
+                   activity.type === 'digital_bin' ? 'Request Bin Pickup' : 'Reward Redemption'}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
                   {activity.date} • {activity.description}
