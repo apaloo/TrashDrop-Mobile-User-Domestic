@@ -334,15 +334,17 @@ const PickupRequest = () => {
         // Exclude: completed, cancelled
         const { data: pickupsData, error: pickupsError } = await supabase
           .from('pickup_requests')
-          .select('bag_count')
+          .select('estimated_volume')
           .eq('user_id', user.id)
           .in('status', ['pending', 'accepted', 'en_route']);
         
         if (pickupsError) throw pickupsError;
         
         // Calculate total bags in active pickups
+        // NOTE: bag_count is GENERATED ALWAYS AS IDENTITY (auto-increment row counter).
+        // The actual user-requested bag count is stored in estimated_volume by the RPC.
         const totalRequestedBags = pickupsData?.reduce((sum, pickup) => {
-          return sum + (pickup.bag_count || 0);
+          return sum + (Number(pickup.estimated_volume) || 0);
         }, 0) || 0;
         
         console.log('[PickupRequest] Requested bags in active pickups:', totalRequestedBags);
@@ -528,6 +530,32 @@ const PickupRequest = () => {
       const selectedLocation = savedLocations.find(loc => loc.id === values.savedLocationId);
       const address = selectedLocation?.address || values.location?.address || '';
 
+      // Fetch a bag to link to this pickup request and resolve the fee from its unit_price
+      let bagId = null;
+      let resolvedFee = 0;
+      try {
+        console.log('[PickupRequest] Fetching bag for user:', user.id);
+        const { data: availableBags, error: bagsError } = await supabase
+          .from('bags')
+          .select('id, unit_price')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .not('unit_price', 'is', null)
+          .gt('unit_price', 0)
+          .limit(1);
+        
+        if (!bagsError && availableBags && availableBags.length > 0) {
+          bagId = availableBags[0].id;
+          resolvedFee = Math.round(Number(availableBags[0].unit_price));
+          console.log('[PickupRequest] Found bag to link:', bagId, 'fee:', resolvedFee);
+        } else {
+          console.log('[PickupRequest] No bag with unit_price found (fee will be 0)');
+        }
+      } catch (bagFetchError) {
+        console.warn('[PickupRequest] Error fetching bag (non-fatal):', bagFetchError);
+        // Continue without bag_id - it's optional
+      }
+
       // Submit using RPC function that properly handles geography type
       // This bypasses the buggy standardize_pickup_coordinates trigger
       console.log('XXXXXXXXXXXXXXXXXXXXXX [PickupRequest] Submitting pickup via RPC');
@@ -542,8 +570,9 @@ const PickupRequest = () => {
           p_special_instructions: values.notes || '',
           p_longitude: lng,
           p_latitude: lat,
-          p_fee: 0,
-          p_address: address
+          p_fee: resolvedFee,
+          p_address: address,
+          p_bag_id: bagId
         })
         .single();
 

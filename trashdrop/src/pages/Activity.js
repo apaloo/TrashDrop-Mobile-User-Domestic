@@ -391,7 +391,7 @@ const Activity = () => {
             date: new Date(activity.created_at).toLocaleDateString(),
             points: activity.points_earned || 0,
             related_id: activity.id,
-            description: `${activity.waste_type || 'Waste'} Pickup - ${activity.bag_count || 1} bag(s)`,
+            description: `${activity.waste_type || 'Waste'} Pickup - ${activity.estimated_volume || activity.bag_count || 1} bag(s)`,
             address: activity.location || 'Custom location',
             created_at: activity.created_at
           };

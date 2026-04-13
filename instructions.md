@@ -559,6 +559,7 @@ CREATE TABLE public.collector_profiles (
   last_active timestamp with time zone DEFAULT now(),
   pending_balance numeric DEFAULT 0,
   withdrawable_balance numeric DEFAULT 0,
+  preferred_language character varying DEFAULT 'tw'::character varying,
   CONSTRAINT collector_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT collector_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT collector_profiles_service_area_id_fkey FOREIGN KEY (service_area_id) REFERENCES public.service_areas(id)
@@ -622,7 +623,7 @@ CREATE TABLE public.digital_bins (
   updated_at timestamp with time zone DEFAULT now(),
   collected_at timestamp with time zone,
   collector_id uuid,
-  status text DEFAULT 'available'::text CHECK (status = ANY (ARRAY['available'::text, 'accepted'::text, 'en_route'::text, 'arrived'::text, 'picked_up'::text, 'disposed'::text, 'completed'::text, 'canceled'::text, 'expired'::text])),
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'accepted'::text, 'en_route'::text, 'arrived'::text, 'collecting'::text, 'completed'::text, 'cancelled'::text])),
   bin_size_liters integer NOT NULL DEFAULT 120 CHECK (bin_size_liters = ANY (ARRAY[60, 80, 90, 100, 120, 240, 340, 360, 660, 1100])),
   is_urgent boolean NOT NULL DEFAULT false,
   fee numeric DEFAULT 0,
@@ -638,6 +639,7 @@ CREATE TABLE public.digital_bins (
   deadhead_km numeric DEFAULT 0,
   disposed_at timestamp with time zone,
   disposal_site_id text,
+  accepted_at timestamp with time zone,
   CONSTRAINT digital_bins_pkey PRIMARY KEY (id),
   CONSTRAINT digital_bins_disposal_site_id_fkey FOREIGN KEY (disposal_site_id) REFERENCES public.disposal_centers(id),
   CONSTRAINT digital_bins_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES auth.users(id),
@@ -763,6 +765,9 @@ CREATE TABLE public.illegal_dumping_mobile (
   latitude numeric,
   longitude numeric,
   assigned_to uuid,
+  location_hash text,
+  idempotency_token text,
+  submission_fingerprint text,
   CONSTRAINT illegal_dumping_mobile_pkey PRIMARY KEY (id),
   CONSTRAINT illegal_dumping_mobile_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.collector_profiles(id)
 );
@@ -850,7 +855,7 @@ CREATE TABLE public.pickup_requests (
   location text NOT NULL CHECK (location IS NULL OR location ~ '^POINT\(\-?\d+(\.\d+)? \-?\d+(\.\d+)?\)$'::text),
   coordinates USER-DEFINED NOT NULL,
   fee integer NOT NULL,
-  status text NOT NULL CHECK (status = ANY (ARRAY['available'::text, 'accepted'::text, 'en_route'::text, 'arrived'::text, 'picked_up'::text, 'disposed'::text, 'completed'::text, 'canceled'::text, 'expired'::text, 'cancelled'::text])),
+  status text NOT NULL CHECK (status = ANY (ARRAY['pending'::text, 'accepted'::text, 'en_route'::text, 'arrived'::text, 'collecting'::text, 'completed'::text, 'cancelled'::text])),
   collector_id uuid,
   accepted_at timestamp with time zone,
   picked_up_at timestamp with time zone,
@@ -879,12 +884,14 @@ CREATE TABLE public.pickup_requests (
   service_area_id uuid,
   user_id uuid,
   address text,
+  bag_id uuid,
   CONSTRAINT pickup_requests_pkey PRIMARY KEY (id),
   CONSTRAINT pickup_requests_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.collector_profiles(id),
   CONSTRAINT pickup_requests_payment_method_fkey FOREIGN KEY (payment_method_id) REFERENCES public.payment_methods(id),
   CONSTRAINT pickup_requests_reserved_by_fkey FOREIGN KEY (reserved_by) REFERENCES auth.users(id),
   CONSTRAINT pickup_requests_assigned_to_profiles_fkey FOREIGN KEY (assigned_to) REFERENCES public.profiles(id),
-  CONSTRAINT pickup_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+  CONSTRAINT pickup_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT pickup_requests_bag_id_fkey FOREIGN KEY (bag_id) REFERENCES public.bags(id)
 );
 CREATE TABLE public.pricing_zones (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

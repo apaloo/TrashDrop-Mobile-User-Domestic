@@ -29,7 +29,7 @@ export const pickupService = {
         .select(`
           id, location, fee, status, collector_id, address,
           accepted_at, picked_up_at, disposed_at, created_at, updated_at,
-          waste_type, bag_count, special_instructions, scheduled_date,
+          waste_type, estimated_volume, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
         `)
         .eq('user_id', userId)
@@ -231,8 +231,8 @@ export const pickupService = {
           })(),
           coordinates: activePickup.coordinates,
           fee: activePickup.fee || 0,
-          bags: activePickup.bag_count || 0,
-          bag_count: activePickup.bag_count || 0,
+          bags: activePickup.estimated_volume || activePickup.bag_count || 0,
+          bag_count: activePickup.estimated_volume || activePickup.bag_count || 0,
           notes: activePickup.special_instructions || '',
           special_instructions: activePickup.special_instructions || '',
           waste_type: activePickup.waste_type || 'general',
@@ -296,7 +296,7 @@ export const pickupService = {
         .select(`
           id, location, fee, status, collector_id, user_id,
           accepted_at, picked_up_at, disposed_at, created_at, updated_at,
-          waste_type, bag_count, special_instructions, scheduled_date,
+          waste_type, estimated_volume, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
         `)
         .eq('id', pickupId)
@@ -525,7 +525,7 @@ export const pickupService = {
         .select(`
           id, location, coordinates, fee, status, collector_id,
           accepted_at, picked_up_at, disposed_at, created_at, updated_at,
-          waste_type, bag_count, special_instructions, scheduled_date,
+          waste_type, estimated_volume, bag_count, special_instructions, scheduled_date,
           preferred_time, points_earned
         `)
         .eq('user_id', userId)
@@ -547,7 +547,7 @@ export const pickupService = {
           longitude: pickup.locations?.longitude || pickup.longitude,
           address: pickup.locations?.address || pickup.address
         },
-        bags: pickup.bag_count || 0,
+        bags: pickup.estimated_volume || pickup.bag_count || 0,
         notes: pickup.special_instructions || '',
         waste_type: pickup.waste_type || 'general',
         collector_id: pickup.collector_id,

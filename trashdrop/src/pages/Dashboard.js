@@ -209,7 +209,7 @@ const Dashboard = () => {
         // Pickup requests
         supabase
           .from('pickup_requests')
-          .select('id, created_at, bag_count, waste_type, status, location, points_earned')
+          .select('id, created_at, estimated_volume, waste_type, status, location, points_earned')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(itemsPerTable),
@@ -247,7 +247,7 @@ const Dashboard = () => {
         const pickups = pickupResult.value.data.map(pickup => ({
           id: pickup.id,
           type: 'pickup_request',
-          description: `Pickup request for ${pickup.bag_count || 1} bag(s) - ${pickup.status}`,
+          description: `Pickup request for ${pickup.estimated_volume || 1} bag(s) - ${pickup.status}`,
           timestamp: pickup.created_at,
           related_id: pickup.id,
           points: pickup.points_earned || 10, // Show actual earned points or default to 10
@@ -1518,7 +1518,7 @@ const Dashboard = () => {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                   <div className="text-center px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                    <p className="text-base font-bold text-gray-900 dark:text-gray-100">{activePickups[0].bag_count || activePickups[0].number_of_bags || 0}</p>
+                    <p className="text-base font-bold text-gray-900 dark:text-gray-100">{activePickups[0].estimated_volume || activePickups[0].bag_count || activePickups[0].number_of_bags || 0}</p>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Bags</p>
                   </div>
                   <div className="text-center px-3 py-1 bg-green-50 dark:bg-green-900/30 rounded-lg">
