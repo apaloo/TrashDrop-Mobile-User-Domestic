@@ -23,6 +23,8 @@
       document.documentElement.removeAttribute('data-theme');
       document.documentElement.classList.remove('dark');
       document.documentElement.classList.remove('app-loaded');
+      // Clear stale theme cache so DB is always the source of truth on next load
+      try { localStorage.removeItem('trashdrop_theme'); } catch(e) {}
       // Force white background on documentElement (body doesn't exist yet)
       document.documentElement.style.backgroundColor = '#ffffff';
       // Set body background when it's available

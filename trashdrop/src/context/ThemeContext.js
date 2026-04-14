@@ -29,6 +29,8 @@ export const ThemeProvider = ({ children }) => {
         setUserId(session.user.id);
       } else {
         setUserId(null);
+        setIsInitialized(false);
+        setTheme('light');
       }
     });
 
@@ -72,15 +74,6 @@ export const ThemeProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('[ThemeContext] Database query failed:', error);
-      }
-      
-      // Fallback to localStorage if database query failed or returned no data
-      if (themeToApply === 'light') {
-        const savedTheme = localStorage.getItem(appConfig.storage.themeKey);
-        if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
-          themeToApply = savedTheme;
-          console.log('[ThemeContext] Theme from localStorage:', themeToApply);
-        }
       }
       
       console.log('[ThemeContext] Final theme applied:', themeToApply);

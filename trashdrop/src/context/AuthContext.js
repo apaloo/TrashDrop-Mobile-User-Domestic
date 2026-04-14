@@ -306,48 +306,6 @@ export const AuthProvider = ({ children }) => {
     }
     console.log('[Auth] Authentication successful:', { user: user?.email, session: !!session });
     
-    // Load and apply theme from database IMMEDIATELY after successful authentication
-    console.log('[Auth Theme] 🔥 IMMEDIATE THEME CHECK, user:', user);
-    console.log('[Auth Theme] 🔥 user?.id:', user?.id);
-    if (user?.id) {
-      // Only load theme if user ID has changed (prevent duplicate theme loads)
-      if (authState.user?.id !== user.id) {
-        console.log('[Auth Theme] 🎨 Loading theme for authenticated user:', user.id);
-        supabase
-          .from('profiles')
-          .select('dark_mode')
-          .eq('id', user.id)
-          .maybeSingle()
-          .then(({ data: profileData, error }) => {
-            if (error) {
-              console.error('[Auth Theme] ❌ Error loading theme:', error);
-              return;
-            }
-            
-            const isDark = profileData?.dark_mode || false;
-            console.log('[Auth Theme] 📦 Theme from database:', isDark ? 'DARK' : 'LIGHT', profileData);
-            
-            // Apply theme globally
-            if (isDark) {
-              document.documentElement.classList.add('dark');
-              document.body.classList.add('dark');
-              console.log('[Auth Theme] ✅ DARK MODE APPLIED to documentElement and body');
-            } else {
-              document.documentElement.classList.remove('dark');
-              document.body.classList.remove('dark');
-              console.log('[Auth Theme] ✅ LIGHT MODE APPLIED to documentElement and body');
-            }
-          })
-          .catch((error) => {
-            console.error('[Auth Theme] ❌ Exception loading theme:', error);
-          });
-      } else {
-        console.log('[Auth Theme] ⏭️ Skipping theme load - same user already authenticated');
-      }
-    } else {
-      console.log('[Auth Theme] ⚠️ No user ID found, skipping theme load');
-    }
-    
     // Store user data in localStorage
     if (user) {
       try {
