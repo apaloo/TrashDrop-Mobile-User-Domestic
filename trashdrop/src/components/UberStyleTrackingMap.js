@@ -705,7 +705,7 @@ const UberStyleTrackingMap = ({
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-1">Bags</p>
-                  <p className="text-sm font-semibold text-gray-900">{activePickup.bag_count || 0}</p>
+                  <p className="text-sm font-semibold text-gray-900">{Math.round(Number(activePickup.estimated_volume)) || activePickup.bag_count || 0}</p>
                 </div>
               </div>
 
