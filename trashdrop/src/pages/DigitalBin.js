@@ -45,6 +45,9 @@ function DigitalBin() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState('');
   
+  // Track newly created bin ID for auto-expand
+  const [newlyCreatedBinId, setNewlyCreatedBinId] = useState(null);
+  
   // Form data state
   const [formData, setFormData] = useState({
     // Location details
@@ -222,6 +225,7 @@ function DigitalBin() {
             expires_at,
             created_at,
             updated_at,
+            fee,
             bin_locations:location_id (id, location_name, address)
           `)
           .eq('user_id', userId)
@@ -811,6 +815,10 @@ function DigitalBin() {
       }
       
       debug.log('[DigitalBin] Successfully created digital bin:', binData);
+      
+      // Store the newly created bin ID for auto-expand in the list
+      setNewlyCreatedBinId(binData.id);
+      debug.log('[DigitalBin] Set newlyCreatedBinId:', binData.id);
 
       // SERVER-FIRST: Immediately refresh from server to get all bins
       debug.log('[DigitalBin] Digital bin created, refreshing from server');
@@ -936,6 +944,8 @@ function DigitalBin() {
                   scheduledPickups={scheduledPickups} 
                   onRefresh={handleRefresh}
                   isLoading={isLoading}
+                  newlyCreatedBinId={newlyCreatedBinId}
+                  onNewBinExpanded={() => setNewlyCreatedBinId(null)}
                 />
               </div>
             ) : (

@@ -52,7 +52,51 @@ const PersonalInfo = () => {
     };
   }, []);
 
-  // Load profile data from Supabase on component mount
+  // Helper: build fallback profile data from local sources
+  const getLocalFallbackData = (userId, email, userMetadata) => {
+    // 1. Module-level cache
+    const cacheHasEmptyNames = profileCache.data && !profileCache.data.firstName && !profileCache.data.lastName;
+    const userHasFullName = userMetadata?.full_name;
+    const shouldInvalidateCache = cacheHasEmptyNames && userHasFullName;
+    
+    if (profileCache.loaded && profileCache.userId === userId && profileCache.data && !shouldInvalidateCache) {
+      return { data: profileCache.data, source: 'memory-cache' };
+    }
+    
+    // 2. localStorage cache
+    try {
+      const storedProfile = localStorage.getItem(`profile_${userId}`);
+      if (storedProfile) {
+        const parsed = JSON.parse(storedProfile);
+        if (parsed && (parsed.firstName || parsed.lastName || parsed.email)) {
+          // Load avatar separately (stored outside main JSON to keep parse fast)
+          const cachedAvatar = localStorage.getItem(`profile_avatar_${userId}`);
+          return { data: { ...parsed, email: email || parsed.email, profileImage: cachedAvatar || parsed.profileImage || null }, source: 'localStorage' };
+        }
+      }
+    } catch (err) {
+      console.warn('[PersonalInfo] Error reading localStorage cache:', err);
+    }
+    
+    // 3. user_metadata fallback
+    const fullName = userMetadata?.full_name || '';
+    const nameParts = fullName.trim().split(' ').filter(n => n);
+    return {
+      data: {
+        firstName: nameParts[0] || '',
+        lastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : '',
+        email: email || '',
+        phone: '',
+        address: '',
+        profileImage: null,
+        memberSince: 'Recently'
+      },
+      source: 'user-metadata'
+    };
+  };
+
+  // Load profile data — stale-while-revalidate approach
+  // Shows cached/fallback data instantly, then refreshes from server in background
   useEffect(() => {
     const loadProfileData = async () => {
       if (!user?.id) {
@@ -60,50 +104,55 @@ const PersonalInfo = () => {
         return;
       }
       
-      // Use module-level cache to prevent reload on remount
-      // But invalidate if cache has empty names and user_metadata has full_name
-      const cacheHasEmptyNames = profileCache.data && !profileCache.data.firstName && !profileCache.data.lastName;
-      const userHasFullName = user.user_metadata?.full_name;
-      const shouldInvalidateCache = cacheHasEmptyNames && userHasFullName;
+      // STEP 1: Show local data immediately (no loading spinner)
+      const local = getLocalFallbackData(user.id, user.email, user.user_metadata);
+      console.log(`[PersonalInfo] Instant display from ${local.source}`);
       
-      if (profileCache.loaded && profileCache.userId === user.id && profileCache.data && !shouldInvalidateCache) {
-        console.log('[PersonalInfo] Using cached profile data');
-        setUserData(profileCache.data);
-        setFormData(profileCache.data);
-        setIsLoading(false);
+      if (isMountedRef.current) {
+        setUserData(local.data);
+        setFormData(local.data);
+        setIsLoading(false); // Unblock UI immediately
+      }
+      
+      // Update module-level cache
+      profileCache.userId = user.id;
+      profileCache.data = local.data;
+      profileCache.loaded = true;
+      
+      // If we already have a memory-cache hit, skip server fetch
+      if (local.source === 'memory-cache') {
         return;
       }
       
+      // STEP 2: Fetch fresh data from server in background
       try {
-        if (isMountedRef.current) setIsLoading(true);
-        console.log('[PersonalInfo] Loading profile for user:', user.id);
+        console.log('[PersonalInfo] Background-fetching profile for user:', user.id);
         
-        // Add timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Profile loading timeout')), 5000)
-        );
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         
-        // Fetch user profile from Supabase with timeout
-        const fetchPromise = supabase
+        const { data: profileData, error } = await supabase
           .from('profiles')
           .select('id, email, first_name, last_name, phone, address, avatar_url, created_at')
           .eq('id', user.id)
+          .abortSignal(controller.signal)
           .maybeSingle();
         
-        const { data: profileData, error } = await Promise.race([fetchPromise, timeoutPromise]);
+        clearTimeout(timeoutId);
+        
+        if (!isMountedRef.current) return;
         
         if (error && error.code !== 'PGRST116') {
-          console.error('[PersonalInfo] Error loading profile:', error);
-          throw error;
+          console.warn('[PersonalInfo] Background fetch error:', error.message);
+          return; // Keep showing local data
         }
         
         if (profileData) {
-          // Calculate member since date from created_at
           const memberSince = profileData.created_at 
             ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
             : 'Recently';
           
-          const loadedData = {
+          const freshData = {
             firstName: profileData.first_name || '',
             lastName: profileData.last_name || '',
             email: profileData.email || user.email || '',
@@ -113,101 +162,28 @@ const PersonalInfo = () => {
             memberSince: memberSince
           };
           
-          setUserData(loadedData);
-          setFormData(loadedData);
+          setUserData(freshData);
+          setFormData(freshData);
           
-          // Update module-level cache
+          // Update caches
           profileCache.userId = user.id;
-          profileCache.data = loadedData;
+          profileCache.data = freshData;
           profileCache.loaded = true;
-          
-          // Also cache in localStorage for offline access
-          localStorage.setItem(`profile_${user.id}`, JSON.stringify(loadedData));
-          console.log('[PersonalInfo] Profile loaded successfully');
-        } else {
-          // No profile found - this is a new user
-          console.log('[PersonalInfo] No profile found, will create on first save');
-          
-          // Try localStorage as fallback
-          const storedProfile = localStorage.getItem(`profile_${user.id}`);
-          if (storedProfile) {
-            try {
-              const parsedProfile = JSON.parse(storedProfile);
-              const fallbackData = { ...userData, ...parsedProfile, email: user.email };
-              setUserData(fallbackData);
-              setFormData(fallbackData);
-              
-              // Update module-level cache
-              profileCache.userId = user.id;
-              profileCache.data = fallbackData;
-              profileCache.loaded = true;
-              
-              console.log('[PersonalInfo] Loaded from localStorage');
-            } catch (err) {
-              console.error('[PersonalInfo] Error parsing cached profile:', err);
-            }
-          } else {
-            // Set default data for new user - use full_name from user_metadata if available
-            const fullName = user.user_metadata?.full_name || '';
-            const nameParts = fullName.trim().split(' ').filter(n => n);
-            const firstName = nameParts[0] || '';
-            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-            
-            const defaultData = {
-              firstName: firstName,
-              lastName: lastName,
-              email: user.email || '',
-              phone: '',
-              address: '',
-              profileImage: null,
-              memberSince: 'Recently'
-            };
-            setUserData(defaultData);
-            setFormData(defaultData);
-            
-            // Update module-level cache with default data
-            profileCache.userId = user.id;
-            profileCache.data = defaultData;
-            profileCache.loaded = true;
-            
-            console.log('[PersonalInfo] Initialized with data from user_metadata:', { firstName, lastName });
+          // Store avatar separately to keep main profile JSON small and fast to parse
+          const { profileImage: avatar, ...profileWithoutAvatar } = freshData;
+          localStorage.setItem(`profile_${user.id}`, JSON.stringify(profileWithoutAvatar));
+          if (avatar) {
+            localStorage.setItem(`profile_avatar_${user.id}`, avatar);
           }
+          
+          console.log('[PersonalInfo] Profile updated from server');
         }
       } catch (error) {
-        console.error('[PersonalInfo] Error in loadProfileData:', error);
-        
-        // Handle timeout specifically
-        if (error.message === 'Profile loading timeout') {
-          console.log('[PersonalInfo] Profile loading timed out, using fallback');
-          // Use user metadata as fallback
-          const fullName = user.user_metadata?.full_name || '';
-          const nameParts = fullName.trim().split(' ').filter(n => n);
-          const firstName = nameParts[0] || '';
-          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-          
-          const fallbackData = {
-            firstName: firstName,
-            lastName: lastName,
-            email: user.email || '',
-            phone: '',
-            address: '',
-            profileImage: null,
-            memberSince: 'Recently'
-          };
-          
-          if (isMountedRef.current) {
-            setUserData(fallbackData);
-            setFormData(fallbackData);
-            setSaveMessage({ type: 'error', text: 'Profile loading timed out, showing basic info' });
-            setTimeout(() => setSaveMessage(null), 3000);
-          }
-        } else if (isMountedRef.current) {
-          setSaveMessage({ type: 'error', text: 'Failed to load profile data' });
-          setTimeout(() => setSaveMessage(null), 5000);
-        }
-      } finally {
-        if (isMountedRef.current) {
-          setIsLoading(false);
+        // Timeout or network failure — local data is already showing, no action needed
+        if (error.name === 'AbortError') {
+          console.warn('[PersonalInfo] Background fetch timed out, keeping local data');
+        } else {
+          console.warn('[PersonalInfo] Background fetch failed:', error.message);
         }
       }
     };
@@ -288,8 +264,12 @@ const PersonalInfo = () => {
       // Update local state
       setUserData({ ...formData });
       
-      // Update localStorage cache
-      localStorage.setItem(`profile_${user.id}`, JSON.stringify(formData));
+      // Update localStorage cache (avatar stored separately)
+      const { profileImage: savedAvatar, ...formWithoutAvatar } = formData;
+      localStorage.setItem(`profile_${user.id}`, JSON.stringify(formWithoutAvatar));
+      if (savedAvatar) {
+        localStorage.setItem(`profile_avatar_${user.id}`, savedAvatar);
+      }
       
       console.log('[PersonalInfo] Profile updated successfully');
       setSaveMessage({ type: 'success', text: 'Personal information updated successfully!' });
@@ -337,6 +317,8 @@ const PersonalInfo = () => {
                   src={formData.profileImage} 
                   alt="Profile" 
                   className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <span className="text-gray-400 text-4xl">👤</span>

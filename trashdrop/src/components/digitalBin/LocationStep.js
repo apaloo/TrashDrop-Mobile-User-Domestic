@@ -16,15 +16,23 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component to update map view when position changes
-const MapUpdater = ({ position }) => {
+const MapUpdater = ({ position, isNewLocation }) => {
   const map = useMapEvents({});
   
   useEffect(() => {
     // Only update map if we have a valid position with both coordinates
     if (position && Array.isArray(position) && position[0] != null && position[1] != null) {
-      map.setView(position, map.getZoom());
+      if (isNewLocation) {
+        // Smooth pan to new location with zoom
+        map.flyTo(position, 16, {
+          duration: 1.5
+        });
+      } else {
+        // Simple view update for manual marker moves
+        map.setView(position, map.getZoom());
+      }
     }
-  }, [position, map]);
+  }, [position, map, isNewLocation]);
   
   return null;
 };
@@ -70,6 +78,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [gpsHint, setGpsHint] = useState(''); // Help text for poor GPS accuracy
+  const [isNewLocation, setIsNewLocation] = useState(false); // Track if location came from GPS
 
   // Initialize form data with default values if not provided
   useEffect(() => {
@@ -113,6 +122,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           
           // Update map position to center on user's location
           setPosition([latitude, longitude]);
+          setIsNewLocation(true); // Trigger smooth map animation to user's location
           
           // Auto-check the checkbox and update form data
           updateFormData({
@@ -121,6 +131,9 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             gps_accuracy: accuracy,
             useCurrentLocation: true
           });
+          
+          // Reset the flag after animation completes
+          setTimeout(() => setIsNewLocation(false), 2000);
           
           // Reverse geocode to get address
           await reverseGeocode(latitude, longitude);
@@ -346,16 +359,11 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   
   // Handler for current location using GeolocationService
   const handleUseCurrentLocation = async (e) => {
-    // Don't prevent default - let checkbox toggle naturally
-    
-    // If unchecking, just update the form data
+    // If location already captured, do nothing
     if (formData.useCurrentLocation) {
-      updateFormData({ useCurrentLocation: false });
       return;
     }
     
-    // Set useCurrentLocation: true immediately so checkbox shows checked
-    updateFormData({ useCurrentLocation: true });
     setLoadingLocation(true);
     
     try {
@@ -383,7 +391,11 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         console.log(`[LocationStep] GPS obtained: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
         
         setPosition([latitude, longitude]);
-        updateFormData({ latitude, longitude, gps_accuracy: accuracy });
+        setIsNewLocation(true); // Mark as new GPS location for smooth animation
+        updateFormData({ latitude, longitude, gps_accuracy: accuracy, useCurrentLocation: true });
+
+        // Reset the flag after animation
+        setTimeout(() => setIsNewLocation(false), 2000);
 
         // Reverse geocode to get address
         await reverseGeocode(latitude, longitude);
@@ -460,18 +472,36 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Digital Bin Location</h2>
       
       <div className="mb-4">
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="useCurrentLocation"
-            checked={formData.useCurrentLocation || false}
-            onChange={handleUseCurrentLocation}
-            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-          />
-          <label htmlFor="useCurrentLocation" className="ml-2 block text-sm text-gray-700 dark:text-gray-400">
-            Use my current location <span className="text-red-500">*</span>
-          </label>
-        </div>
+        <button
+          type="button"
+          onClick={handleUseCurrentLocation}
+          disabled={loadingLocation || formData.useCurrentLocation}
+          className="w-full flex items-center justify-center px-4 py-3 bg-primary hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-md transition-colors font-medium"
+        >
+          {loadingLocation ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Getting location...
+            </>
+          ) : formData.useCurrentLocation ? (
+            <>
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Location captured
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+              </svg>
+              Get my current location <span className="text-red-500">*</span>
+            </>
+          )}
+        </button>
         {gpsHint && (
           <p className="mt-2 text-sm text-amber-600 dark:text-amber-400 flex items-start">
             <svg className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -518,7 +548,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
-            <MapUpdater position={position} />
+            <MapUpdater position={position} isNewLocation={isNewLocation} />
             <DraggableMarker position={position} setPosition={handlePositionChange} />
           </MapContainer>
         </div>

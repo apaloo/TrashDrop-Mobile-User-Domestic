@@ -5,13 +5,17 @@ import supabase from '../../utils/supabaseClient.js';
 import QRCodeList from './QRCodeList.js';
 import { subscribeToPickupUpdates, handlePickupUpdate } from '../../utils/realtime.js';
 import debug from '../../utils/debug.js';
+import ConfirmModal from '../ConfirmModal.js';
 
-const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
+const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCreatedBinId = null, onNewBinExpanded = null }) => {
 
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('active');
   const [localPickups, setLocalPickups] = useState([]);
   const subscriptionRef = useRef(null);  // Use ref to avoid stale closure in cleanup
+  const [cancelModal, setCancelModal] = useState({ open: false, binId: null });
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', variant: 'info' });
   
   // Load persisted QR codes from localStorage on component mount
   useEffect(() => {
@@ -162,11 +166,17 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
   
 
   
-  // Handle bin cancellation
-  const handleCancelBin = async (binId) => {
-    if (!window.confirm('Are you sure you want to cancel this digital bin? This action cannot be undone.')) {
-      return;
-    }
+  // Handle bin cancellation - show confirmation modal
+  const handleCancelBin = (binId) => {
+    setCancelModal({ open: true, binId });
+  };
+
+  // Execute bin cancellation after user confirms
+  const executeCancelBin = async () => {
+    const binId = cancelModal.binId;
+    if (!binId) return;
+
+    setIsCancelling(true);
     
     try {
       // First update local state optimistically
@@ -195,6 +205,8 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
       
       if (error) throw error;
       
+      setCancelModal({ open: false, binId: null });
+      
       // Refresh data
       onRefresh();
       
@@ -215,14 +227,17 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
       setLocalPickups(revertedBins);
       localStorage.setItem('digitalBins', JSON.stringify(revertedBins));
       
-      alert('Failed to cancel digital bin. Please try again.');
+      setCancelModal({ open: false, binId: null });
+      setAlertModal({ open: true, title: 'Cancellation Failed', message: 'Failed to cancel digital bin. Please try again.', variant: 'danger' });
+    } finally {
+      setIsCancelling(false);
     }
   };
   
   // Handle QR code sharing
   const handleShareQRCode = async (bin) => {
     if (!bin.qrCode) {
-      alert('QR code not available for this digital bin.');
+      setAlertModal({ open: true, title: 'QR Code Unavailable', message: 'QR code not available for this digital bin.', variant: 'warning' });
       return;
     }
     
@@ -241,11 +256,11 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
         tempInput.select();
         document.execCommand('copy');
         document.body.removeChild(tempInput);
-        alert('QR code link copied to clipboard!');
+        setAlertModal({ open: true, title: 'Link Copied', message: 'QR code link copied to clipboard!', variant: 'success' });
       }
     } catch (error) {
       console.error('Error sharing QR code:', error);
-      alert('Failed to share QR code. Please try again.');
+      setAlertModal({ open: true, title: 'Share Failed', message: 'Failed to share QR code. Please try again.', variant: 'danger' });
     }
   };
   
@@ -377,6 +392,8 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
               onRefresh={onRefresh}
               isLoading={isLoading}
               emptyStateMessage={getEmptyStateMessage()}
+              newlyCreatedBinId={newlyCreatedBinId}
+              onNewBinExpanded={onNewBinExpanded}
             />
             
             {/* Help Text */}
@@ -387,6 +404,28 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading }) => {
           </>
         )}
       </div>
+
+      {/* Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={cancelModal.open}
+        onClose={() => setCancelModal({ open: false, binId: null })}
+        onConfirm={executeCancelBin}
+        title="Cancel Digital Bin"
+        message="Are you sure you want to cancel this digital bin? This action cannot be undone."
+        confirmText="Cancel Bin"
+        cancelText="Keep Bin"
+        variant="danger"
+        isProcessing={isCancelling}
+      />
+
+      {/* Alert Modal (replaces browser alert) */}
+      <ConfirmModal
+        isOpen={alertModal.open}
+        onClose={() => setAlertModal({ open: false, title: '', message: '', variant: 'info' })}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
     </div>
   );
 };

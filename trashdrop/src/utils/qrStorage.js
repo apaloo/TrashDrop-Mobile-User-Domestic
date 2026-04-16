@@ -150,16 +150,12 @@ export const getQRCode = async (locationId) => {
       
       if (data) {
         console.log(`[QR Storage] Found QR code in Supabase for location: ${locationId}`);
-        // Also store locally for future use
-        const qrStorage = {
-          ...data,
-          storedAt: Date.now(),
-          syncedToSupabase: true
-        };
-        localStorage.setItem(storageKey, JSON.stringify(qrStorage));
+        // DON'T store to localStorage - Supabase data doesn't have the generated qrCodeUrl image
+        // Return null so the component knows it needs to generate a QR code
+        console.log(`[QR Storage] Supabase data doesn't have generated image, needs generation`);
       }
       
-      return data;
+      return null;
     } catch (supabaseError) {
       console.warn(`[QR Storage] Supabase fallback failed:`, supabaseError);
       return null;
