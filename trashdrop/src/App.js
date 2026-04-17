@@ -117,8 +117,9 @@ const AppContent = () => {
       }
     };
     
-    // Add a small delay to prevent auth check race conditions
-    const timeoutId = setTimeout(handleAuthCheck, 100);
+    // Add delay to allow install prompt to show first (4s)
+    // Install prompt shows at 50ms, this gives it time to be dismissed or acted upon
+    const timeoutId = setTimeout(handleAuthCheck, 4000);
     
     return () => clearTimeout(timeoutId);
   }, [location.pathname, isAuthenticated, isLoading, navigate, location]);
@@ -272,6 +273,7 @@ const App = () => {
       <ThemeProvider>
         <ToastProvider position="top-right" maxToasts={5}>
           <AuthProvider>
+            {/* Install prompt shown globally on all routes (public & private) */}
             <ForceInstallPrompt />
             <PwaInitializer />
             <PwaRecovery />

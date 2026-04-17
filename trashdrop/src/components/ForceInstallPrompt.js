@@ -12,12 +12,15 @@ const ForceInstallPrompt = () => {
   const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
+    console.log('[ForceInstallPrompt] Initializing...');
+    
     // Check if already in standalone mode (PWA installed)
     const standalone = window.matchMedia('(display-mode: standalone)').matches || 
                       window.navigator.standalone === true;
     setIsStandalone(standalone);
     
     if (standalone) {
+      console.log('[ForceInstallPrompt] Already in standalone mode');
       localStorage.setItem('trashdrop_app_installed', 'true');
       return;
     }
@@ -26,13 +29,17 @@ const ForceInstallPrompt = () => {
     const hasSeenPrompt = localStorage.getItem('trashdrop_install_prompt_seen');
     const isInstalled = localStorage.getItem('trashdrop_app_installed') === 'true';
     
+    console.log('[ForceInstallPrompt] localStorage check:', { hasSeenPrompt, isInstalled });
+    
     if (hasSeenPrompt || isInstalled) {
+      console.log('[ForceInstallPrompt] Prompt already seen or installed - exiting');
       return;
     }
 
     // Detect iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     setIsIOS(iOS);
+    console.log('[ForceInstallPrompt] Platform detection:', { iOS, userAgent: navigator.userAgent });
 
     // For iOS, show prompt immediately (no beforeinstallprompt event)
     if (iOS) {
@@ -42,25 +49,35 @@ const ForceInstallPrompt = () => {
 
     // For Android/Chrome, listen for beforeinstallprompt
     const handleBeforeInstallPrompt = (e) => {
+      console.log('[ForceInstallPrompt] beforeinstallprompt event fired');
       e.preventDefault();
       setDeferredPrompt(e);
       setShowPrompt(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    console.log('[ForceInstallPrompt] Event listener registered for beforeinstallprompt');
 
     // Also show after a delay if beforeinstallprompt doesn't fire (some browsers)
+    // Reduced to 50ms to fire before auth redirect (which happens at 100ms)
+    console.log('[ForceInstallPrompt] Setting 50ms timeout for fallback prompt');
     const timeoutId = setTimeout(() => {
+      console.log('[ForceInstallPrompt] Timeout callback executing, deferredPrompt:', !!deferredPrompt);
       if (!deferredPrompt) {
+        console.log('[ForceInstallPrompt] Timeout fired - showing prompt');
         setShowPrompt(true);
+      } else {
+        console.log('[ForceInstallPrompt] Timeout skipped - prompt already shown via event');
       }
-    }, 3000);
+    }, 50);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       clearTimeout(timeoutId);
     };
-  }, [deferredPrompt]);
+    // Empty dependency array to prevent re-running on navigation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleInstall = useCallback(async () => {
     if (deferredPrompt) {
