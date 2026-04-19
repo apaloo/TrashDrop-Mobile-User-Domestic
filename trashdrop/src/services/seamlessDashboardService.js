@@ -8,6 +8,7 @@ import seamlessCache from '../utils/seamlessCache.js';
 import userServiceOptimized from './userServiceOptimized.js';
 import requestDeduplicator from '../utils/requestDeduplication.js';
 import supabase from '../utils/supabaseClient.js';
+import { pickupService } from './pickupService.js';
 
 class SeamlessDashboardService {
   constructor() {
@@ -89,19 +90,13 @@ class SeamlessDashboardService {
       async () => {
         console.log(`[SeamlessDashboard] 📦 Fetching active pickups for user ${userId}`);
         
-        const { data, error } = await supabase
-          .from('pickup_requests')
-          .select('*')
-          .eq('user_id', userId)
-          .in('status', ['available', 'pending', 'accepted', 'en_route', 'collector_assigned'])
-          .order('created_at', { ascending: false })
-          .limit(1);
+        const result = await pickupService.getActivePickup(userId);
         
-        if (error) {
-          throw new Error(error.message || 'Failed to fetch active pickups');
+        if (result.error) {
+          throw new Error(result.error.message || 'Failed to fetch active pickups');
         }
         
-        return data || [];
+        return result.data ? [result.data] : [];
       },
       {
         ttl: 10000, // 10 seconds for pickups (more time-sensitive)
@@ -248,14 +243,8 @@ class SeamlessDashboardService {
     seamlessCache.preload(
       this.cacheKeys.activePickups(userId),
       async () => {
-        const { data } = await supabase
-          .from('pickup_requests')
-          .select('*')
-          .eq('user_id', userId)
-          .in('status', ['available', 'pending', 'accepted', 'en_route', 'collector_assigned'])
-          .order('created_at', { ascending: false })
-          .limit(1);
-        return data || [];
+        const result = await pickupService.getActivePickup(userId);
+        return result.data ? [result.data] : [];
       },
       { ttl: 10000 }
     );

@@ -21,7 +21,7 @@ export const pickupService = {
       console.log('[PickupService] Fetching active pickup for user:', userId);
 
       // Check both one-time and scheduled pickups
-      const activeStatuses = ['available', 'accepted', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up'];
+      const activeStatuses = ['pending', 'accepted', 'en_route', 'arrived', 'collecting'];
       
       // Check one-time pickups
       const { data: oneTimeData, error: oneTimeError } = await supabase
@@ -110,23 +110,50 @@ export const pickupService = {
         throw scheduledError;
       }
 
-      // Check digital bins (active bins)
+      // Check digital bins — use canonical statuses only
+      // ('pending','accepted','en_route','arrived','collecting','completed','cancelled')
       const { data: digitalBinData, error: digitalBinError } = await supabase
         .from('digital_bins')
         .select(`
           id, user_id, location_id, qr_code_url, frequency, waste_type, bag_count,
-          bin_size_liters, is_urgent, is_active, status, expires_at, collected_at,
-          collector_id, created_at, updated_at
+          is_active, status, expires_at, collected_at, collector_id, fee,
+          created_at, updated_at
         `)
         .eq('user_id', userId)
-        .eq('is_active', true)
-        .in('status', ['available', 'in_service', 'accepted'])
+        .in('status', ['pending', 'accepted', 'en_route', 'arrived', 'collecting'])
         .order('created_at', { ascending: false })
         .limit(1);
+
+      console.log('[PickupService] Digital bins query result:', {
+        data: digitalBinData,
+        error: digitalBinError,
+        count: digitalBinData?.length || 0
+      });
 
       if (digitalBinError) {
         console.error('[PickupService] Error fetching active digital bin:', digitalBinError);
         // Non-fatal, continue without digital bin data
+      }
+
+      // Fetch collector details for digital bin if collector_id exists
+      if (digitalBinData?.[0]?.collector_id) {
+        try {
+          const { data: collectorData } = await supabase
+            .from('collector_profiles')
+            .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
+            .eq('user_id', digitalBinData[0].collector_id)
+            .single();
+          
+          if (collectorData) {
+            digitalBinData[0].collector = {
+              id: collectorData.user_id,
+              ...collectorData
+            };
+            console.log('[PickupService] Fetched digital bin collector:', collectorData.first_name, collectorData.last_name);
+          }
+        } catch (collectorError) {
+          console.warn('[PickupService] Could not fetch digital bin collector details:', collectorError);
+        }
       }
 
       // Fetch location details for digital bin if exists

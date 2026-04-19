@@ -336,7 +336,7 @@ const PickupRequest = () => {
           .from('pickup_requests')
           .select('estimated_volume')
           .eq('user_id', user.id)
-          .in('status', ['pending', 'accepted', 'en_route']);
+          .in('status', ['pending', 'accepted', 'en_route', 'arrived', 'collecting']);
         
         if (pickupsError) throw pickupsError;
         

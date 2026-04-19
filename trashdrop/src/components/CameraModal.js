@@ -288,7 +288,9 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
     
     // Check photo limit early to avoid unnecessary processing
     if (photoCount >= maxPhotos) {
-      setError(`Maximum ${maxPhotos} photos reached.`);
+      // Auto-close modal when limit reached - parent will show toast
+      console.log('CameraModal: Maximum photos reached, auto-closing');
+      handleClose();
       return;
     }
 

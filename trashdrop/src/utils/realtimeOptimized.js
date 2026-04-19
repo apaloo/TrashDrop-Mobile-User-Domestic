@@ -198,11 +198,8 @@ export class RealtimeManager {
 
     // Auto-navigate when pickup is accepted or collector is en route
     const shouldNavigate = (
-      (oldStatus?.status === 'available' && newStatus?.status === 'accepted') ||
       (oldStatus?.status === 'pending' && newStatus?.status === 'accepted') ||
-      (oldStatus?.status === 'accepted' && newStatus?.status === 'en_route') ||
-      (oldStatus?.status === 'available' && newStatus?.status === 'collector_assigned') ||
-      (oldStatus?.status === 'pending' && newStatus?.status === 'collector_assigned')
+      (oldStatus?.status === 'accepted' && newStatus?.status === 'en_route')
     );
 
     if (shouldNavigate && onActivityUpdate?.handlePickupAccepted) {
