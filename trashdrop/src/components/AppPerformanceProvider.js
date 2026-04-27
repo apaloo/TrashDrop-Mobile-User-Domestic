@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import performanceMonitor from '../utils/performanceMonitor.js';
 
 /**
@@ -77,8 +77,15 @@ export const AppPerformanceProvider = ({ children }) => {
     }
   }, []);
 
+  // Refs for CLS accumulation and observer cleanup
+  const clsAccumulatorRef = useRef(0);
+  const observersRef = useRef([]);
+  const warningsLoggedRef = useRef({ lcp: false, cls: false, fid: false });
+
   // Collect Web Vitals
   useEffect(() => {
+    const observers = [];
+
     const collectWebVitals = () => {
       // Largest Contentful Paint
       if ('PerformanceObserver' in window) {
@@ -92,21 +99,22 @@ export const AppPerformanceProvider = ({ children }) => {
             }));
           });
           lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
+          observers.push(lcpObserver);
 
-          // Cumulative Layout Shift
+          // Cumulative Layout Shift — accumulate across all callbacks
           const clsObserver = new PerformanceObserver((entryList) => {
-            let clsValue = 0;
             for (const entry of entryList.getEntries()) {
               if (!entry.hadRecentInput) {
-                clsValue += entry.value;
+                clsAccumulatorRef.current += entry.value;
               }
             }
             setPerformanceMetrics(prev => ({
               ...prev,
-              cumulativeLayoutShift: clsValue
+              cumulativeLayoutShift: clsAccumulatorRef.current
             }));
           });
           clsObserver.observe({ entryTypes: ['layout-shift'] });
+          observers.push(clsObserver);
 
           // First Input Delay
           const fidObserver = new PerformanceObserver((entryList) => {
@@ -117,6 +125,7 @@ export const AppPerformanceProvider = ({ children }) => {
             }));
           });
           fidObserver.observe({ entryTypes: ['first-input'] });
+          observers.push(fidObserver);
 
         } catch (error) {
           console.warn('Performance Observer not fully supported:', error);
@@ -138,22 +147,30 @@ export const AppPerformanceProvider = ({ children }) => {
       });
     };
 
+    observersRef.current = observers;
     collectWebVitals();
+
+    return () => {
+      observers.forEach(obs => obs.disconnect());
+    };
   }, []);
 
-  // Log performance warnings
+  // Log performance warnings — only once per metric to avoid console spam
   useEffect(() => {
     const { largestContentfulPaint, cumulativeLayoutShift, firstInputDelay } = performanceMetrics;
     
-    if (largestContentfulPaint && largestContentfulPaint > 2500) {
+    if (largestContentfulPaint && largestContentfulPaint > 2500 && !warningsLoggedRef.current.lcp) {
+      warningsLoggedRef.current.lcp = true;
       console.warn(`🚨 Poor LCP: ${largestContentfulPaint.toFixed(2)}ms (should be < 2500ms)`);
     }
     
-    if (cumulativeLayoutShift && cumulativeLayoutShift > 0.1) {
+    if (cumulativeLayoutShift && cumulativeLayoutShift > 0.1 && !warningsLoggedRef.current.cls) {
+      warningsLoggedRef.current.cls = true;
       console.warn(`🚨 Poor CLS: ${cumulativeLayoutShift.toFixed(3)} (should be < 0.1)`);
     }
     
-    if (firstInputDelay && firstInputDelay > 100) {
+    if (firstInputDelay && firstInputDelay > 100 && !warningsLoggedRef.current.fid) {
+      warningsLoggedRef.current.fid = true;
       console.warn(`🚨 Poor FID: ${firstInputDelay.toFixed(2)}ms (should be < 100ms)`);
     }
   }, [performanceMetrics]);
