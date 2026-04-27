@@ -83,6 +83,7 @@ const PickupRequest = () => {
   });
   const [requestedBags, setRequestedBags] = useState(0); // Bags already in active pickups
   const [insufficientBags, setInsufficientBags] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   
   // Calculate available bags: total bags - requested bags (never below 0)
   const availableBags = Math.max(0, (userStats.totalBags || 0) - (requestedBags || 0));
@@ -672,7 +673,7 @@ const PickupRequest = () => {
             <div className="mt-3 flex space-x-4">
               <button 
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
-                onClick={() => navigate('/store')}
+                onClick={() => setShowPurchaseModal(true)}
               >
                 Purchase Bags
               </button>
@@ -841,14 +842,13 @@ const PickupRequest = () => {
                       <>
                         <div className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
                           You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.
-                          {JSON.stringify(userStats)}
                         </div>
                         <div className="mt-2 flex justify-center space-x-4">
                           <button 
-                            className="bg-blue-500 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-600 transition-colors cursor-not-allowed opacity-75"
+                            className="bg-blue-500 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-600 transition-colors"
                             onClick={(e) => {
                               e.preventDefault();
-                              alert('Coming out soon!');
+                              setShowPurchaseModal(true);
                             }}
                           >
                             Purchase Bags
@@ -1003,6 +1003,110 @@ const PickupRequest = () => {
           )}
         </Formik>
       </div>
+
+      {/* Purchase Bags — Coming Soon Modal */}
+      {showPurchaseModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setShowPurchaseModal(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          
+          {/* Modal content */}
+          <div 
+            className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle (mobile) */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="px-6 pt-4 pb-3 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900 mb-3">
+                <svg className="w-7 h-7 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white">Purchase Bags</h3>
+              <span className="inline-block mt-1 px-3 py-0.5 text-xs font-semibold text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/40 rounded-full">
+                Coming Soon
+              </span>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 pb-2">
+              <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4">
+                In-app bag purchasing is currently being developed. Soon you'll be able to buy TrashDrop QR-coded bags directly from the app!
+              </p>
+
+              {/* Pricing card */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 mb-4">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center">
+                  <svg className="w-4 h-4 mr-1.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                  Bag Pricing — Per Batch of 5 Bags
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Pricing varies by location. Visit our website for the latest rates in your area.
+                </p>
+                <a
+                  href="https://trashdrops.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  View pricing on trashdrops.com
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              </div>
+
+              {/* How to get bags now */}
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-4">
+                <h4 className="text-sm font-semibold text-green-700 dark:text-green-300 mb-2">How to get bags now</h4>
+                <ul className="text-xs text-green-600 dark:text-green-400 space-y-1.5">
+                  <li className="flex items-start">
+                    <span className="font-bold mr-1.5 mt-px">1.</span>
+                    <span>Purchase a batch from an authorized TrashDrop vendor</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="font-bold mr-1.5 mt-px">2.</span>
+                    <span>Scan the batch QR code using the <strong>Scan QR</strong> tab</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="font-bold mr-1.5 mt-px">3.</span>
+                    <span>Your bags will be credited to your account instantly</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex flex-col gap-2">
+              <button
+                className="w-full py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
+                onClick={() => {
+                  setShowPurchaseModal(false);
+                  navigate('/qr-scanner');
+                }}
+              >
+                Scan a Batch QR Code
+              </button>
+              <button
+                className="w-full py-2.5 text-gray-600 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => setShowPurchaseModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

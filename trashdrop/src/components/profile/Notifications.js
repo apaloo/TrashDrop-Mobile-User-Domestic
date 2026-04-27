@@ -140,11 +140,24 @@ const Notifications = () => {
       setIsSaving(true);
       console.log('[Notifications] Saving notification preferences for user:', user.id);
       
+      // Get current notification_preferences to preserve other settings (e.g. accessibility)
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('notification_preferences')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      // Merge notification settings with existing data to avoid overwriting other keys
+      const mergedPreferences = {
+        ...(currentProfile?.notification_preferences || {}),
+        ...notificationSettings
+      };
+      
       // Update notification preferences in Supabase
       const { error } = await supabase
         .from('profiles')
         .update({
-          notification_preferences: notificationSettings,
+          notification_preferences: mergedPreferences,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);

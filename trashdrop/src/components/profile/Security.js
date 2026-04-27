@@ -167,6 +167,17 @@ const Security = () => {
       setIsUpdating(true);
       console.log('[Security] Updating password for user:', user?.id);
       
+      // Verify current password by re-authenticating
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: passwordForm.currentPassword
+      });
+      
+      if (verifyError) {
+        console.error('[Security] Current password verification failed:', verifyError);
+        throw new Error('Current password is incorrect. Please try again.');
+      }
+      
       // Update password using Supabase Auth
       const { error } = await supabase.auth.updateUser({
         password: passwordForm.newPassword
@@ -212,24 +223,17 @@ const Security = () => {
       setIsLoggingOut(true);
       console.log('[Security] Logging out from all devices');
       
-      // Sign out using Supabase Auth (this invalidates all sessions)
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('[Security] Error logging out:', error);
-        throw error;
-      }
-      
-      // Clear all local storage
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      console.log('[Security] Logged out successfully');
-      
-      // The signOut from AuthContext will handle the redirect
+      // Use AuthContext signOut which handles Supabase signOut + state cleanup
+      // This avoids calling signOut twice (once directly, once via AuthContext)
       if (signOut) {
         await signOut();
       }
+      
+      // Clear any remaining local storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      console.log('[Security] Logged out from all devices successfully');
       
     } catch (error) {
       console.error('[Security] Error in handleLogoutAllDevices:', error);
