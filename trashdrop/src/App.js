@@ -244,6 +244,7 @@ const AppContent = () => {
               <NetworkTest />
             </PrivateRoute>
           } />
+          <Route path="/store" element={<Navigate to="/rewards" replace />} />
         </Route>
         
         {/* 404 route */}
