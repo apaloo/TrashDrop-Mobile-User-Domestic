@@ -12,6 +12,8 @@ export class RealtimeManager {
     this.subscriptions = new Map(); // userId -> subscription info
     this.channel = null;
     this.mountedRef = null;
+    this._cleaning = false; // suppress errors during cleanup
+    this._reconnectTimer = null;
   }
 
   /**
@@ -133,8 +135,22 @@ export class RealtimeManager {
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('[RealtimeManager] ✅ Optimized subscription active');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[RealtimeManager] ❌ Subscription error');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Suppress errors during intentional cleanup (e.g. sign-out)
+          if (this._cleaning) {
+            console.log('[RealtimeManager] ℹ️ Channel closed during cleanup — expected');
+            return;
+          }
+          console.warn(`[RealtimeManager] ⚠️ Subscription ${status}, will retry...`);
+          // Auto-reconnect if component is still mounted
+          if (this.mountedRef?.current && this.subscriptions.has(userId)) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = setTimeout(() => {
+              this.reconnectSubscription(userId);
+            }, 3000);
+          }
+        } else if (status === 'CLOSED') {
+          console.log('[RealtimeManager] ℹ️ Channel closed for user:', userId);
         }
       });
 
@@ -304,9 +320,16 @@ export class RealtimeManager {
     const subscription = this.subscriptions.get(userId);
     if (subscription?.channel) {
       console.log('[RealtimeManager] 🧹 Cleaning up subscription for user:', userId);
+      this._cleaning = true;
+      clearTimeout(this._reconnectTimer);
       supabase.removeChannel(subscription.channel);
+      // Reset cleaning flag after a tick so late-arriving callbacks are suppressed
+      setTimeout(() => { this._cleaning = false; }, 500);
     }
     this.subscriptions.delete(userId);
+    if (this.channel === subscription?.channel) {
+      this.channel = null;
+    }
   }
 
   /**
