@@ -23,8 +23,8 @@ const MapViewController = ({ position }) => {
   
   useEffect(() => {
     if (position && position.length === 2) {
-      // Fly to the new position with smooth animation
-      map.flyTo(position, 15, {
+      // Fly to the new position with smooth animation and tight focus
+      map.flyTo(position, 17, {
         duration: 1.5, // Animation duration in seconds
         easeLinearity: 0.25
       });
@@ -35,11 +35,14 @@ const MapViewController = ({ position }) => {
 };
 
 // Component for handling map clicks
-const LocationMarker = ({ position, setPosition, disabled }) => {
+const LocationMarker = ({ position, setPosition, onMapClick, disabled }) => {
   const map = useMapEvents({
     click(e) {
       if (!disabled) {
         setPosition([e.latlng.lat, e.latlng.lng]);
+        if (onMapClick) {
+          onMapClick(e.latlng);
+        }
       }
     },
   });
@@ -915,7 +918,7 @@ const DumpingReportForm = ({ onSuccess }) => {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   />
                   <MapViewController position={mapPosition} />
-                  <LocationMarker position={mapPosition} setPosition={setMapPosition} disabled={showCamera} />
+                  <LocationMarker position={mapPosition} setPosition={setMapPosition} onMapClick={handleMapClick} disabled={showCamera} />
                   {mapPosition && <Marker position={mapPosition} />}
                 </MapContainer>
 
