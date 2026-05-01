@@ -17,6 +17,7 @@ import ReviewStep from '../components/digitalBin/ReviewStep.js';
 import ScheduledQRTab from '../components/digitalBin/ScheduledQRTab.js';
 import { getCostBreakdown } from '../utils/costCalculator.js';
 import { prepareDigitalBinData } from '../services/digitalBinService.js';
+import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
 
 
@@ -815,7 +816,28 @@ function DigitalBin() {
       }
       
       debug.log('[DigitalBin] Successfully created digital bin:', binData);
-      
+
+      // Upload waste bin photos to Supabase Storage and persist URLs
+      const photoBlobUrls = (formData.photos || []).filter(p => p && (p.startsWith('blob:') || p.startsWith('data:')));
+      if (photoBlobUrls.length > 0) {
+        console.log('[DigitalBin] Uploading', photoBlobUrls.length, 'waste bin photo(s)...');
+        const uploadResult = await uploadPhotos(photoBlobUrls, user.id);
+        if (uploadResult.success && uploadResult.publicUrls.length > 0) {
+          console.log('[DigitalBin] Photos uploaded:', uploadResult.publicUrls);
+          const { error: photoUpdateError } = await supabase
+            .from('digital_bins')
+            .update({ photo_urls: uploadResult.publicUrls })
+            .eq('id', binData.id);
+          if (photoUpdateError) {
+            console.warn('[DigitalBin] Could not save photo URLs to bin record:', photoUpdateError.message);
+          } else {
+            console.log('[DigitalBin] photo_urls saved to digital_bins row');
+          }
+        } else {
+          console.warn('[DigitalBin] Photo upload partially failed:', uploadResult);
+        }
+      }
+
       // Store the newly created bin ID for auto-expand in the list
       setNewlyCreatedBinId(binData.id);
       debug.log('[DigitalBin] Set newlyCreatedBinId:', binData.id);

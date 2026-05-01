@@ -26,6 +26,24 @@ const blobUrlToFile = async (blobUrl, filename) => {
 };
 
 /**
+ * Convert data URL (base64) to File object
+ * @param {string} dataUrl - The data URL (e.g. data:image/jpeg;base64,...)
+ * @param {string} filename - The desired filename
+ * @returns {File} File object
+ */
+const dataUrlToFile = (dataUrl, filename) => {
+  const [header, base64] = dataUrl.split(',');
+  const mimeMatch = header.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const byteCharacters = atob(base64);
+  const byteArray = new Uint8Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteArray[i] = byteCharacters.charCodeAt(i);
+  }
+  return new File([byteArray], filename, { type: mime });
+};
+
+/**
  * Validate photo file
  * @param {File} file - File to validate
  * @returns {Object} Validation result {valid: boolean, error?: string}
@@ -70,9 +88,15 @@ export const uploadPhoto = async (blobUrl, userId, originalFilename = 'photo.jpg
   try {
     console.log('[PhotoUpload] Starting photo upload for user:', userId);
 
-    // Convert blob URL to File object
-    const file = await blobUrlToFile(blobUrl, originalFilename);
-    console.log('[PhotoUpload] Converted blob to file:', file.name, file.size, 'bytes');
+    // Convert data URL or blob URL to File object
+    let file;
+    if (blobUrl.startsWith('data:')) {
+      file = dataUrlToFile(blobUrl, originalFilename);
+      console.log('[PhotoUpload] Converted data URL to file:', file.name, file.size, 'bytes');
+    } else {
+      file = await blobUrlToFile(blobUrl, originalFilename);
+      console.log('[PhotoUpload] Converted blob URL to file:', file.name, file.size, 'bytes');
+    }
 
     // Validate the photo
     const validation = validatePhoto(file);
