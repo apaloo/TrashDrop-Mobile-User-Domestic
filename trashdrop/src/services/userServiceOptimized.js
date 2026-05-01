@@ -40,18 +40,24 @@ export const userServiceOptimized = {
           console.log('[UserServiceOptimized] No stats from view for user:', userId, '— trying direct user_stats table');
           // View may return nothing if profiles row is missing; query user_stats directly
           try {
-            const { data: directStats } = await supabase
-              .from('user_stats')
-              .select('*')
-              .eq('user_id', userId)
-              .maybeSingle();
+            const [{ data: directStats }, { count: reportCount }] = await Promise.all([
+              supabase
+                .from('user_stats')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle(),
+              supabase
+                .from('illegal_dumping_mobile')
+                .select('id', { count: 'exact', head: true })
+                .eq('reported_by', userId)
+            ]);
             if (directStats) {
               console.log('[UserServiceOptimized] Found direct user_stats:', directStats);
               return {
                 data: {
                   points: 0,
                   pickups: 0,
-                  reports: 0,
+                  reports: reportCount || 0,
                   batches: directStats.total_batches || 0,
                   totalBags: directStats.total_bags || directStats.available_bags || 0,
                   available_bags: directStats.available_bags || 0,
@@ -62,7 +68,7 @@ export const userServiceOptimized = {
                   avatar: '',
                   last_updated: directStats.created_at || new Date().toISOString(),
                   _source: 'direct_user_stats',
-                  _query_count: 2
+                  _query_count: 3
                 },
                 error: null
               };
@@ -218,22 +224,28 @@ export const userServiceOptimized = {
       if (!data) {
         console.log('[UserServiceOptimized] Main view empty, querying user_stats table directly');
         try {
-          const { data: directStats } = await supabase
-            .from('user_stats')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+          const [{ data: directStats }, { count: reportCount }] = await Promise.all([
+            supabase
+              .from('user_stats')
+              .select('*')
+              .eq('user_id', userId)
+              .maybeSingle(),
+            supabase
+              .from('illegal_dumping_mobile')
+              .select('id', { count: 'exact', head: true })
+              .eq('reported_by', userId)
+          ]);
           if (directStats) {
             console.log('[UserServiceOptimized] Found direct user_stats:', directStats);
             return {
               points: 0,
               pickups: 0,
-              reports: 0,
+              reports: reportCount || 0,
               batches: directStats.total_batches || 0,
               totalBags: directStats.total_bags || directStats.available_bags || 0,
               available_bags: directStats.available_bags || 0,
               _source: 'direct_user_stats',
-              _query_count: 2
+              _query_count: 3
             };
           }
         } catch (directErr) {
