@@ -317,10 +317,14 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
     }
 
     try {
-      // Ultra-small canvas size to guarantee no crashes
-      // Fixed dimensions regardless of camera to prevent variable memory usage
-      const captureWidth = 480; // Even smaller than before
-      const captureHeight = 270; // 16:9 aspect ratio
+      // Use native video resolution capped at 1280x960 for good quality without crashing
+      const maxWidth = 1280;
+      const maxHeight = 960;
+      const videoW = video.videoWidth || maxWidth;
+      const videoH = video.videoHeight || maxHeight;
+      const scale = Math.min(maxWidth / videoW, maxHeight / videoH, 1);
+      const captureWidth = Math.round(videoW * scale);
+      const captureHeight = Math.round(videoH * scale);
       
       console.log('CameraModal: Capture size', { captureWidth, captureHeight });
       
@@ -331,13 +335,12 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
       // Force garbage collection before drawing (unofficial but helps)
       if (window.gc) window.gc();
       
-      // Simple draw operation with fixed dimensions
-      // Using willReadFrequently=true attribute for performance optimization
+      // Draw at native resolution for sharpness
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
       
-      // Very low quality JPEG to minimize memory use
-      const dataURL = canvas.toDataURL('image/jpeg', 0.3);
+      // Good quality JPEG - 0.82 balances file size and sharpness
+      const dataURL = canvas.toDataURL('image/jpeg', 0.82);
       
       // Clear canvas immediately after capture to free memory
       ctx.clearRect(0, 0, canvas.width, canvas.height);
