@@ -1,326 +1,277 @@
-Below are detailed instructions for developing the TrashDrop mobile app as a Progressive Web App (PWA) using React, based on the provided prompts. These instructions cover the entire development process, from project setup to deployment, ensuring the app is robust, secure, and user-friendly with offline capabilities.
+# TrashDrop Mobile User App — Technical Reference
+
+> **Last updated:** May 2026
+> This document reflects the **current implemented state** of the TrashDrop mobile PWA for domestic users.
 
 ---
 
-## Instructions for Developing the TrashDrop Mobile App as a React PWA
+## 1. Project Overview
 
-### 1. Project Architecture & Configuration
-Set up the TrashDrop application as a React-based PWA with a structured architecture:
-
-- **React Setup**:
-  - Initialize the project with `npx create-react-app trashdrop --template cra-template-pwa` to enable PWA support with a service worker.
-  - Install React Router (`npm install react-router-dom`) for client-side navigation.
-  - Use the Context API for global state management (e.g., authentication). Install Redux (`npm install redux react-redux`) if complexity increases later.
-  - Organize the project: `src/components/` for reusable UI, `src/pages/` for routed pages, `src/services/` for API calls, and `src/utils/` for helper functions.
-
-- **Express.js Backend Structure**:
-  - Create a separate backend folder with `routes/` (API endpoints), `controllers/` (business logic), `middleware/` (authentication, error handling), and `services/` (data operations).
-  - Use async/await for error handling and middleware like `express-rate-limit` and `cors` (configured for ngrok in development).
-
-- **PWA Features**:
-  - Modify `src/service-worker.js` to cache key assets (e.g., HTML, CSS, JS) for offline use.
-  - Create `public/manifest.json` with app metadata (name, icons, theme colors) for installability.
-  - Implement offline fallbacks by caching critical pages in the service worker.
-
-- **Configuration Management**:
-  - Use `.env` files (e.g., `.env.development`, `.env.production`) with `dotenv` for environment variables.
-  - Create `src/utils/app-config.js` for client-side configs and `server/config-manager.js` for server-side settings.
-
-- **Security Measures**:
-  - Use `helmet` for secure headers, enforce HTTPS, and sanitize inputs with `sanitize-html`.
-  - Implement CSRF protection with `csurf` and use parameterized queries with Supabase.
+TrashDrop is a Progressive Web App (PWA) for domestic waste management. Users can request waste pickups, register digital bins, report illegal dumping, scan QR codes on waste bags, track collectors in real time, and earn rewards. The app is mobile-first, installable, and works offline.
 
 ---
 
-### 2. Authentication System
-Build a secure authentication system with React and Supabase:
+## 2. Tech Stack
 
-- **Supabase Integration**:
-  - Install Supabase client (`npm install @supabase/supabase-js`) and initialize it in `src/services/supabase.js`.
-  - Store JWT tokens in local storage with secure handling (e.g., `localStorage.setItem('token', token)`).
-  - Use a `useEffect` hook for silent token refresh.
-
-- **Authentication Flow**:
-  - Create components: `Login.js`, `Register.js`, and `ResetPassword.js` in `src/pages/`.
-  - Use React Router to navigate between them (e.g., `/login`, `/register`).
-  - Implement email verification and social login with Supabase APIs.
-
-- **Auth State Management**:
-  - Create `src/context/AuthContext.js` with Context API to manage `isAuthenticated` and `user`.
-  - Use `PrivateRoute.js` to protect authenticated routes.
-
-- **Development Features**:
-  - Mock auth responses in `src/mocks/auth.js` for offline testing.
-  - Add debug logging with `console.log`, redacting sensitive data.
+| Layer | Technology |
+|---|---|
+| **Framework** | React 18 (Create React App + CRACO override) |
+| **Routing** | React Router DOM v6 |
+| **Styling** | Tailwind CSS 3 + Material UI 5 (`@mui/material`, `@mui/x-date-pickers`) |
+| **State** | React Context API (`AuthContext`, `ThemeContext`, `OfflineQueueContext`) |
+| **Backend / DB** | Supabase (auth, Postgres, storage, realtime, RPC functions) |
+| **Maps** | React-Leaflet + Leaflet Routing Machine |
+| **QR** | qr-scanner, qrcode.react |
+| **Forms** | Formik + Yup validation |
+| **Offline** | IndexedDB via `idb`, Workbox service worker, custom sync services |
+| **PWA** | Custom service worker, manifest.json, install prompts |
+| **Build** | CRACO (wraps react-scripts 5) |
+| **Deployment** | Netlify (auto-deploy from `trashdrop/` subfolder) |
+| **CI/CD** | GitHub Actions (`.github/workflows/ci-cd.yml`) |
+| **Testing** | Jest + React Testing Library, Cypress for E2E |
 
 ---
 
-### 3. UI Framework & Navigation
-Design a responsive UI with React components:
+## 3. Project Structure
 
-- **Responsive Layout**:
-  - Install Tailwind CSS (`npm install -D tailwindcss`) and configure it for mobile-first design.
-  - Create reusable components like `Grid.js` and `Card.js` in `src/components/`.
+**Important:** The app source lives in `/trashdrop/src/`. There is a legacy `/src/` folder at the repo root — **do not edit it**.
 
-- **Navigation**:
-  - Set up React Router in `src/App.js` with routes for each page.
-  - Create `NavBar.js` with active state highlighting using `NavLink`.
-
-- **Dark Mode**:
-  - Use CSS variables in `src/index.css` and toggle with a `ThemeContext` in `src/context/ThemeContext.js`.
-  - Persist theme in local storage.
-
-- **Modal Management**:
-  - Create `Modal.js` using React portals for modals with accessibility features.
-
-- **Base URL Handling**:
-  - Set `basename` in `BrowserRouter` for environment-specific routing.
-
----
-
-### 4. Dashboard Module
-Develop the dashboard with React components:
-
-- **Dashboard Structure**:
-  - Build `Dashboard.js` with a grid layout using Tailwind CSS.
-  - Use `LoadingSpinner.js` for loading states.
-
-- **Data Fetching**:
-  - Install React Query (`npm install @tanstack/react-query`) for fetching and caching data from Supabase.
-  - Use `useEffect` for background updates.
-
-- **Interactive Elements**:
-  - Install React-Leaflet (`npm install react-leaflet leaflet`) for map integration.
-  - Use WebSockets or polling for real-time updates.
-
-- **Event Handlers**:
-  - Manage events with hooks like `useState` and `useEffect`.
-
----
-
-### 5. QR Code Scanner Module
-Implement the QR code scanner:
-
-- **Camera Integration**:
-  - Install `react-qr-reader` (`npm install react-qr-reader`) and create `QRScanner.js`.
-  - Handle permissions with React state.
-
-- **Scanning Workflow**:
-  - Use state to display scan results and provide feedback with UI components.
-
-- **Offline Support**:
-  - Store scans in IndexedDB using `idb` library (`npm install idb`).
-  - Sync with service workers.
-
-- **Scan History**:
-  - Display history in `ScanHistory.js` with React Query.
-
----
-
-### 6. Pickup Request System
-Create the pickup request feature:
-
-- **Multi-Step Form**:
-  - Use `PickupForm.js` with React state or Formik (`npm install formik`) for validation.
-  - Manage steps with state or React Router.
-
-- **Map Integration**:
-  - Use React-Leaflet for location selection with draggable markers.
-
-- **Scheduling**:
-  - Use a date picker library (`npm install react-datepicker`) in `SchedulePickup.js`.
-
-- **Offline Support**:
-  - Persist form data in local storage and sync with service workers.
-
----
-
-### 7. Illegal Dumping Reporting Module
-Build the reporting feature:
-
-- **Report Creation**:
-  - Create `ReportForm.js` with photo upload and React-Leaflet for location.
-
-- **Camera Functionality**:
-  - Use `react-webcam` (`npm install react-webcam`) for photo capture.
-
-- **Offline Support**:
-  - Store reports in IndexedDB and sync with service workers.
-
-- **Report History**:
-  - Display in `ReportHistory.js` with React Query.
-
----
-
-### 8. Rewards & Points System
-Implement the rewards system:
-
-- **Rewards Catalog**:
-  - Create `RewardsCatalog.js` with filtering using state.
-
-- **Redemption Flow**:
-  - Use `RedemptionModal.js` for the redemption process.
-
-- **Points Management**:
-  - Display points in `PointsDisplay.js` with animations.
-
-- **API Integration**:
-  - Fetch data with React Query.
-
----
-
-### 9. Data Synchronization & Offline Support
-Enable offline functionality:
-
-- **Service Worker**:
-  - Use Workbox (`npm install workbox-window`) for advanced caching.
-
-- **Offline Data Storage**:
-  - Use IndexedDB for data persistence.
-
-- **User Experience**:
-  - Show offline status with `OfflineIndicator.js`.
-
-- **Feature-Specific Support**:
-  - Cache maps and forms for offline use.
-
----
-
-### 10. Deployment & Docker Configuration
-Prepare for deployment:
-
-- **Docker Setup**:
-  - Create a `Dockerfile` to build and serve the React app with Nginx.
-
-- **PWA Configuration**:
-  - Ensure `manifest.json` and service worker are included in the build.
-
-- **Environment Variables**:
-  - Inject variables during `npm run build`.
-
----
-
-### 11. Security Implementation
-Secure the app:
-
-- **Authentication Security**:
-  - Use HttpOnly cookies for JWTs if possible.
-
-- **Data Protection**:
-  - Sanitize inputs and use parameterized queries.
-
-- **Frontend Security**:
-  - Add CSP headers in `public/index.html`.
-
----
-
-### 12. Performance Optimization
-Optimize performance:
-
-- **Code Splitting**:
-  - Use `React.lazy` and `Suspense` for dynamic imports.
-
-- **Asset Optimization**:
-  - Compress images and minify files.
-
-- **Caching**:
-  - Cache assets with service workers and React Query.
-
----
-
-### 13. Mock Data Seeding with React
-Facilitate development with mock data:
-
-- **Mock Data**:
-  - Create mock files in `src/mocks/` and use `msw` (`npm install msw`) to intercept requests.
-
-- **Configuration**:
-  - Toggle mocks with `.env` variables.
-
-- **Example Operation**:
-  - Mock API responses for testing.
-
----
-
-Below is a sample implementation of the app's entry point to demonstrate the setup:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TrashDrop</title>
-  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="manifest" href="/manifest.json">
-</head>
-<body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect, createContext, useContext } = React;
-
-    // Auth Context
-    const AuthContext = createContext();
-    const AuthProvider = ({ children }) => {
-      const [user, setUser] = useState(null);
-      useEffect(() => {
-        // Simulate auth check
-        setUser({ id: 1, name: "User" });
-      }, []);
-      return (
-        <AuthContext.Provider value={{ user, setUser }}>
-          {children}
-        </AuthContext.Provider>
-      );
-    };
-
-    // Navigation
-    const NavBar = () => (
-      <nav className="bg-blue-500 p-4 text-white">
-        <ul className="flex space-x-4">
-          <li><a href="/" className="hover:underline">Home</a></li>
-          <li><a href="/dashboard" className="hover:underline">Dashboard</a></li>
-        </ul>
-      </nav>
-    );
-
-    // Main App
-    const App = () => {
-      const { user } = useContext(AuthContext);
-      return (
-        <div className="min-h-screen bg-gray-100">
-          <NavBar />
-          <div className="p-4">
-            <h1 className="text-2xl font-bold">Welcome to TrashDrop, {user?.name || "Guest"}!</h1>
-          </div>
-        </div>
-      );
-    };
-
-    // Render
-    ReactDOM.render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>,
-      document.getElementById("root")
-    );
-
-    // Service Worker Registration
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/service-worker.js")
-        .then(reg => console.log("Service Worker registered", reg))
-        .catch(err => console.error("Service Worker registration failed", err));
-    }
-  </script>
-</body>
-</html>
 ```
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
+trashdrop/
+├── public/              # Static assets, manifest.json, PWA icons
+├── netlify.toml         # Netlify build & redirect config
+├── craco.config.js      # CRACO overrides for CRA
+├── package.json         # Dependencies & scripts
+└── src/
+    ├── App.js           # Root component, routing, provider tree
+    ├── index.js         # Entry point, service worker registration
+    ├── components/      # Reusable UI components
+    │   ├── digitalBin/  # Digital bin wizard steps
+    │   ├── profile/     # Profile sub-pages
+    │   └── collection/  # Collection components
+    ├── pages/           # Route-level page components
+    ├── services/        # Supabase API & business logic services
+    ├── context/         # React Context providers (Auth, Theme, OfflineQueue)
+    ├── hooks/           # Custom hooks (useGpsRefinement, useOptimizedData, useTheme)
+    ├── utils/           # Helpers, clients, offline storage, realtime, etc.
+    ├── styles/          # Additional CSS
+    ├── theme/           # MUI theme configuration
+    └── service-worker.js # Workbox-based service worker
+```
 
+---
+
+## 4. Authentication
+
+- **Provider:** Supabase Auth (email/password, social login, email verification)
+- **Context:** `src/context/AuthContext.js` — manages `isAuthenticated`, `user`, silent token refresh, session persistence via `localStorage`
+- **Route protection:** `src/components/PrivateRoute.js` wraps all authenticated routes
+- **Error handling:** `AuthErrorBoundary.js`, `AuthFallback.js` for graceful auth failure recovery
+- **Pages:** `Login.js`, `Register.js`, `ResetPassword.js`, `ResetPasswordConfirm.js`, `AuthCallback.js`
+
+---
+
+## 5. Routing (App.js)
+
+### Public Routes
+| Path | Component |
+|---|---|
+| `/login` | Login |
+| `/register` | Register |
+| `/reset-password` | ResetPassword |
+| `/reset-password-confirm` | ResetPasswordConfirm |
+| `/auth/callback` | AuthCallback |
+
+### Protected Routes (wrapped in `<PrivateRoute>` + `<Layout>`)
+| Path | Component | Description |
+|---|---|---|
+| `/dashboard` | Dashboard | Main hub with stats, active pickups, onboarding |
+| `/qr-scanner` | QRScanner | Scan waste bag QR codes |
+| `/pickup-request` | PickupRequest | Request a new waste pickup |
+| `/digital-bin` | DigitalBin | Multi-step bin registration wizard |
+| `/report` | DumpingReport | Report illegal dumping |
+| `/rewards` | Rewards | View/redeem reward points |
+| `/activity` | Activity | Activity & transaction history |
+| `/profile` | Profile | User profile with sub-tabs |
+| `/payment-methods` | PaymentMethods | Manage payment methods |
+| `/notifications` | Notifications | Notification center |
+| `/collector-tracking` | CollectorTracking | Real-time Uber-style collector tracking |
+| `/collection/:collectionId` | CollectionForm | Active collection details |
+| `/collection-qr` | CollectionQRCode | QR code for collection |
+| `/store` | → redirects to `/rewards` | Legacy redirect |
+
+---
+
+## 6. Core Features (Implemented)
+
+### 6.1 Dashboard
+- Grid layout with Tailwind CSS, skeleton loaders, real-time data
+- **Onboarding system** (`OnboardingFlow.js` + `onboardingService.js`): guided walkthrough for new users with smart step detection based on progress (bags, locations, QR scans), force parameter (`?force=true`) for re-triggering
+- Active pickup cards (`ActivePickupCard.js`) with live status
+- Seamless dashboard service for cached data and smooth UX
+
+### 6.2 Digital Bin Registration
+Multi-step wizard in `src/components/digitalBin/`:
+- **LocationStep** — select/set bin location via Leaflet map
+- **WasteDetailsStep** — choose waste type, bin size (60L–1100L), bag count
+- **ScheduleDetailsStep** — pickup frequency (one-time, weekly, biweekly, monthly)
+- **AdditionalInfoStep** — bin photos via `CameraModal.js` (portrait-optimized, back camera, max 3 photos)
+- **ReviewStep** — confirm & submit; generates QR code
+- **QRCodeList / ScheduledQRTab** — view active digital bins and their QR codes
+
+### 6.3 Pickup Requests
+- `PickupRequest.js` — full pickup request flow with location, waste type, scheduling, payment
+- GPS-based pricing via `gpsPricingService.js` and `costCalculator.js`
+- Map integration for location selection
+- Real-time status tracking
+
+### 6.4 QR Code System
+- **Scanning:** `QRScanner.js` page + `QRReader.js` component (uses `qr-scanner` library with environment-facing camera)
+- **Batch scanning:** `BatchQRScanner.js` for scanning multiple bags
+- **Generation:** `qrcode.react` for generating QR codes on digital bins
+- **Storage:** Offline QR scan storage via IndexedDB (`qrStorage.js`)
+
+### 6.5 Illegal Dumping Reports
+- `DumpingReportForm.js` — comprehensive form with:
+  - Photo capture via `CameraModal.js` (up to 6 photos)
+  - Location via Leaflet map with auto-detect
+  - Waste type, severity, size classification
+  - Anonymous reporting option
+  - Photo upload to Supabase storage (`photoUploadService.js`)
+- Deduplication via `requestDeduplication.js` (location hash, idempotency tokens, submission fingerprints)
+
+### 6.6 Rewards & Points
+- `Rewards.js` — catalog with categories, point costs, redemption flow
+- Points earned from pickups, QR scans, dumping reports
+- User levels (Eco Starter, etc.) tracked in `profiles` table
+- Services: `rewardsService.js`
+
+### 6.7 Real-Time Collector Tracking
+- `UberStyleTrackingMap.js` — Uber-style live map showing collector location, route, ETA
+- `CollectorTracking.js` — full tracking page
+- `CollectorMap.js` — collector location display
+- Supabase Realtime subscriptions for live updates (`realtime.js`, `realtimeOptimized.js`)
+
+### 6.8 Camera System
+- `CameraModal.js` — standalone fullscreen camera modal with:
+  - Portrait-optimized constraints (`720×1280`)
+  - Back camera (`facingMode: 'environment'`)
+  - Flash effect on capture
+  - Memory management (garbage collection, URL cleanup)
+  - Crash-proof capture with canvas-based JPEG compression (0.82 quality)
+  - Photo count limits per context (3 for bins, 6 for dumping reports)
+
+### 6.9 Notifications
+- `NotificationList.js` — in-app notification display
+- `smartNotificationService.js` — intelligent notification management
+- `notificationService.js` — Supabase-backed notification CRUD
+- `toastService.js` + `ToastProvider.js` — toast notification system
+
+### 6.10 Profile Management
+Sub-pages in `src/components/profile/`:
+- **PersonalInfo** — name, email, phone, avatar
+- **Locations** — saved bin locations (CRUD with map)
+- **Notifications** — notification preferences
+- **Preferences** — dark mode, language
+- **Security** — password change
+
+---
+
+## 7. Services Layer (`src/services/`)
+
+| Service | Purpose |
+|---|---|
+| `activityService.js` | User activity/history tracking |
+| `adaptiveUpdateService.js` | Smart data refresh based on context |
+| `batchService.js` | Bag batch management |
+| `collectorService.js` | Collector data and status |
+| `digitalBinService.js` | Digital bin CRUD |
+| `dumpingService.js` | Illegal dumping report submission |
+| `gpsPricingService.js` | GPS-based pickup pricing |
+| `locationService.js` | Location management |
+| `notificationService.js` | Notification CRUD |
+| `onboardingService.js` | Onboarding state detection & management |
+| `paymentService.js` | Payment method operations |
+| `photoUploadService.js` | Photo upload to Supabase storage |
+| `pickupService.js` | Pickup request operations |
+| `rewardsService.js` | Rewards catalog & redemption |
+| `seamlessDashboardService.js` | Cached dashboard data loading |
+| `smartNotificationService.js` | Intelligent notification batching |
+| `statusService.js` | Pickup status management |
+| `syncService.js` | Offline data synchronization |
+| `toastService.js` | Toast notification management |
+| `userService.js` | User profile operations |
+
+---
+
+## 8. Offline & PWA Support
+
+- **Service Worker:** Workbox-based (`src/service-worker.js`) with asset precaching and runtime caching
+- **IndexedDB:** `src/utils/indexedDB.js` + `offlineStorage.js` for offline data persistence
+- **Offline Queue:** `src/context/OfflineQueueContext.js` queues mutations when offline
+- **Sync Services:** `syncService.js`, `pickupSyncService.js`, `binSyncService.js` for background sync
+- **Network Monitoring:** `networkMonitor.js`, `NetworkStatusRibbon.js`, `OfflineIndicator.js`
+- **Install Prompts:** `InstallPrompt.js`, `ForceInstallPrompt.js`, `PwaInitializer.js`, `PwaRecovery.js`
+- **Manifest:** `public/manifest.json` — standalone display, portrait orientation, PWA shortcuts for Report, Pickup, Locations
+
+---
+
+## 9. Performance
+
+- **Code splitting:** `React.lazy` + `Suspense` for debug/dev components
+- **Optimized data hooks:** `useOptimizedData.js` for efficient data fetching
+- **Performance monitoring:** `AppPerformanceProvider.js`, `AppPerformanceOptimizer.js`, `PerformanceMonitor.js`
+- **Image optimization:** `OptimizedImage.js` component
+- **Caching:** `seamlessCache.js` for in-memory dashboard caches
+- **Request deduplication:** `requestDeduplication.js` prevents duplicate submissions
+
+---
+
+## 10. Deployment
+
+- **Platform:** Netlify
+- **Build command:** `CI=false npm run build` (via CRACO)
+- **Publish directory:** `trashdrop/build`
+- **SPA routing:** Netlify `_redirects` / `netlify.toml` catches all routes → `index.html`
+- **CI/CD:** GitHub Actions (`.github/workflows/ci-cd.yml`)
+- **Environment variables:** Set in Netlify dashboard (Supabase URL, anon key, etc.)
+
+### Development
+```bash
+cd trashdrop
+npm install
+npm start          # Starts CRACO dev server (port 3003 or default)
+```
+
+### Production Build
+```bash
+cd trashdrop
+CI=false npm run build
+```
+
+---
+
+## 11. Key Configuration Files
+
+| File | Purpose |
+|---|---|
+| `trashdrop/package.json` | Dependencies, scripts |
+| `trashdrop/craco.config.js` | CRA overrides |
+| `trashdrop/netlify.toml` | Netlify build, redirects, headers, dev config |
+| `trashdrop/tailwind.config.js` | Tailwind CSS configuration |
+| `trashdrop/public/manifest.json` | PWA manifest |
+| `trashdrop/src/utils/supabaseClient.js` | Supabase client initialization |
+| `trashdrop/src/utils/app-config.js` | App-level config values |
+| `.github/workflows/ci-cd.yml` | CI/CD pipeline |
+
+---
+
+## 12. Database Schema (Supabase / Postgres)
+
+> WARNING: This schema is for context only and is not meant to be run.
+> Table order and constraints may not be valid for execution.
+
+```sql
 CREATE TABLE public.alerts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -1120,3 +1071,4 @@ CREATE TABLE public.withdrawals (
   CONSTRAINT withdrawals_pkey PRIMARY KEY (id),
   CONSTRAINT withdrawals_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES auth.users(id)
 );
+```

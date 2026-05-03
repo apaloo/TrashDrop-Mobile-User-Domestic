@@ -62,12 +62,12 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
         
         console.log(`CameraModal: Initializing camera (attempt ${attemptCount})...`);
         
-        // Start with more modest constraints that are more likely to succeed
+        // Portrait-optimized constraints for mobile devices
         const constraints = {
           video: {
             facingMode: 'environment', // Use back camera on mobile
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 }
+            width: { ideal: 720, max: 1080 },
+            height: { ideal: 1280, max: 1920 }
           },
           audio: false
         };
@@ -317,9 +317,10 @@ const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
     }
 
     try {
-      // Use native video resolution capped at 1280x960 for good quality without crashing
-      const maxWidth = 1280;
-      const maxHeight = 960;
+      // Use native video resolution capped for good quality without crashing
+      // Portrait-oriented cap to match portrait camera constraints
+      const maxWidth = 960;
+      const maxHeight = 1280;
       const videoW = video.videoWidth || maxWidth;
       const videoH = video.videoHeight || maxHeight;
       const scale = Math.min(maxWidth / videoW, maxHeight / videoH, 1);
