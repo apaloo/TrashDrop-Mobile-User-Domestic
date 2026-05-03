@@ -817,25 +817,32 @@ function DigitalBin() {
       
       debug.log('[DigitalBin] Successfully created digital bin:', binData);
 
-      // Upload waste bin photos to Supabase Storage and persist URLs
+      // Fire-and-forget background photo upload — does NOT block UI or success flow
       const photoBlobUrls = (formData.photos || []).filter(p => p && (p.startsWith('blob:') || p.startsWith('data:')));
       if (photoBlobUrls.length > 0) {
-        console.log('[DigitalBin] Uploading', photoBlobUrls.length, 'waste bin photo(s)...');
-        const uploadResult = await uploadPhotos(photoBlobUrls, user.id);
-        if (uploadResult.success && uploadResult.publicUrls.length > 0) {
-          console.log('[DigitalBin] Photos uploaded:', uploadResult.publicUrls);
-          const { error: photoUpdateError } = await supabase
-            .from('digital_bins')
-            .update({ photo_urls: uploadResult.publicUrls })
-            .eq('id', binData.id);
-          if (photoUpdateError) {
-            console.warn('[DigitalBin] Could not save photo URLs to bin record:', photoUpdateError.message);
+        const binId = binData.id;
+        const userId = user.id;
+        console.log('[DigitalBin] Scheduling background upload of', photoBlobUrls.length, 'photo(s) for bin:', binId);
+        uploadPhotos(photoBlobUrls, userId).then(uploadResult => {
+          if (uploadResult.success && uploadResult.publicUrls.length > 0) {
+            console.log('[DigitalBin] Background photos uploaded:', uploadResult.publicUrls);
+            supabase
+              .from('digital_bins')
+              .update({ photo_urls: uploadResult.publicUrls })
+              .eq('id', binId)
+              .then(({ error: photoUpdateError }) => {
+                if (photoUpdateError) {
+                  console.warn('[DigitalBin] Could not save photo URLs to bin record:', photoUpdateError.message);
+                } else {
+                  console.log('[DigitalBin] photo_urls saved to digital_bins row (background)');
+                }
+              });
           } else {
-            console.log('[DigitalBin] photo_urls saved to digital_bins row');
+            console.warn('[DigitalBin] Background photo upload partially failed:', uploadResult);
           }
-        } else {
-          console.warn('[DigitalBin] Photo upload partially failed:', uploadResult);
-        }
+        }).catch(err => {
+          console.warn('[DigitalBin] Background photo upload error (non-fatal):', err.message);
+        });
       }
 
       // Store the newly created bin ID for auto-expand in the list
