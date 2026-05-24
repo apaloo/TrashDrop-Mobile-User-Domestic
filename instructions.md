@@ -271,7 +271,7 @@ CI=false npm run build
 > WARNING: This schema is for context only and is not meant to be run.
 > Table order and constraints may not be valid for execution.
 
-```sql
+
 CREATE TABLE public.alerts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -453,6 +453,8 @@ CREATE TABLE public.bin_payments (
   scanned_bag_ids ARRAY DEFAULT '{}'::text[],
   gateway_transaction_id text,
   gateway_error text,
+  platform_subsidy numeric NOT NULL DEFAULT 0,
+  is_promotional boolean NOT NULL DEFAULT false,
   CONSTRAINT bin_payments_pkey PRIMARY KEY (id),
   CONSTRAINT bin_payments_digital_bin_id_fkey FOREIGN KEY (digital_bin_id) REFERENCES public.digital_bins(id),
   CONSTRAINT bin_payments_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES public.collector_profiles(id)
@@ -478,7 +480,7 @@ CREATE TABLE public.collector_profiles (
   last_name text NOT NULL,
   phone text,
   status text NOT NULL DEFAULT 'inactive'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text, 'suspended'::text, 'on_break'::text])),
-  vehicle_type text CHECK (vehicle_type = ANY (ARRAY['truck'::text, 'van'::text, 'motorcycle'::text, 'bicycle'::text, 'cart'::text, 'other'::text])),
+  vehicle_type text CHECK (vehicle_type = ANY (ARRAY['motorcycle'::text, 'tricycle'::text, 'truck'::text, 'van'::text, 'bicycle'::text, 'cart'::text, 'other'::text])),
   vehicle_plate text,
   vehicle_capacity integer,
   current_latitude numeric,
@@ -593,6 +595,9 @@ CREATE TABLE public.digital_bins (
   disposed_at timestamp with time zone,
   disposal_site_id text,
   accepted_at timestamp with time zone,
+  photo_urls ARRAY,
+  is_promotional boolean NOT NULL DEFAULT false,
+  promo_request_number integer,
   CONSTRAINT digital_bins_pkey PRIMARY KEY (id),
   CONSTRAINT digital_bins_disposal_site_id_fkey FOREIGN KEY (disposal_site_id) REFERENCES public.disposal_centers(id),
   CONSTRAINT digital_bins_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES auth.users(id),
@@ -712,7 +717,7 @@ CREATE TABLE public.illegal_dumping_mobile (
   severity text NOT NULL DEFAULT 'medium'::text CHECK (severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
   size text NOT NULL DEFAULT 'medium'::text CHECK (size = ANY (ARRAY['small'::text, 'medium'::text, 'large'::text])),
   photos ARRAY DEFAULT ARRAY[]::text[],
-  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'verified'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text])),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'verified'::text, 'in_progress'::text, 'completed'::text, 'disposed'::text, 'cancelled'::text])),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   latitude numeric,
@@ -721,8 +726,13 @@ CREATE TABLE public.illegal_dumping_mobile (
   location_hash text,
   idempotency_token text,
   submission_fingerprint text,
+  disposed_at timestamp with time zone,
+  disposal_site_id text,
+  disposal_site_name text,
+  cleanup_fee numeric,
   CONSTRAINT illegal_dumping_mobile_pkey PRIMARY KEY (id),
-  CONSTRAINT illegal_dumping_mobile_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.collector_profiles(id)
+  CONSTRAINT illegal_dumping_mobile_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.collector_profiles(id),
+  CONSTRAINT illegal_dumping_mobile_disposal_site_id_fkey FOREIGN KEY (disposal_site_id) REFERENCES public.disposal_centers(id)
 );
 CREATE TABLE public.locations (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -839,6 +849,16 @@ CREATE TABLE public.pickup_requests (
   address text,
   bag_id uuid,
   batch_id uuid,
+  collector_core_payout numeric DEFAULT NULL::numeric,
+  collector_urgent_payout numeric DEFAULT NULL::numeric,
+  collector_distance_payout numeric DEFAULT NULL::numeric,
+  collector_surge_payout numeric DEFAULT NULL::numeric,
+  collector_tips numeric DEFAULT NULL::numeric,
+  collector_recyclables_payout numeric DEFAULT NULL::numeric,
+  collector_loyalty_cashback numeric DEFAULT NULL::numeric,
+  collector_total_payout numeric DEFAULT NULL::numeric,
+  platform_share numeric DEFAULT NULL::numeric,
+  payout_breakdown jsonb,
   CONSTRAINT pickup_requests_pkey PRIMARY KEY (id),
   CONSTRAINT pickup_requests_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.collector_profiles(id),
   CONSTRAINT pickup_requests_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.batches(id),
@@ -894,6 +914,42 @@ CREATE TABLE public.profiles (
   role text DEFAULT 'user'::text,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.promotional_fee_schedule (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  bin_size_liters integer NOT NULL,
+  client_fee numeric NOT NULL,
+  collector_payout numeric NOT NULL,
+  platform_subsidy numeric DEFAULT (collector_payout - client_fee),
+  max_requests integer NOT NULL DEFAULT 5,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT promotional_fee_schedule_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.promotional_pricing (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  digital_bin_id uuid,
+  bin_size_liters integer NOT NULL,
+  client_fee numeric NOT NULL,
+  collector_payout numeric NOT NULL,
+  platform_subsidy numeric NOT NULL,
+  request_number integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT promotional_pricing_pkey PRIMARY KEY (id),
+  CONSTRAINT promotional_pricing_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT promotional_pricing_digital_bin_id_fkey FOREIGN KEY (digital_bin_id) REFERENCES public.digital_bins(id)
+);
+CREATE TABLE public.promotional_usage (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  max_requests integer NOT NULL DEFAULT 5,
+  used_count integer NOT NULL DEFAULT 0,
+  is_eligible boolean DEFAULT (used_count < max_requests),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT promotional_usage_pkey PRIMARY KEY (id),
+  CONSTRAINT promotional_usage_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.reward_redemptions (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -1051,6 +1107,16 @@ CREATE TABLE public.waste_items (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT waste_items_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.withdrawal_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  withdrawal_id uuid NOT NULL,
+  item_type text NOT NULL CHECK (item_type = ANY (ARRAY['digital_bin'::text, 'pickup_request'::text])),
+  item_id text NOT NULL,
+  amount numeric NOT NULL CHECK (amount >= 0::numeric),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT withdrawal_items_pkey PRIMARY KEY (id),
+  CONSTRAINT withdrawal_items_withdrawal_fkey FOREIGN KEY (withdrawal_id) REFERENCES public.withdrawals(id)
+);
 CREATE TABLE public.withdrawals (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   collector_id uuid NOT NULL,
@@ -1071,4 +1137,3 @@ CREATE TABLE public.withdrawals (
   CONSTRAINT withdrawals_pkey PRIMARY KEY (id),
   CONSTRAINT withdrawals_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES auth.users(id)
 );
-```

@@ -112,7 +112,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
     debug.log('[ScheduledQRTab] Received scheduledPickups:', scheduledPickups);
     debug.log('[ScheduledQRTab] Valid pickups:', validPickups);
     
-    if (validPickups && validPickups.length >= 0) {
+    if (validPickups && validPickups.length > 0) {
       // Sort by creation date, newest first
       const sortedBins = [...validPickups].sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

@@ -466,12 +466,6 @@ const NavBar = () => {
         isSigningOut={isSigningOut}
       />
       
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black text-white p-2 text-xs z-[10000]">
-          Modal State: {showSignOutModal ? 'OPEN' : 'CLOSED'}
-        </div>
-      )}
     </>
   );
 };

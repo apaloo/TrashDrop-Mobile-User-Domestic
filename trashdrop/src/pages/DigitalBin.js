@@ -19,6 +19,7 @@ import { getCostBreakdown } from '../utils/costCalculator.js';
 import { prepareDigitalBinData } from '../services/digitalBinService.js';
 import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
+import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees, incrementPromotionalUsage } from '../services/promotionalService.js';
 
 
 /**
@@ -48,6 +49,16 @@ function DigitalBin() {
   
   // Track newly created bin ID for auto-expand
   const [newlyCreatedBinId, setNewlyCreatedBinId] = useState(null);
+  
+  // Promotional pricing state
+  const [promoState, setPromoState] = useState({
+    isEligible: false,
+    usedCount: 0,
+    maxRequests: 0,
+    allFees: [],       // All promotional fee rows for banner display
+    currentFee: null,  // Fee for currently selected bin size
+    isLoading: true
+  });
   
   // Form data state
   const [formData, setFormData] = useState({
@@ -331,6 +342,25 @@ function DigitalBin() {
     // Only load data if we have a user
     if (user) {
       loadData();
+      // Check promotional eligibility
+      checkPromotionalEligibility(user.id).then(async (eligibility) => {
+        let allFees = [];
+        if (eligibility.isEligible) {
+          allFees = await getAllPromotionalFees();
+        }
+        setPromoState(prev => ({
+          ...prev,
+          isEligible: eligibility.isEligible,
+          usedCount: eligibility.usedCount,
+          maxRequests: eligibility.maxRequests,
+          allFees,
+          isLoading: false
+        }));
+        console.log('[DigitalBin] Promotional eligibility:', eligibility);
+      }).catch(err => {
+        console.warn('[DigitalBin] Promotional check failed:', err);
+        setPromoState(prev => ({ ...prev, isLoading: false }));
+      });
     }
   }, [user, authLoading, navigate]);
   
@@ -781,6 +811,13 @@ function DigitalBin() {
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
       
+      // Fetch promotional fee for the selected bin size if eligible
+      let promoFeeData = { clientFee: null, collectorPayout: null, platformSubsidy: null };
+      if (promoState.isEligible) {
+        promoFeeData = await getPromotionalFee(formData.bin_size_liters);
+        console.log('[DigitalBin] Promotional fee for', formData.bin_size_liters, 'L:', promoFeeData);
+      }
+
       const digitalBinData = await prepareDigitalBinData({
         user_id: user.id,
         location_id: locationId,
@@ -792,7 +829,13 @@ function DigitalBin() {
         is_urgent: formData.is_urgent || false,
         expires_at: expiryDate.toISOString(),
         latitude: formData.latitude,
-        longitude: formData.longitude
+        longitude: formData.longitude,
+        // Promotional pricing fields
+        is_promotional: promoState.isEligible && promoFeeData.clientFee != null,
+        promo_request_number: promoState.isEligible ? promoState.usedCount + 1 : null,
+        promotional_client_fee: promoFeeData.clientFee,
+        promotional_collector_payout: promoFeeData.collectorPayout,
+        promotional_platform_subsidy: promoFeeData.platformSubsidy
       });
       
       debug.log('[DigitalBin] Digital bin data with fees:', digitalBinData);
@@ -816,6 +859,21 @@ function DigitalBin() {
       }
       
       debug.log('[DigitalBin] Successfully created digital bin:', binData);
+
+      // Increment promotional usage if this was a promotional bin
+      if (promoState.isEligible && digitalBinData.is_promotional) {
+        const incremented = await incrementPromotionalUsage(user.id);
+        if (incremented) {
+          setPromoState(prev => ({
+            ...prev,
+            usedCount: prev.usedCount + 1,
+            isEligible: (prev.usedCount + 1) < prev.maxRequests
+          }));
+          console.log('[DigitalBin] Promotional usage incremented');
+        } else {
+          console.warn('[DigitalBin] Promotional usage increment returned false');
+        }
+      }
 
       // Fire-and-forget background photo upload — does NOT block UI or success flow
       const photoBlobUrls = (formData.photos || []).filter(p => p && (p.startsWith('blob:') || p.startsWith('data:')));
@@ -974,7 +1032,7 @@ function DigitalBin() {
                   onRefresh={handleRefresh}
                   isLoading={isLoading}
                   newlyCreatedBinId={newlyCreatedBinId}
-                  onNewBinExpanded={() => setNewlyCreatedBinId(null)}
+                  onNewBinExpanded={() => setTimeout(() => setNewlyCreatedBinId(null), 3000)}
                 />
               </div>
             ) : (
@@ -1035,6 +1093,7 @@ function DigitalBin() {
                       updateFormData={updateFormData}
                       nextStep={nextStep}
                       prevStep={prevStep}
+                      promoState={promoState}
                     />
                   )}
                   
@@ -1051,6 +1110,7 @@ function DigitalBin() {
                       formData={formData}
                       prevStep={prevStep}
                       handleSubmit={handleSubmit}
+                      promoState={promoState}
                     />
                   )}
                 </div>

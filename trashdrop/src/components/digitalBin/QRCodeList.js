@@ -67,6 +67,13 @@ const formatRelativeTime = (dateString) => {
 // Single QR code card component
 const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = false, onExpanded = null }) => {
   const [isExpanded, setIsExpanded] = useState(isNewlyCreated);
+
+  useEffect(() => {
+    if (isNewlyCreated) {
+      setIsExpanded(true);
+    }
+  }, [isNewlyCreated]);
+
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isQrExpanded, setIsQrExpanded] = useState(false);

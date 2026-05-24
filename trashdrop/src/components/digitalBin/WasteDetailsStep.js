@@ -1,7 +1,7 @@
 import React from 'react';
 import { BIN_SIZES, getBinSizeLabel } from '../../utils/costCalculator';
 
-const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
+const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoState = {} }) => {
   // Validation: Bin size is required
   const isValid = () => {
     return formData.numberOfBags && 
@@ -250,6 +250,21 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
         </p>
       </div>
       
+      {/* Promotional pricing indicator */}
+      {promoState?.isEligible && (
+        <div className="mb-5 bg-purple-50 p-3 rounded-md border border-purple-200">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🎁</span>
+            <div>
+              <span className="text-sm font-medium text-purple-900">Promotional pricing active</span>
+              <p className="text-xs text-purple-700 mt-0.5">
+                {promoState.maxRequests - promoState.usedCount} of {promoState.maxRequests} discounted pickups remaining
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Urgent Priority - NEW (OPTIONAL) */}
       <div className="mb-5 bg-yellow-50 p-4 rounded-md border border-yellow-200">
         <div className="flex items-start">
