@@ -22,6 +22,13 @@ import useGpsRefinement from '../hooks/useGpsRefinement.js';
 import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees, incrementPromotionalUsage } from '../services/promotionalService.js';
 
 
+// Pickup time windows offered in ScheduleDetailsStep
+const PREFERRED_TIME_LABELS = {
+  morning: 'Morning (8am - 12pm)',
+  afternoon: 'Afternoon (12pm - 4pm)',
+  evening: 'Evening (4pm - 8pm)'
+};
+
 /**
  * Multi-step form for getting a digital bin
  */
@@ -766,14 +773,14 @@ function DigitalBin() {
         
         console.log('Final coordinates for location update:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
         
-        // Update existing location
+        // Update existing location - locationId always refers to bin_locations here,
+        // since it was resolved (or migrated) from that table above
         const { error: updateError } = await supabase
-          .from('locations')
+          .from('bin_locations')
           .update({
             location_name: formData.location_name || 'Home',
             address: formData.address || '',
-            latitude: latitude,
-            longitude: longitude,
+            coordinates: `POINT(${longitude} ${latitude})`, // PostGIS Point format: POINT(lng lat)
             is_default: formData.is_default || false
           })
           .eq('id', locationId);
@@ -789,6 +796,9 @@ function DigitalBin() {
       // Calculate expiry date based on frequency
       const expiryDate = new Date();
       switch (formData.frequency) {
+        case 'one-time':
+          expiryDate.setDate(expiryDate.getDate() + 7); // One-time requests stay open for a week
+          break;
         case 'weekly':
           expiryDate.setDate(expiryDate.getDate() + 7);
           break;
@@ -810,6 +820,19 @@ function DigitalBin() {
       // Prepare digital bin data with calculated fees
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
+
+      // digital_bins has no column for the requested start date or time window,
+      // so they ride along with the user's notes in the details text
+      const schedulePreference = [
+        formData.startDate ? `Preferred date: ${formData.startDate}` : null,
+        formData.preferredTime
+          ? `Preferred time: ${PREFERRED_TIME_LABELS[formData.preferredTime] || formData.preferredTime}`
+          : null
+      ].filter(Boolean).join(' • ');
+
+      const details = [schedulePreference, formData.notes?.trim()]
+        .filter(Boolean)
+        .join('\n') || null;
       
       // Fetch promotional fee for the selected bin size if eligible
       let promoFeeData = { clientFee: null, collectorPayout: null, platformSubsidy: null };
@@ -823,11 +846,12 @@ function DigitalBin() {
         location_id: locationId,
         qr_code_url: qrCodeUrl,
         frequency: formData.frequency,
-        waste_type: formData.waste_type || formData.wasteType,
+        waste_type: formData.wasteType || formData.waste_type,
         bag_count: bagCount,
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
         expires_at: expiryDate.toISOString(),
+        details,
         latitude: formData.latitude,
         longitude: formData.longitude,
         // Promotional pricing fields

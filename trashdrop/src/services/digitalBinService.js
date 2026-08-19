@@ -20,6 +20,7 @@ export const prepareDigitalBinData = async ({
   bin_size_liters,
   is_urgent,
   expires_at,
+  details,
   latitude,
   longitude,
   is_promotional = false,
@@ -49,6 +50,7 @@ export const prepareDigitalBinData = async ({
       bin_size_liters,
       is_urgent,
       expires_at,
+      details,
       is_active: true,
       status: 'pending',
 
@@ -118,6 +120,7 @@ export const prepareDigitalBinData = async ({
     bin_size_liters,
     is_urgent,
     expires_at,
+    details,
     is_active: true,
     status: 'pending', // Set initial status to comply with constraint
     is_promotional: false,

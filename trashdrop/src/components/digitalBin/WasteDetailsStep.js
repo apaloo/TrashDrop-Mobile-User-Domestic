@@ -1,6 +1,13 @@
 import React from 'react';
 import { BIN_SIZES, getBinSizeLabel } from '../../utils/costCalculator';
 
+// Waste types accepted by the digital_bins CHECK constraint
+const WASTE_TYPES = [
+  { value: 'general', label: 'General Waste', icon: '🗑️' },
+  { value: 'recycling', label: 'Recycling', icon: '♻️' },
+  { value: 'organic', label: 'Organic Waste', icon: '🥬' }
+];
+
 const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoState = {} }) => {
   // Validation: Bin size is required
   const isValid = () => {
@@ -104,149 +111,31 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
             msOverflowStyle: 'none'
           }}
         >
-          {/* General Waste Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'general' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'general'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🗑️</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'general' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                General Waste
-              </span>
+          {WASTE_TYPES.map(({ value, label, icon }) => (
+            <div
+              key={value}
+              onClick={() => updateFormData({ wasteType: value, waste_type: value })}
+              className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                formData.wasteType === value
+                  ? 'bg-green-50 border-2 border-green-500 shadow-md'
+                  : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+              }`}
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="text-3xl mb-2">{icon}</div>
+                <span className={`text-xs font-medium ${
+                  formData.wasteType === value ? 'text-green-700' : 'text-gray-700'
+                }`}>
+                  {label}
+                </span>
+              </div>
             </div>
-          </div>
-
-          {/* Organic Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'organic' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'organic'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🥬</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'organic' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                Organic
-              </span>
-            </div>
-          </div>
-
-          {/* Plastic Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'plastic' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'plastic'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🧴</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'plastic' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                Plastics
-              </span>
-            </div>
-          </div>
-
-          {/* Paper Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'paper' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'paper'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">📄</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'paper' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                Paper
-              </span>
-            </div>
-          </div>
-
-          {/* Glass Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'glass' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'glass'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🫙</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'glass' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                Glass
-              </span>
-            </div>
-          </div>
-
-          {/* Metal Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'metal' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'metal'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🥫</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'metal' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                Metal
-              </span>
-            </div>
-          </div>
-
-          {/* Textiles Card */}
-          <div
-            onClick={() => updateFormData({ wasteType: 'textiles' })}
-            className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-              formData.wasteType === 'textiles'
-                ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
-            }`}
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">👕</div>
-              <span className={`text-xs font-medium ${
-                formData.wasteType === 'textiles' ? 'text-green-700' : 'text-gray-700'
-              }`}>
-                Textiles
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
         
         <p className="text-sm text-gray-500 mt-2">
-          Swipe to see more options • Choose the type that matches your waste
+          Choose the type that matches your waste
         </p>
       </div>
       
