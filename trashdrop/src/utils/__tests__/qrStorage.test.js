@@ -11,57 +11,106 @@ jest.mock('../supabaseClient', () => ({
 }));
 
 describe('QR Code Storage Tests', () => {
-  const mockLocationId = '123e4567-e89b-12d3-a456-426614174000';
+  // QR codes are keyed by DIGITAL BIN id: the collector decodes ".../bin/<uuid>"
+  // and matches it against digital_bins.id. A location is reused across bookings
+  // at one address, so keying by location made two bins share one QR.
+  const mockBinId = '123e4567-e89b-12d3-a456-426614174000';
+  const mockLocationId = '99999999-9999-9999-9999-999999999999';
   const mockQrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=test';
 
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+  });
+
+  // Restore spies even when an expectation throws first, so a failure here
+  // cannot silently disable localStorage for the tests that follow
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('storeQRCode', () => {
-    it('should store a new QR code locally and return stored object', async () => {
+    it('should store a new QR code locally, keyed by bin id', async () => {
       const setSpy = jest.spyOn(Storage.prototype, 'setItem');
 
-      const result = await qrStorage.storeQRCode(mockLocationId, mockQrCodeUrl);
+      const result = await qrStorage.storeQRCode(mockBinId, mockQrCodeUrl, {
+        locationId: mockLocationId
+      });
 
       expect(result).toBeTruthy();
+      expect(result.binId).toBe(mockBinId);
       expect(result.locationId).toBe(mockLocationId);
       expect(result.qrCodeUrl).toBe(mockQrCodeUrl);
       expect(result.storedAt).toBeDefined();
       expect(setSpy).toHaveBeenCalledWith(
-        `qr_${mockLocationId}`,
+        `qr_${mockBinId}`,
         expect.any(String)
       );
+    });
 
-      setSpy.mockRestore();
+    it('should encode the bin id, not the location id, in the QR url', async () => {
+      const result = await qrStorage.storeQRCode(mockBinId, mockQrCodeUrl, {
+        locationId: mockLocationId
+      });
+
+      expect(result.url).toBe(`https://trashdrop.app/bin/${mockBinId}`);
+      expect(result.url).not.toContain(mockLocationId);
+    });
+
+    it('should give two bins at the same location distinct storage keys', async () => {
+      const setSpy = jest.spyOn(Storage.prototype, 'setItem');
+      const otherBinId = '44444444-4444-4444-4444-444444444444';
+
+      await qrStorage.storeQRCode(mockBinId, mockQrCodeUrl, { locationId: mockLocationId });
+      await qrStorage.storeQRCode(otherBinId, mockQrCodeUrl, { locationId: mockLocationId });
+
+      const keys = setSpy.mock.calls.map(([key]) => key);
+      expect(keys).toContain(`qr_${mockBinId}`);
+      expect(keys).toContain(`qr_${otherBinId}`);
+      expect(new Set(keys).size).toBe(2);
     });
   });
 
   describe('getQRCode', () => {
     it('should retrieve an active QR code from localStorage', async () => {
       const validData = {
-        locationId: mockLocationId,
+        binId: mockBinId,
         qrCodeUrl: mockQrCodeUrl,
         expires: Date.now() + 60_000,
         storedAt: Date.now()
       };
-      localStorage.setItem(`qr_${mockLocationId}`, JSON.stringify(validData));
+      localStorage.setItem(`qr_${mockBinId}`, JSON.stringify(validData));
 
-      const result = await qrStorage.getQRCode(mockLocationId);
+      const result = await qrStorage.getQRCode(mockBinId);
 
       expect(result).toEqual(validData);
     });
 
     it('should return null for expired QR codes in localStorage', async () => {
       const expiredData = {
-        locationId: mockLocationId,
+        binId: mockBinId,
         qrCodeUrl: mockQrCodeUrl,
         expires: Date.now() - 60_000,
         storedAt: Date.now() - 120_000
       };
-      localStorage.setItem(`qr_${mockLocationId}`, JSON.stringify(expiredData));
+      localStorage.setItem(`qr_${mockBinId}`, JSON.stringify(expiredData));
 
-      const result = await qrStorage.getQRCode(mockLocationId);
+      const result = await qrStorage.getQRCode(mockBinId);
+
+      expect(result).toBeNull();
+    });
+
+    it('should not return another bin\'s QR from the same location', async () => {
+      const otherBinId = '44444444-4444-4444-4444-444444444444';
+      localStorage.setItem(`qr_${otherBinId}`, JSON.stringify({
+        binId: otherBinId,
+        qrCodeUrl: mockQrCodeUrl,
+        expires: Date.now() + 60_000,
+        storedAt: Date.now()
+      }));
+
+      // Nothing stored for mockBinId, so it must miss rather than borrow
+      const result = await qrStorage.getQRCode(mockBinId);
 
       expect(result).toBeNull();
     });
