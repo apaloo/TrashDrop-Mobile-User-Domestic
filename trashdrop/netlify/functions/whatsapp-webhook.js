@@ -14,11 +14,11 @@
  *   WHATSAPP_VERIFY_TOKEN     - Your chosen verification string
  *   META_APP_SECRET           - Meta app secret, for X-Hub-Signature-256 checks
  *   SUPABASE_URL              - Supabase project URL
- *   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key (NOT anon key)
+ *   SUPABASE_SERVICE_ROLE     - Supabase service role key (NOT the anon key)
  */
 
 const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('./utils/supabase-admin');
 const { getConfig, extractMessage, markAsRead } = require('./utils/whatsapp-api');
 const { processMessage, STATES } = require('./utils/conversation-engine');
 
@@ -74,16 +74,7 @@ function isRateLimited(phone) {
 }
 
 function getSupabaseClient() {
-  const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error('[WhatsApp Webhook] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-  }
-
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return getServiceClient('[WhatsApp Webhook]');
 }
 
 exports.handler = async (event) => {

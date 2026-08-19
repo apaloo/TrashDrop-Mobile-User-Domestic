@@ -142,7 +142,12 @@ netlify env:set WHATSAPP_ACCESS_TOKEN      "<NEW token from 0.1>"
 netlify env:set WHATSAPP_VERIFY_TOKEN      "$(openssl rand -hex 16)"
 netlify env:set META_APP_SECRET            "<app secret from 0.1>"
 netlify env:set SUPABASE_URL               "https://tfdedlqdsajjdjkerkli.supabase.co"
-netlify env:set SUPABASE_SERVICE_ROLE_KEY  "<service_role key from 0.2>"
+# NOTE: this project already has SUPABASE_SERVICE_ROLE holding the real
+# service_role key (the older batch functions use it). A second variable,
+# SUPABASE_SERVICE_ROLE_KEY, exists and holds the ANON key despite its name.
+# The functions now select whichever variable carries a service_role JWT claim
+# and refuse an anon key outright, so nothing needs setting here — but the
+# misnamed SUPABASE_SERVICE_ROLE_KEY is worth deleting to remove the trap.
 netlify env:set WHATSAPP_NOTIFY_SECRET     "$(openssl rand -hex 32)"
 ```
 

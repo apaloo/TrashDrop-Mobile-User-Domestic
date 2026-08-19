@@ -25,24 +25,15 @@
  *   WHATSAPP_PHONE_NUMBER_ID
  *   WHATSAPP_ACCESS_TOKEN
  *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
+ *   SUPABASE_SERVICE_ROLE
  *   WHATSAPP_NOTIFY_SECRET - Shared secret for authenticating webhook calls
  */
 
-const { createClient } = require('@supabase/supabase-js');
+const { getServiceClient } = require('./utils/supabase-admin');
 const { sendTextMessage } = require('./utils/whatsapp-api');
 
 function getSupabaseClient() {
-  const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error('[WhatsApp Notify] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-  }
-
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return getServiceClient('[WhatsApp Notify]');
 }
 
 // Status transition messages
