@@ -3,6 +3,14 @@ import { FaCamera, FaTrash, FaCheckCircle } from 'react-icons/fa';
 import CameraModal from '../CameraModal';
 import { toastService } from '../../services/toastService';
 
+// Service frequencies offered in ScheduleDetailsStep
+const FREQUENCY_LABELS = {
+  'one-time': 'One-time',
+  weekly: 'Weekly',
+  biweekly: 'Bi-weekly',
+  monthly: 'Monthly'
+};
+
 const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) => {
   const [photos, setPhotos] = useState(formData.photos || []);
   const [showCamera, setShowCamera] = useState(false);
@@ -157,8 +165,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           Service fee will be calculated based on waste type, size, and number of bins
         </p>
         <p className="text-sm text-gray-700 font-medium">
-          Based on your selected frequency: {formData.frequency === 'weekly' ? 'Weekly' : 
-                                          formData.frequency === 'biweekly' ? 'Bi-weekly' : 'Monthly'}
+          Based on your selected frequency: {FREQUENCY_LABELS[formData.frequency] || formData.frequency}
         </p>
       </div>
       
