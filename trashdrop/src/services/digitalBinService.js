@@ -11,6 +11,7 @@ import { getCostBreakdown, getCostBreakdownWithGPS } from '../utils/costCalculat
  * @returns {Promise<Object>} Complete digital bin data ready for database insert
  */
 export const prepareDigitalBinData = async ({
+  id,
   user_id,
   location_id,
   qr_code_url,
@@ -41,6 +42,7 @@ export const prepareDigitalBinData = async ({
     const collectorPayout = promotional_collector_payout ?? promotional_client_fee;
 
     return {
+      id,
       user_id,
       location_id,
       qr_code_url,
@@ -111,6 +113,7 @@ export const prepareDigitalBinData = async ({
 
   // Prepare complete digital bin data with all fee fields
   const digitalBinData = {
+    id,
     user_id,
     location_id,
     qr_code_url,

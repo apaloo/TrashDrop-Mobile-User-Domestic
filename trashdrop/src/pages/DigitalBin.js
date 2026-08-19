@@ -790,8 +790,15 @@ function DigitalBin() {
         }
       }
 
-      // Generate QR code URL
-      const qrCodeUrl = `https://trashdrop.app/bin/${locationId}`;
+      // The QR must carry the DIGITAL BIN id: the collector decodes ".../bin/<uuid>"
+      // and matches it against digital_bins.id. Keying it off the location was
+      // wrong — one location is reused across bookings at the same address, so
+      // two bins there produced identical QR codes.
+      // The id is minted here rather than left to the database default so the
+      // URL is correct at insert time; a trigger enforces the same value server
+      // side for every other writer.
+      const binId = crypto.randomUUID();
+      const qrCodeUrl = `https://trashdrop.app/bin/${binId}`;
 
       // Calculate expiry date based on frequency
       const expiryDate = new Date();
@@ -842,6 +849,7 @@ function DigitalBin() {
       }
 
       const digitalBinData = await prepareDigitalBinData({
+        id: binId,
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
@@ -902,7 +910,6 @@ function DigitalBin() {
       // Fire-and-forget background photo upload — does NOT block UI or success flow
       const photoBlobUrls = (formData.photos || []).filter(p => p && (p.startsWith('blob:') || p.startsWith('data:')));
       if (photoBlobUrls.length > 0) {
-        const binId = binData.id;
         const userId = user.id;
         console.log('[DigitalBin] Scheduling background upload of', photoBlobUrls.length, 'photo(s) for bin:', binId);
         uploadPhotos(photoBlobUrls, userId).then(uploadResult => {

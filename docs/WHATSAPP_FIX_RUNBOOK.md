@@ -49,20 +49,25 @@ server-side and sends it as a WhatsApp image (uploaded to Meta's media endpoint,
 sent by media id — no public hosting needed). If the upload fails the booking
 still stands and the link is sent as text instead.
 
-**Open question — which value the QR should encode.** The app is inconsistent
-with itself:
+**Resolved: the QR must encode the digital bin id.** Confirmed against the
+collector app (`TrashDrop_Mobile_Collector_Driver`): `NavigationQRModal.jsx`
+decodes `.../bin/<uuid>` and compares it to `expectedQRValue`, which
+`Request.jsx:3119` supplies as `navigationRequestId` — used at `Request.jsx:3008`
+as `.eq('id', …)` against `digital_bins`. The collector never reads
+`qr_code_url`.
 
-| Where | Encoded value |
-|---|---|
-| `DigitalBin.js:794` → `digital_bins.qr_code_url` | `https://trashdrop.app/bin/{locationId}` |
-| `qrStorage.js:13` → the image shown in the app | `https://trashdrop.app/bin/{binId}` |
+The app was writing the *location* id into that column, and a location is reused
+across bookings at one address, so two bins there carried identical QR codes and
+the second failed the collector's check with "Wrong bin! Try again."
+`20260819010000_fix_digital_bin_qr_code_url.sql` derives the column from the
+row's own id via a BEFORE INSERT trigger and backfills existing rows, which makes
+every writer correct by construction — including the WhatsApp RPC, whose own
+`qr_code_url` argument is now vestigial.
 
-So the app's on-screen QR and its own stored `qr_code_url` point at different
-things. The WhatsApp QR encodes `digital_bins.qr_code_url` read back from the
-row, because that is the only server-side value a collector could resolve
-against — but if the collector app expects the bin id, **both** the app's stored
-column and this need correcting together. Confirm against the collector codebase
-before go-live.
+The same collision existed in the app's local QR cache, which was keyed by
+location id (`qrStorage.js`, `QRCodeList.js`); it is now keyed by bin id, and
+`DigitalBin.js` mints the bin id client-side so the URL is right at insert time
+regardless of trigger deployment order.
 
 ### Migration validation (local only)
 

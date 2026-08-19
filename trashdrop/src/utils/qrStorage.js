@@ -4,7 +4,10 @@ import QRCode from 'qrcode';
 // Default expiration time: 7 days in seconds
 const DEFAULT_EXPIRATION = 7 * 24 * 60 * 60;
 
-// Generate a proper QR code using the qrcode library
+// Generate a proper QR code using the qrcode library.
+// The encoded value MUST be the digital bin id: the collector app decodes
+// ".../bin/<uuid>" and matches it against digital_bins.id. A location id is
+// reused across bookings at the same address and cannot identify a pickup.
 const generateQRCodeData = async (binId, locationId) => {
   const qrData = {
     binId,
@@ -45,36 +48,41 @@ const generateQRCodeData = async (binId, locationId) => {
 };
 
 /**
- * Stores a QR code locally first, then optionally syncs to Supabase
- * @param {string} locationId - The ID of the location associated with the digital bin
- * @param {string} qrCodeUrl - The URL of the QR code (optional, will be generated if not provided)
+ * Stores a QR code locally first, then optionally syncs to Supabase.
+ *
+ * Keyed by DIGITAL BIN id. It used to be keyed by location id, which meant two
+ * bins booked at the same address shared one cache entry and the second bin
+ * displayed the first bin's QR — the collector then rejected it as "Wrong bin".
+ *
+ * @param {string} binId - The ID of the digital bin this QR identifies
+ * @param {string} qrCodeUrl - The QR image data URL (optional, generated if absent)
  * @param {Object} [options] - Optional configuration
  * @param {boolean} [options.syncToSupabase] - Whether to sync to Supabase (default: false)
- * @param {string} [options.binId] - The bin ID if already exists
+ * @param {string} [options.locationId] - The location the bin sits at, for reference only
  * @returns {Promise<Object>} The stored QR code data
  */
-export const storeQRCode = async (locationId, qrCodeUrl = null, options = {}) => {
+export const storeQRCode = async (binId, qrCodeUrl = null, options = {}) => {
   try {
-    const { syncToSupabase = false, binId } = options;
+    const { syncToSupabase = false, locationId = null } = options;
     
     // Generate QR code data if not provided
     let qrData;
     if (qrCodeUrl) {
       qrData = {
-        binId: binId || `bin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        binId,
         locationId,
         qrCodeUrl,
-        url: `https://trashdrop.app/bin/${binId || locationId}`,
+        url: `https://trashdrop.app/bin/${binId}`,
         timestamp: Date.now(),
         expires: Date.now() + (DEFAULT_EXPIRATION * 1000),
         dataString: qrCodeUrl
       };
     } else {
-      qrData = await generateQRCodeData(binId || `bin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, locationId);
+      qrData = await generateQRCodeData(binId, locationId);
     }
     
     // Always store in localStorage first (local-first approach)
-    const storageKey = `qr_${locationId}`;
+    const storageKey = `qr_${binId}`;
     const qrStorage = {
       ...qrData,
       storedAt: Date.now(),
@@ -82,7 +90,7 @@ export const storeQRCode = async (locationId, qrCodeUrl = null, options = {}) =>
     };
     
     localStorage.setItem(storageKey, JSON.stringify(qrStorage));
-    console.log(`[QR Storage] QR code stored locally for location: ${locationId}`);
+    console.log(`[QR Storage] QR code stored locally for bin: ${binId}`);
     
     // Optional: Sync to Supabase (only if explicitly requested and we have proper auth)
     if (syncToSupabase) {
@@ -109,13 +117,13 @@ export const storeQRCode = async (locationId, qrCodeUrl = null, options = {}) =>
 
 /**
  * Retrieves an active QR code for a digital bin location (checks local storage first)
- * @param {string} locationId - The ID of the location
+ * @param {string} binId - The ID of the digital bin
  * @returns {Promise<Object|null>} The QR code data or null if not found/expired
  */
-export const getQRCode = async (locationId) => {
+export const getQRCode = async (binId) => {
   try {
     // First, check localStorage (local-first approach)
-    const storageKey = `qr_${locationId}`;
+    const storageKey = `qr_${binId}`;
     const storedQR = localStorage.getItem(storageKey);
     
     if (storedQR) {
@@ -123,7 +131,7 @@ export const getQRCode = async (locationId) => {
       
       // Check if it's still valid
       if (qrData.expires && Date.now() < qrData.expires) {
-        console.log(`[QR Storage] Found valid QR code in localStorage for location: ${locationId}`);
+        console.log(`[QR Storage] Found valid QR code in localStorage for bin: ${binId}`);
         return qrData;
       } else {
         console.log(`[QR Storage] QR code expired in localStorage, removing...`);
@@ -136,11 +144,9 @@ export const getQRCode = async (locationId) => {
       const { data, error } = await supabase
         .from('digital_bins')
         .select('*')
-        .eq('location_id', locationId)
+        .eq('id', binId)
         .eq('is_active', true)
         .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -149,7 +155,7 @@ export const getQRCode = async (locationId) => {
       }
       
       if (data) {
-        console.log(`[QR Storage] Found QR code in Supabase for location: ${locationId}`);
+        console.log(`[QR Storage] Found digital bin in Supabase for bin: ${binId}`);
         // DON'T store to localStorage - Supabase data doesn't have the generated qrCodeUrl image
         // Return null so the component knows it needs to generate a QR code
         console.log(`[QR Storage] Supabase data doesn't have generated image, needs generation`);
