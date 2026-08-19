@@ -25,6 +25,19 @@
   [headers.values]
     Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
 
+# Netlify Functions configuration
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[functions."whatsapp-webhook"]
+  # qrcode is shipped rather than bundled — the booking confirmation renders the
+  # digital bin QR server-side, the way the app renders it client-side
+  external_node_modules = ["@supabase/supabase-js", "qrcode"]
+
+[functions."whatsapp-notify"]
+  external_node_modules = ["@supabase/supabase-js"]
+
 # Local development configuration
 [dev]
   # Netlify Dev UI port

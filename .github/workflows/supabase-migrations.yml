@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'migrations/**'  # Only trigger on changes to migration files
+      - 'supabase/migrations/**'  # supabase db push applies this directory
   workflow_dispatch:     # Allow manual triggering
 
 jobs:
