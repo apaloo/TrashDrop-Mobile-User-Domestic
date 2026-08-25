@@ -178,7 +178,7 @@
                 "name": "notes",
                 "label": "Notes (optional)",
                 "required": false,
-                "max-length": "500",
+                "max-length": 500,
                 "helper-text": "A landmark, gate code, or where the bin is kept"
               },
               {

@@ -85,6 +85,16 @@ curl -X POST "https://graph.facebook.com/v18.0/<WABA_ID>/flows" \
   -F "flow_json=@bin-pickup.flow.json"
 ```
 
-Validate before publishing — the Flow Builder reports schema errors that this
-repo's checks cannot catch, and a published Flow's JSON is versioned separately
-from this file, so re-upload after any edit here.
+## Validate before uploading
+
+```bash
+python3 validate.py
+```
+
+Checks scalar types (`max-length` and friends must be integers, not strings —
+Flow Builder rejects the string form), cross-screen `${screen.X.form.y}`
+references, `${data.x}` declarations, terminal/`complete` pairing and screen
+reachability.
+
+Flow Builder remains the only complete validator, and a published Flow's JSON is
+versioned separately from this file, so re-upload after any edit here.
