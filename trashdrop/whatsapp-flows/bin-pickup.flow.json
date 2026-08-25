@@ -40,7 +40,7 @@
               {
                 "type": "RadioButtonsGroup",
                 "name": "frequency",
-                "label": "How often should we collect?",
+                "label": "Collection frequency",
                 "required": true,
                 "data-source": [
                   { "id": "one-time", "title": "One-time", "description": "A single pickup" },
@@ -95,7 +95,7 @@
               {
                 "type": "Dropdown",
                 "name": "bag_count",
-                "label": "Number of digital bins",
+                "label": "Number of bins",
                 "required": true,
                 "data-source": [
                   { "id": "1", "title": "1 Bin" },

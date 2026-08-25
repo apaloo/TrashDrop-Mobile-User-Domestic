@@ -17,6 +17,18 @@ INPUTS = {'TextInput', 'TextArea', 'DatePicker', 'CalendarPicker', 'Dropdown',
 INT_PROPS = {'max-length', 'min-length', 'max-chars', 'max-selected-items', 'min-selected-items'}
 BOOL_PROPS = {'required', 'enabled', 'visible', 'terminal', 'success'}
 
+# Documented per-component limits. Flow Builder warns rather than errors on some
+# of these, but an over-long label is truncated on smaller handsets.
+LABEL_MAX = {
+    'Dropdown': 20, 'TextInput': 20, 'TextArea': 20,
+    'RadioButtonsGroup': 30, 'CheckboxGroup': 30,
+    'DatePicker': 40, 'CalendarPicker': 40,
+    'Footer': 35,
+}
+HELPER_TEXT_MAX = 80
+OPTION_TITLE_MAX = 30
+OPTION_DESCRIPTION_MAX = 300
+
 flow = json.load(open(PATH))
 screens = {s['id']: s for s in flow['screens']}
 problems = []
@@ -43,6 +55,33 @@ walk(flow, check_types)
 
 if not isinstance(flow.get('version'), str):
     problems.append("top-level 'version' must be a string")
+
+
+# label / helper-text / option lengths
+def check_lengths(node, path):
+    t = node.get('type')
+    label = node.get('label')
+    if t in LABEL_MAX and isinstance(label, str) and len(label) > LABEL_MAX[t]:
+        problems.append(
+            f"{path}: {t} label {label!r} is {len(label)} chars, "
+            f"max {LABEL_MAX[t]} (truncates on small screens)")
+
+    helper = node.get('helper-text')
+    if isinstance(helper, str) and len(helper) > HELPER_TEXT_MAX:
+        problems.append(f'{path}: helper-text is {len(helper)} chars, max {HELPER_TEXT_MAX}')
+
+    ds = node.get('data-source')
+    if isinstance(ds, list):
+        for i, item in enumerate(ds):
+            if not isinstance(item, dict):
+                continue
+            title = item.get('title', '')
+            desc = item.get('description', '')
+            if isinstance(title, str) and len(title) > OPTION_TITLE_MAX:
+                problems.append(f'{path}.data-source[{i}].title is {len(title)} chars, max {OPTION_TITLE_MAX}')
+            if isinstance(desc, str) and len(desc) > OPTION_DESCRIPTION_MAX:
+                problems.append(f'{path}.data-source[{i}].description is {len(desc)} chars, max {OPTION_DESCRIPTION_MAX}')
+walk(flow, check_lengths)
 
 # input names per screen
 fields = {}
