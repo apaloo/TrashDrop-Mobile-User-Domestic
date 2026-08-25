@@ -50,6 +50,31 @@ Send the Flow with these three values, which `SCHEDULE` declares as screen data:
 (`min={new Date().toISOString().split('T')[0]}`). Send today's date in the
 customer's timezone.
 
+## Wiring (already done)
+
+`WHATSAPP_FLOW_ID` on the Netlify site switches the conversation engine over to
+the Flow. With it set:
+
+1. The customer shares a location pin in the chat as before.
+2. `launchBookingFlow()` sends this Flow with `flow_token` = the session id —
+   the completion payload carries no Flow id, so the token is the only way to
+   correlate the reply with the conversation.
+3. The customer fills the form; the completion arrives as `interactive/nfm_reply`
+   and `extractMessage()` parses `response_json`.
+4. `parseFlowResponse()` coerces and validates it, then the normal review step
+   prices the booking and asks for confirmation in the chat.
+
+Unset `WHATSAPP_FLOW_ID` and the engine asks the same questions message by
+message instead. It also falls back to that automatically if the Flow cannot be
+sent (unpublished, wrong id, revoked token) or if the completion payload fails
+validation — a booking is never stranded.
+
+Set `WHATSAPP_FLOW_MODE=draft` to test before publishing; `published` (the
+default) for live.
+
+Run `node netlify/functions/__checks__/whatsapp-smoke.js` to exercise the whole
+path against stubs.
+
 ## Completion payload
 
 The Flow completes with a `nfm_reply` message whose `response_json` carries:

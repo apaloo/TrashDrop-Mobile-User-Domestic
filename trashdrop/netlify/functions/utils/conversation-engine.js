@@ -25,8 +25,10 @@ const {
   sendTextMessage,
   sendListMessage,
   sendButtonMessage,
+  sendFlowMessage,
   sendImageMessage,
   uploadMedia,
+  getConfig,
 } = require('./whatsapp-api');
 const {
   BIN_SIZES,
@@ -40,7 +42,9 @@ const STATES = {
   IDLE: 'idle',
   // Step 1 — Bin Location
   AWAITING_LOCATION: 'awaiting_location',
-  // Step 2 — Schedule Details
+  // Steps 2-4 collected in one native form when a Flow is configured
+  AWAITING_FLOW: 'awaiting_flow',
+  // Step 2 — Schedule Details (used when no Flow is configured)
   AWAITING_FREQUENCY: 'awaiting_frequency',
   AWAITING_START_DATE: 'awaiting_start_date',
   AWAITING_PREFERRED_TIME: 'awaiting_preferred_time',
@@ -73,6 +77,7 @@ const FLOW = [
 // The app's step numbering, for the "Step n of 5" progress line
 const STEP_NUMBERS = {
   [STATES.AWAITING_LOCATION]: 1,
+  [STATES.AWAITING_FLOW]: 2,
   [STATES.AWAITING_FREQUENCY]: 2,
   [STATES.AWAITING_START_DATE]: 2,
   [STATES.AWAITING_PREFERRED_TIME]: 2,
@@ -159,6 +164,102 @@ function parsePickupDate(raw) {
   if (parsed < today) return null;
 
   return toISODate(parsed);
+}
+
+// --- WhatsApp Flow ---------------------------------------------------------
+// When WHATSAPP_FLOW_ID is set, steps 2-4 are collected in one native form
+// (whatsapp-flows/bin-pickup.flow.json) instead of question by question. The
+// location still comes from a shared pin beforehand — Flow JSON has no map
+// component — and the price and confirmation still happen here in the chat,
+// because pricing inside the Flow would need an encrypted Flow endpoint.
+
+function flowIsConfigured() {
+  try {
+    return Boolean(getConfig().flowId);
+  } catch {
+    return false;
+  }
+}
+
+/** Today in Accra, as YYYY-MM-DD, for the Flow's min-date. */
+function todayInAccra() {
+  // Ghana is UTC+0 year round, but format via the zone so this survives a move
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Accra', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}
+
+async function launchBookingFlow(phone, data, session) {
+  await sendFlowMessage(phone, {
+    flowToken: session.id,
+    screen: 'SCHEDULE',
+    data: {
+      location_name: String(data.location_name || 'My Location'),
+      address: String(data.address || ''),
+      min_date: todayInAccra(),
+    },
+    headerText: 'Bin pickup',
+    bodyText:
+      `Pickup at ${data.location_name}.\n\n` +
+      'Tap below to choose your schedule and bin details. ' +
+      "We'll send the price for approval before anything is booked.",
+    footerText: 'Reply CANCEL to stop',
+    ctaText: 'Book pickup',
+  });
+}
+
+/**
+ * Coerce and validate a Flow completion payload.
+ * Selection components return their option id, so numbers arrive as strings.
+ * @returns {{ok: true, value: Object} | {ok: false, reason: string}}
+ */
+function parseFlowResponse(response) {
+  if (!response || typeof response !== 'object') {
+    return { ok: false, reason: 'empty response' };
+  }
+
+  const frequency = String(response.frequency || '');
+  if (!FREQUENCIES[frequency]) return { ok: false, reason: `frequency "${frequency}"` };
+
+  const preferredTime = String(response.preferred_time || '');
+  if (!PREFERRED_TIMES[preferredTime]) return { ok: false, reason: `preferred_time "${preferredTime}"` };
+
+  const wasteType = String(response.waste_type || '');
+  if (!WASTE_TYPES[wasteType]) return { ok: false, reason: `waste_type "${wasteType}"` };
+
+  const bagCount = parseInt(response.bag_count, 10);
+  if (!Number.isInteger(bagCount) || bagCount < 1 || bagCount > MAX_BINS) {
+    return { ok: false, reason: `bag_count "${response.bag_count}"` };
+  }
+
+  const binSize = parseInt(response.bin_size_liters, 10);
+  if (!BIN_SIZES.includes(binSize)) {
+    return { ok: false, reason: `bin_size_liters "${response.bin_size_liters}"` };
+  }
+
+  const startDate = parsePickupDate(response.start_date);
+  if (!startDate) return { ok: false, reason: `start_date "${response.start_date}"` };
+
+  // OptIn returns a real boolean, but tolerate the string form
+  const isUrgent = response.is_urgent === true || response.is_urgent === 'true';
+
+  const rawNotes = typeof response.notes === 'string' ? response.notes.trim() : '';
+  const notes = rawNotes ? rawNotes.slice(0, 500) : null;
+
+  return {
+    ok: true,
+    value: {
+      frequency,
+      start_date: startDate,
+      preferred_time: preferredTime,
+      bag_count: bagCount,
+      bin_size_liters: binSize,
+      waste_type: wasteType,
+      is_urgent: isUrgent,
+      notes,
+      via_flow: true,
+    },
+  };
 }
 
 // --- Prompts ---------------------------------------------------------------
@@ -389,6 +490,11 @@ async function promptReview(phone, data, supabase, session) {
  * has to price the booking first.
  */
 async function goTo(state, phone, data, supabase, session) {
+  if (state === STATES.AWAITING_FLOW) {
+    await launchBookingFlow(phone, data, session);
+    return { newState: state, newData: data, done: true };
+  }
+
   if (state === STATES.AWAITING_CONFIRMATION) {
     const newData = await promptReview(phone, data, supabase, session);
     return { newState: state, newData, done: true };
@@ -416,17 +522,27 @@ async function processMessage({ phone, message, session, supabase }) {
     return { newState: STATES.IDLE, newData: {}, done: true };
   }
 
-  if ((text === 'back' || text === 'previous') && FLOW.includes(state)) {
+  if (text === 'back' || text === 'previous') {
     if (state === STATES.AWAITING_LOCATION) {
       await sendTextMessage(phone, 'You are at the first step. Share your location to continue, or reply CANCEL to stop.');
       return { newState: state, newData: data, done: true };
     }
-    return await goTo(prevState(state), phone, data, supabase, session);
+    // A booking collected through the Flow has no per-question steps to step
+    // back through, so BACK re-opens the form with the same location
+    if (state === STATES.AWAITING_FLOW || (data.via_flow && state === STATES.AWAITING_CONFIRMATION)) {
+      return await goTo(STATES.AWAITING_FLOW, phone, data, supabase, session);
+    }
+    if (FLOW.includes(state)) {
+      return await goTo(prevState(state), phone, data, supabase, session);
+    }
   }
 
   switch (state) {
     case STATES.AWAITING_LOCATION:
       return await handleLocation(phone, message, data, supabase, session);
+
+    case STATES.AWAITING_FLOW:
+      return await handleFlowReply(phone, message, data, supabase, session);
 
     case STATES.AWAITING_FREQUENCY:
       return await handleFrequency(phone, text, data, supabase, session);
@@ -518,7 +634,50 @@ async function handleLocation(phone, message, data, supabase, session) {
   };
 
   await sendTextMessage(phone, `📍 Location saved: ${newData.location_name}`);
+
+  if (flowIsConfigured()) {
+    try {
+      return await goTo(STATES.AWAITING_FLOW, phone, newData, supabase, session);
+    } catch (err) {
+      // An unpublished Flow, a bad id or a revoked token must not strand the
+      // booking — drop back to asking the same questions in the chat
+      console.error('[Conversation] Flow send failed, falling back to chat:', err.message);
+    }
+  }
+
   return await goTo(STATES.AWAITING_FREQUENCY, phone, newData, supabase, session);
+}
+
+/**
+ * The customer submitted the Flow (or sent something else while it was open).
+ */
+async function handleFlowReply(phone, message, data, supabase, session) {
+  if (message.type !== 'nfm_reply') {
+    await sendTextMessage(phone,
+      'Please tap *Book pickup* on the message above to choose your schedule and bin details.\n\n' +
+      'Reply BACK to re-open the form, or CANCEL to stop.'
+    );
+    return { newState: STATES.AWAITING_FLOW, newData: data, done: true };
+  }
+
+  // flow_token is echoed from the send; a mismatch means a form opened in an
+  // earlier session. Worth logging, not worth rejecting the customer's answers.
+  const token = message.flowResponse?.flow_token;
+  if (token && token !== session.id) {
+    console.warn(`[Conversation] Flow token ${token} does not match session ${session.id}`);
+  }
+
+  const parsed = parseFlowResponse(message.flowResponse);
+
+  if (!parsed.ok) {
+    console.error(`[Conversation] Unusable flow response (${parsed.reason}) — falling back to chat`);
+    await sendTextMessage(phone,
+      "Thanks! I couldn't read part of that form, so let's finish the details here instead."
+    );
+    return await goTo(STATES.AWAITING_FREQUENCY, phone, data, supabase, session);
+  }
+
+  return await goTo(STATES.AWAITING_CONFIRMATION, phone, { ...data, ...parsed.value }, supabase, session);
 }
 
 // Step 2 — Schedule Details

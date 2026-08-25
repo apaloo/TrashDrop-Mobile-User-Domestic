@@ -21,7 +21,16 @@ function getConfig() {
     throw new Error('[WhatsApp API] Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN');
   }
 
-  return { phoneNumberId, accessToken, verifyToken };
+  return {
+    phoneNumberId,
+    accessToken,
+    verifyToken,
+    // Booking Flow (whatsapp-flows/bin-pickup.flow.json). Unset -> the engine
+    // falls back to asking the same questions message by message.
+    flowId: process.env.WHATSAPP_FLOW_ID || null,
+    // 'draft' lets an unpublished Flow be tested by its creator
+    flowMode: (process.env.WHATSAPP_FLOW_MODE || 'published').toLowerCase(),
+  };
 }
 
 /**
@@ -131,6 +140,69 @@ async function sendButtonMessage(to, { bodyText, footerText, buttons }) {
 }
 
 /**
+ * Send an interactive Flow message.
+ *
+ * `flowToken` is echoed back inside the completion payload and is the only way
+ * to correlate a response with the conversation that opened it — the reply does
+ * not carry the Flow id — so the session id is passed here.
+ *
+ * @param {string} to
+ * @param {Object} opts
+ * @param {string} opts.flowToken       correlation token echoed in response_json
+ * @param {string} opts.screen          first screen id, e.g. 'SCHEDULE'
+ * @param {Object} opts.data            screen data for that first screen
+ * @param {string} [opts.headerText]
+ * @param {string} opts.bodyText
+ * @param {string} [opts.footerText]
+ * @param {string} [opts.ctaText]       button label
+ */
+async function sendFlowMessage(to, { flowToken, screen, data, headerText, bodyText, footerText, ctaText }) {
+  const { phoneNumberId, accessToken, flowId, flowMode } = getConfig();
+
+  if (!flowId) throw new Error('[WhatsApp API] WHATSAPP_FLOW_ID is not configured');
+
+  const parameters = {
+    flow_message_version: '3',
+    flow_token: flowToken,
+    flow_id: flowId,
+    flow_cta: ctaText || 'Continue',
+    flow_action: 'navigate',
+    flow_action_payload: { screen, data },
+  };
+
+  // Only send `mode` for drafts; published Flows reject it
+  if (flowMode === 'draft') parameters.mode = 'draft';
+
+  const response = await fetch(`${BASE_URL}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        ...(headerText ? { header: { type: 'text', text: headerText } } : {}),
+        body: { text: bodyText },
+        ...(footerText ? { footer: { text: footerText } } : {}),
+        action: { name: 'flow', parameters },
+      },
+    }),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    console.error('[WhatsApp API] Send flow failed:', JSON.stringify(result));
+    throw new Error(`WhatsApp API error: ${result.error?.message || response.statusText}`);
+  }
+  return result;
+}
+
+/**
  * Upload a media file to WhatsApp and return its media id.
  * Sending by id avoids having to host the file on a public URL.
  */
@@ -237,7 +309,18 @@ function extractMessage(body) {
         result.text = message.text.body;
         break;
       case 'interactive':
-        if (message.interactive.type === 'list_reply') {
+        // A completed Flow arrives as interactive/nfm_reply. response_json is a
+        // JSON *string* holding the Complete action's payload plus flow_token.
+        if (message.interactive.type === 'nfm_reply') {
+          result.type = 'nfm_reply';
+          result.text = null;
+          try {
+            result.flowResponse = JSON.parse(message.interactive.nfm_reply.response_json || '{}');
+          } catch (err) {
+            console.error('[WhatsApp API] Could not parse flow response_json:', err.message);
+            result.flowResponse = null;
+          }
+        } else if (message.interactive.type === 'list_reply') {
           result.text = message.interactive.list_reply.id;
           result.interactiveTitle = message.interactive.list_reply.title;
         } else if (message.interactive.type === 'button_reply') {
@@ -269,6 +352,7 @@ module.exports = {
   sendTextMessage,
   sendListMessage,
   sendButtonMessage,
+  sendFlowMessage,
   sendImageMessage,
   uploadMedia,
   markAsRead,
