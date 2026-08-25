@@ -19,10 +19,38 @@ ENVJSON=$(netlify env:list --json 2>/dev/null)
 have() { echo "$ENVJSON" | python3 -c "import json,sys;print('y' if '$1' in json.load(sys.stdin) else 'n')" 2>/dev/null; }
 getv() { echo "$ENVJSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$1',''))" 2>/dev/null; }
 
-for v in WHATSAPP_PHONE_NUMBER_ID WHATSAPP_ACCESS_TOKEN WHATSAPP_VERIFY_TOKEN \
-         WHATSAPP_NOTIFY_SECRET META_APP_SECRET WHATSAPP_FLOW_ID SUPABASE_URL; do
+for v in META_PHONE_NUMBER_ID META_ACCESS_TOKEN META_APP_SECRET \
+         WHATSAPP_VERIFY_TOKEN WHATSAPP_NOTIFY_SECRET WHATSAPP_FLOW_ID SUPABASE_URL; do
   [ "$(have $v)" = y ] && ok "$v set" || bad "$v missing"
 done
+
+# These four are easy to paste into the wrong box; check their shapes
+TOKEN=$(getv META_ACCESS_TOKEN); SECRET=$(getv META_APP_SECRET)
+case "$TOKEN" in
+  EAA*) ok "META_ACCESS_TOKEN has access-token shape";;
+  "")   : ;;
+  *)    bad "META_ACCESS_TOKEN is ${#TOKEN} chars and does not start with EAA — not an access token"
+        note "a 32-char hex value is an App Secret; check the two are not swapped";;
+esac
+if [ -n "$SECRET" ]; then
+  if printf '%s' "$SECRET" | grep -qE '^[0-9a-f]{32}$'; then
+    ok "META_APP_SECRET has app-secret shape (32 hex)"
+  else
+    bad "META_APP_SECRET is ${#SECRET} chars — an App Secret is 32 hexadecimal characters"
+  fi
+fi
+
+# Does the token actually work against the phone number?
+PHONE=$(getv META_PHONE_NUMBER_ID)
+if [ -n "$TOKEN" ] && [ -n "$PHONE" ]; then
+  RESP=$(curl -s -H "Authorization: Bearer $TOKEN" \
+         "https://graph.facebook.com/v18.0/${PHONE}?fields=display_phone_number,verified_name" --max-time 25)
+  if echo "$RESP" | grep -q display_phone_number; then
+    ok "token authenticates against the phone number id"
+  else
+    bad "Graph rejected the token: $(echo "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("error",{}).get("message","?")[:80])' 2>/dev/null)"
+  fi
+fi
 
 # service_role key must exist under some name, and must not be the anon key
 ROLE=$(python3 - <<PY
@@ -41,11 +69,12 @@ PY
 )
 [ -n "$ROLE" ] && ok "service_role key present (in $ROLE)" || bad "no variable holds a service_role key"
 
-TOK=$(getv WHATSAPP_ACCESS_TOKEN)
-case "$TOK" in
-  EAActvKX*) bad "WHATSAPP_ACCESS_TOKEN is still the leaked token — rotate it";;
-  "")        : ;;
-  *)         ok "WHATSAPP_ACCESS_TOKEN differs from the known-leaked value";;
+# The superseded variable still holds the leaked token until it is revoked
+OLD=$(getv WHATSAPP_ACCESS_TOKEN)
+case "$OLD" in
+  EAActvKX*) bad "WHATSAPP_ACCESS_TOKEN still holds the leaked token — revoke it in Meta and delete the variable";;
+  "")        ok "no stale WHATSAPP_ACCESS_TOKEN left behind";;
+  *)         : ;;
 esac
 
 echo

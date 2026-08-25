@@ -12,13 +12,35 @@
 const WHATSAPP_API_VERSION = 'v18.0';
 const BASE_URL = `https://graph.facebook.com/${WHATSAPP_API_VERSION}`;
 
+/**
+ * Credentials are read under the META_* names, falling back to the older
+ * WHATSAPP_* ones so an environment that still uses those keeps working.
+ *
+ * The shape check is not pedantry: these four values are easy to paste into the
+ * wrong box, and doing so fails far away from the cause. A WhatsApp access token
+ * is a long "EAA…" string; an App Secret is 32 hex characters. Swapping them
+ * gets you "Cannot parse access token" from Graph on the first send, and a
+ * webhook that rejects every signature — neither of which points at the mix-up.
+ */
+function looksLikeAccessToken(v) {
+  return typeof v === 'string' && v.startsWith('EAA') && v.length > 50;
+}
+
 function getConfig() {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.META_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
-    throw new Error('[WhatsApp API] Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN');
+    throw new Error('[WhatsApp API] Missing META_PHONE_NUMBER_ID or META_ACCESS_TOKEN');
+  }
+
+  if (!looksLikeAccessToken(accessToken)) {
+    console.warn(
+      '[WhatsApp API] META_ACCESS_TOKEN does not look like a WhatsApp access token ' +
+      `(${accessToken.length} chars, does not start with "EAA"). A 32-character hex ` +
+      'value is an App Secret, not a token — check the two are not swapped.'
+    );
   }
 
   return {
@@ -30,6 +52,9 @@ function getConfig() {
     flowId: process.env.WHATSAPP_FLOW_ID || null,
     // 'draft' lets an unpublished Flow be tested by its creator
     flowMode: (process.env.WHATSAPP_FLOW_MODE || 'published').toLowerCase(),
+    // WhatsApp Business Account id — needed to create, update or publish Flows
+    // through the Flows API, not to send messages
+    wabaId: process.env.META_BUSINESS_ACCOUNT_ID || null,
   };
 }
 
