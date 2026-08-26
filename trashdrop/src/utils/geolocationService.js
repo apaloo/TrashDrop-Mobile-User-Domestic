@@ -112,6 +112,13 @@ class GeolocationService {
       } catch (error) {
         console.warn(`Geolocation attempt ${i+1} failed:`, error);
         lastError = error;
+
+        // A denied permission will never succeed on retry - stop immediately
+        // instead of burning the remaining timeouts on a hopeless request
+        if (error?.code === 1) {
+          console.warn('Geolocation permission denied - skipping remaining attempts');
+          break;
+        }
       }
     }
     

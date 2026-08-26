@@ -11,12 +11,15 @@ const DumpingReport = () => {
 
   const handleSuccess = (reportData) => {
     console.log('Report submitted successfully:', reportData);
-    // Navigate to success page or dashboard
-    navigate('/dashboard');
+    // The form shows its own confirmation - navigation is the user's call,
+    // so they actually see that the report went through
   };
 
   return (
-    <DumpingReportForm onSuccess={handleSuccess} />
+    <DumpingReportForm
+      onSuccess={handleSuccess}
+      onDone={() => navigate('/dashboard')}
+    />
   );
 };
 

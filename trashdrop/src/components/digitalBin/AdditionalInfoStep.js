@@ -3,6 +3,17 @@ import { FaCamera, FaTrash, FaCheckCircle } from 'react-icons/fa';
 import CameraModal from '../CameraModal';
 import { toastService } from '../../services/toastService';
 
+// The camera screen must stop at the same number the labels below promise
+const MAX_BIN_PHOTOS = 3;
+
+// Service frequencies offered in ScheduleDetailsStep
+const FREQUENCY_LABELS = {
+  'one-time': 'One-time',
+  weekly: 'Weekly',
+  biweekly: 'Bi-weekly',
+  monthly: 'Monthly'
+};
+
 const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) => {
   const [photos, setPhotos] = useState(formData.photos || []);
   const [showCamera, setShowCamera] = useState(false);
@@ -26,11 +37,11 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
       setPhotos(newPhotos);
       updateFormData({ photos: newPhotos });
       
-      toastService.success(`Photo ${newPhotos.length}/3 captured successfully`);
+      toastService.success(`Photo ${newPhotos.length}/${MAX_BIN_PHOTOS} captured successfully`);
 
-      if (newPhotos.length >= 3) {
+      if (newPhotos.length >= MAX_BIN_PHOTOS) {
         setShowCamera(false);
-        toastService.info('Maximum photos reached (3)');
+        toastService.info(`Maximum photos reached (${MAX_BIN_PHOTOS})`);
       }
     } catch (error) {
       console.error('Photo capture error:', error);
@@ -75,17 +86,17 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         <button
           type="button"
           onClick={() => setShowCamera(true)}
-          disabled={photos.length >= 3}
+          disabled={photos.length >= MAX_BIN_PHOTOS}
           className={`w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center
-            ${photos.length >= 3 ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}
+            ${photos.length >= MAX_BIN_PHOTOS ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}
             transition-colors`}
         >
-          <FaCamera className={`text-2xl mb-2 ${photos.length >= 3 ? 'text-gray-400' : 'text-primary'}`} />
+          <FaCamera className={`text-2xl mb-2 ${photos.length >= MAX_BIN_PHOTOS ? 'text-gray-400' : 'text-primary'}`} />
           <span className="text-sm font-medium text-gray-700">
             {photos.length === 0 ? 'Take Photos' : 'Add More Photos'}
           </span>
           <span className="text-xs text-gray-500 mt-1">
-            {photos.length}/3 photos taken
+            {photos.length}/{MAX_BIN_PHOTOS} photos taken
           </span>
         </button>
 
@@ -95,6 +106,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
             onCapture={handlePhotoCapture}
             onClose={handleCameraClose}
             currentPhotoCount={photos.length}
+            maxPhotos={MAX_BIN_PHOTOS}
           />
         )}
 
@@ -102,7 +114,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         {photos.length > 0 && (
           <div className="mt-4">
             <h4 className="text-sm font-medium text-gray-700 mb-2">
-              Your Photos ({photos.length}/3)
+              Your Photos ({photos.length}/{MAX_BIN_PHOTOS})
             </h4>
             <div className="grid grid-cols-3 gap-2">
               {photos.map((photo, index) => (
@@ -157,8 +169,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           Service fee will be calculated based on waste type, size, and number of bins
         </p>
         <p className="text-sm text-gray-700 font-medium">
-          Based on your selected frequency: {formData.frequency === 'weekly' ? 'Weekly' : 
-                                          formData.frequency === 'biweekly' ? 'Bi-weekly' : 'Monthly'}
+          Based on your selected frequency: {FREQUENCY_LABELS[formData.frequency] || formData.frequency}
         </p>
       </div>
       

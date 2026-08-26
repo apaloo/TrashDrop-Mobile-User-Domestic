@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
-import { FaQrcode, FaPlus, FaSpinner, FaSync, FaTimes, FaPlusCircle } from 'react-icons/fa';
+import { FaQrcode, FaPlus, FaSpinner, FaSync, FaTimes, FaPlusCircle, FaCheckCircle } from 'react-icons/fa';
 import toastService from '../services/toastService.js';
 import debug from '../utils/debug.js';
 // QR storage removed - using server-first approach
@@ -15,12 +15,26 @@ import WasteDetailsStep from '../components/digitalBin/WasteDetailsStep.js';
 import AdditionalInfoStep from '../components/digitalBin/AdditionalInfoStep.js';
 import ReviewStep from '../components/digitalBin/ReviewStep.js';
 import ScheduledQRTab from '../components/digitalBin/ScheduledQRTab.js';
-import { getCostBreakdown } from '../utils/costCalculator.js';
-import { prepareDigitalBinData } from '../services/digitalBinService.js';
+import { getCostBreakdown, getBinSizeLabelShort } from '../utils/costCalculator.js';
+import { prepareDigitalBinData, transformBin } from '../services/digitalBinService.js';
 import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
 import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees, incrementPromotionalUsage } from '../services/promotionalService.js';
 
+
+// Pickup time windows offered in ScheduleDetailsStep
+const PREFERRED_TIME_LABELS = {
+  morning: 'Morning (8am - 12pm)',
+  afternoon: 'Afternoon (12pm - 4pm)',
+  evening: 'Evening (4pm - 8pm)'
+};
+
+// Waste types offered in WasteDetailsStep
+const WASTE_TYPE_LABELS = {
+  general: 'General waste',
+  recycling: 'Recycling',
+  organic: 'Organic waste'
+};
 
 /**
  * Multi-step form for getting a digital bin
@@ -49,6 +63,10 @@ function DigitalBin() {
   
   // Track newly created bin ID for auto-expand
   const [newlyCreatedBinId, setNewlyCreatedBinId] = useState(null);
+
+  // Summary of the last successful submission, shown as an inline confirmation
+  // on the list view (the toast alone is easy to miss on a slow phone)
+  const [submissionSuccess, setSubmissionSuccess] = useState(null);
   
   // Promotional pricing state
   const [promoState, setPromoState] = useState({
@@ -216,7 +234,7 @@ function DigitalBin() {
   };
   
   // Fetch scheduled pickups with location details for the current user - SERVER-FIRST APPROACH
-  const fetchScheduledPickups = async (userId) => {
+  const fetchScheduledPickups = async (userId, { silent = false } = {}) => {
     try {
       debug.log('[DigitalBin] Fetching digital bins from server for user:', userId);
 
@@ -251,18 +269,7 @@ function DigitalBin() {
         console.log(`[DigitalBin] Server returned ${pickups.length} digital bins:`, pickups);
         
         // Transform server data to consistent format
-        const transformedBins = pickups.map(pickup => {
-          const transformed = {
-            ...pickup,
-            location_name: pickup.bin_locations?.location_name,
-            address: pickup.bin_locations?.address,
-            status: pickup.collected_at ? 'completed' : 
-                    (pickup.status === 'completed' || pickup.status === 'disposed') ? 'completed' :
-                    pickup.is_active ? 'active' : 'cancelled'
-          };
-          console.log(`[DigitalBin] Transformed bin:`, transformed);
-          return transformed;
-        });
+        const transformedBins = pickups.map(transformBin);
 
         // NO CACHING: Pure server-first approach
         console.log(`[DigitalBin] Server returned ${transformedBins.length} digital bins`);
@@ -280,8 +287,10 @@ function DigitalBin() {
       }
     } catch (error) {
       console.error('[DigitalBin] Error in fetchScheduledPickups:', error);
-      toastService.error('Failed to fetch digital bins');
-      setError(error.message);
+      if (!silent) {
+        toastService.error('Failed to fetch digital bins');
+        setError(error.message);
+      }
       return [];
     } 
   };
@@ -766,14 +775,14 @@ function DigitalBin() {
         
         console.log('Final coordinates for location update:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
         
-        // Update existing location
+        // Update existing location - locationId always refers to bin_locations here,
+        // since it was resolved (or migrated) from that table above
         const { error: updateError } = await supabase
-          .from('locations')
+          .from('bin_locations')
           .update({
             location_name: formData.location_name || 'Home',
             address: formData.address || '',
-            latitude: latitude,
-            longitude: longitude,
+            coordinates: `POINT(${longitude} ${latitude})`, // PostGIS Point format: POINT(lng lat)
             is_default: formData.is_default || false
           })
           .eq('id', locationId);
@@ -783,12 +792,22 @@ function DigitalBin() {
         }
       }
 
-      // Generate QR code URL
-      const qrCodeUrl = `https://trashdrop.app/bin/${locationId}`;
+      // The QR must carry the DIGITAL BIN id: the collector decodes ".../bin/<uuid>"
+      // and matches it against digital_bins.id. Keying it off the location was
+      // wrong — one location is reused across bookings at the same address, so
+      // two bins there produced identical QR codes.
+      // The id is minted here rather than left to the database default so the
+      // URL is correct at insert time; a trigger enforces the same value server
+      // side for every other writer.
+      const binId = crypto.randomUUID();
+      const qrCodeUrl = `https://trashdrop.app/bin/${binId}`;
 
       // Calculate expiry date based on frequency
       const expiryDate = new Date();
       switch (formData.frequency) {
+        case 'one-time':
+          expiryDate.setDate(expiryDate.getDate() + 7); // One-time requests stay open for a week
+          break;
         case 'weekly':
           expiryDate.setDate(expiryDate.getDate() + 7);
           break;
@@ -810,6 +829,19 @@ function DigitalBin() {
       // Prepare digital bin data with calculated fees
       // Ensure bag_count is always an integer
       const bagCount = parseInt(formData.numberOfBags || formData.bag_count) || 1;
+
+      // digital_bins has no column for the requested start date or time window,
+      // so they ride along with the user's notes in the details text
+      const schedulePreference = [
+        formData.startDate ? `Preferred date: ${formData.startDate}` : null,
+        formData.preferredTime
+          ? `Preferred time: ${PREFERRED_TIME_LABELS[formData.preferredTime] || formData.preferredTime}`
+          : null
+      ].filter(Boolean).join(' • ');
+
+      const details = [schedulePreference, formData.notes?.trim()]
+        .filter(Boolean)
+        .join('\n') || null;
       
       // Fetch promotional fee for the selected bin size if eligible
       let promoFeeData = { clientFee: null, collectorPayout: null, platformSubsidy: null };
@@ -819,15 +851,17 @@ function DigitalBin() {
       }
 
       const digitalBinData = await prepareDigitalBinData({
+        id: binId,
         user_id: user.id,
         location_id: locationId,
         qr_code_url: qrCodeUrl,
         frequency: formData.frequency,
-        waste_type: formData.waste_type || formData.wasteType,
+        waste_type: formData.wasteType || formData.waste_type,
         bag_count: bagCount,
         bin_size_liters: formData.bin_size_liters,
         is_urgent: formData.is_urgent || false,
         expires_at: expiryDate.toISOString(),
+        details,
         latitude: formData.latitude,
         longitude: formData.longitude,
         // Promotional pricing fields
@@ -878,7 +912,6 @@ function DigitalBin() {
       // Fire-and-forget background photo upload — does NOT block UI or success flow
       const photoBlobUrls = (formData.photos || []).filter(p => p && (p.startsWith('blob:') || p.startsWith('data:')));
       if (photoBlobUrls.length > 0) {
-        const binId = binData.id;
         const userId = user.id;
         console.log('[DigitalBin] Scheduling background upload of', photoBlobUrls.length, 'photo(s) for bin:', binId);
         uploadPhotos(photoBlobUrls, userId).then(uploadResult => {
@@ -907,17 +940,56 @@ function DigitalBin() {
       setNewlyCreatedBinId(binData.id);
       debug.log('[DigitalBin] Set newlyCreatedBinId:', binData.id);
 
-      // SERVER-FIRST: Immediately refresh from server to get all bins
-      debug.log('[DigitalBin] Digital bin created, refreshing from server');
-      await fetchScheduledPickups(user.id);
+      // Put the new bin in the list before we switch views. The confirmation
+      // tells the user their QR code is waiting below, so the row has to be
+      // there the moment they land - not after a round-trip that can be slow
+      // or fail. The server refresh below reconciles it.
+      const optimisticBin = transformBin({
+        ...binData,
+        location_id: binData.location_id || locationId,
+        location_name: formData.location_name,
+        address: formData.address
+      });
+      setScheduledPickups(prev => [
+        optimisticBin,
+        ...prev.filter(bin => bin.id !== optimisticBin.id)
+      ]);
+      setLastUpdated(new Date());
+
+      // Snapshot what was requested before resetForm() clears formData
+      const confirmation = {
+        binCount: bagCount,
+        binSize: formData.bin_size_liters,
+        wasteType: WASTE_TYPE_LABELS[formData.wasteType || formData.waste_type]
+          || formData.wasteType || formData.waste_type,
+        frequency: formData.frequency,
+        startDate: formData.startDate,
+        preferredTime: PREFERRED_TIME_LABELS[formData.preferredTime] || formData.preferredTime,
+        isUrgent: !!formData.is_urgent
+      };
 
       // Reset form and update UI
       resetForm();
       setCurrentStep(1);
       setViewMode('list');
 
-      // Show success message
+      // Show success message - toast plus a persistent inline confirmation
+      setSubmissionSuccess(confirmation);
       toastService.success('Digital bin created successfully!');
+
+      // SERVER-FIRST: reconcile with the server in the background. Silent on
+      // failure - the optimistic row stays put rather than following a success
+      // message with a fetch error for a bin that was created just fine.
+      fetchScheduledPickups(user.id, { silent: true })
+        .then(bins => {
+          if (bins.length > 0 && !bins.some(bin => bin.id === optimisticBin.id)) {
+            debug.log('[DigitalBin] New bin missing from server refresh, keeping optimistic row');
+            setScheduledPickups([optimisticBin, ...bins]);
+          }
+        })
+        .catch(err => {
+          console.warn('[DigitalBin] Post-create refresh failed, keeping optimistic row:', err.message);
+        });
     } catch (error) {
       console.error('Error in form submission:', error);
       setError(error.message);
@@ -1027,6 +1099,40 @@ function DigitalBin() {
             {viewMode === 'list' ? (
               /* List View */
               <div className="animate-fadeIn">
+                {submissionSuccess && (
+                  <div
+                    className="mb-4 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-start gap-3">
+                      <FaCheckCircle className="text-green-600 dark:text-green-400 text-xl flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-green-900 dark:text-green-200">
+                          Request submitted
+                        </p>
+                        <p className="text-sm text-green-800 dark:text-green-300 mt-1">
+                          {submissionSuccess.binCount} {getBinSizeLabelShort(submissionSuccess.binSize)} bin
+                          {submissionSuccess.binCount > 1 ? 's' : ''} for {submissionSuccess.wasteType}
+                          {submissionSuccess.startDate ? `, starting ${submissionSuccess.startDate}` : ''}
+                          {submissionSuccess.preferredTime ? ` (${submissionSuccess.preferredTime})` : ''}
+                          {submissionSuccess.isUrgent ? ' · marked urgent' : ''}.
+                        </p>
+                        <p className="text-sm text-green-800 dark:text-green-300 mt-1">
+                          Your QR code is ready below - print or show it to the collector on pickup day.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSubmissionSuccess(null)}
+                        className="text-green-700 dark:text-green-300 hover:text-green-900 dark:hover:text-green-100 p-1"
+                        aria-label="Dismiss confirmation"
+                      >
+                        <FaTimes />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <ScheduledQRTab 
                   scheduledPickups={scheduledPickups} 
                   onRefresh={handleRefresh}
@@ -1131,7 +1237,10 @@ function DigitalBin() {
         {/* Floating Action Button - only visible in list view */}
         {viewMode === 'list' && (
           <button
-            onClick={() => setViewMode('create')}
+            onClick={() => {
+              setSubmissionSuccess(null);
+              setViewMode('create');
+            }}
             className="absolute bottom-6 right-6 bg-primary hover:bg-primary-dark text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 flex items-center gap-2 z-10"
             aria-label="Create new digital bin"
           >

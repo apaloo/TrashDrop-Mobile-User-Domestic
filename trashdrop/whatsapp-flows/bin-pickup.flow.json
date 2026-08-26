@@ -1,0 +1,211 @@
+{
+  "version": "6.0",
+  "screens": [
+    {
+      "id": "SCHEDULE",
+      "title": "Schedule",
+      "data": {
+        "location_name": {
+          "type": "string",
+          "__example__": "Osu Home"
+        },
+        "address": {
+          "type": "string",
+          "__example__": "12 Oxford St, Osu"
+        },
+        "min_date": {
+          "type": "string",
+          "__example__": "2026-08-19"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Bin pickup"
+          },
+          {
+            "type": "TextBody",
+            "text": "Pickup location: ${data.location_name}"
+          },
+          {
+            "type": "TextCaption",
+            "text": "${data.address}"
+          },
+          {
+            "type": "Form",
+            "name": "schedule_form",
+            "children": [
+              {
+                "type": "RadioButtonsGroup",
+                "name": "frequency",
+                "label": "Collection frequency",
+                "required": true,
+                "data-source": [
+                  { "id": "one-time", "title": "One-time", "description": "A single pickup" },
+                  { "id": "weekly", "title": "Weekly", "description": "Every week" },
+                  { "id": "biweekly", "title": "Bi-weekly", "description": "Every two weeks" },
+                  { "id": "monthly", "title": "Monthly", "description": "Once a month" }
+                ]
+              },
+              {
+                "type": "DatePicker",
+                "name": "start_date",
+                "label": "Pickup date",
+                "required": true,
+                "min-date": "${data.min_date}",
+                "helper-text": "The first collection date"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "preferred_time",
+                "label": "Preferred time",
+                "required": true,
+                "data-source": [
+                  { "id": "morning", "title": "Morning", "description": "8am - 12pm" },
+                  { "id": "afternoon", "title": "Afternoon", "description": "12pm - 4pm" },
+                  { "id": "evening", "title": "Evening", "description": "4pm - 8pm" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "WASTE_DETAILS" },
+                  "payload": {}
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "WASTE_DETAILS",
+      "title": "Waste details",
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "waste_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "name": "bag_count",
+                "label": "Number of bins",
+                "required": true,
+                "data-source": [
+                  { "id": "1", "title": "1 Bin" },
+                  { "id": "2", "title": "2 Bins" },
+                  { "id": "3", "title": "3 Bins" },
+                  { "id": "4", "title": "4 Bins" },
+                  { "id": "5", "title": "5 Bins" }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "bin_size_liters",
+                "label": "Bin size",
+                "required": true,
+                "data-source": [
+                  { "id": "60", "title": "60L", "description": "Extra Small" },
+                  { "id": "80", "title": "80L", "description": "Small" },
+                  { "id": "90", "title": "90L", "description": "Small" },
+                  { "id": "100", "title": "100L", "description": "Medium" },
+                  { "id": "120", "title": "120L", "description": "Standard (Recommended)" },
+                  { "id": "240", "title": "240L", "description": "Large" },
+                  { "id": "340", "title": "340L", "description": "Extra Large" },
+                  { "id": "360", "title": "360L", "description": "Extra Large" },
+                  { "id": "660", "title": "660L", "description": "Industrial" },
+                  { "id": "1100", "title": "1100L", "description": "Commercial" }
+                ]
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "waste_type",
+                "label": "Bin type",
+                "required": true,
+                "data-source": [
+                  { "id": "general", "title": "General Waste", "description": "Mixed household waste" },
+                  { "id": "recycling", "title": "Recycling", "description": "Plastics, paper, metal, glass" },
+                  { "id": "organic", "title": "Organic Waste", "description": "Food scraps, garden waste" }
+                ]
+              },
+              {
+                "type": "TextCaption",
+                "text": "Urgent pickups are collected within 2 hours and add 30% to the base price."
+              },
+              {
+                "type": "OptIn",
+                "name": "is_urgent",
+                "label": "Mark as urgent"
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "ADDITIONAL_INFO" },
+                  "payload": {}
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ADDITIONAL_INFO",
+      "title": "Additional info",
+      "terminal": true,
+      "success": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextBody",
+            "text": "Anything the collector should know?"
+          },
+          {
+            "type": "Form",
+            "name": "info_form",
+            "children": [
+              {
+                "type": "TextArea",
+                "name": "notes",
+                "label": "Notes (optional)",
+                "required": false,
+                "max-length": 500,
+                "helper-text": "A landmark, gate code, or where the bin is kept"
+              },
+              {
+                "type": "TextCaption",
+                "text": "We'll send your price for approval in the chat before anything is booked."
+              },
+              {
+                "type": "Footer",
+                "label": "Review price",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "frequency": "${screen.SCHEDULE.form.frequency}",
+                    "start_date": "${screen.SCHEDULE.form.start_date}",
+                    "preferred_time": "${screen.SCHEDULE.form.preferred_time}",
+                    "bag_count": "${screen.WASTE_DETAILS.form.bag_count}",
+                    "bin_size_liters": "${screen.WASTE_DETAILS.form.bin_size_liters}",
+                    "waste_type": "${screen.WASTE_DETAILS.form.waste_type}",
+                    "is_urgent": "${screen.WASTE_DETAILS.form.is_urgent}",
+                    "notes": "${form.notes}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

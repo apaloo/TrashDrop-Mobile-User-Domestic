@@ -122,8 +122,23 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
     }
   };
   
+  // Everything the request needs before it can be submitted, with the step that
+  // fixes each gap - shown inline so a disabled button is never a dead end
+  const missingRequirements = [];
+  if (!formData.address || formData.latitude == null || formData.longitude == null) {
+    missingRequirements.push('Pickup location and GPS coordinates (Step 1: Location)');
+  }
+  if (!formData.frequency || !formData.startDate || !formData.preferredTime) {
+    missingRequirements.push('Service frequency, start date and preferred time (Step 2: Schedule)');
+  }
+  if (!formData.numberOfBags || !(formData.wasteType || formData.waste_type) || !formData.bin_size_liters) {
+    missingRequirements.push('Number of bins, waste type and bin size (Step 3: Bin details)');
+  }
+  const canSubmit = missingRequirements.length === 0 && !isSubmitting;
+
   // Handle form submission
   const onSubmit = async () => {
+    if (missingRequirements.length > 0) return;
     setIsSubmitting(true);
     try {
       await handleSubmit();
@@ -364,6 +379,23 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
         </p>
       </div>
       
+      {missingRequirements.length > 0 && (
+        <div
+          id="review-missing-requirements"
+          className="mt-6 p-4 rounded-md bg-amber-50 border border-amber-300"
+          role="status"
+        >
+          <p className="text-sm font-semibold text-amber-900">
+            Add the following before you can submit:
+          </p>
+          <ul className="mt-2 list-disc list-inside space-y-1">
+            {missingRequirements.map(requirement => (
+              <li key={requirement} className="text-sm text-amber-800">{requirement}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex justify-between mt-6">
         <button
           type="button"
@@ -376,7 +408,9 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
         <button
           type="button"
           onClick={onSubmit}
-          disabled={isSubmitting}
+          disabled={!canSubmit}
+          aria-describedby={missingRequirements.length > 0 ? 'review-missing-requirements' : undefined}
+          title={missingRequirements.length > 0 ? `Still needed: ${missingRequirements.join('; ')}` : undefined}
           className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (

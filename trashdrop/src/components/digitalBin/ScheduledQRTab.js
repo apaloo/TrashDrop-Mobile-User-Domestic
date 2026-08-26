@@ -6,6 +6,7 @@ import QRCodeList from './QRCodeList.js';
 import { subscribeToPickupUpdates, handlePickupUpdate } from '../../utils/realtime.js';
 import debug from '../../utils/debug.js';
 import ConfirmModal from '../ConfirmModal.js';
+import { transformBin } from '../../services/digitalBinService.js';
 
 const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCreatedBinId = null, onNewBinExpanded = null }) => {
 
@@ -13,10 +14,22 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
   const [activeTab, setActiveTab] = useState('active');
   const [localPickups, setLocalPickups] = useState([]);
   const subscriptionRef = useRef(null);  // Use ref to avoid stale closure in cleanup
+  // handleBinStatusChange is memoized with no deps so the realtime subscription
+  // isn't torn down on every render - these keep it reading current values
+  const localPickupsRef = useRef([]);
+  const onRefreshRef = useRef(onRefresh);
   const [cancelModal, setCancelModal] = useState({ open: false, binId: null });
   const [isCancelling, setIsCancelling] = useState(false);
   const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', variant: 'info' });
   
+  useEffect(() => {
+    localPickupsRef.current = localPickups;
+  }, [localPickups]);
+
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
+
   // Load persisted QR codes from localStorage on component mount
   useEffect(() => {
     const loadPersistedPickups = () => {
@@ -123,32 +136,67 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       
       // Update localStorage to match (server-first approach)
       localStorage.setItem('digitalBins', JSON.stringify(sortedBins));
+    } else if (!isLoading) {
+      // A settled fetch that came back empty is the truth - keeping the
+      // localStorage rows here would show bins the server no longer has
+      debug.log('[ScheduledQRTab] Server returned no bins, clearing list');
+      setLocalPickups([]);
+      localStorage.setItem('digitalBins', JSON.stringify([]));
     }
-  }, [validPickups]);
+  }, [validPickups, isLoading]);
+
+  // Land the user on the tab holding the bin they just created. The active tab
+  // is remembered across visits, so without this a user whose last visit ended
+  // on Completed/Cancelled gets a confirmation pointing at an empty list.
+  useEffect(() => {
+    if (!newlyCreatedBinId) return;
+
+    const newBin = localPickups.find(bin => bin && bin.id === newlyCreatedBinId);
+    if (!newBin) return;
+
+    const tabForBin = newBin.status === 'completed' ? 'completed'
+      : newBin.status === 'cancelled' ? 'cancelled'
+      : 'active';
+
+    setActiveTab(prev => (prev === tabForBin ? prev : tabForBin));
+  }, [newlyCreatedBinId, localPickups]);
   
-  // Handle real-time updates
+  // Handle real-time updates.
+  //
+  // The payload is a raw digital_bins row: its `status` is the database's own
+  // ('pending' on insert) and it carries no bin_locations join. Merging it in
+  // as-is overwrote the list-facing status of a freshly created bin with
+  // 'pending', which matches no tab - so the bin the success message points at
+  // disappeared. Run it through the same transform as every other source, and
+  // keep the location fields the payload can't supply.
   const handleBinStatusChange = useCallback((updatedBin) => {
+    if (!updatedBin?.id) return;
+
     setLocalPickups(prevBins => {
       const binIndex = prevBins.findIndex(bin => bin.id === updatedBin.id);
-      
-      if (binIndex === -1) {
-        // New bin, add it
-        const newBins = [...prevBins, updatedBin];
-        localStorage.setItem('digitalBins', JSON.stringify(newBins));
-        return newBins;
-      }
-      
-      // Update existing bin
-      const updatedBins = [...prevBins];
-      updatedBins[binIndex] = {
-        ...updatedBins[binIndex],
+      const existing = binIndex === -1 ? null : prevBins[binIndex];
+
+      const merged = transformBin({
+        ...(existing || {}),
         ...updatedBin,
+        location_name: updatedBin.location_name || existing?.location_name,
+        address: updatedBin.address || existing?.address,
         lastUpdated: new Date().toISOString()
-      };
-      
-      localStorage.setItem('digitalBins', JSON.stringify(updatedBins));
-      return updatedBins;
+      });
+
+      const newBins = binIndex === -1
+        ? [merged, ...prevBins]
+        : prevBins.map((bin, i) => (i === binIndex ? merged : bin));
+
+      localStorage.setItem('digitalBins', JSON.stringify(newBins));
+      return newBins;
     });
+
+    // A bin we've never seen arrives without its location join - pull the full
+    // row so the card isn't left with a blank address
+    if (!localPickupsRef.current.some(bin => bin.id === updatedBin.id)) {
+      onRefreshRef.current?.();
+    }
   }, []);
   
   // Filter bins by status

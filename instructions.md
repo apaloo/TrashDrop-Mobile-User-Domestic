@@ -106,6 +106,10 @@ trashdrop/
 
 ### 6.1 Dashboard
 - Grid layout with Tailwind CSS, skeleton loaders, real-time data
+- Recent Activity shows skeleton rows until the first fetch settles (`activitiesLoaded`), so the empty state never flashes on a slow connection
+- Initial load (`loadDashboardDataSeamless`) settles stats/activities/pickups independently and paints each as it lands, retries the failed ones on an exponential backoff (`LOAD_RETRY_DELAYS`, skipped while offline), and only then shows a plain-language banner with a "Try again" button - never a raw error overlay
+- One initial load, not two: the progressive loader now only drives the 30s auto-refresh, and the duplicate unread-notification and online-listener fetches are gone (~49 → ~19 API calls in the first 10s)
+- `mountedRef` is set on mount as well as cleared on unmount, so StrictMode's remount doesn't discard every guarded fetch result
 - **Onboarding system** (`OnboardingFlow.js` + `onboardingService.js`): guided walkthrough for new users with smart step detection based on progress (bags, locations, QR scans), force parameter (`?force=true`) for re-triggering
 - Active pickup cards (`ActivePickupCard.js`) with live status
 - Seamless dashboard service for cached data and smooth UX
@@ -115,8 +119,11 @@ Multi-step wizard in `src/components/digitalBin/`:
 - **LocationStep** — select/set bin location via Leaflet map
 - **WasteDetailsStep** — choose waste type, bin size (60L–1100L), bag count
 - **ScheduleDetailsStep** — pickup frequency (one-time, weekly, biweekly, monthly)
-- **AdditionalInfoStep** — bin photos via `CameraModal.js` (portrait-optimized, back camera, max 3 photos)
-- **ReviewStep** — confirm & submit; generates QR code
+- **AdditionalInfoStep** — bin photos via `CameraModal.js` (portrait-optimized, back camera, max 3 photos). The limit lives in one `MAX_BIN_PHOTOS` constant and is passed to `CameraModal` as `maxPhotos`, so the camera screen's counter can't disagree with the form's labels
+- **ReviewStep** — confirm & submit; generates QR code. Submit stays disabled until location, schedule and bin details are complete, and lists what is still missing inline; steps 2–3 do the same for their Continue buttons
+- After a successful submit the list view shows a dismissible confirmation summarising the request (bins, waste type, start date, time window) alongside the toast
+- The new bin is added to the list optimistically before the view switches, then reconciled by a background (silent-on-failure) server refresh, so the row backing "your QR code is ready below" is always there; `ScheduledQRTab` also switches to the tab holding the new bin, overriding the remembered tab
+- `transformBin` (exported from `digitalBinService.js`) is the single mapping from a `digital_bins` row to the list's status vocabulary. The database's own `status` starts at `'pending'`, which matches none of the tabs, so every source must go through it - the joined fetch, the optimistic row, and raw realtime payloads alike. The realtime handler used to merge payloads unmapped, so the background `photo_urls` write fired seconds after a create knocked the new bin out of all three tabs. Covered by `src/services/__tests__/digitalBinService.transformBin.test.js`
 - **QRCodeList / ScheduledQRTab** — view active digital bins and their QR codes
 
 ### 6.3 Pickup Requests
@@ -138,6 +145,9 @@ Multi-step wizard in `src/components/digitalBin/`:
   - Waste type, severity, size classification
   - Anonymous reporting option
   - Photo upload to Supabase storage (`photoUploadService.js`)
+  - Coordinates read-out shows "Detecting your location..." while the first GPS fix is in flight instead of `N/A`
+  - Submit stays disabled until location, waste type, size and at least one photo are present, and lists what is still missing inline
+  - On success the form shows a confirmation with the report reference and summary; the page no longer auto-navigates - "Back to Dashboard" and "Report another site" are the user's call
 - Deduplication via `requestDeduplication.js` (location hash, idempotency tokens, submission fingerprints)
 
 ### 6.6 Rewards & Points
@@ -270,7 +280,6 @@ CI=false npm run build
 
 > WARNING: This schema is for context only and is not meant to be run.
 > Table order and constraints may not be valid for execution.
-
 
 CREATE TABLE public.alerts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

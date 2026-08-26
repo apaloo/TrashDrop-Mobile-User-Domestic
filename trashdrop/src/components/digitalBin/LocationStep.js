@@ -129,7 +129,9 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
             latitude,
             longitude,
             gps_accuracy: accuracy,
-            useCurrentLocation: true
+            useCurrentLocation: true,
+            location_id: null,
+            isNewLocation: true
           });
           
           // Reset the flag after animation completes
@@ -392,7 +394,16 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         
         setPosition([latitude, longitude]);
         setIsNewLocation(true); // Mark as new GPS location for smooth animation
-        updateFormData({ latitude, longitude, gps_accuracy: accuracy, useCurrentLocation: true });
+        // Clear any previously selected saved location so the bin is filed against
+        // these fresh coordinates rather than the old address
+        updateFormData({
+          latitude,
+          longitude,
+          gps_accuracy: accuracy,
+          useCurrentLocation: true,
+          location_id: null,
+          isNewLocation: true
+        });
 
         // Reset the flag after animation
         setTimeout(() => setIsNewLocation(false), 2000);
