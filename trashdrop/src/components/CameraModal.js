@@ -6,14 +6,24 @@ if (typeof window !== 'undefined' && window.cameraModalMounted === undefined) {
   window.cameraModalMounted = false;
 }
 
+// Fallback ceiling for callers that don't state one
+const DEFAULT_MAX_PHOTOS = 5;
+
 /**
  * Standalone camera modal component
  * This component is completely isolated from the rest of the application
  * to prevent interference with other components like maps
  */
-const CameraModal = ({ onCapture, onClose, currentPhotoCount = 0 }) => {
-  const [photoCount, setPhotoCount] = useState(currentPhotoCount);
-  const maxPhotos = 5; // Maximum allowed photos
+const CameraModal = ({
+  onCapture,
+  onClose,
+  currentPhotoCount = 0,
+  // Callers set their own ceiling - it has to match the limit their form
+  // advertises, otherwise the camera keeps shooting past what the form accepts
+  maxPhotos = DEFAULT_MAX_PHOTOS,
+  currentCount = null
+}) => {
+  const [photoCount, setPhotoCount] = useState(currentCount ?? currentPhotoCount);
   const [cameraStream, setCameraStream] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);

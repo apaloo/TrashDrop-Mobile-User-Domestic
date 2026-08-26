@@ -1,10 +1,17 @@
 import React from 'react';
 
 const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
-  // Helper to determine if form is valid
-  const isValid = () => {
-    return formData.frequency && formData.startDate && formData.preferredTime;
+  // What is still missing, so a disabled Continue button explains itself
+  const getMissingFields = () => {
+    const missing = [];
+    if (!formData.frequency) missing.push('service frequency');
+    if (!formData.startDate) missing.push('start date');
+    if (!formData.preferredTime) missing.push('preferred time');
+    return missing;
   };
+
+  // Helper to determine if form is valid
+  const isValid = () => getMissingFields().length === 0;
 
   // Handle start date change
   const handleDateChange = (e) => {
@@ -238,6 +245,12 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
         </div>
       </div>
       
+      {!isValid() && (
+        <p id="schedule-step-missing" className="mt-6 text-sm text-amber-700" role="status">
+          Select {getMissingFields().join(', ')} to continue.
+        </p>
+      )}
+
       <div className="flex justify-between mt-6">
         <button
           type="button"
@@ -250,6 +263,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           type="button"
           onClick={nextStep}
           disabled={!isValid()}
+          aria-describedby={isValid() ? undefined : 'schedule-step-missing'}
           className={`px-6 py-2 rounded-md transition-colors ${
             isValid()
               ? 'bg-primary hover:bg-primary-dark text-white'

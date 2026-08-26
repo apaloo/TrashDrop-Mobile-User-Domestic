@@ -342,12 +342,30 @@ class SeamlessDashboardService {
     seamlessCache.invalidate(this.cacheKeys.activities(userId));
     seamlessCache.invalidate(this.cacheKeys.activePickups(userId));
     
-    // Fetch fresh data
-    const [stats, activities, pickups] = await Promise.all([
+    // Fetch fresh data. One failing endpoint must not discard the other two,
+    // so settle them all and only surface a failure if nothing came back.
+    const results = await Promise.allSettled([
       this.getUserStats(userId),
       this.getRecentActivities(userId, 5),
       this.getActivePickups(userId)
     ]);
+    
+    const rejected = results.filter(result => result.status === 'rejected');
+    if (rejected.length === results.length) {
+      console.error('[SeamlessDashboard] ❌ Force refresh failed for every source');
+      throw rejected[0].reason;
+    }
+    
+    if (rejected.length > 0) {
+      console.warn(
+        `[SeamlessDashboard] ⚠️ Force refresh partially failed (${rejected.length}/${results.length}):`,
+        rejected.map(result => result.reason?.message).join(', ')
+      );
+    }
+    
+    const [stats, activities, pickups] = results.map(
+      result => (result.status === 'fulfilled' ? result.value : null)
+    );
     
     return { stats, activities, pickups };
   }

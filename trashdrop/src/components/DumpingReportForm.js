@@ -49,10 +49,30 @@ const LocationMarker = ({ position, setPosition, onMapClick, disabled }) => {
   return null;
 };
 
-const DumpingReportForm = ({ onSuccess }) => {
+// Labels for the option cards, reused by the submission confirmation
+const WASTE_TYPE_LABELS = {
+  mixed: 'Mixed waste',
+  construction: 'Construction debris',
+  household: 'Household waste',
+  electronic: 'Electronic waste',
+  organic: 'Organic waste',
+  recyclables: 'Recyclables',
+  hazardous: 'Hazardous waste'
+};
+
+const VOLUME_LABELS = {
+  small: 'Small (few bags)',
+  medium: 'Medium',
+  large: 'Large',
+  massive: 'Massive'
+};
+
+const DumpingReportForm = ({ onSuccess, onDone }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isLocating, setIsLocating] = useState(true); // First GPS fix is in flight on mount
+  const [submissionSuccess, setSubmissionSuccess] = useState(null); // Summary of the submitted report
 
   // Default to Accra, Ghana coordinates so map can render immediately
   const [mapPosition, setMapPosition] = useState([5.614736, -0.208811]);
@@ -174,6 +194,7 @@ const DumpingReportForm = ({ onSuccess }) => {
   const handleUseMyLocation = useCallback((showFeedback = true) => {
     // Clear any previous errors
     setError(null);
+    setIsLocating(true);
     
     if (navigator.geolocation) {
       try {
@@ -202,6 +223,8 @@ const DumpingReportForm = ({ onSuccess }) => {
               
               setMapPosition([location.latitude, location.longitude]);
               
+              setIsLocating(false);
+              
               // Show success message only if explicitly requested
               if (showFeedback) {
                 showSuccessToast('📍 Location updated successfully');
@@ -210,6 +233,7 @@ const DumpingReportForm = ({ onSuccess }) => {
             } catch (processingError) {
               console.warn('Error processing location data:', processingError);
               handleGeolocationFallback('Could not process your location data');
+              setIsLocating(false);
               if (showFeedback) {
                 setLoading(false);
               }
@@ -218,6 +242,7 @@ const DumpingReportForm = ({ onSuccess }) => {
           (error) => {
             console.warn('Geolocation error:', error);
             handleGeolocationFallback(`${getGeolocationErrorMessage(error)}`);
+            setIsLocating(false);
             if (showFeedback) {
               setLoading(false);
             }
@@ -227,12 +252,14 @@ const DumpingReportForm = ({ onSuccess }) => {
       } catch (exception) {
         console.warn('Geolocation exception:', exception);
         handleGeolocationFallback('Unexpected error accessing location services');
+        setIsLocating(false);
         if (showFeedback) {
           setLoading(false);
         }
       }
     } else {
       handleGeolocationFallback('Geolocation is not supported by your browser');
+      setIsLocating(false);
       if (showFeedback) {
         setLoading(false);
       }
@@ -246,6 +273,7 @@ const DumpingReportForm = ({ onSuccess }) => {
     }
     
     setMapPosition([latlng.lat, latlng.lng]);
+    setIsLocating(false);
     setFormData(prev => ({
       ...prev,
       coordinates: {
@@ -386,6 +414,22 @@ const DumpingReportForm = ({ onSuccess }) => {
     }));
   };
 
+  // Everything the report needs, so a disabled Submit button is never a dead end
+  const missingRequirements = [];
+  if (!formData.coordinates) {
+    missingRequirements.push('A location - tap the map or use "Use My Location"');
+  }
+  if (!formData.waste_type) {
+    missingRequirements.push('The type of waste');
+  }
+  if (!formData.estimated_volume) {
+    missingRequirements.push('The size of the illegal dumping');
+  }
+  if (formData.photos.length === 0) {
+    missingRequirements.push('At least one photo taken with your camera');
+  }
+  const canSubmit = missingRequirements.length === 0 && !loading;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -450,6 +494,17 @@ const DumpingReportForm = ({ onSuccess }) => {
         console.warn('Failed to create notification:', notificationError);
       }
 
+      // Snapshot what was reported before the form is cleared
+      const confirmation = {
+        reference: String(data.id).slice(0, 8).toUpperCase(),
+        wasteType: WASTE_TYPE_LABELS[formData.waste_type] || formData.waste_type,
+        volume: VOLUME_LABELS[formData.estimated_volume] || formData.estimated_volume,
+        severity: formData.severity,
+        photoCount: formData.photos.length,
+        coordinates: formData.coordinates,
+        hazardous: formData.hazardous_materials
+      };
+
       // Reset form
       setFormData({
         location: '',
@@ -464,6 +519,16 @@ const DumpingReportForm = ({ onSuccess }) => {
         photos: [],
         contact_consent: false
       });
+      setCapturedPhotos([]);
+
+      // Confirm on screen - a toast alone disappears before it is read
+      setSubmissionSuccess(confirmation);
+      showSuccessToast('Report submitted successfully');
+      try {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (scrollError) {
+        // Non-fatal - some environments do not implement smooth scrolling
+      }
 
       // Call success callback
       if (onSuccess) {
@@ -487,6 +552,57 @@ const DumpingReportForm = ({ onSuccess }) => {
       </div>
       
       <div className="px-4 py-2" style={{marginTop: '65px'}}>
+
+        {/* Submission confirmation */}
+        {submissionSuccess && (
+          <div
+            className="bg-green-50 dark:bg-green-900 dark:bg-opacity-20 border border-green-300 dark:border-green-800 rounded-lg p-4 mb-6"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start">
+              <div className="bg-green-600 rounded-full p-2 mr-3 mt-1 flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-green-900 dark:text-green-200">
+                  Report submitted - reference {submissionSuccess.reference}
+                </p>
+                <p className="text-sm text-green-800 dark:text-green-300 mt-1">
+                  {submissionSuccess.wasteType}, {submissionSuccess.volume}, {submissionSuccess.severity} severity,
+                  {' '}{submissionSuccess.photoCount} photo{submissionSuccess.photoCount === 1 ? '' : 's'}
+                  {submissionSuccess.hazardous ? ' · flagged hazardous' : ''}
+                  {submissionSuccess.coordinates
+                    ? ` at ${submissionSuccess.coordinates.latitude.toFixed(5)}, ${submissionSuccess.coordinates.longitude.toFixed(5)}`
+                    : ''}.
+                </p>
+                <p className="text-sm text-green-800 dark:text-green-300 mt-1">
+                  Local authorities have been notified. You can follow it up under Activity.
+                </p>
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {onDone && (
+                    <button
+                      type="button"
+                      onClick={() => onDone(submissionSuccess)}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Back to Dashboard
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSubmissionSuccess(null)}
+                    className="px-4 py-2 border border-green-600 text-green-800 dark:text-green-300 rounded-lg text-sm font-medium hover:bg-green-100 dark:hover:bg-green-900 dark:hover:bg-opacity-40 transition-colors"
+                  >
+                    Report another site
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Info Box */}
         <div className="bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 flex items-start">
@@ -927,9 +1043,27 @@ const DumpingReportForm = ({ onSuccess }) => {
             
             {/* Location coordinates */}
             <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                <div>Lat: {formData?.coordinates?.latitude?.toFixed(6) || 'N/A'}</div>
-                <div>Lng: {formData?.coordinates?.longitude?.toFixed(6) || 'N/A'}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400" role="status" aria-live="polite">
+                {isLocating && !formData?.coordinates ? (
+                  <div className="animate-pulse">
+                    <div className="flex items-center">
+                      <svg className="animate-spin mr-2 h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Detecting your location...
+                    </div>
+                  </div>
+                ) : formData?.coordinates ? (
+                  <>
+                    <div>Lat: {formData.coordinates.latitude?.toFixed(6)}</div>
+                    <div>Lng: {formData.coordinates.longitude?.toFixed(6)}</div>
+                  </>
+                ) : (
+                  <div className="text-amber-700 dark:text-amber-400">
+                    No location set yet - tap the map or use the button.
+                  </div>
+                )}
               </div>
               <button
                 type="button"
@@ -1042,10 +1176,30 @@ const DumpingReportForm = ({ onSuccess }) => {
             </p>
           </div>
 
+          {/* Reasons the Submit button is disabled */}
+          {missingRequirements.length > 0 && (
+            <div
+              id="report-missing-requirements"
+              className="mb-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900 dark:bg-opacity-20 border border-amber-300 dark:border-amber-800"
+              role="status"
+            >
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                Add the following before you can submit:
+              </p>
+              <ul className="mt-2 list-disc list-inside space-y-1">
+                {missingRequirements.map(requirement => (
+                  <li key={requirement} className="text-sm text-amber-800 dark:text-amber-300">{requirement}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !formData.waste_type || !formData.estimated_volume || formData.photos.length === 0}
+            disabled={!canSubmit}
+            aria-describedby={missingRequirements.length > 0 ? 'report-missing-requirements' : undefined}
+            title={missingRequirements.length > 0 ? `Still needed: ${missingRequirements.join('; ')}` : undefined}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-lg transition-colors"
           >
             {loading ? (

@@ -6,6 +6,27 @@
 import { getCostBreakdown, getCostBreakdownWithGPS } from '../utils/costCalculator.js';
 
 /**
+ * Shape a digital_bins row the way the bin list expects it.
+ *
+ * Rows reach the UI from three places - the joined server fetch, the optimistic
+ * row added right after a create, and raw realtime payloads - and every one of
+ * them has to end up with the same `status` vocabulary ('active' | 'completed' |
+ * 'cancelled'). The database's own `status` starts at 'pending', which matches
+ * none of the list's tabs, so anything skipping this mapping goes invisible.
+ *
+ * @param {Object} pickup - A digital_bins row, optionally with a bin_locations join
+ * @returns {Object} Row with resolved location fields and a list-facing status
+ */
+export const transformBin = (pickup) => ({
+  ...pickup,
+  location_name: pickup.location_name || pickup.bin_locations?.location_name,
+  address: pickup.address || pickup.bin_locations?.address,
+  status: pickup.collected_at ? 'completed' :
+          (pickup.status === 'completed' || pickup.status === 'disposed') ? 'completed' :
+          pickup.is_active ? 'active' : 'cancelled'
+});
+
+/**
  * Prepare digital bin data with calculated fees (GPS-based pricing)
  * @param {Object} params - Parameters for digital bin creation
  * @returns {Promise<Object>} Complete digital bin data ready for database insert
@@ -150,5 +171,6 @@ export const prepareDigitalBinData = async ({
 };
 
 export default {
-  prepareDigitalBinData
+  prepareDigitalBinData,
+  transformBin
 };

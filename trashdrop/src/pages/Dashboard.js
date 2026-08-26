@@ -17,6 +17,7 @@ import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReport
 import realtimeManager from '../utils/realtimeOptimized.js';
 import seamlessDashboardService from '../services/seamlessDashboardService.js';
 import DataFreshnessIndicator from '../components/DataFreshnessIndicator.js';
+import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
 
 // For development: expose cleanup function
 if (process.env.NODE_ENV === 'development') {
@@ -61,6 +62,27 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+// Placeholder rows for the Recent Activity list while the first fetch is in
+// flight - without it the empty state flashes and reads like an error
+const ActivityListSkeleton = () => (
+  <div role="status" aria-label="Loading recent activity">
+    {[1, 2, 3].map(i => (
+      <div
+        key={i}
+        className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-3"
+        aria-hidden="true"
+      >
+        <ActivityItemSkeleton />
+      </div>
+    ))}
+    <span className="sr-only">Loading recent activity</span>
+  </div>
+);
+
+// Backoff schedule for the initial dashboard load, in ms. Length also decides
+// how many retries happen before the user sees a failure banner.
+const LOAD_RETRY_DELAYS = [500, 1500, 4000];
+
 /**
  * Dashboard page component showing user's activity and nearby trash drop points
  */
@@ -90,6 +112,7 @@ const Dashboard = () => {
   const [dashboardTab, setDashboardTab] = useState('activity'); // 'activity' | 'pickup'
   const [isLoading, setIsLoading] = useState(false); // Start with false to improve LCP
   const [isRefreshingActivities, setIsRefreshingActivities] = useState(false); // Track activity refresh state
+  const [activitiesLoaded, setActivitiesLoaded] = useState(false); // First activity fetch has settled (success or failure)
   const [isOnlineStatus, setIsOnlineStatus] = useState(isOnline());
   const [dataSource, setDataSource] = useState('seamless'); // 'seamless', 'network', 'loading'
   const [updateType, setUpdateType] = useState('initial'); // Track update type for visual feedback
@@ -98,6 +121,8 @@ const Dashboard = () => {
   const [bagsPulse, setBagsPulse] = useState(false);
   const bagsPulseTimerRef = useRef(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false); // Initial load exhausted its retries
+  const [isRetryingLoad, setIsRetryingLoad] = useState(false);
   const seamlessSubscriptionsRef = useRef({});
   
   // Onboarding state
@@ -110,6 +135,13 @@ const Dashboard = () => {
   // Navigation choice modal state
   const [showNavigationModal, setShowNavigationModal] = useState(false);
   const [navigationPickup, setNavigationPickup] = useState(null);
+
+  // All activity writes go through here so the UI can tell "still loading" apart
+  // from "genuinely empty" - accepts a value or an updater, like setState
+  const applyRecentActivities = useCallback((activities) => {
+    setRecentActivities(activities);
+    setActivitiesLoaded(true);
+  }, []);
   
   // Check onboarding status and show appropriate UI
   useEffect(() => {
@@ -363,6 +395,10 @@ const Dashboard = () => {
 
   // Cleanup function
   useEffect(() => {
+    // Set on mount, not just cleared on unmount: React 18 StrictMode mounts,
+    // unmounts and remounts, and the ref survives that cycle - leaving it false
+    // meant every mountedRef-guarded fetch result was thrown away in dev
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -409,12 +445,13 @@ const Dashboard = () => {
               console.log('[Dashboard] 📝 Loading recent activities in idle time');
               setIsRefreshingActivities(true);
               const activities = await getDatabaseActivities(5);
-              setRecentActivities(activities);
+              applyRecentActivities(activities);
               setIsRefreshingActivities(false);
               console.log('[Dashboard] ✅ Recent activities loaded');
             } catch (error) {
               console.warn('[Dashboard] Error loading deferred activities:', error);
               setIsRefreshingActivities(false);
+              setActivitiesLoaded(true);
             }
           });
         } else {
@@ -424,11 +461,12 @@ const Dashboard = () => {
               console.log('[Dashboard] 📝 Loading recent activities (fallback)');
               setIsRefreshingActivities(true);
               const activities = await getDatabaseActivities(5);
-              setRecentActivities(activities);
+              applyRecentActivities(activities);
               setIsRefreshingActivities(false);
             } catch (error) {
               console.warn('[Dashboard] Error loading fallback activities:', error);
               setIsRefreshingActivities(false);
+              setActivitiesLoaded(true);
             }
           }, 100);
         }
@@ -456,7 +494,7 @@ const Dashboard = () => {
             }
             
             if (completeData?.activities) {
-              setRecentActivities(completeData.activities);
+              applyRecentActivities(completeData.activities);
             }
             
             console.log('[Dashboard] ✅ Background refresh completed');
@@ -476,7 +514,7 @@ const Dashboard = () => {
       console.error('[Dashboard] Error in progressive loading:', error);
       setIsLoading(false);
     }
-  }, [user?.id, isOnlineStatus, getDatabaseActivities]);
+  }, [user?.id, isOnlineStatus, getDatabaseActivities, applyRecentActivities]);
 
   // Optimized consolidated real-time subscription
   useEffect(() => {
@@ -494,7 +532,7 @@ const Dashboard = () => {
       
       // Activity update callbacks
       addActivity: (activity) => {
-        setRecentActivities(prev => [activity, ...prev.slice(0, 4)]);
+        applyRecentActivities(prev => [activity, ...prev.slice(0, 4)]);
       },
       refreshStats: () => {
         loadDashboardDataProgressive();
@@ -566,25 +604,6 @@ const Dashboard = () => {
     };
   }, [user?.id, stats, loadDashboardDataProgressive, navigate, mountedRef]);
 
-  // Online status listener
-  useEffect(() => {
-    const handleOnlineStatus = () => {
-      setIsOnlineStatus(isOnline());
-      if (isOnline() && user?.id) {
-        console.log('[Dashboard] Back online, refreshing data');
-        loadDashboardDataProgressive();
-      }
-    };
-
-    window.addEventListener('online', handleOnlineStatus);
-    window.addEventListener('offline', handleOnlineStatus);
-
-    return () => {
-      window.removeEventListener('online', handleOnlineStatus);
-      window.removeEventListener('offline', handleOnlineStatus);
-    };
-  }, [user?.id, loadDashboardDataProgressive]);
-
   // Fetch unread notifications count and subscribe to updates
   useEffect(() => {
     if (!user?.id) return;
@@ -639,24 +658,6 @@ const Dashboard = () => {
     };
   }, [user?.id]);
 
-  // Fetch unread notifications count and subscribe to updates
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const fetchUnreadCount = async () => {
-      try {
-        const { data } = await notificationService.getUserNotifications(user.id, {
-          status: 'unread',
-          limit: 100
-        });
-        setUnreadNotifications(data?.length || 0);
-      } catch (err) {
-        console.error('[Dashboard] Error fetching unread notifications:', err);
-      }
-    };
-
-    fetchUnreadCount();
-  }, [user?.id]);
 
   // Optimistic bag updates from scanner
   useEffect(() => {
@@ -680,48 +681,104 @@ const Dashboard = () => {
     return () => window.removeEventListener('trashdrop:bags-updated', onBagsUpdated);
   }, [user?.id]);
 
-  // Seamless data loading with background caching
+  // Seamless data loading with background caching.
+  //
+  // Each of the three fetches is settled independently so one failing endpoint
+  // can't blank out the two that answered, and the whole thing is retried with
+  // exponential backoff before the user is told anything went wrong - a flaky
+  // mobile connection shouldn't put an error in front of them on first paint.
   const loadDashboardDataSeamless = useCallback(async () => {
     if (!user?.id) return;
 
-    try {
-      console.log('[Dashboard] 🚀 Seamless data loading started for user:', user.id);
-      setUpdateType('initial');
-      setIsLoading(true);
+    console.log('[Dashboard] 🚀 Seamless data loading started for user:', user.id);
+    setUpdateType('initial');
+    setIsLoading(true);
 
-      // Load all data using seamless service (no visual data loss)
-      const [statsData, activitiesData, pickupsData] = await Promise.all([
-        seamlessDashboardService.getUserStats(user.id),
-        seamlessDashboardService.getRecentActivities(user.id, 5),
-        seamlessDashboardService.getActivePickups(user.id)
-      ]);
+    let lastError = null;
 
-      if (mountedRef.current) {
-        // Update state immediately - data is already cached or fresh
-        setStats(statsData || {
+    for (let attempt = 0; attempt < LOAD_RETRY_DELAYS.length + 1; attempt++) {
+      if (!mountedRef.current) return;
+
+      // Paint each source the moment it lands rather than waiting for the
+      // slowest of the three - and settle them independently so one failing
+      // endpoint can't blank out the two that answered
+      const paintOnArrival = (promise, apply) => promise.then(
+        value => {
+          if (mountedRef.current) apply(value);
+          return { status: 'fulfilled' };
+        },
+        reason => ({ status: 'rejected', reason })
+      );
+
+      const results = await Promise.all([
+        paintOnArrival(seamlessDashboardService.getUserStats(user.id), value => setStats(value || {
           points: 0,
           pickups: 0,
           reports: 0,
           batches: 0,
           totalBags: 0,
           available_bags: 0
-        });
-        setRecentActivities(activitiesData || []);
-        setActivePickups(pickupsData || []);
+        })),
+        paintOnArrival(seamlessDashboardService.getRecentActivities(user.id, 5),
+          value => applyRecentActivities(value || [])),
+        paintOnArrival(seamlessDashboardService.getActivePickups(user.id),
+          value => setActivePickups(value || []))
+      ]);
+
+      if (!mountedRef.current) return;
+
+      const failures = results.filter(result => result.status === 'rejected');
+
+      if (failures.length === 0) {
         setDataSource('seamless');
+        setLoadFailed(false);
         setIsLoading(false);
-        
         console.log('[Dashboard] ✅ Seamless data loading complete');
+        return;
       }
 
-    } catch (error) {
-      console.error('[Dashboard] ❌ Error in seamless data loading:', error);
-      if (mountedRef.current) {
-        setIsLoading(false);
-        setDataSource('error');
+      lastError = failures[0].reason;
+      console.warn(
+        `[Dashboard] Seamless load attempt ${attempt + 1} had ${failures.length} failure(s):`,
+        lastError?.message || lastError
+      );
+
+      const retryDelay = LOAD_RETRY_DELAYS[attempt];
+      if (retryDelay === undefined) break;
+
+      // No point spending the backoff schedule with the radio off - the online
+      // listener refreshes as soon as the connection is back
+      if (!isOnline()) {
+        console.log('[Dashboard] Offline, skipping remaining load retries');
+        break;
       }
+
+      // Jitter so a batch of clients doesn't retry in lockstep
+      const wait = retryDelay + Math.floor(Math.random() * 250);
+      console.log(`[Dashboard] ⏳ Retrying dashboard load in ${wait}ms`);
+      await new Promise(resolve => setTimeout(resolve, wait));
     }
-  }, [user?.id]);
+
+    if (!mountedRef.current) return;
+
+    console.error('[Dashboard] ❌ Seamless data loading failed after retries:', lastError);
+    setIsLoading(false);
+    setDataSource('error');
+    setActivitiesLoaded(true);
+    setLoadFailed(true);
+  }, [user?.id, applyRecentActivities]);
+
+  // Explicit "Try again" from the failure banner
+  const handleRetryInitialLoad = useCallback(async () => {
+    if (isRetryingLoad) return;
+    setIsRetryingLoad(true);
+    setLoadFailed(false);
+    try {
+      await loadDashboardDataSeamless();
+    } finally {
+      if (mountedRef.current) setIsRetryingLoad(false);
+    }
+  }, [isRetryingLoad, loadDashboardDataSeamless]);
 
   // Setup seamless subscriptions for real-time updates
   useEffect(() => {
@@ -744,7 +801,7 @@ const Dashboard = () => {
         if (!mountedRef.current) return;
         
         console.log(`[Dashboard] 📝 Activities update received: ${type}`);
-        setRecentActivities(data);
+        applyRecentActivities(data);
         setUpdateType(type);
         
         // Clear update type after a short delay
@@ -796,8 +853,19 @@ const Dashboard = () => {
       
       if (online && user?.id) {
         console.log('[Dashboard] 🌐 Back online, refreshing seamless cache');
-        // Refresh data when coming back online
-        seamlessDashboardService.forceRefresh(user.id);
+        // Refresh data when coming back online. The browser fires 'online' as
+        // soon as it has a link, which can be before the API is reachable, so
+        // swallow the failure here - whatever is already rendered stays put.
+        seamlessDashboardService.forceRefresh(user.id)
+          .then(() => {
+            if (mountedRef.current) {
+              setLoadFailed(false);
+              setDataSource('seamless');
+            }
+          })
+          .catch(error => {
+            console.warn('[Dashboard] Reconnect refresh failed, keeping cached data:', error.message);
+          });
       }
     };
 
@@ -824,6 +892,7 @@ const Dashboard = () => {
     
     try {
       await seamlessDashboardService.forceRefresh(user.id);
+      setLoadFailed(false);
       setUpdateType('refreshed');
       
       // Clear update type after delay
@@ -843,7 +912,15 @@ const Dashboard = () => {
       loadDashboardDataSeamless();
     }, 100); // Faster initial load with seamless caching
 
-    return () => clearTimeout(initialLoadTimeout);
+    // Failsafe: never leave the activity skeleton up indefinitely if a fetch hangs
+    const skeletonFailsafe = setTimeout(() => {
+      if (mountedRef.current) setActivitiesLoaded(true);
+    }, 10000);
+
+    return () => {
+      clearTimeout(initialLoadTimeout);
+      clearTimeout(skeletonFailsafe);
+    };
   }, [user?.id, loadDashboardDataSeamless]);
 
   // Optimized session refresh function with caching
@@ -925,14 +1002,10 @@ const Dashboard = () => {
   }, [user?.id, isOnlineStatus]);
 
 
-  // Call loadDashboardDataProgressive when dependencies change and setup auto-refresh
+  // Periodic refresh only. The initial load is loadDashboardDataSeamless's job -
+  // running the progressive pass on mount as well fetched the same stats,
+  // activities and pickups a second time on every visit.
   useEffect(() => {
-    // More aggressive LCP optimization - defer initial load longer
-    const initialLoadTimeout = setTimeout(() => {
-      loadDashboardDataProgressive();
-    }, 500); // Longer delay to ensure LCP is captured first
-    
-    // Set up auto-refresh interval when online
     const autoRefreshInterval = setInterval(() => {
       if (isOnlineStatus && mountedRef.current) {
         console.log('[Dashboard] Auto-refreshing data...');
@@ -940,10 +1013,7 @@ const Dashboard = () => {
       }
     }, 30000); // Auto-refresh every 30 seconds when online
     
-    return () => {
-      clearTimeout(initialLoadTimeout);
-      clearInterval(autoRefreshInterval);
-    };
+    return () => clearInterval(autoRefreshInterval);
   }, [loadDashboardDataProgressive, isOnlineStatus]);
 
   // Handle local activity updates with seamless optimistic updates
@@ -1004,7 +1074,7 @@ const Dashboard = () => {
         const refreshActivities = async () => {
           try {
             const mergedActivities = await mergeRecentActivities([], 5);
-            setRecentActivities(mergedActivities);
+            applyRecentActivities(mergedActivities);
           } catch (error) {
             console.warn('[Dashboard] Error refreshing activities from storage:', error);
           }
@@ -1014,7 +1084,7 @@ const Dashboard = () => {
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [user?.id, mergeRecentActivities]);
+  }, [user?.id, mergeRecentActivities, applyRecentActivities]);
 
   // Memoized calculations for better performance
   const memoizedStats = useMemo(() => ({
@@ -1056,7 +1126,9 @@ const Dashboard = () => {
   const ActivitySection = useMemo(() => {
     return (
       <div className="space-y-3">
-          {!recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
+          {!activitiesLoaded && (!Array.isArray(recentActivities) || recentActivities.length === 0) ? (
+            <ActivityListSkeleton />
+          ) : !recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
             <div className="text-center py-6 text-gray-500 dark:text-gray-400">
               <p>No recent activities yet</p>
             </div>
@@ -1120,7 +1192,7 @@ const Dashboard = () => {
           )}
       </div>
     );
-  }, [recentActivities, isRefreshingActivities]); // Re-render when activities change or refresh state changes
+  }, [recentActivities, isRefreshingActivities, activitiesLoaded]); // Re-render when activities change, refresh state changes, or the first fetch settles
 
   // Auto-switch tab based on active pickup state
   useEffect(() => {
@@ -1455,6 +1527,37 @@ const Dashboard = () => {
 
       {/* Scrollable Content - Tab-based: Recent Activity or Active Pickup */}
       <div className="px-4 pb-4 space-y-6" style={{marginTop: hasCollectorAssigned ? "375px" : "325px" }}>
+        {/* Initial load gave up after retries - plain language plus a way out,
+            never a raw error dump */}
+        {loadFailed && (
+          <div
+            role="alert"
+            className="bg-amber-50 dark:bg-amber-900 dark:bg-opacity-20 border border-amber-300 dark:border-amber-700 rounded-lg p-4 flex items-start gap-3"
+          >
+            <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                We couldn't load your latest dashboard data
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                {isOnlineStatus
+                  ? "Anything shown below may be out of date."
+                  : "You're offline - anything shown below may be out of date."}
+              </p>
+              <button
+                type="button"
+                onClick={handleRetryInitialLoad}
+                disabled={isRetryingLoad}
+                className="mt-3 inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {isRetryingLoad ? 'Retrying...' : 'Try again'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Recent Activity - shown when activity tab selected or no active pickup */}
         {dashboardTab === 'activity' && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">

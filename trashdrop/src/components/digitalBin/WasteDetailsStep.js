@@ -9,12 +9,17 @@ const WASTE_TYPES = [
 ];
 
 const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoState = {} }) => {
-  // Validation: Bin size is required
-  const isValid = () => {
-    return formData.numberOfBags && 
-           formData.wasteType && 
-           formData.bin_size_liters;
+  // What is still missing, so a disabled Continue button explains itself
+  const getMissingFields = () => {
+    const missing = [];
+    if (!formData.numberOfBags) missing.push('number of bins');
+    if (!formData.wasteType) missing.push('waste type');
+    if (!formData.bin_size_liters) missing.push('bin size');
+    return missing;
   };
+
+  // Validation: Bin size is required
+  const isValid = () => getMissingFields().length === 0;
   
   return (
     <div>
@@ -175,6 +180,12 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
         </div>
       </div>
       
+      {!isValid() && (
+        <p id="waste-step-missing" className="mt-6 text-sm text-amber-700" role="status">
+          Select {getMissingFields().join(', ')} to continue.
+        </p>
+      )}
+
       <div className="flex justify-between mt-6">
         <button
           type="button"
@@ -187,6 +198,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
           type="button"
           onClick={nextStep}
           disabled={!isValid()}
+          aria-describedby={isValid() ? undefined : 'waste-step-missing'}
           className={`px-6 py-2 rounded-md transition-colors ${
             isValid()
               ? 'bg-primary hover:bg-primary-dark text-white'
