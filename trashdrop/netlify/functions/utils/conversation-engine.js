@@ -246,6 +246,19 @@ function parseFlowResponse(response) {
   const rawNotes = typeof response.notes === 'string' ? response.notes.trim() : '';
   const notes = rawNotes ? rawNotes.slice(0, 500) : null;
 
+  // address/location_name are optional here: an older Flow build has no field
+  // for them, and the SCHEDULE screen's TextInput is a confirm-or-correct of
+  // the value already captured from the shared pin, not a new one. Omit the
+  // key entirely when absent/blank so the merge in handleFlowReply
+  // (`{ ...data, ...parsed.value }`) leaves the pin-derived address alone
+  // instead of overwriting it with an empty string.
+  // NOTE: editing this text does not move the pin — data.latitude/longitude
+  // (used for GPS pricing and the collector's route) still come from the
+  // location share, so a typed correction can leave the stored address
+  // string out of sync with the coordinates.
+  const rawAddress = typeof response.address === 'string' ? response.address.trim() : '';
+  const rawLocationName = typeof response.location_name === 'string' ? response.location_name.trim() : '';
+
   return {
     ok: true,
     value: {
@@ -258,6 +271,8 @@ function parseFlowResponse(response) {
       is_urgent: isUrgent,
       notes,
       via_flow: true,
+      ...(rawAddress ? { address: rawAddress } : {}),
+      ...(rawLocationName ? { location_name: rawLocationName } : {}),
     },
   };
 }
@@ -937,7 +952,7 @@ async function handleConfirmation(phone, text, data, supabase, session) {
       "A collector will be assigned shortly and you'll get updates right here.",
       '',
       'Send *STATUS* anytime to check your bookings.',
-      'Get live tracking and photo uploads in the app: https://trashdrops.app'
+      'Get live tracking and photo uploads in the app: https://trashdrop.app'
     );
 
     await sendTextMessage(phone, confirmation.join('\n'));

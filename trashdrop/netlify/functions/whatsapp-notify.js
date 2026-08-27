@@ -47,7 +47,7 @@ const STATUS_MESSAGES = {
 
   en_route: (data) =>
     `Your collector is on the way! Please ensure your bins are accessible.\n\n` +
-    `Track in real-time on the app: https://trashdrops.app`,
+    `Track in real-time on the app: https://trashdrop.app`,
 
   arrived: (data) =>
     `Your collector has arrived at your location.`,
