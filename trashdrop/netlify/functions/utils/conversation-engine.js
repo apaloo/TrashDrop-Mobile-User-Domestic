@@ -11,9 +11,14 @@
  *   Step 4  Additional Info   → notes
  *   Step 5  Review & Submit   → summary + fee breakdown, then confirm
  *
- * Photos (app step 4) are not collected here: they are uploaded to storage by
- * the app and are not part of the digital_bins row, so a WhatsApp booking
- * simply has none.
+ * Photos (app step 4) come only from the Flow's PhotoPicker, which is pinned to
+ * photo-source "camera" so the customer cannot pick from their gallery — the same
+ * rule the app enforces with CameraModal. Chat attachments are refused rather
+ * than accepted: WhatsApp has no camera-only mode for them, so honouring the rule
+ * means having no second way in. WhatsApp keeps the bytes and hands over only a
+ * media id, so each photo is downloaded, put in the same Supabase bucket the app
+ * uses, and written to digital_bins.photo_urls after the row exists — the order
+ * DigitalBin.js uses (insert first, attach once the upload returns).
  *
  * Reply handling is state-scoped. Only CANCEL/STOP and BACK are global —
  * a bare "2" always means "the second option in the current step", never a
@@ -28,6 +33,7 @@ const {
   sendFlowMessage,
   sendImageMessage,
   uploadMedia,
+  downloadMedia,
   getConfig,
 } = require('./whatsapp-api');
 const {
@@ -112,6 +118,9 @@ const PREFERRED_TIMES = {
 };
 
 const MAX_BINS = 5; // WasteDetailsStep offers 1–5
+const MAX_BIN_PHOTOS = 3;             // AdditionalInfoStep MAX_BIN_PHOTOS
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // photoUploadService MAX_FILE_SIZE
+const PHOTO_BUCKET = 'dumping-photos';   // photoUploadService STORAGE_BUCKET
 
 // --- Small helpers ---------------------------------------------------------
 
@@ -256,6 +265,23 @@ function parseFlowResponse(response) {
   // (used for GPS pricing and the collector's route) still come from the
   // location share, so a typed correction can leave the stored address
   // string out of sync with the coordinates.
+  // PhotoPicker returns one entry per photo: { file_name, mime_type, sha256, id }.
+  // This is the only way a photo can enter a booking — the Flow's camera-only
+  // picker is what makes "no gallery uploads" true rather than merely intended.
+  // Only the id is load-bearing — it is what downloadMedia() resolves. Photos are
+  // fetched after the booking is committed, so a malformed entry is dropped here
+  // rather than failing a booking the customer has already paid attention to.
+  const photos = Array.isArray(response.bin_photos)
+    ? response.bin_photos
+        .filter(p => p && typeof p.id === 'string' && p.id)
+        .slice(0, MAX_BIN_PHOTOS)
+        .map(p => ({
+          id: p.id,
+          file_name: typeof p.file_name === 'string' ? p.file_name : null,
+          mime_type: typeof p.mime_type === 'string' ? p.mime_type : null,
+        }))
+    : [];
+
   const rawAddress = typeof response.address === 'string' ? response.address.trim() : '';
   const rawLocationName = typeof response.location_name === 'string' ? response.location_name.trim() : '';
 
@@ -271,6 +297,7 @@ function parseFlowResponse(response) {
       is_urgent: isUrgent,
       notes,
       via_flow: true,
+      bin_photos: photos,
       ...(rawAddress ? { address: rawAddress } : {}),
       ...(rawLocationName ? { location_name: rawLocationName } : {}),
     },
@@ -839,10 +866,16 @@ async function handleNotes(phone, message, data, supabase, session) {
   const raw = (message.text || '').trim();
   const lower = raw.toLowerCase();
 
+  // Chat images are refused on purpose. Bin photos must be taken live, and the
+  // Flow's PhotoPicker enforces that with photo-source: "camera". A normal chat
+  // attachment carries no such guarantee — WhatsApp offers no camera-only mode
+  // for it and the payload cannot tell a fresh capture from a gallery pick — so
+  // accepting one here would be a hole straight through that rule.
   if (message.type === 'image') {
     await sendTextMessage(phone,
-      'Thanks — photos can only be attached from the TrashDrop app, so I cannot save this one. ' +
-      'Please describe anything the collector should know, or reply *SKIP*.'
+      'Thanks, but bin photos have to be taken live with your camera, so I cannot accept ' +
+      'one sent in chat.\n\nUse the booking form (or the TrashDrop app) to add photos. ' +
+      'For now, please describe anything the collector should know, or reply *SKIP*.'
     );
     return { newState: STATES.AWAITING_NOTES, newData: data, done: true };
   }
@@ -960,6 +993,12 @@ async function handleConfirmation(phone, text, data, supabase, session) {
     // Same artefact the app produces on completion, delivered in-chat
     await sendBinQrCode(phone, binId, supabase);
 
+    // Last, deliberately: each photo is a CDN download plus a storage upload, and
+    // this runs inside the webhook's invocation budget. Ordering it behind the
+    // confirmation and the QR means a slow or timed-out upload costs the customer
+    // nothing they can see — the booking is already committed and acknowledged.
+    await attachBinPhotos(binId, data.bin_photos, supabase);
+
     return {
       newState: STATES.COMPLETED,
       newData: { ...data, digital_bin_id: binId, quote },
@@ -970,6 +1009,65 @@ async function handleConfirmation(phone, text, data, supabase, session) {
     await sendTextMessage(phone, 'Sorry, something went wrong. Please try again by sending "hi".');
     return { newState: STATES.IDLE, newData: {}, done: true };
   }
+}
+
+/**
+ * Move the customer's photos into the bin's record.
+ *
+ * WhatsApp never sends image bytes in a webhook — a PhotoPicker entry or an
+ * image message carries only a media id, so each one is a download from the
+ * WhatsApp CDN before it can be put in the same Supabase bucket the app writes
+ * to. Runs after the booking is committed, mirroring DigitalBin.js, which
+ * inserts the row first and attaches photo_urls once the upload returns.
+ *
+ * Never throws, and never blocks the booking: a bin with no photos is worth far
+ * more than a lost booking, and the customer has already been told they are
+ * confirmed by the time this runs. Photos that fail are logged and skipped, so
+ * a partial set still lands.
+ *
+ * @returns {Promise<number>} how many photos were attached
+ */
+async function attachBinPhotos(binId, photos, supabase) {
+  if (!binId || !Array.isArray(photos) || photos.length === 0) return 0;
+
+  const publicUrls = [];
+
+  for (const photo of photos.slice(0, MAX_BIN_PHOTOS)) {
+    try {
+      const { buffer, mimeType } = await downloadMedia(photo.id, { maxBytes: MAX_PHOTO_BYTES });
+
+      // photoUploadService.generateFilename: <owner>/<timestamp>_<random>.<ext>
+      const extension = (mimeType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      const random = Math.random().toString(36).substring(2, 15);
+      const path = `${binId}/${Date.now()}_${random}.${extension}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, buffer, { cacheControl: '3600', upsert: false, contentType: mimeType });
+
+      if (uploadErr) throw new Error(uploadErr.message);
+
+      const { data: { publicUrl } } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+      publicUrls.push(publicUrl);
+    } catch (err) {
+      console.error(`[Conversation] Photo ${photo.id} could not be attached:`, err.message);
+    }
+  }
+
+  if (publicUrls.length === 0) return 0;
+
+  const { error } = await supabase
+    .from('digital_bins')
+    .update({ photo_urls: publicUrls })
+    .eq('id', binId);
+
+  if (error) {
+    console.error('[Conversation] Could not save photo_urls:', error.message);
+    return 0;
+  }
+
+  console.log(`[Conversation] Attached ${publicUrls.length} photo(s) to bin ${binId}`);
+  return publicUrls.length;
 }
 
 /**

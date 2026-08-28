@@ -40,10 +40,18 @@ require.cache[apiPath] = { id: apiPath, filename: apiPath, loaded: true, exports
     sent.push({ k: 'flow', x: o.bodyText, payload: o });
   },
   uploadMedia: async () => 'media-id',
+  downloadMedia: async (id) => {
+    downloaded.push(id);
+    if (id === 'media-bad') throw new Error('CDN 404');
+    return { buffer: Buffer.from('jpegbytes'), mimeType: 'image/jpeg', sha256: null };
+  },
   markAsRead: async () => {},
 }};
 
 const seen = new Set();
+const downloaded = [];
+const uploaded = [];
+let savedPhotoUrls = null;
 const rpcCalls = [];
 const sbPath = require.resolve('@supabase/supabase-js', { paths: [path.join(FN, '../..')] });
 require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
@@ -61,7 +69,15 @@ require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
       if (n === 'create_whatsapp_digital_bin') return { data: 'bin-1', error: null };
       return { data: null, error: null };
     },
-    from: (t) => { const q = { select: () => q, update: () => q, eq: () => q, or: () => q,
+    storage: {
+      from: () => ({
+        upload: async (path) => { uploaded.push(path); return { data: { path }, error: null }; },
+        getPublicUrl: (path) => ({ data: { publicUrl: `https://cdn.test/${path}` } }),
+      }),
+    },
+    from: (t) => { const q = { select: () => q,
+      update: (vals) => { if (vals && vals.photo_urls) savedPhotoUrls = vals.photo_urls; return q; },
+      eq: () => q, or: () => q,
       in: () => q, order: () => q, limit: () => q,
       single: async () => t === 'digital_bins'
         ? { data: { qr_code_url: 'https://trashdrop.app/bin/bin-1' }, error: null }
@@ -144,6 +160,99 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
     assert.strictEqual(session.state, STATES.COMPLETED);
     assert.ok(sent.some(m => m.k === 'image'), 'no QR image');
   });
+
+  // ---- photos --------------------------------------------------------------
+  console.log('photos');
+
+  // A Flow that returns PhotoPicker entries: ids ride through the booking and
+  // are only downloaded once the bin row exists.
+  {
+    downloaded.length = 0; uploaded.length = 0; savedPhotoUrls = null;
+    const s2 = { id: 's1', whatsapp_user_id: 'wa1', state: STATES.IDLE, collected_data: {}, app_user_id: null };
+    const go = async (m) => { sent = [];
+      const res = await processMessage({ phone: '233244000000',
+        message: typeof m === 'string' ? { type: 'text', text: m } : m, session: s2, supabase });
+      s2.state = res.newState; s2.collected_data = res.newData; return res; };
+
+    await go('hi'); await go(LOC);
+    await go({ type: 'nfm_reply', flowResponse: { ...GOOD, bin_photos: [
+      { id: 'media-1', file_name: 'a.jpg', mime_type: 'image/jpeg' },
+      { id: 'media-bad', file_name: 'b.jpg', mime_type: 'image/jpeg' },
+    ] } });
+
+    check('Flow PhotoPicker entries survive to confirmation', () =>
+      assert.strictEqual((s2.collected_data.bin_photos || []).length, 2));
+
+    check('photos are not downloaded before the booking is confirmed', () =>
+      assert.strictEqual(downloaded.length, 0, 'downloaded too early'));
+
+    await go('confirm');
+
+    check('confirmed booking downloads and attaches photos', () => {
+      assert.deepStrictEqual(downloaded, ['media-1', 'media-bad']);
+      assert.strictEqual(uploaded.length, 1, 'the failed download should not upload');
+      assert.ok(uploaded[0].startsWith('bin-1/'), `unexpected path ${uploaded[0]}`);
+    });
+
+    check('a failed photo still saves the rest', () => {
+      assert.ok(Array.isArray(savedPhotoUrls), 'photo_urls was never written');
+      assert.strictEqual(savedPhotoUrls.length, 1);
+      assert.ok(savedPhotoUrls[0].startsWith('https://cdn.test/bin-1/'));
+    });
+  }
+
+  // Chat fallback: images must be refused outright. Bin photos are camera-only,
+  // and a chat attachment could just as easily be a gallery pick.
+  {
+    downloaded.length = 0; uploaded.length = 0; savedPhotoUrls = null;
+    const s3 = { id: 's1', whatsapp_user_id: 'wa1',
+      state: STATES.AWAITING_NOTES, collected_data: { ...GOOD }, app_user_id: null };
+    const go = async (m) => { sent = [];
+      const res = await processMessage({ phone: '233244000000',
+        message: typeof m === 'string' ? { type: 'text', text: m } : m, session: s3, supabase });
+      s3.state = res.newState; s3.collected_data = res.newData; return res; };
+
+    await go({ type: 'image', image: { id: 'media-1', mimeType: 'image/jpeg' } });
+    check('a chat photo is refused, not stored', () => {
+      assert.strictEqual(s3.state, STATES.AWAITING_NOTES);
+      assert.ok(!s3.collected_data.bin_photos || s3.collected_data.bin_photos.length === 0,
+        'a chat image was stored');
+      assert.strictEqual(downloaded.length, 0, 'a chat image was downloaded');
+      assert.ok(sent.some(m => /camera/i.test(m.x || '')), 'no camera-only explanation sent');
+    });
+
+    await go('skip');
+    check('refusing a photo does not derail the booking', () =>
+      assert.strictEqual(s3.state, STATES.AWAITING_CONFIRMATION));
+  }
+
+  // The notes prompt must not invite photos it will then refuse
+  {
+    const s5 = { id: 's1', whatsapp_user_id: 'wa1',
+      state: STATES.AWAITING_URGENT, collected_data: { ...GOOD }, app_user_id: null };
+    sent = [];
+    await processMessage({ phone: '233244000000', message: { type: 'text', text: 'no' }, session: s5, supabase });
+    check('the notes prompt does not invite photos', () => {
+      const prompt = sent.map(m => m.x || '').join('\n');
+      assert.ok(prompt, 'no prompt sent');
+      assert.ok(!/photo/i.test(prompt), `notes prompt still mentions photos: ${prompt}`);
+    });
+  }
+
+  // A booking with no photos must behave exactly as before
+  {
+    downloaded.length = 0; savedPhotoUrls = null;
+    const s4 = { id: 's1', whatsapp_user_id: 'wa1',
+      state: STATES.AWAITING_CONFIRMATION, collected_data: { ...GOOD, latitude: 5.56, longitude: -0.2057 },
+      app_user_id: null };
+    sent = [];
+    await processMessage({ phone: '233244000000', message: { type: 'text', text: 'confirm' }, session: s4, supabase });
+    check('a photoless booking still completes and writes nothing', () => {
+      assert.strictEqual(downloaded.length, 0);
+      assert.strictEqual(savedPhotoUrls, null, 'photo_urls should be left alone');
+      assert.ok(sent.some(m => (m.x || '').includes('Booking confirmed')), 'no confirmation sent');
+    });
+  }
 
   console.log('fallbacks');
   const fresh = () => Object.assign(session, { state: STATES.IDLE, collected_data: {} });

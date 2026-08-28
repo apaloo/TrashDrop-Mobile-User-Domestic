@@ -38,15 +38,39 @@
             "name": "schedule_form",
             "children": [
               {
+                "type": "TextInput",
+                "name": "address",
+                "label": "Pickup address",
+                "input-type": "text",
+                "required": true,
+                "helper-text": "Confirm or edit the exact pickup address — this is used to calculate your price"
+              },
+              {
                 "type": "RadioButtonsGroup",
                 "name": "frequency",
                 "label": "Collection frequency",
                 "required": true,
                 "data-source": [
-                  { "id": "one-time", "title": "One-time", "description": "A single pickup" },
-                  { "id": "weekly", "title": "Weekly", "description": "Every week" },
-                  { "id": "biweekly", "title": "Bi-weekly", "description": "Every two weeks" },
-                  { "id": "monthly", "title": "Monthly", "description": "Once a month" }
+                  {
+                    "id": "one-time",
+                    "title": "One-time",
+                    "description": "A single pickup"
+                  },
+                  {
+                    "id": "weekly",
+                    "title": "Weekly",
+                    "description": "Every week"
+                  },
+                  {
+                    "id": "biweekly",
+                    "title": "Bi-weekly",
+                    "description": "Every two weeks"
+                  },
+                  {
+                    "id": "monthly",
+                    "title": "Monthly",
+                    "description": "Once a month"
+                  }
                 ]
               },
               {
@@ -63,9 +87,21 @@
                 "label": "Preferred time",
                 "required": true,
                 "data-source": [
-                  { "id": "morning", "title": "Morning", "description": "8am - 12pm" },
-                  { "id": "afternoon", "title": "Afternoon", "description": "12pm - 4pm" },
-                  { "id": "evening", "title": "Evening", "description": "4pm - 8pm" }
+                  {
+                    "id": "morning",
+                    "title": "Morning",
+                    "description": "8am - 12pm"
+                  },
+                  {
+                    "id": "afternoon",
+                    "title": "Afternoon",
+                    "description": "12pm - 4pm"
+                  },
+                  {
+                    "id": "evening",
+                    "title": "Evening",
+                    "description": "4pm - 8pm"
+                  }
                 ]
               },
               {
@@ -73,8 +109,14 @@
                 "label": "Continue",
                 "on-click-action": {
                   "name": "navigate",
-                  "next": { "type": "screen", "name": "WASTE_DETAILS" },
-                  "payload": {}
+                  "next": {
+                    "type": "screen",
+                    "name": "WASTE_DETAILS"
+                  },
+                  "payload": {
+                    "location_name": "${data.location_name}",
+                    "address": "${screen.SCHEDULE.form.address}"
+                  }
                 }
               }
             ]
@@ -98,11 +140,26 @@
                 "label": "Number of bins",
                 "required": true,
                 "data-source": [
-                  { "id": "1", "title": "1 Bin" },
-                  { "id": "2", "title": "2 Bins" },
-                  { "id": "3", "title": "3 Bins" },
-                  { "id": "4", "title": "4 Bins" },
-                  { "id": "5", "title": "5 Bins" }
+                  {
+                    "id": "1",
+                    "title": "1 Bin"
+                  },
+                  {
+                    "id": "2",
+                    "title": "2 Bins"
+                  },
+                  {
+                    "id": "3",
+                    "title": "3 Bins"
+                  },
+                  {
+                    "id": "4",
+                    "title": "4 Bins"
+                  },
+                  {
+                    "id": "5",
+                    "title": "5 Bins"
+                  }
                 ]
               },
               {
@@ -111,16 +168,56 @@
                 "label": "Bin size",
                 "required": true,
                 "data-source": [
-                  { "id": "60", "title": "60L", "description": "Extra Small" },
-                  { "id": "80", "title": "80L", "description": "Small" },
-                  { "id": "90", "title": "90L", "description": "Small" },
-                  { "id": "100", "title": "100L", "description": "Medium" },
-                  { "id": "120", "title": "120L", "description": "Standard (Recommended)" },
-                  { "id": "240", "title": "240L", "description": "Large" },
-                  { "id": "340", "title": "340L", "description": "Extra Large" },
-                  { "id": "360", "title": "360L", "description": "Extra Large" },
-                  { "id": "660", "title": "660L", "description": "Industrial" },
-                  { "id": "1100", "title": "1100L", "description": "Commercial" }
+                  {
+                    "id": "60",
+                    "title": "60L",
+                    "description": "Extra Small"
+                  },
+                  {
+                    "id": "80",
+                    "title": "80L",
+                    "description": "Small"
+                  },
+                  {
+                    "id": "90",
+                    "title": "90L",
+                    "description": "Small"
+                  },
+                  {
+                    "id": "100",
+                    "title": "100L",
+                    "description": "Medium"
+                  },
+                  {
+                    "id": "120",
+                    "title": "120L",
+                    "description": "Standard (Recommended)"
+                  },
+                  {
+                    "id": "240",
+                    "title": "240L",
+                    "description": "Large"
+                  },
+                  {
+                    "id": "340",
+                    "title": "340L",
+                    "description": "Extra Large"
+                  },
+                  {
+                    "id": "360",
+                    "title": "360L",
+                    "description": "Extra Large"
+                  },
+                  {
+                    "id": "660",
+                    "title": "660L",
+                    "description": "Industrial"
+                  },
+                  {
+                    "id": "1100",
+                    "title": "1100L",
+                    "description": "Commercial"
+                  }
                 ]
               },
               {
@@ -129,9 +226,21 @@
                 "label": "Bin type",
                 "required": true,
                 "data-source": [
-                  { "id": "general", "title": "General Waste", "description": "Mixed household waste" },
-                  { "id": "recycling", "title": "Recycling", "description": "Plastics, paper, metal, glass" },
-                  { "id": "organic", "title": "Organic Waste", "description": "Food scraps, garden waste" }
+                  {
+                    "id": "general",
+                    "title": "General Waste",
+                    "description": "Mixed household waste"
+                  },
+                  {
+                    "id": "recycling",
+                    "title": "Recycling",
+                    "description": "Plastics, paper, metal, glass"
+                  },
+                  {
+                    "id": "organic",
+                    "title": "Organic Waste",
+                    "description": "Food scraps, garden waste"
+                  }
                 ]
               },
               {
@@ -148,13 +257,29 @@
                 "label": "Continue",
                 "on-click-action": {
                   "name": "navigate",
-                  "next": { "type": "screen", "name": "ADDITIONAL_INFO" },
-                  "payload": {}
+                  "next": {
+                    "type": "screen",
+                    "name": "ADDITIONAL_INFO"
+                  },
+                  "payload": {
+                    "location_name": "${data.location_name}",
+                    "address": "${data.address}"
+                  }
                 }
               }
             ]
           }
         ]
+      },
+      "data": {
+        "location_name": {
+          "type": "string",
+          "__example__": "Osu Home"
+        },
+        "address": {
+          "type": "string",
+          "__example__": "12 Oxford St, Osu"
+        }
       }
     },
     {
@@ -173,6 +298,16 @@
             "type": "Form",
             "name": "info_form",
             "children": [
+              {
+                "type": "PhotoPicker",
+                "name": "bin_photos",
+                "label": "Photos of your waste bin",
+                "description": "Take up to 3 photos of your filled bin. This helps the collector find and service it.",
+                "photo-source": "camera",
+                "min-uploaded-photos": 1,
+                "max-uploaded-photos": 3,
+                "max-file-size-kb": 5120
+              },
               {
                 "type": "TextArea",
                 "name": "notes",
@@ -198,13 +333,26 @@
                     "bin_size_liters": "${screen.WASTE_DETAILS.form.bin_size_liters}",
                     "waste_type": "${screen.WASTE_DETAILS.form.waste_type}",
                     "is_urgent": "${screen.WASTE_DETAILS.form.is_urgent}",
-                    "notes": "${form.notes}"
+                    "notes": "${form.notes}",
+                    "bin_photos": "${form.bin_photos}",
+                    "location_name": "${data.location_name}",
+                    "address": "${data.address}"
                   }
                 }
               }
             ]
           }
         ]
+      },
+      "data": {
+        "location_name": {
+          "type": "string",
+          "__example__": "Osu Home"
+        },
+        "address": {
+          "type": "string",
+          "__example__": "12 Oxford St, Osu"
+        }
       }
     }
   ]

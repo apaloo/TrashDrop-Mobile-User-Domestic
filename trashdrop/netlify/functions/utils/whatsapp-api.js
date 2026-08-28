@@ -255,6 +255,55 @@ async function uploadMedia(buffer, mimeType, filename) {
 }
 
 /**
+ * Download a media file the customer uploaded (Flow PhotoPicker, or an image
+ * message) and return its bytes.
+ *
+ * Two hops, both authenticated: the id resolves to a short-lived, single-use
+ * CDN url which must then be fetched with the same bearer token. The url is
+ * deliberately not returned — it expires quickly and is useless to callers.
+ *
+ * @param {string} mediaId
+ * @param {Object} [opts]
+ * @param {number} [opts.maxBytes] reject anything larger, before downloading
+ * @returns {Promise<{buffer: Buffer, mimeType: string, sha256: string|null}>}
+ */
+async function downloadMedia(mediaId, { maxBytes } = {}) {
+  const { accessToken } = getConfig();
+  const auth = { 'Authorization': `Bearer ${accessToken}` };
+
+  const lookup = await fetch(`${BASE_URL}/${mediaId}`, { headers: auth });
+  const meta = await lookup.json();
+
+  if (!lookup.ok || !meta.url) {
+    console.error('[WhatsApp API] Media lookup failed:', JSON.stringify(meta));
+    throw new Error(`WhatsApp API error: ${meta.error?.message || lookup.statusText}`);
+  }
+
+  // file_size is advertised here, so an oversized file costs a lookup, not a download
+  if (maxBytes && Number(meta.file_size) > maxBytes) {
+    throw new Error(`Media ${mediaId} is ${meta.file_size} bytes, over the ${maxBytes} limit`);
+  }
+
+  const download = await fetch(meta.url, { headers: auth });
+  if (!download.ok) {
+    throw new Error(`Media download failed: ${download.status} ${download.statusText}`);
+  }
+
+  const buffer = Buffer.from(await download.arrayBuffer());
+
+  // file_size can be absent or wrong; the delivered bytes are the real check
+  if (maxBytes && buffer.length > maxBytes) {
+    throw new Error(`Media ${mediaId} downloaded ${buffer.length} bytes, over the ${maxBytes} limit`);
+  }
+
+  return {
+    buffer,
+    mimeType: meta.mime_type || 'application/octet-stream',
+    sha256: meta.sha256 || null,
+  };
+}
+
+/**
  * Send an image, either by uploaded media id or by public link
  */
 async function sendImageMessage(to, { mediaId, link, caption }) {
@@ -353,6 +402,17 @@ function extractMessage(body) {
           result.interactiveTitle = message.interactive.button_reply.title;
         }
         break;
+      case 'image':
+        // Extracted so the engine can recognise and politely refuse a chat photo.
+        // Bin photos must be camera-only, which only the Flow's PhotoPicker can
+        // guarantee, so this id is deliberately never downloaded or stored.
+        result.image = {
+          id: message.image?.id || null,
+          mimeType: message.image?.mime_type || null,
+          sha256: message.image?.sha256 || null,
+        };
+        result.text = message.image?.caption || null;
+        break;
       case 'location':
         result.location = {
           latitude: message.location.latitude,
@@ -380,6 +440,7 @@ module.exports = {
   sendFlowMessage,
   sendImageMessage,
   uploadMedia,
+  downloadMedia,
   markAsRead,
   extractMessage,
 };
