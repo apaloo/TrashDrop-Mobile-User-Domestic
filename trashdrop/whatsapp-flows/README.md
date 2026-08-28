@@ -47,6 +47,25 @@ Send the Flow with these three values, which `SCHEDULE` declares as screen data:
 ```
 
 `min_date` blocks past dates the way the web form's date input does
+
+## Photos
+
+`ADDITIONAL_INFO` carries a `PhotoPicker` (`bin_photos`), mirroring the app's
+`AdditionalInfoStep`: camera only, 1–3 photos, 5 MB each.
+
+`photo-source` MUST stay `"camera"`. Meta's default is `"camera_gallery"`, so
+omitting it silently allows gallery uploads. `"camera"` means the WhatsApp client
+offers no gallery option at all, which is what makes camera-only real rather than
+advisory. This is also why chat attachments are refused in
+`conversation-engine.js` — a chat image has no such guarantee, and accepting one
+would reopen the gallery route the picker closes. Meta allows a
+PhotoPicker in a `complete` payload, so this needs no Flow endpoint — the
+completion webhook receives `{ file_name, mime_type, sha256, id }` per photo and
+`conversation-engine.js` downloads each `id` after the booking is committed,
+into the same `dumping-photos` bucket the app writes to.
+
+Changing the count here means changing `MAX_BIN_PHOTOS` in both
+`conversation-engine.js` and `src/components/digitalBin/AdditionalInfoStep.js`.
 (`min={new Date().toISOString().split('T')[0]}`). Send today's date in the
 customer's timezone.
 
