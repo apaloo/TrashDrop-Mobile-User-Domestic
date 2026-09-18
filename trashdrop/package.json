@@ -48,7 +48,9 @@
     "test:e2e": "cypress run",
     "cypress:open": "cypress open",
     "dev:noop": "node -e \"setInterval(()=>{}, 1<<30)\"",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "whatsapp:upload-flow": "node scripts/upload-whatsapp-flow.js",
+    "whatsapp:flow-status": "node scripts/upload-whatsapp-flow.js --status"
   },
   "eslintConfig": {
     "extends": [
