@@ -25,6 +25,7 @@ import Profile from './pages/Profile.js';
 import PaymentMethods from './pages/PaymentMethods.js';
 import Notifications from './pages/Notifications.js';
 import CollectorTracking from './pages/CollectorTracking.js';
+import RateService from './pages/RateService.js';
 import ToastTest from './pages/ToastTest.js';
 import ResetPassword from './pages/ResetPassword.js';
 import ResetPasswordConfirm from './pages/ResetPasswordConfirm.js';
@@ -232,6 +233,11 @@ const AppContent = () => {
           <Route path="/collector-tracking" element={
             <PrivateRoute>
               <CollectorTracking />
+            </PrivateRoute>
+          } />
+          <Route path="/rate-service" element={
+            <PrivateRoute>
+              <RateService />
             </PrivateRoute>
           } />
           <Route path="/toast-test" element={

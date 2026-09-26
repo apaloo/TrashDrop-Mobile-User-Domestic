@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './UberStyleTrackingMap.css';
 import { formatDistance } from '../utils/geoUtils.js';
+import { pickupService, CANCELLABLE_PICKUP_STATUSES } from '../services/pickupService.js';
 
 // Fix default Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -734,13 +735,17 @@ const UberStyleTrackingMap = ({
                     <span className="text-xs font-semibold">Call</span>
                   </button>
                   
+                  {CANCELLABLE_PICKUP_STATUSES.includes(activePickup.status) && (
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (window.confirm('Are you sure you want to cancel this pickup?')) {
                         try {
-                          const { pickupService } = await import('../services/pickupService.js');
-                          const { error: cancelError } = await pickupService.cancelPickupRequest(activePickup.id, 'Cancelled by user');
+                          const { error: cancelError } = await pickupService.cancelPickupRequest(
+                            activePickup.id,
+                            'Cancelled by user',
+                            { isDigitalBin: !!activePickup.is_digital_bin }
+                          );
                           if (cancelError) {
                             alert(`Failed to cancel: ${cancelError.message}`);
                           } else {
@@ -759,6 +764,7 @@ const UberStyleTrackingMap = ({
                     </svg>
                     <span className="text-xs font-semibold">Cancel</span>
                   </button>
+                  )}
                   
                   <button
                     onClick={(e) => {

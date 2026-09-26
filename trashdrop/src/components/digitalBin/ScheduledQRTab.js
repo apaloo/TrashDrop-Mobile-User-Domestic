@@ -6,7 +6,7 @@ import QRCodeList from './QRCodeList.js';
 import { subscribeToPickupUpdates, handlePickupUpdate } from '../../utils/realtime.js';
 import debug from '../../utils/debug.js';
 import ConfirmModal from '../ConfirmModal.js';
-import { transformBin } from '../../services/digitalBinService.js';
+import { transformBin, CANCELLABLE_BIN_STATUSES } from '../../services/digitalBinService.js';
 
 const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCreatedBinId = null, onNewBinExpanded = null }) => {
 
@@ -242,16 +242,26 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       setLocalPickups(updatedBins);
       localStorage.setItem('digitalBins', JSON.stringify(updatedBins));
       
-      // Then update server - digital bins table
-      const { error } = await supabase
+      // Then update server. Setting status (not only is_active) is what
+      // takes the bin off collectors' lists and tells a collector who has
+      // accepted it. The status filter refuses once the collector has set off.
+      const { data: cancelledRows, error } = await supabase
         .from('digital_bins')
         .update({ 
+          status: 'cancelled',
           is_active: false,
           updated_at: new Date().toISOString()
         })
-        .eq('id', binId);
+        .eq('id', binId)
+        .in('status', CANCELLABLE_BIN_STATUSES)
+        .select('id');
       
       if (error) throw error;
+      if (!cancelledRows || cancelledRows.length === 0) {
+        const tooLate = new Error('Collector already on the way');
+        tooLate.tooLate = true;
+        throw tooLate;
+      }
       
       setCancelModal({ open: false, binId: null });
       
@@ -276,7 +286,12 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       localStorage.setItem('digitalBins', JSON.stringify(revertedBins));
       
       setCancelModal({ open: false, binId: null });
-      setAlertModal({ open: true, title: 'Cancellation Failed', message: 'Failed to cancel digital bin. Please try again.', variant: 'danger' });
+      if (error.tooLate) {
+        setAlertModal({ open: true, title: 'Too late to cancel', message: 'Your collector is already on the way.', variant: 'warning' });
+        onRefresh();
+      } else {
+        setAlertModal({ open: true, title: 'Cancellation Failed', message: 'Failed to cancel digital bin. Please try again.', variant: 'danger' });
+      }
     } finally {
       setIsCancelling(false);
     }

@@ -17,14 +17,35 @@ import { getCostBreakdown, getCostBreakdownWithGPS } from '../utils/costCalculat
  * @param {Object} pickup - A digital_bins row, optionally with a bin_locations join
  * @returns {Object} Row with resolved location fields and a list-facing status
  */
-export const transformBin = (pickup) => ({
-  ...pickup,
-  location_name: pickup.location_name || pickup.bin_locations?.location_name,
-  address: pickup.address || pickup.bin_locations?.address,
-  status: pickup.collected_at ? 'completed' :
-          (pickup.status === 'completed' || pickup.status === 'disposed') ? 'completed' :
-          pickup.is_active ? 'active' : 'cancelled'
-});
+// Database statuses from which the household may still cancel a bin: before
+// the collector sets off. Once they are en_route the trip has been made.
+export const CANCELLABLE_BIN_STATUSES = ['pending', 'available', 'accepted'];
+
+const CANCELLED_BIN_STATUSES = ['cancelled', 'canceled', 'expired'];
+
+export const transformBin = (pickup) => {
+  // Keep the raw database status: `status` below is collapsed to the three
+  // tabs the UI shows, which hides whether a collector has set off. Rows are
+  // sometimes re-transformed (a realtime row merged over a listed one), so a
+  // database status on the input wins over an earlier db_status; 'active' is
+  // the only UI-only value and never comes from the database.
+  const dbStatus = pickup.status === 'active'
+    ? (pickup.db_status ?? 'pending')
+    : pickup.status;
+  return {
+    ...pickup,
+    db_status: dbStatus,
+    location_name: pickup.location_name || pickup.bin_locations?.location_name,
+    address: pickup.address || pickup.bin_locations?.address,
+    status: pickup.collected_at ? 'completed' :
+            (dbStatus === 'completed' || dbStatus === 'disposed') ? 'completed' :
+            (!pickup.is_active || CANCELLED_BIN_STATUSES.includes(dbStatus)) ? 'cancelled' :
+            'active'
+  };
+};
+
+export const canCancelBin = (bin) =>
+  bin?.status === 'active' && (!bin.db_status || CANCELLABLE_BIN_STATUSES.includes(bin.db_status));
 
 /**
  * Prepare digital bin data with calculated fees (GPS-based pricing)

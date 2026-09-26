@@ -6,6 +6,10 @@
 import supabase from '../utils/supabaseClient.js';
 import { parsePostGISPoint } from '../utils/geoUtils.js';
 
+// Statuses from which the household may still cancel: before the collector
+// sets off. Matches CANCELLABLE_BIN_STATUSES for digital bins.
+export const CANCELLABLE_PICKUP_STATUSES = ['pending', 'available', 'accepted'];
+
 export const pickupService = {
   /**
    * Get active pickup request for a user
@@ -770,11 +774,28 @@ export const pickupService = {
    * @param {string} reason - Cancellation reason
    * @returns {Object} Updated pickup request
    */
-  async cancelPickupRequest(pickupId, reason = '') {
+  async cancelPickupRequest(pickupId, reason = '', { isDigitalBin = false } = {}) {
     try {
-      return await this.updatePickupStatus(pickupId, 'cancelled', {
-        cancellation_reason: reason
-      });
+      // Conditional on status so the household can only cancel before the
+      // collector sets off (en_route). Neither table has a column for the
+      // reason, so it is not stored.
+      const update = { status: 'cancelled', updated_at: new Date().toISOString() };
+      if (isDigitalBin) update.is_active = false;
+      const { data, error } = await supabase
+        .from(isDigitalBin ? 'digital_bins' : 'pickup_requests')
+        .update(update)
+        .eq('id', pickupId)
+        .in('status', CANCELLABLE_PICKUP_STATUSES)
+        .select();
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return {
+          data: null,
+          error: { message: 'Too late to cancel. Your collector is already on the way.', code: 'TOO_LATE_TO_CANCEL' }
+        };
+      }
+      return { data: data[0], error: null };
     } catch (error) {
       console.error('[PickupService] Error in cancelPickupRequest:', error);
       return { 

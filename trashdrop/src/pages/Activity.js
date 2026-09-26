@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
+import { Link } from 'react-router-dom';
+import { canRateJob } from './RateService.js';
 
 /**
  * Activity page to display user's complete activity history
@@ -393,7 +395,8 @@ const Activity = () => {
             related_id: activity.id,
             description: `${activity.waste_type || 'Waste'} Pickup - ${activity.estimated_volume || activity.bag_count || 1} bag(s)`,
             address: activity.location || 'Custom location',
-            created_at: activity.created_at
+            created_at: activity.created_at,
+            rateLink: canRateJob(activity) ? `/rate-service?pickupId=${activity.id}&type=pickup` : null
           };
         } else if (activity._source === 'digital_bins') {
           const locationName = activity.bin_locations?.location_name || 'Unknown location';
@@ -410,7 +413,8 @@ const Activity = () => {
             related_id: activity.id,
             description: `Request Bin Pickup (${activity.frequency})`,
             address: locationName,
-            created_at: activity.created_at
+            created_at: activity.created_at,
+            rateLink: canRateJob(activity) ? `/rate-service?pickupId=${activity.id}&type=bin` : null
           };
         } else if (activity._source === 'batches') {
           const batchNumber = activity.batch_number || activity.code || activity.id;
@@ -666,6 +670,14 @@ const Activity = () => {
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 ml-2">
                     Pending Sync
                   </span>
+                )}
+                {activity.rateLink && (
+                  <Link
+                    to={activity.rateLink}
+                    className="mt-2 inline-flex items-center gap-1 rounded-xl bg-yellow-400 px-4 py-2 text-base font-bold text-gray-900 shadow"
+                  >
+                    ⭐ Rate
+                  </Link>
                 )}
                 {activity.points !== 0 && (
                   <div className="mt-2">

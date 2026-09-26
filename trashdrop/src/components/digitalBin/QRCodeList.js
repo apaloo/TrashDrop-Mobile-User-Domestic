@@ -6,6 +6,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { getQRCode, storeQRCode } from '../../utils/qrStorage.js';
 import { getBinSizeLabelShort } from '../../utils/costCalculator.js';
+import { canCancelBin } from '../../services/digitalBinService.js';
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -452,7 +453,7 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
                 Show Less
               </button>
               
-              {pickup.status === 'active' && (
+              {canCancelBin(pickup) && (
                 <button 
                   className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm font-medium flex items-center"
                   onClick={handleCancel}

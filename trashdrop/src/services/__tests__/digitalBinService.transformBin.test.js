@@ -1,4 +1,4 @@
-import { transformBin } from '../digitalBinService.js';
+import { transformBin, canCancelBin } from '../digitalBinService.js';
 
 // gpsPricingService reaches for supabase (and its env validation) on import,
 // and none of that is involved in the status mapping under test
@@ -90,5 +90,36 @@ describe('realtime payload merge (regression)', () => {
     const listRow = transformBin(dbRow());
     const merged = transformBin({ ...listRow, ...dbRow({ is_active: false }) });
     expect(merged.status).toBe('cancelled');
+  });
+});
+
+describe('cancellation', () => {
+  it('maps a bin cancelled by status to cancelled even while is_active is true', () => {
+    expect(transformBin(dbRow({ status: 'cancelled' })).status).toBe('cancelled');
+    expect(transformBin(dbRow({ status: 'expired' })).status).toBe('cancelled');
+  });
+
+  it('keeps the database status for the cancel rule', () => {
+    expect(transformBin(dbRow({ status: 'accepted' })).db_status).toBe('accepted');
+  });
+
+  it('lets the household cancel until the collector sets off', () => {
+    expect(canCancelBin(transformBin(dbRow()))).toBe(true);
+    expect(canCancelBin(transformBin(dbRow({ status: 'accepted' })))).toBe(true);
+    expect(canCancelBin(transformBin(dbRow({ status: 'en_route' })))).toBe(false);
+    expect(canCancelBin(transformBin(dbRow({ status: 'arrived' })))).toBe(false);
+    expect(canCancelBin(transformBin(dbRow({ is_active: false })))).toBe(false);
+  });
+
+  it('uses the newer database status when a realtime row is merged over a listed one', () => {
+    const listRow = transformBin(dbRow());
+    const merged = transformBin({ ...listRow, ...dbRow({ status: 'en_route' }) });
+    expect(merged.db_status).toBe('en_route');
+    expect(canCancelBin(merged)).toBe(false);
+  });
+
+  it('keeps the database status when an already-shown bin is transformed again', () => {
+    const shown = transformBin(dbRow({ status: 'accepted' }));
+    expect(transformBin(shown).db_status).toBe('accepted');
   });
 });

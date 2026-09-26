@@ -1,4 +1,5 @@
 import supabase from './supabaseClient.js';
+import { transformBin, CANCELLABLE_BIN_STATUSES } from '../services/digitalBinService.js';
 
 /**
  * Service for handling synchronization of digital bins
@@ -30,37 +31,39 @@ export async function processPendingCancellations(userId) {
     const timestamp = new Date().toISOString();
     
     // Process each pending cancellation
-    for (const locationId of pendingCancellations) {
+    for (const binId of pendingCancellations) {
       try {
         const { data, error } = await supabase
           .from('digital_bins')
           .update({ 
             status: 'cancelled',
-            updated_at: timestamp,
-            cancelled_by: userId
+            is_active: false,
+            updated_at: timestamp
           })
-          .eq('location_id', locationId)
+          .eq('id', binId)
+          .eq('user_id', userId)
+          .in('status', CANCELLABLE_BIN_STATUSES)
           .select();
         
         if (error) {
-          console.error('Error processing cancellation for bin:', locationId, error);
+          console.error('Error processing cancellation for bin:', binId, error);
           results.push({ 
-            id: locationId, 
+            id: binId, 
             success: false, 
             error: error.message 
           });
         } else {
-          console.log('Successfully processed cancellation for bin:', locationId);
+          console.log('Successfully processed cancellation for bin:', binId);
           results.push({ 
-            id: locationId, 
+            id: binId, 
             success: true, 
             data 
           });
         }
       } catch (error) {
-        console.error('Exception processing cancellation for bin:', locationId, error);
+        console.error('Exception processing cancellation for bin:', binId, error);
         results.push({ 
-          id: locationId, 
+          id: binId, 
           success: false, 
           error: error.message 
         });
@@ -125,10 +128,7 @@ export async function syncBinsWithServer(userId) {
     // SERVER-FIRST: Transform and store server data directly
     if (serverBins && serverBins.length > 0) {
       // Transform server data to consistent format
-      const transformedBins = serverBins.map(bin => ({
-        ...bin,
-        status: bin.is_active ? 'active' : 'cancelled'
-      }));
+      const transformedBins = serverBins.map(transformBin);
       
       // Store server data as single source of truth
       localStorage.setItem('digitalBins', JSON.stringify(transformedBins));
