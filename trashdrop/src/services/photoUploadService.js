@@ -233,3 +233,29 @@ export default {
   uploadPhotos,
   deletePhoto
 };
+
+/** True for photos held only on this device (camera blob: or inline data: URLs) */
+export const isLocalPhotoUrl = (url) => typeof url === 'string' && /^(blob|data):/i.test(url);
+
+/**
+ * Turn a report's photo list into storage URLs that anyone can open.
+ * blob:/data: photos are uploaded to the dumping-photos bucket, https URLs
+ * are kept, anything else is dropped. Order is preserved. A blob:/data: value
+ * is never returned, so it can never be saved on a report.
+ * @param {string[]} photos
+ * @param {string} userId
+ * @returns {Promise<{urls: string[], failed: number}>}
+ */
+export const prepareReportPhotos = async (photos, userId) => {
+  const list = Array.isArray(photos) ? photos : [];
+  const results = await Promise.all(list.map(async (url, index) => {
+    if (typeof url === 'string' && /^https:\/\//i.test(url)) return { url };
+    if (!isLocalPhotoUrl(url)) return { dropped: true };
+    const upload = await uploadPhoto(url, userId, `photo_${index + 1}.jpg`);
+    return upload.success ? { url: upload.publicUrl } : { failed: true };
+  }));
+  return {
+    urls: results.filter(r => r.url).map(r => r.url),
+    failed: results.filter(r => r.failed).length,
+  };
+};

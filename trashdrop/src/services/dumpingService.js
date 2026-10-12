@@ -6,7 +6,7 @@ import supabase from '../utils/supabaseClient.js';
 import { toastService } from '../services/toastService.js';
 import { retrySupabaseOperation } from '../utils/retryUtils.js';
 import syncService from './syncService.js';
-import { uploadPhotos } from './photoUploadService.js';
+import { prepareReportPhotos, isLocalPhotoUrl } from './photoUploadService.js';
 
 /**
  * General area for the public map, "Town, Region" (e.g. "Pokuase, Greater Accra Region").
@@ -149,12 +149,11 @@ export const dumpingService = {
         throw new Error('Invalid size value. Must be one of: small, medium, large');
       }
 
-      // Validate photos if provided (allow blob URLs - they'll be uploaded to storage)
+      // Validate photos if provided (blob:/data: camera photos are uploaded below)
       if (reportData.photos) {
         const hasInvalidPhotos = reportData.photos.some(url => {
           if (!url || typeof url !== 'string') return true;
-          // Allow blob URLs (for camera captures) and regular URLs
-          return !url.startsWith('blob:') && !validatePhotoUrls([url]);
+          return !isLocalPhotoUrl(url) && !validatePhotoUrls([url]);
         });
         if (hasInvalidPhotos) {
           throw new Error('Invalid photo URL format');
@@ -180,22 +179,15 @@ export const dumpingService = {
       }
       console.log('[DumpingService] Using location:', location);
       
-      // Upload photos to Supabase Storage if blob URLs are provided
-      let photoUrls = reportData.photos || [];
-      if (photoUrls.length > 0 && photoUrls[0].startsWith('blob:')) {
-        console.log('[DumpingService] Uploading blob photos to storage...');
-        const uploadResult = await uploadPhotos(photoUrls, userId);
-        
-        if (uploadResult.success && uploadResult.publicUrls.length > 0) {
-          photoUrls = uploadResult.publicUrls;
-          console.log(`[DumpingService] Successfully uploaded ${photoUrls.length} photos`);
-        } else {
-          console.warn('[DumpingService] Photo upload failed:', uploadResult.error);
-          // Continue with empty photos array rather than failing the whole report
-          photoUrls = [];
-        }
+      // Upload every camera photo to Supabase Storage. Device-only blob:/data:
+      // URLs are never saved: they can't be opened from any other device.
+      const { urls: photoUrls, failed: failedPhotos } = await prepareReportPhotos(reportData.photos, userId);
+      if (failedPhotos > 0) {
+        const err = new Error(`${failedPhotos} photo${failedPhotos > 1 ? 's' : ''} could not be uploaded. Check your connection and try again.`);
+        err.code = 'PHOTO_UPLOAD_FAILED';
+        throw err;
       }
-      
+
       // Include all required fields for illegal_dumping_mobile table based on confirmed schema
       const report = {
         reported_by: userId,

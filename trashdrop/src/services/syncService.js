@@ -5,6 +5,13 @@
 
 import supabase from '../utils/supabaseClient.js';
 import { toastService } from './toastService.js';
+import { prepareReportPhotos } from './photoUploadService.js';
+
+// Reports queued by older app versions may hold device-only blob:/data: photo
+// URLs. Upload what can still be read (data: survives reloads; old blob: URLs
+// don't) and never insert a blob:/data: value.
+const uploadedPhotos = async (dbReport) =>
+  (await prepareReportPhotos(dbReport.photos, dbReport.reported_by)).urls;
 
 class SyncService {
   constructor() {
@@ -96,6 +103,7 @@ class SyncService {
         try {
           // Prepare report for database (remove local fields)
           const { id, sync_status, ...dbReport } = reportData;
+          dbReport.photos = await uploadedPhotos(dbReport);
           
           // Insert into illegal_dumping_mobile table
           const { data: syncedReport, error } = await supabase
@@ -264,6 +272,7 @@ class SyncService {
     }
 
     const { id, sync_status, ...dbReport } = reportData;
+    dbReport.photos = await uploadedPhotos(dbReport);
     
     const { data: syncedReport, error } = await supabase
       .from('illegal_dumping_mobile')
