@@ -4,7 +4,10 @@ import supabase from '../../utils/supabaseClient.js';
 jest.mock('../../utils/supabaseClient.js', () => ({ __esModule: true, default: { from: jest.fn() } }));
 jest.mock('../toastService.js', () => ({ toastService: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('../syncService.js', () => ({ __esModule: true, default: {} }));
-jest.mock('../photoUploadService.js', () => ({ uploadPhotos: jest.fn() }));
+jest.mock('../photoUploadService.js', () => ({
+  prepareReportPhotos: async (photos) => ({ urls: photos || [], failed: 0 }),
+  isLocalPhotoUrl: (url) => /^(blob|data):/i.test(url),
+}));
 jest.mock('../../utils/retryUtils.js', () => ({ retrySupabaseOperation: (fn) => fn() }));
 
 const nominatim = { address: { road: 'Main St', suburb: 'Pokuase', state: 'Greater Accra Region', country: 'Ghana' } };
