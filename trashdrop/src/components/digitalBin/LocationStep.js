@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -6,6 +6,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { useAuth } from '../../context/AuthContext.js';
 import toastService from '../../services/toastService.js';
 import GeolocationService from '../../utils/geolocationService.js';
+import { checkServiceCoverage } from '../../services/serviceCoverageService.js';
 
 // Fix for default marker icon in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -14,6 +15,21 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
+
+// A pin moved less than this keeps its address; GPS refinement nudges it by a few metres
+const ADDRESS_REFRESH_METERS = 25;
+// Wait for the pin to settle before looking up its address (map drags, GPS bursts)
+const GEOCODE_DEBOUNCE_MS = 600;
+
+// Haversine distance between two [lat, lng] points
+const distanceInMeters = ([lat1, lng1], [lat2, lng2]) => {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 // Component to update map view when position changes
 const MapUpdater = ({ position, isNewLocation }) => {
@@ -79,6 +95,38 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [gpsHint, setGpsHint] = useState(''); // Help text for poor GPS accuracy
   const [isNewLocation, setIsNewLocation] = useState(false); // Track if location came from GPS
+  // Service coverage for the current pin: idle | checking | covered | not_covered | unavailable
+  const [coverage, setCoverage] = useState({ status: 'idle', zone: null });
+  const [coverageAttempt, setCoverageAttempt] = useState(0); // Bumped by "Try again"
+  const [isGeocoding, setIsGeocoding] = useState(false); // Address lookup pending for the current pin
+  const geocodeRequestRef = useRef(0); // Id of the newest address lookup
+
+  // Background GPS refinement on the page updates formData's coordinates
+  // directly; follow it so the map, coverage and address describe the same point
+  useEffect(() => {
+    const { latitude, longitude } = formData;
+    if (latitude == null || longitude == null) return;
+    if (position && position[0] === latitude && position[1] === longitude) return;
+    setPosition([latitude, longitude]);
+  }, [formData.latitude, formData.longitude]);
+
+  // Re-check coverage whenever the pin moves. A slower answer for an earlier pin
+  // is dropped so it cannot overwrite the result for where the pin is now.
+  useEffect(() => {
+    if (!position || position[0] == null || position[1] == null) {
+      setCoverage({ status: 'idle', zone: null });
+      return;
+    }
+
+    let isCancelled = false;
+    setCoverage({ status: 'checking', zone: null });
+
+    checkServiceCoverage(position[0], position[1]).then(result => {
+      if (!isCancelled) setCoverage(result);
+    });
+
+    return () => { isCancelled = true; };
+  }, [position, coverageAttempt]);
 
   // Initialize form data with default values if not provided
   useEffect(() => {
@@ -136,10 +184,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           
           // Reset the flag after animation completes
           setTimeout(() => setIsNewLocation(false), 2000);
-          
-          // Reverse geocode to get address
-          await reverseGeocode(latitude, longitude);
-          
+
           // Show accuracy hint if needed
           if (locationResult.accuracyWarning) {
             setGpsHint(`GPS accuracy is ${accuracy?.toFixed(0)}m. For better accuracy, move to an open area away from buildings.`);
@@ -269,6 +314,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       updateFormData({
         location_id: id,
         address: address || '',
+        address_coords: address ? [latitude, longitude] : null, // Keep the saved address
         latitude,
         longitude,
         useCurrentLocation: false
@@ -277,7 +323,17 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   };
   
   // Helper function to reverse geocode coordinates to address
-  const reverseGeocode = async (latitude, longitude) => {
+  const reverseGeocode = async (latitude, longitude, requestId) => {
+    // The pin may have moved again while the lookups were in flight; only the
+    // newest request is allowed to write the address
+    const applyAddress = (address) => {
+      if (requestId !== geocodeRequestRef.current) return;
+      setAddressInput(address);
+      setIsGeocoding(false);
+      updateFormData({ address, address_coords: [latitude, longitude] });
+    };
+
+
     try {
       console.log('[LocationStep] Reverse geocoding:', latitude, longitude);
       
@@ -342,8 +398,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       
       if (addressFound) {
         console.log('[LocationStep] Address found:', addressFound);
-        setAddressInput(addressFound);
-        updateFormData({ address: addressFound });
+        applyAddress(addressFound);
         return true;
       }
       
@@ -353,11 +408,30 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     
     // Fallback: Generate a meaningful location description
     const fallbackAddress = `Near ${latitude.toFixed(4)}°N, ${Math.abs(longitude).toFixed(4)}°W`;
-    setAddressInput(fallbackAddress);
-    updateFormData({ address: fallbackAddress });
+    applyAddress(fallbackAddress);
     console.log('[LocationStep] Using coordinate fallback:', fallbackAddress);
     return false;
   };
+
+  // Keep the address in step with the pin, whatever moved it: GPS, a map drag
+  // or click, background GPS refinement, or returning to this step after the
+  // coordinates changed. Moves under ADDRESS_REFRESH_METERS keep the address;
+  // larger ones look it up again once the pin settles.
+  useEffect(() => {
+    if (!position || position[0] == null || position[1] == null) return;
+
+    const geocodedAt = formData.address_coords;
+    if (addressInput && geocodedAt && distanceInMeters(position, geocodedAt) < ADDRESS_REFRESH_METERS) {
+      geocodeRequestRef.current++; // Drop any lookup still running for an earlier pin
+      setIsGeocoding(false);
+      return;
+    }
+
+    setIsGeocoding(true);
+    const requestId = ++geocodeRequestRef.current;
+    const timer = setTimeout(() => reverseGeocode(position[0], position[1], requestId), GEOCODE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [position]);
   
   // Handler for current location using GeolocationService
   const handleUseCurrentLocation = async (e) => {
@@ -407,9 +481,6 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
 
         // Reset the flag after animation
         setTimeout(() => setIsNewLocation(false), 2000);
-
-        // Reverse geocode to get address
-        await reverseGeocode(latitude, longitude);
 
         // Show hint if accuracy is poor, but still accept the reading
         if (locationResult.accuracyWarning) {
@@ -461,8 +532,19 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       return;
     }
 
+    // The address on screen may still belong to where the pin was before
+    if (isGeocoding) {
+      return;
+    }
+
     if (!addressInput.trim()) {
       setAddressError('Location address not found. Please try again.');
+      return;
+    }
+
+    // Only locations inside a service area can be booked; the panel under the
+    // map already explains why when this is not the case
+    if (coverage.status !== 'covered') {
       return;
     }
 
@@ -530,9 +612,9 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         <input
           type="text"
           id="address"
-          value={addressInput}
+          value={isGeocoding ? '' : addressInput}
           readOnly
-          placeholder="Use current location to auto-fill"
+          placeholder={isGeocoding ? 'Looking up address...' : 'Use current location to auto-fill'}
           className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white font-medium placeholder-gray-400 dark:placeholder-gray-500 cursor-not-allowed"
         />
         {addressError && (
@@ -565,6 +647,49 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </div>
       </div>
       
+      {coverage.status === 'checking' && (
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Checking service availability at this location...</p>
+      )}
+
+      {coverage.status === 'covered' && coverage.zone && (
+        <p className="mb-4 text-sm text-green-700 dark:text-green-400">
+          ✓ Service available in {coverage.zone.suburb}
+        </p>
+      )}
+
+      {coverage.status === 'not_covered' && (
+        <div className="mb-4 p-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20">
+          <p className="font-medium text-amber-800 dark:text-amber-300">
+            We haven't started operating here yet
+          </p>
+          <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+            TrashDrop doesn't have collectors at this location yet, so we can't take a pickup request here.
+            {coverage.zone?.suburb && coverage.zone?.distance_km != null && (
+              <> The nearest area we serve is {coverage.zone.suburb}, about {Math.round(coverage.zone.distance_km)} km away.</>
+            )}
+            {' '}We're expanding and hope to reach your area soon.
+          </p>
+          <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
+            If the pin is in the wrong place, drag it to where your bin is.
+          </p>
+        </div>
+      )}
+
+      {coverage.status === 'unavailable' && (
+        <div className="mb-4 p-3 rounded-md border border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20">
+          <p className="text-sm text-red-700 dark:text-red-300">
+            We couldn't confirm service at this location right now.
+          </p>
+          <button
+            type="button"
+            onClick={() => setCoverageAttempt(attempt => attempt + 1)}
+            className="mt-2 text-sm font-medium text-red-700 dark:text-red-300 underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* Hidden inputs to maintain coordinates in background */}
       {position && position[0] != null && position[1] != null && (
         <>
@@ -577,7 +702,8 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         <button
           type="button"
           onClick={handleContinue}
-          className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-md transition-colors font-medium"
+          disabled={isGeocoding || ['checking', 'not_covered', 'unavailable'].includes(coverage.status)}
+          className="bg-primary hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-md transition-colors font-medium"
         >
           Continue
         </button>

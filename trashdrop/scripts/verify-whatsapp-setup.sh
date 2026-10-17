@@ -5,6 +5,11 @@
 set -uo pipefail
 
 URL="${1:-https://trashdrop-mobile.windsurf.build}"
+# META_APP_SECRET and META_ACCESS_TOKEN carry a different value per deploy
+# context. `netlify env:list` defaults to `dev`, so without this the script signs
+# a payload with the dev secret, the production function validates it with the
+# production secret, and a healthy site is reported as a signature failure.
+CONTEXT="${NETLIFY_CONTEXT:-production}"
 pass=0; fail=0
 ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=$((fail+1)); }
@@ -15,7 +20,8 @@ echo "site: $URL"
 echo
 echo "1. Environment (values are never printed)"
 
-ENVJSON=$(netlify env:list --json 2>/dev/null)
+echo "context: $CONTEXT"
+ENVJSON=$(netlify env:list --context "$CONTEXT" --json 2>/dev/null)
 have() { echo "$ENVJSON" | python3 -c "import json,sys;print('y' if '$1' in json.load(sys.stdin) else 'n')" 2>/dev/null; }
 getv() { echo "$ENVJSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$1',''))" 2>/dev/null; }
 
@@ -113,11 +119,79 @@ case "$code" in
 esac
 
 echo
-echo "3. Flow"
+echo "3. Meta-side delivery"
+# Everything above can pass while Meta sends nothing at all: the endpoints only
+# hear from Meta if an app is subscribed to the WABA and its callback URL points
+# here. Both have been wrong before, and both fail silently.
+WABA=$(getv META_BUSINESS_ACCOUNT_ID)
+if [ -z "$WABA" ] || [ -z "$TOKEN" ]; then
+  note "skipped (needs META_BUSINESS_ACCOUNT_ID and META_ACCESS_TOKEN)"
+else
+  SUBS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+         "https://graph.facebook.com/v21.0/${WABA}/subscribed_apps" --max-time 25)
+  # A rejected token returns an error body, not an empty list. Reporting that as
+  # "nothing is subscribed" sends you to fix the wrong thing.
+  if echo "$SUBS" | grep -q '"error"'; then
+    bad "Graph rejected the subscription query — cannot tell what is subscribed"
+    note "$(echo "$SUBS" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("error",{}).get("message","?")[:90])' 2>/dev/null)"
+  elif echo "$SUBS" | grep -q whatsapp_business_api_data; then
+    ok "an app is subscribed to WABA $WABA"
+    echo "$SUBS" | python3 -c '
+import json,sys
+for d in json.load(sys.stdin).get("data",[]):
+    a=d.get("whatsapp_business_api_data",{})
+    print("        app: %s (%s)" % (a.get("name","?"), a.get("id","?")))
+' 2>/dev/null
+    note "confirm in Meta: the app callback URL is $URL/.netlify/functions/whatsapp-webhook"
+    note "and that the 'messages' webhook field is Subscribed, not just configured"
+  else
+    bad "no app is subscribed to WABA $WABA — inbound messages are delivered nowhere"
+    note "WhatsApp Manager > the app > Configure Webhooks, then subscribe 'messages'"
+  fi
+fi
+
+echo
+echo "4. Flow"
 FID=$(getv WHATSAPP_FLOW_ID); MODE=$(getv WHATSAPP_FLOW_MODE)
 [ -n "$FID" ] && ok "flow id $FID (mode: ${MODE:-published})" || bad "WHATSAPP_FLOW_ID missing"
-note "if the flow is Draft in WhatsApp Manager, WHATSAPP_FLOW_MODE must be 'draft'"
-note "publish it and set the variable to 'published' before real customers use it"
+
+if [ -n "$FID" ] && [ -n "$TOKEN" ]; then
+  FLOW=$(curl -s -H "Authorization: Bearer $TOKEN" \
+         "https://graph.facebook.com/v21.0/${FID}?fields=name,status,validation_errors" --max-time 25)
+  STATUS=$(echo "$FLOW" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))' 2>/dev/null)
+  EFFMODE=$(printf '%s' "${MODE:-published}" | tr '[:upper:]' '[:lower:]')
+
+  case "$STATUS" in
+    PUBLISHED)
+      if [ "$EFFMODE" = draft ]; then
+        bad "flow is PUBLISHED but WHATSAPP_FLOW_MODE=draft — Meta rejects mode:draft on a published flow"
+      else
+        ok "flow is PUBLISHED and WHATSAPP_FLOW_MODE=$EFFMODE"
+      fi;;
+    DRAFT)
+      if [ "$EFFMODE" = draft ]; then
+        ok "flow is DRAFT and WHATSAPP_FLOW_MODE=draft (admins only — publish before real customers)"
+      else
+        bad "flow is DRAFT but WHATSAPP_FLOW_MODE=$EFFMODE — every send fails with (#132000) Flow not published"
+        note "the engine then falls back to chat, where bin photos are refused by design"
+        note "fix: node scripts/upload-whatsapp-flow.js --publish   (or set WHATSAPP_FLOW_MODE=draft to test)"
+      fi;;
+    "") if echo "$FLOW" | grep -q '"error"'; then
+          bad "Graph rejected the flow query — cannot tell whether the flow is published"
+          note "$(echo "$FLOW" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("error",{}).get("message","?")[:90])' 2>/dev/null)"
+        else
+          bad "flow $FID returned no status — check the id"
+        fi;;
+    *)  bad "flow status is $STATUS";;
+  esac
+
+  echo "$FLOW" | python3 -c '
+import json,sys
+errs=json.load(sys.stdin).get("validation_errors") or []
+for e in errs:
+    print("        validation: %s" % e.get("message","?"))
+' 2>/dev/null
+fi
 
 echo
 printf 'result: %d passed, %d failed\n' "$pass" "$fail"

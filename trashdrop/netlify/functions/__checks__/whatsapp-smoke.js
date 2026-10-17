@@ -66,6 +66,13 @@ require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
         return { data: [{ session_id: 's1', whatsapp_user_id: 'wa1', state: 'idle', collected_data: {} }], error: null };
       }
       if (n === 'find_nearest_pricing_zone') return { data: [{ price_120l: 30 }], error: null };
+      if (n === 'check_service_coverage') {
+        // Accra is served; Tamale-ish latitudes are not; latitude 0 breaks the check
+        if (a.p_latitude === 0) return { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
+        const covered = a.p_latitude < 6;
+        return { data: [{ is_covered: covered, zone_id: 'z1', region: 'Greater Accra', district: 'Accra Metro',
+          community: 'Osu', suburb: 'Osu', distance_km: covered ? 0.4 : 312.6, service_radius_km: 5 }], error: null };
+      }
       if (n === 'create_whatsapp_digital_bin') return { data: 'bin-1', error: null };
       return { data: null, error: null };
     },
@@ -252,6 +259,36 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
       assert.strictEqual(savedPhotoUrls, null, 'photo_urls should be left alone');
       assert.ok(sent.some(m => (m.x || '').includes('Booking confirmed')), 'no confirmation sent');
     });
+  }
+
+  console.log('coverage');
+  {
+    const s6 = { id: 's1', whatsapp_user_id: 'wa1', state: STATES.IDLE, collected_data: {}, app_user_id: null };
+    const go = async (m) => { sent = [];
+      const res = await processMessage({ phone: '233244000000',
+        message: typeof m === 'string' ? { type: 'text', text: m } : m, session: s6, supabase });
+      s6.state = res.newState; s6.collected_data = res.newData; return res; };
+    const at = (latitude) => ({ type: 'location', location: { latitude, longitude: -0.85, name: 'Far Home' } });
+
+    await go('hi'); await go(at(9.44));
+    check('a pin outside coverage is refused at the location step', () => {
+      assert.strictEqual(s6.state, STATES.AWAITING_LOCATION);
+      assert.strictEqual(s6.collected_data.latitude, undefined, 'uncovered pin was saved');
+      assert.ok(!sent.some(m => m.k === 'flow'), 'the Flow was opened for an uncovered pin');
+      const text = sent.map(m => m.x || '').join('\n');
+      assert.ok(/haven't started operating here yet/.test(text), 'no not-operating message:\n' + text);
+      assert.ok(text.includes('Osu') && text.includes('313 km'), 'nearest service area not named:\n' + text);
+    });
+
+    await go(at(0));
+    check('a failed coverage check asks to try again, not to proceed', () => {
+      assert.strictEqual(s6.state, STATES.AWAITING_LOCATION);
+      assert.ok(sent.some(m => /couldn't confirm service/.test(m.x || '')), 'no retry message');
+    });
+
+    await go(LOC);
+    check('re-pinning inside coverage continues the booking', () =>
+      assert.strictEqual(s6.state, STATES.AWAITING_FLOW));
   }
 
   console.log('fallbacks');
