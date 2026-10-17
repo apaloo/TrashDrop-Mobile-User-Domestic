@@ -43,6 +43,7 @@ const {
   formatCurrency,
   quoteBooking,
 } = require('./pricing');
+const { checkServiceCoverage, notCoveredMessage } = require('./coverage');
 
 const STATES = {
   IDLE: 'idle',
@@ -666,6 +667,23 @@ async function handleLocation(phone, message, data, supabase, session) {
   }
 
   const { latitude, longitude, name, address } = message.location;
+
+  // Only take bookings where collectors operate — the same rule as the app's
+  // LocationStep. The customer stays on this step to re-pin or cancel.
+  const coverage = await checkServiceCoverage(supabase, latitude, longitude);
+
+  if (coverage.status === 'unavailable') {
+    await sendTextMessage(phone,
+      "We couldn't confirm service at that location right now. " +
+      'Please share your location again in a moment, or reply CANCEL to stop.'
+    );
+    return { newState: STATES.AWAITING_LOCATION, newData: data, done: true };
+  }
+
+  if (coverage.status === 'not_covered') {
+    await sendTextMessage(phone, notCoveredMessage(coverage.zone));
+    return { newState: STATES.AWAITING_LOCATION, newData: data, done: true };
+  }
 
   const newData = {
     ...data,
