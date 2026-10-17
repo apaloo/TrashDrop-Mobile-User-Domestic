@@ -2,36 +2,39 @@
  * GPS-based Pricing Service
  * Provides location-specific pricing for waste collection services
  * 
- * This service queries the pricing_zones table to find location-specific pricing.
- * Falls back to default BASE_COSTS if no zone is found within range.
+ * Prices come only from the pricing zone that covers the location (the
+ * get_covering_pricing_zone RPC, which applies each zone's service_radius_km).
+ * There are no default prices: a location outside every zone, a zone without a
+ * price for the bin size, or a failed lookup raises PricingUnavailableError so
+ * nothing is ever quoted or charged at a made-up rate.
  */
 
 import supabase from '../utils/supabaseClient.js';
 
-/**
- * Default fallback prices by bin size (in GHS)
- * Used when no GPS pricing zone is found
- */
-const DEFAULT_PRICES = {
-  50: 10,
-  60: 15,
-  80: 18,
-  90: 22,
-  100: 25,
-  120: 30,
-  240: 40,
-  260: 50,
-  320: 65,
-  340: 55,
-  360: 75,
-  660: 100,
-  1100: 150
-};
+const BIN_SIZES = [50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100];
 
 /**
- * Maximum distance in km to search for a pricing zone
+ * Why a location could not be priced
+ *   no_location   — no coordinates to price
+ *   not_covered   — outside every zone's service radius
+ *   size_unpriced — the covering zone has no price for this bin size
+ *   lookup_failed — the pricing lookup itself failed; retrying may work
  */
-const MAX_SEARCH_DISTANCE_KM = 10;
+const PRICING_MESSAGES = {
+  no_location: 'Set your bin location before we can price this pickup.',
+  not_covered: "We haven't started operating at this location yet, so we can't price a pickup here.",
+  size_unpriced: "This bin size isn't available in your area yet. Please choose another size.",
+  lookup_failed: "We couldn't load prices for your location right now. Please try again in a moment."
+};
+
+export class PricingUnavailableError extends Error {
+  constructor(reason, details = {}) {
+    super(PRICING_MESSAGES[reason] || PRICING_MESSAGES.lookup_failed);
+    this.name = 'PricingUnavailableError';
+    this.reason = reason;
+    Object.assign(this, details);
+  }
+}
 
 /**
  * RPC timeout in milliseconds (5 seconds for good UX)
@@ -46,11 +49,10 @@ const MAX_RETRIES = 2;
 /**
  * Cache for pricing lookups to reduce database queries
  * Key: `${lat}_${lng}` (rounded to 4 decimal places)
- * Value: { zone, timestamp, isError }
+ * Value: { zone, timestamp } (zone is null for a location outside coverage)
  */
 const pricingCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const ERROR_CACHE_TTL_MS = 30 * 1000; // 30 seconds for error states
 
 /**
  * Circuit Breaker State
@@ -135,8 +137,7 @@ const getCacheKey = (latitude, longitude) => {
  */
 const isCacheValid = (cacheEntry) => {
   if (!cacheEntry) return false;
-  const ttl = cacheEntry.isError ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS;
-  return (Date.now() - cacheEntry.timestamp) < ttl;
+  return (Date.now() - cacheEntry.timestamp) < CACHE_TTL_MS;
 };
 
 /**
@@ -171,20 +172,19 @@ const withRetry = async (operation, maxRetries = MAX_RETRIES, delayMs = 500) => 
 };
 
 /**
- * Find the nearest pricing zone for given GPS coordinates
- * 
+ * Find the pricing zone that covers the given GPS coordinates
+ *
  * @param {number} latitude - GPS latitude
  * @param {number} longitude - GPS longitude
- * @param {number} maxDistanceKm - Maximum search distance (default: 10km)
- * @returns {Promise<Object|null>} Pricing zone data or null if not found
+ * @returns {Promise<Object|null>} The covering zone, or null when the location is outside every zone
+ * @throws {PricingUnavailableError} lookup_failed when the lookup cannot be completed
  */
-export const findNearestPricingZone = async (latitude, longitude, maxDistanceKm = MAX_SEARCH_DISTANCE_KM) => {
+export const findCoveringPricingZone = async (latitude, longitude) => {
   metrics.totalRequests++;
-  
+
   // Validate coordinates
-  if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
-    console.warn('[GPSPricing] Invalid coordinates:', { latitude, longitude });
-    return null;
+  if (latitude == null || longitude == null || isNaN(latitude) || isNaN(longitude)) {
+    throw new PricingUnavailableError('no_location');
   }
 
   // Check cache first
@@ -198,179 +198,147 @@ export const findNearestPricingZone = async (latitude, longitude, maxDistanceKm 
 
   // Check circuit breaker before making RPC call
   if (!isCircuitClosed()) {
-    console.warn('[GPSPricing] Circuit breaker OPEN - skipping RPC call, using default pricing');
-    return null; // Will trigger fallback to default pricing
+    console.warn('[GPSPricing] Circuit breaker OPEN - skipping RPC call');
+    throw new PricingUnavailableError('lookup_failed');
   }
 
+  let data;
   try {
     metrics.rpcCalls++;
-    console.log('[GPSPricing] Querying for nearest zone:', { latitude, longitude, maxDistanceKm });
+    console.log('[GPSPricing] Querying for covering zone:', { latitude, longitude });
 
     // Call the database function with timeout and retry
     const rpcOperation = async () => {
-      const rpcPromise = supabase.rpc('find_nearest_pricing_zone', {
+      const rpcPromise = supabase.rpc('get_covering_pricing_zone', {
         p_latitude: latitude,
-        p_longitude: longitude,
-        p_max_distance_km: maxDistanceKm
+        p_longitude: longitude
       });
-      
+
       // Apply timeout to prevent indefinite hanging
       const result = await withTimeout(
         rpcPromise,
         RPC_TIMEOUT_MS,
         'GPS pricing lookup timed out'
       );
-      
+
       if (result.error) {
         throw new Error(result.error.message || 'Database error');
       }
-      
+
       return result.data;
     };
 
     // Execute with retry logic for transient failures
-    const data = await withRetry(rpcOperation);
+    data = await withRetry(rpcOperation);
 
     // Record success - resets circuit breaker
     recordSuccess();
-
-    if (!data || data.length === 0) {
-      console.log('[GPSPricing] No zone found within', maxDistanceKm, 'km');
-      // Cache the null result to avoid repeated queries
-      pricingCache.set(cacheKey, { zone: null, timestamp: Date.now(), isError: false });
-      return null;
-    }
-
-    const zone = data[0];
-    console.log('[GPSPricing] Found zone:', zone.suburb, 'at', zone.distance_km?.toFixed(2), 'km');
-
-    // Cache the result
-    pricingCache.set(cacheKey, { zone, timestamp: Date.now(), isError: false });
-
-    return zone;
   } catch (error) {
     // Record failure - may trip circuit breaker
     recordFailure();
     console.error('[GPSPricing] Error finding pricing zone:', error.message);
-    // Cache the error state briefly to prevent hammering on failures
-    pricingCache.set(cacheKey, { zone: null, timestamp: Date.now(), isError: true });
-    return null;
+    // Failures are not cached, so "Try again" really retries; the circuit
+    // breaker is what stops a failing service being hammered
+    throw new PricingUnavailableError('lookup_failed');
   }
+
+  const zone = Array.isArray(data) ? (data[0] || null) : (data || null);
+  if (zone) {
+    console.log('[GPSPricing] Covering zone:', zone.suburb);
+  } else {
+    console.log('[GPSPricing] Location is outside every service area');
+  }
+
+  pricingCache.set(cacheKey, { zone, timestamp: Date.now() });
+  return zone;
 };
+
+// The zone's price for a bin size, or null when the zone has none
+const zonePriceFor = (zone, binSize) => {
+  const price = parseFloat(zone[`price_${binSize}l`]);
+  return Number.isFinite(price) && price > 0 ? price : null;
+};
+
+const zoneSummary = (zone) => ({
+  region: zone.region,
+  district: zone.district,
+  community: zone.community,
+  suburb: zone.suburb
+});
 
 /**
  * Get price for a specific bin size at a location
- * Falls back to default pricing if no zone is found
- * 
+ *
  * @param {number} latitude - GPS latitude
  * @param {number} longitude - GPS longitude
  * @param {number} binSize - Bin size in liters (50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100)
- * @returns {Promise<Object>} Price info with source indicator
+ * @returns {Promise<Object>} { price, source: 'gps', zone }
+ * @throws {PricingUnavailableError} when the location or size cannot be priced
  */
 export const getLocationPrice = async (latitude, longitude, binSize) => {
-  // Validate bin size
-  const validSizes = [50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100];
-  if (!validSizes.includes(binSize)) {
-    console.warn('[GPSPricing] Invalid bin size:', binSize, '- using default 120L');
-    binSize = 120;
+  if (!BIN_SIZES.includes(binSize)) {
+    throw new PricingUnavailableError('size_unpriced', { binSize });
   }
 
-  // Try to find GPS-based pricing
-  const zone = await findNearestPricingZone(latitude, longitude);
-
-  if (zone) {
-    // Map bin size to zone price column
-    const priceKey = `price_${binSize}l`;
-    const price = zone[priceKey];
-
-    if (price !== undefined && price !== null) {
-      return {
-        price: parseFloat(price),
-        source: 'gps',
-        zone: {
-          region: zone.region,
-          district: zone.district,
-          community: zone.community,
-          suburb: zone.suburb,
-          distance_km: zone.distance_km
-        }
-      };
-    }
+  const zone = await findCoveringPricingZone(latitude, longitude);
+  if (!zone) {
+    throw new PricingUnavailableError('not_covered');
   }
 
-  // Fallback to default pricing
-  const defaultPrice = DEFAULT_PRICES[binSize] || DEFAULT_PRICES[120];
+  const price = zonePriceFor(zone, binSize);
+  if (price == null) {
+    throw new PricingUnavailableError('size_unpriced', { binSize, zone: zoneSummary(zone) });
+  }
+
   return {
-    price: defaultPrice,
-    source: 'default',
-    zone: null
+    price,
+    source: 'gps',
+    zone: zoneSummary(zone)
   };
 };
 
 /**
  * Get all bin size prices for a location
- * Useful for displaying price options to user
- * 
+ * Useful for displaying price options to user. Sizes the zone does not price
+ * are left out rather than filled with a made-up rate.
+ *
  * @param {number} latitude - GPS latitude
  * @param {number} longitude - GPS longitude
- * @returns {Promise<Object>} All prices with source indicator
+ * @returns {Promise<Object>} { prices: {size: price}, source: 'gps', zone }
+ * @throws {PricingUnavailableError} when the location cannot be priced
  */
 export const getAllPricesForLocation = async (latitude, longitude) => {
-  const zone = await findNearestPricingZone(latitude, longitude);
-
-  const prices = {};
-  const binSizes = [50, 60, 80, 90, 100, 120, 240, 260, 320, 340, 360, 660, 1100];
-
-  if (zone) {
-    binSizes.forEach(size => {
-      const priceKey = `price_${size}l`;
-      prices[size] = parseFloat(zone[priceKey]) || DEFAULT_PRICES[size];
-    });
-
-    return {
-      prices,
-      source: 'gps',
-      zone: {
-        region: zone.region,
-        district: zone.district,
-        community: zone.community,
-        suburb: zone.suburb,
-        distance_km: zone.distance_km
-      }
-    };
+  const zone = await findCoveringPricingZone(latitude, longitude);
+  if (!zone) {
+    throw new PricingUnavailableError('not_covered');
   }
 
-  // Return default prices
-  binSizes.forEach(size => {
-    prices[size] = DEFAULT_PRICES[size];
+  const prices = {};
+  BIN_SIZES.forEach(size => {
+    const price = zonePriceFor(zone, size);
+    if (price != null) prices[size] = price;
   });
 
   return {
     prices,
-    source: 'default',
-    zone: null
+    source: 'gps',
+    zone: zoneSummary(zone)
   };
 };
 
 /**
  * Get base cost for cost calculator integration
- * This function is designed to be a drop-in replacement for the static BASE_COSTS lookup
- * 
+ *
  * @param {number} binSize - Bin size in liters
- * @param {number|null} latitude - Optional GPS latitude
- * @param {number|null} longitude - Optional GPS longitude
+ * @param {number} latitude - GPS latitude
+ * @param {number} longitude - GPS longitude
  * @returns {Promise<number>} Base cost in GHS
+ * @throws {PricingUnavailableError} when the location or size cannot be priced
  */
-export const getBaseCost = async (binSize, latitude = null, longitude = null) => {
-  // If coordinates provided, try GPS-based pricing
-  if (latitude !== null && longitude !== null) {
-    const priceInfo = await getLocationPrice(latitude, longitude, binSize);
-    console.log('[GPSPricing] Base cost for', binSize, 'L:', priceInfo.price, 'GHS (source:', priceInfo.source, ')');
-    return priceInfo.price;
-  }
-
-  // No coordinates - return default
-  return DEFAULT_PRICES[binSize] || DEFAULT_PRICES[120];
+export const getBaseCost = async (binSize, latitude, longitude) => {
+  const priceInfo = await getLocationPrice(latitude, longitude, binSize);
+  console.log('[GPSPricing] Base cost for', binSize, 'L:', priceInfo.price, 'GHS');
+  return priceInfo.price;
 };
 
 /**
@@ -441,7 +409,7 @@ export const getHealthStatus = () => {
 
   if (circuitBreaker.isOpen) {
     status = 'degraded';
-    message = `Circuit breaker is open. Using default pricing. Will retry in ${Math.max(0, Math.ceil((circuitBreaker.resetTimeout - (Date.now() - circuitBreaker.lastFailure)) / 1000))}s`;
+    message = `Circuit breaker is open. Pricing is unavailable. Will retry in ${Math.max(0, Math.ceil((circuitBreaker.resetTimeout - (Date.now() - circuitBreaker.lastFailure)) / 1000))}s`;
   } else if (recentFailureRate > 0.5) {
     status = 'warning';
     message = `High failure rate detected: ${(recentFailureRate * 100).toFixed(0)}%`;
@@ -487,7 +455,7 @@ export const resetCircuitBreaker = () => {
 
 // Default export with all functions
 export default {
-  findNearestPricingZone,
+  findCoveringPricingZone,
   getLocationPrice,
   getAllPricesForLocation,
   getBaseCost,
@@ -497,5 +465,5 @@ export default {
   getHealthStatus,
   resetMetrics,
   resetCircuitBreaker,
-  DEFAULT_PRICES
+  PricingUnavailableError
 };

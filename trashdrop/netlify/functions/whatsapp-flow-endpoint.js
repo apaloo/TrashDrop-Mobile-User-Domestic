@@ -23,7 +23,7 @@
  *     SCHEDULE --navigate--> WASTE_DETAILS --navigate--> ADDITIONAL_INFO --complete-->
  * and `complete` delivers the submission to whatsapp-webhook.js as an
  * interactive `nfm_reply`, where it is already priced against `pricing_zones`
- * (utils/pricing.js → quoteBooking → find_nearest_pricing_zone) and confirmed
+ * (utils/pricing.js → quoteBooking → get_covering_pricing_zone) and confirmed
  * in chat. Pricing does NOT belong here.
  *
  * This file exists so the capability is ready and correct if the Flow is ever

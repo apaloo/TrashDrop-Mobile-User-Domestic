@@ -10,11 +10,16 @@
  * Distance (>5-10km, Urgent only) → Surge (hidden from user) → Request fee (₵1) → Taxes
  * 
  * GPS-BASED PRICING (v4.5.7):
- * When coordinates are provided, base pricing is fetched from GPS pricing zones.
- * Falls back to DEFAULT BASE_COSTS if no zone is found within 10km.
+ * A booking's base price comes only from the pricing zone covering its
+ * location (getCostBreakdownWithGPS). There is no fallback: a location outside
+ * coverage, an unpriced size or a failed lookup throws PricingUnavailableError.
+ * BASE_COSTS below feeds the synchronous estimate helpers only and is never
+ * used to price a booking.
  */
 
-import gpsPricingService from '../services/gpsPricingService.js';
+import gpsPricingService, { PricingUnavailableError } from '../services/gpsPricingService.js';
+
+export { PricingUnavailableError };
 
 /**
  * Available bin sizes in liters
@@ -377,12 +382,12 @@ export const SOP_CONSTANTS = {
  * Get cost breakdown with GPS-based pricing (ASYNC)
  * 
  * This is the GPS-enhanced version of getCostBreakdown.
- * Uses location-specific base pricing when coordinates are provided.
+ * Base pricing comes from the pricing zone covering the location.
  * 
  * @param {Object} params - Bin service parameters
  * @param {number} params.bin_size_liters - Size of bin in liters
- * @param {number} params.latitude - GPS latitude (optional)
- * @param {number} params.longitude - GPS longitude (optional)
+ * @param {number} params.latitude - GPS latitude (required)
+ * @param {number} params.longitude - GPS longitude (required)
  * @param {string} params.frequency - Service frequency
  * @param {string} params.waste_type - Type of waste
  * @param {boolean} params.is_urgent - Whether request is urgent
@@ -391,6 +396,7 @@ export const SOP_CONSTANTS = {
  * @param {number} params.on_site_charges - Additional on-site charges
  * @param {number} params.discount_amount - Discount amount
  * @returns {Promise<Object>} Cost breakdown with GPS pricing info
+ * @throws {PricingUnavailableError} when the location or bin size cannot be priced
  */
 export const getCostBreakdownWithGPS = async ({
   bin_size_liters,
@@ -406,25 +412,13 @@ export const getCostBreakdownWithGPS = async ({
 }) => {
   const binCount = Math.max(1, parseInt(bag_count) || 1);
   
-  // Get base cost - try GPS pricing first, fallback to default
-  let baseCost;
-  let pricingSource = 'default';
-  let pricingZone = null;
-
-  if (latitude !== null && longitude !== null) {
-    try {
-      const priceInfo = await gpsPricingService.getLocationPrice(latitude, longitude, bin_size_liters);
-      baseCost = priceInfo.price;
-      pricingSource = priceInfo.source;
-      pricingZone = priceInfo.zone;
-      console.log('[CostCalculator] GPS pricing used:', baseCost, 'GHS from', pricingSource);
-    } catch (error) {
-      console.warn('[CostCalculator] GPS pricing failed, using default:', error.message);
-      baseCost = BASE_COSTS[bin_size_liters] || BASE_COSTS[120];
-    }
-  } else {
-    baseCost = BASE_COSTS[bin_size_liters] || BASE_COSTS[120];
-  }
+  // Base cost from the covering zone only; PricingUnavailableError propagates
+  // to the caller, which must not quote or save the booking
+  const priceInfo = await gpsPricingService.getLocationPrice(latitude, longitude, bin_size_liters);
+  const baseCost = priceInfo.price;
+  const pricingSource = priceInfo.source;
+  const pricingZone = priceInfo.zone;
+  console.log('[CostCalculator] GPS pricing used:', baseCost, 'GHS from', pricingZone?.suburb);
 
   const base = baseCost * binCount;
 

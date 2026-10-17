@@ -5,8 +5,8 @@
  * "Request Bin Pickup (No Bag)" flow so that a booking made over WhatsApp is
  * quoted exactly like the same booking made in the app:
  *
- *   src/utils/costCalculator.js       → BASE_COSTS, getCostBreakdownWithGPS
- *   src/services/gpsPricingService.js → find_nearest_pricing_zone RPC
+ *   src/utils/costCalculator.js       → getCostBreakdownWithGPS
+ *   src/services/gpsPricingService.js → get_covering_pricing_zone RPC
  *   src/services/promotionalService.js→ promotional_usage / promotional_fee_schedule
  *
  * Pricing order (SOP v4.5.6):
@@ -14,25 +14,13 @@
  * Distance and surge are 0 at creation time; they are settled server-side when
  * a collector accepts, exactly as in the app.
  *
- * IMPORTANT: if you change BASE_COSTS here, change it in costCalculator.js too.
+ * The base price comes only from the pricing zone covering the pin. There are
+ * no default prices: a pin outside coverage, a size the zone does not price, or
+ * a failed lookup throws PricingUnavailableError and the booking is not quoted.
  */
 
 // Bin sizes accepted by the digital_bins CHECK constraint (costCalculator.BIN_SIZES)
 const BIN_SIZES = [60, 80, 90, 100, 120, 240, 340, 360, 660, 1100];
-
-// costCalculator.js BASE_COSTS — weekly base rates in GHS
-const BASE_COSTS = {
-  60: 15,    // Extra Small
-  80: 18,    // Small
-  90: 22,    // Small
-  100: 25,   // Medium
-  120: 30,   // Standard (Recommended)
-  240: 40,   // Large
-  340: 55,   // Extra Large
-  360: 60,   // Extra Large
-  660: 85,   // Industrial
-  1100: 120, // Commercial
-};
 
 const BIN_SIZE_LABELS = {
   60: 'Extra Small',
@@ -50,7 +38,20 @@ const BIN_SIZE_LABELS = {
 // SOP v4.5.6 constants (costCalculator.SOP_CONSTANTS)
 const URGENT_SURCHARGE = 0.30;
 const REQUEST_FEE = 1.0;
-const GPS_MAX_DISTANCE_KM = 10;
+
+/**
+ * Why a booking could not be priced — same reasons as gpsPricingService
+ *   not_covered   — outside every zone's service radius
+ *   size_unpriced — the covering zone has no price for this bin size
+ *   lookup_failed — the pricing lookup itself failed; retrying may work
+ */
+class PricingUnavailableError extends Error {
+  constructor(reason, message) {
+    super(message || reason);
+    this.name = 'PricingUnavailableError';
+    this.reason = reason;
+  }
+}
 
 const round2 = (n) => parseFloat(Number(n).toFixed(2));
 
@@ -67,37 +68,40 @@ function formatCurrency(amount) {
 }
 
 /**
- * Base cost per bin for a location — GPS zone pricing first, BASE_COSTS fallback.
- * Mirrors gpsPricingService.getLocationPrice(): the zone table only carries a
- * subset of sizes, so a zone hit without a price for this size still falls back.
+ * Base cost per bin for a location, from the zone covering it.
+ * Mirrors gpsPricingService.getLocationPrice().
+ *
+ * @throws {PricingUnavailableError}
  */
 async function getBaseCostPerBin(supabase, { bin_size_liters, latitude, longitude }) {
-  const fallback = BASE_COSTS[bin_size_liters] || BASE_COSTS[120];
-
   if (latitude == null || longitude == null) {
-    return { baseCost: fallback, pricingSource: 'default', zone: null };
+    throw new PricingUnavailableError('not_covered', 'No location to price');
   }
 
+  let data;
   try {
-    const { data, error } = await supabase.rpc('find_nearest_pricing_zone', {
-      p_latitude: latitude,
-      p_longitude: longitude,
-      p_max_distance_km: GPS_MAX_DISTANCE_KM,
+    const result = await supabase.rpc('get_covering_pricing_zone', {
+      p_latitude: Number(latitude),
+      p_longitude: Number(longitude),
     });
-
-    if (error) throw new Error(error.message);
-
-    const zone = Array.isArray(data) ? data[0] : data;
-    const zonePrice = zone ? Number(zone[`price_${bin_size_liters}l`]) : NaN;
-
-    if (zone && Number.isFinite(zonePrice) && zonePrice > 0) {
-      return { baseCost: zonePrice, pricingSource: 'gps', zone };
-    }
+    if (result.error) throw new Error(result.error.message);
+    data = result.data;
   } catch (err) {
-    console.warn('[Pricing] GPS pricing failed, using default:', err.message);
+    console.error('[Pricing] Covering zone lookup failed:', err.message);
+    throw new PricingUnavailableError('lookup_failed', err.message);
   }
 
-  return { baseCost: fallback, pricingSource: 'default', zone: null };
+  const zone = Array.isArray(data) ? data[0] : data;
+  if (!zone) {
+    throw new PricingUnavailableError('not_covered', 'Location is outside every service area');
+  }
+
+  const zonePrice = Number(zone[`price_${bin_size_liters}l`]);
+  if (!Number.isFinite(zonePrice) || zonePrice <= 0) {
+    throw new PricingUnavailableError('size_unpriced', `${zone.suburb} has no ${bin_size_liters}L price`);
+  }
+
+  return { baseCost: zonePrice, pricingSource: 'gps', zone };
 }
 
 /**
@@ -159,6 +163,7 @@ async function getPromotionalFee(supabase, binSizeLiters) {
  * in chat is the fee that gets written to digital_bins.fee.
  *
  * @returns {Promise<Object>} quote used for both the review message and the RPC
+ * @throws {PricingUnavailableError} when the pin or bin size cannot be priced
  */
 async function quoteBooking(supabase, {
   bin_size_liters,
@@ -232,7 +237,7 @@ async function quoteBooking(supabase, {
 
 module.exports = {
   BIN_SIZES,
-  BASE_COSTS,
+  PricingUnavailableError,
   BIN_SIZE_LABELS,
   URGENT_SURCHARGE,
   REQUEST_FEE,
