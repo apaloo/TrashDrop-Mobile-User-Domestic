@@ -10,6 +10,7 @@ import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import * as mobileServiceWorker from "./mobileServiceWorker";
 import { initGlobalErrorHandlers } from "./utils/errorBoundary";
 import { isMobileDevice } from "./utils/mobileAuth";
+import { initAppUpdates, activateWaitingWorker } from "./utils/appUpdates";
 
 // Initialize global error handlers early
 initGlobalErrorHandlers();
@@ -37,27 +38,29 @@ function logAppDebug(message, data) {
 logAppDebug("React initialization starting");
 
 // Initialize the app - REGISTER service worker
-// Use mobile-specific service worker for mobile devices
+// Use mobile-specific service worker for mobile devices.
+// A new deploy is activated straight away (see utils/appUpdates.js) instead of
+// waiting until every tab is closed.
+const serviceWorkerConfig = {
+  onUpdate: registration => {
+    console.log("[PWA] New version installed, activating it");
+    activateWaitingWorker(registration);
+  },
+  onSuccess: registration => {
+    console.log("[PWA] Content is cached for offline use");
+  }
+};
+
 if (isMobileDevice()) {
   console.log("[PWA] Mobile device detected, using mobile-specific service worker");
-  mobileServiceWorker.register({
-    onUpdate: registration => {
-      console.log("[PWA] New content is available, please refresh");
-    },
-    onSuccess: registration => {
-      console.log("[PWA] Content is cached for offline use");
-    }
-  });
+  mobileServiceWorker.register(serviceWorkerConfig);
 } else {
   console.log("[PWA] Desktop device detected, using standard service worker");
-  serviceWorkerRegistration.register({
-    onUpdate: registration => {
-      console.log("[PWA] New content is available, please refresh");
-    },
-    onSuccess: registration => {
-      console.log("[PWA] Content is cached for offline use");
-    }
-  });
+  serviceWorkerRegistration.register(serviceWorkerConfig);
+}
+
+if (process.env.NODE_ENV === "production") {
+  initAppUpdates();
 }
 
 // Using the ErrorBoundary component imported from ./components/ErrorBoundary
