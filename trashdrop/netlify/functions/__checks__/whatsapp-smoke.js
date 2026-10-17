@@ -53,6 +53,8 @@ const downloaded = [];
 const uploaded = [];
 let savedPhotoUrls = null;
 const rpcCalls = [];
+let pricingFails = false;
+let createRejectsCoverage = false;
 const sbPath = require.resolve('@supabase/supabase-js', { paths: [path.join(FN, '../..')] });
 require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
   createClient: () => ({
@@ -65,7 +67,13 @@ require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
       if (n === 'get_active_whatsapp_session') {
         return { data: [{ session_id: 's1', whatsapp_user_id: 'wa1', state: 'idle', collected_data: {} }], error: null };
       }
-      if (n === 'find_nearest_pricing_zone') return { data: [{ price_120l: 30 }], error: null };
+      if (n === 'get_covering_pricing_zone') {
+        if (pricingFails) return { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
+        // 5.9-6.0: the location step's check passes, but by review the pin is no
+        // longer covered (a zone's radius was narrowed mid-booking)
+        if (a.p_latitude >= 5.9) return { data: [], error: null };
+        return { data: [{ suburb: 'Osu', price_120l: 30, price_660l: null }], error: null };
+      }
       if (n === 'check_service_coverage') {
         // Accra is served; Tamale-ish latitudes are not; latitude 0 breaks the check
         if (a.p_latitude === 0) return { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
@@ -73,7 +81,10 @@ require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
         return { data: [{ is_covered: covered, zone_id: 'z1', region: 'Greater Accra', district: 'Accra Metro',
           community: 'Osu', suburb: 'Osu', distance_km: covered ? 0.4 : 312.6, service_radius_km: 5 }], error: null };
       }
-      if (n === 'create_whatsapp_digital_bin') return { data: 'bin-1', error: null };
+      if (n === 'create_whatsapp_digital_bin') {
+        if (createRejectsCoverage) return { data: null, error: { code: 'TDC01', message: 'This location is outside the TrashDrop service area' } };
+        return { data: 'bin-1', error: null };
+      }
       return { data: null, error: null };
     },
     storage: {
@@ -213,7 +224,7 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
   {
     downloaded.length = 0; uploaded.length = 0; savedPhotoUrls = null;
     const s3 = { id: 's1', whatsapp_user_id: 'wa1',
-      state: STATES.AWAITING_NOTES, collected_data: { ...GOOD }, app_user_id: null };
+      state: STATES.AWAITING_NOTES, collected_data: { ...GOOD, latitude: 5.56, longitude: -0.2057 }, app_user_id: null };
     const go = async (m) => { sent = [];
       const res = await processMessage({ phone: '233244000000',
         message: typeof m === 'string' ? { type: 'text', text: m } : m, session: s3, supabase });
@@ -250,7 +261,8 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
   {
     downloaded.length = 0; savedPhotoUrls = null;
     const s4 = { id: 's1', whatsapp_user_id: 'wa1',
-      state: STATES.AWAITING_CONFIRMATION, collected_data: { ...GOOD, latitude: 5.56, longitude: -0.2057 },
+      state: STATES.AWAITING_CONFIRMATION,
+      collected_data: { ...GOOD, latitude: 5.56, longitude: -0.2057, quote: { total: 61 } },
       app_user_id: null };
     sent = [];
     await processMessage({ phone: '233244000000', message: { type: 'text', text: 'confirm' }, session: s4, supabase });
@@ -289,6 +301,69 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
     await go(LOC);
     check('re-pinning inside coverage continues the booking', () =>
       assert.strictEqual(s6.state, STATES.AWAITING_FLOW));
+  }
+
+  console.log('no default pricing');
+  {
+    const s7 = { id: 's1', whatsapp_user_id: 'wa1', state: STATES.IDLE, collected_data: {}, app_user_id: null };
+    const go = async (m) => { sent = [];
+      const res = await processMessage({ phone: '233244000000',
+        message: typeof m === 'string' ? { type: 'text', text: m } : m, session: s7, supabase });
+      s7.state = res.newState; s7.collected_data = res.newData; return res; };
+    const text = () => sent.map(m => m.x || '').join('\n');
+
+    // Coverage passes at step 1 but the pin has no covering zone by review
+    await go('hi');
+    await go({ type: 'location', location: { latitude: 5.95, longitude: -0.2, name: 'Edge' } });
+    await go({ type: 'nfm_reply', flowResponse: GOOD });
+    check('an uncovered pin is never quoted, and goes back to the location step', () => {
+      assert.strictEqual(s7.state, STATES.AWAITING_LOCATION);
+      assert.ok(!/TOTAL/.test(text()), 'a price was quoted:\n' + text());
+      assert.ok(/haven't started operating here yet/.test(text()));
+      assert.strictEqual(s7.collected_data.latitude, undefined, 'uncovered pin kept');
+    });
+
+    // A size the covering zone does not price
+    await go(LOC);
+    await go({ type: 'nfm_reply', flowResponse: { ...GOOD, bin_size_liters: '660' } });
+    check('a size the zone does not price is refused and the form re-opens', () => {
+      assert.strictEqual(s7.state, STATES.AWAITING_FLOW);
+      assert.ok(/660L bin isn't available in your area/.test(text()), text());
+      assert.ok(sent.some(m => m.k === 'flow'), 'Flow not re-opened');
+      assert.ok(!/TOTAL/.test(text()));
+    });
+
+    // The pricing lookup itself fails: no default price, RETRY prices again
+    pricingFails = true;
+    await go({ type: 'nfm_reply', flowResponse: GOOD });
+    check('a failed pricing lookup asks to retry instead of quoting a default', () => {
+      assert.strictEqual(s7.state, STATES.AWAITING_CONFIRMATION);
+      assert.ok(/Reply \*RETRY\*/.test(text()), text());
+      assert.ok(!/TOTAL/.test(text()));
+    });
+
+    await go('confirm');
+    check('confirming an unpriced booking does not create it', () => {
+      assert.ok(!sent.some(m => /Booking confirmed/.test(m.x || '')), 'booked without a price');
+      assert.strictEqual(s7.state, STATES.AWAITING_CONFIRMATION);
+    });
+
+    pricingFails = false;
+    await go('retry');
+    check('RETRY prices the booking once the lookup works', () => {
+      assert.strictEqual(s7.state, STATES.AWAITING_CONFIRMATION);
+      assert.ok(text().includes('TOTAL: GHS 61.00'), text());
+    });
+
+    // The database trigger is the last word
+    createRejectsCoverage = true;
+    await go('confirm');
+    check('a coverage rejection from the database sends the customer back to re-pin', () => {
+      assert.strictEqual(s7.state, STATES.AWAITING_LOCATION);
+      assert.ok(/haven't started operating here yet/.test(text()), text());
+      assert.ok(!sent.some(m => /Booking confirmed/.test(m.x || '')));
+    });
+    createRejectsCoverage = false;
   }
 
   console.log('fallbacks');

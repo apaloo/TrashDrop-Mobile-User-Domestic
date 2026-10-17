@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCostBreakdown, getCostBreakdownWithGPS, formatCurrency, getBinSizeLabelShort } from '../../utils/costCalculator';
+import { getCostBreakdownWithGPS, formatCurrency, getBinSizeLabelShort } from '../../utils/costCalculator';
 import { getPromotionalFee } from '../../services/promotionalService.js';
 
 const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
@@ -7,6 +7,10 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [costBreakdown, setCostBreakdown] = useState(null);
   const [promoFee, setPromoFee] = useState(null); // promotional fee for current bin size
+  // Why this booking cannot be priced ({ reason, message }), or null. There is
+  // no default price to fall back on, so a pricing failure blocks submission.
+  const [pricingError, setPricingError] = useState(null);
+  const [pricingAttempt, setPricingAttempt] = useState(0); // Bumped by "Try again"
   
   const isPromotional = promoState?.isEligible === true;
   const promoRemaining = isPromotional ? (promoState.maxRequests - promoState.usedCount) : 0;
@@ -29,6 +33,7 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
     
     const fetchGPSPricing = async () => {
       setIsLoadingPrice(true);
+      setPricingError(null);
       try {
         // Use GPS-based pricing with user's location coordinates
         const breakdown = await getCostBreakdownWithGPS({
@@ -51,20 +56,15 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
         }
       } catch (error) {
         if (isCancelled) return; // Don't update state if cancelled
-        
-        console.error('[ReviewStep] GPS pricing failed, using default:', error);
-        // Fallback to synchronous pricing
-        const fallbackBreakdown = getCostBreakdown({
-          bin_size_liters: formData.bin_size_liters,
-          frequency: formData.frequency,
-          waste_type: formData.wasteType || formData.waste_type,
-          is_urgent: formData.is_urgent,
-          bag_count: formData.numberOfBags || formData.bag_count || 1,
-          distance_km: 0,
-          on_site_charges: 0,
-          discount_amount: 0
+
+        console.error('[ReviewStep] Pricing unavailable:', error);
+        setCostBreakdown(null);
+        setPricingError({
+          reason: error.reason || 'lookup_failed',
+          message: error.reason
+            ? error.message
+            : "We couldn't load prices for your location right now. Please try again in a moment."
         });
-        setCostBreakdown(fallbackBreakdown);
       } finally {
         if (!isCancelled) {
           setIsLoadingPrice(false);
@@ -78,7 +78,7 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
     return () => {
       isCancelled = true;
     };
-  }, [formData.bin_size_liters, formData.latitude, formData.longitude, formData.frequency, formData.wasteType, formData.waste_type, formData.is_urgent, formData.numberOfBags, formData.bag_count]);
+  }, [formData.bin_size_liters, formData.latitude, formData.longitude, formData.frequency, formData.wasteType, formData.waste_type, formData.is_urgent, formData.numberOfBags, formData.bag_count, pricingAttempt]);
   
   // Format waste type for display
   const formatWasteType = (type) => {
@@ -134,11 +134,11 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
   if (!formData.numberOfBags || !(formData.wasteType || formData.waste_type) || !formData.bin_size_liters) {
     missingRequirements.push('Number of bins, waste type and bin size (Step 3: Bin details)');
   }
-  const canSubmit = missingRequirements.length === 0 && !isSubmitting;
+  const canSubmit = missingRequirements.length === 0 && !isSubmitting && !isLoadingPrice && !pricingError;
 
   // Handle form submission
   const onSubmit = async () => {
-    if (missingRequirements.length > 0) return;
+    if (!canSubmit) return;
     setIsSubmitting(true);
     try {
       await handleSubmit();
@@ -241,7 +241,26 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
           {isPromotional && promoFee?.clientFee != null ? 'Promotional Price' : 'Estimated Cost'}
         </h3>
         
-        {isLoadingPrice || (!costBreakdown && !isPromotional) ? (
+        {pricingError && !isLoadingPrice ? (
+          <div className="bg-amber-50 border border-amber-300 rounded-md p-3 mb-3" role="alert">
+            <p className="text-sm font-medium text-amber-900">{pricingError.message}</p>
+            {pricingError.reason === 'not_covered' && (
+              <p className="mt-1 text-sm text-amber-800">Go back to Step 1 to check your bin's location.</p>
+            )}
+            {pricingError.reason === 'size_unpriced' && (
+              <p className="mt-1 text-sm text-amber-800">Go back to Step 3 to choose a different bin size.</p>
+            )}
+            {pricingError.reason === 'lookup_failed' && (
+              <button
+                type="button"
+                onClick={() => setPricingAttempt(attempt => attempt + 1)}
+                className="mt-2 text-sm font-medium text-amber-900 underline"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        ) : isLoadingPrice || (!costBreakdown && !isPromotional) ? (
           <div className="bg-white p-3 rounded-md mb-3 flex items-center justify-center py-8">
             <span className="inline-block animate-spin mr-2 text-2xl">⟳</span>
             <span className="text-gray-600">Calculating price...</span>

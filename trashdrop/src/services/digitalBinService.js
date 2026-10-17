@@ -3,7 +3,7 @@
  * Helper functions for digital bin creation and fee calculation
  */
 
-import { getCostBreakdown, getCostBreakdownWithGPS } from '../utils/costCalculator.js';
+import { getCostBreakdownWithGPS } from '../utils/costCalculator.js';
 
 /**
  * Shape a digital_bins row the way the bin list expects it.
@@ -97,38 +97,22 @@ export const prepareDigitalBinData = async ({
   }
 
   // --- Standard SOP v4.5.6 pricing path ---
-  // Calculate cost breakdown using GPS-based pricing (SOP v4.5.7)
-  let costBreakdown;
-  
-  if (latitude && longitude) {
-    // Use GPS-based pricing
-    costBreakdown = await getCostBreakdownWithGPS({
-      bin_size_liters,
-      latitude,
-      longitude,
-      frequency,
-      waste_type,
-      is_urgent,
-      bag_count,
-      distance_km: 0, // Will be calculated when collector accepts
-      on_site_charges: 0,
-      discount_amount: 0
-    });
-    console.log('[DigitalBinService] GPS pricing used:', costBreakdown.pricing_source, costBreakdown.pricing_zone);
-  } else {
-    // Fallback to default pricing
-    costBreakdown = getCostBreakdown({
-      bin_size_liters,
-      frequency,
-      waste_type,
-      is_urgent,
-      bag_count,
-      distance_km: 0,
-      on_site_charges: 0,
-      discount_amount: 0
-    });
-    console.log('[DigitalBinService] Default pricing used (no GPS coordinates)');
-  }
+  // Priced from the zone covering the bin's location. There is no default
+  // price: an uncovered or unpriceable location throws PricingUnavailableError,
+  // whose message is shown to the user, and no bin is created.
+  const costBreakdown = await getCostBreakdownWithGPS({
+    bin_size_liters,
+    latitude,
+    longitude,
+    frequency,
+    waste_type,
+    is_urgent,
+    bag_count,
+    distance_km: 0, // Will be calculated when collector accepts
+    on_site_charges: 0,
+    discount_amount: 0
+  });
+  console.log('[DigitalBinService] GPS pricing used:', costBreakdown.pricing_source, costBreakdown.pricing_zone);
 
   console.log('[DigitalBinService] Calculated cost breakdown:', costBreakdown);
 

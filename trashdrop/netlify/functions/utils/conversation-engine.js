@@ -539,12 +539,45 @@ async function goTo(state, phone, data, supabase, session) {
   }
 
   if (state === STATES.AWAITING_CONFIRMATION) {
-    const newData = await promptReview(phone, data, supabase, session);
-    return { newState: state, newData, done: true };
+    try {
+      const newData = await promptReview(phone, data, supabase, session);
+      return { newState: state, newData, done: true };
+    } catch (err) {
+      return await handlePricingFailure(err, phone, data, supabase, session);
+    }
   }
 
   await promptFor(state, phone, data);
   return { newState: state, newData: data, done: true };
+}
+
+/**
+ * A booking that cannot be priced is never quoted at a default rate. Send the
+ * customer back to the step that can fix it.
+ */
+async function handlePricingFailure(err, phone, data, supabase, session) {
+  const reason = err && err.reason;
+  console.warn('[Conversation] Booking cannot be priced:', reason || 'lookup_failed', err && err.message);
+
+  if (reason === 'not_covered') {
+    await sendTextMessage(phone, notCoveredMessage(null));
+    const { latitude, longitude, location_name, address, quote, ...rest } = data;
+    return { newState: STATES.AWAITING_LOCATION, newData: rest, done: true };
+  }
+
+  if (reason === 'size_unpriced') {
+    await sendTextMessage(phone,
+      `The ${getBinSizeLabelShort(data.bin_size_liters)} bin isn't available in your area yet. Please choose another size.`
+    );
+    const { quote, ...rest } = data;
+    return await goTo(rest.via_flow ? STATES.AWAITING_FLOW : STATES.AWAITING_BIN_SIZE, phone, rest, supabase, session);
+  }
+
+  await sendTextMessage(phone,
+    "We couldn't load prices for your location right now. Reply *RETRY* to try again, or CANCEL to stop."
+  );
+  const { quote, ...rest } = data;
+  return { newState: STATES.AWAITING_CONFIRMATION, newData: rest, done: true };
 }
 
 // --- Entry point -----------------------------------------------------------
@@ -908,6 +941,12 @@ async function handleNotes(phone, message, data, supabase, session) {
 async function handleConfirmation(phone, text, data, supabase, session) {
   const confirmed = ['confirm_booking', 'confirm', 'yes', 'y', 'submit'].includes(text);
 
+  // The review could not be priced (see handlePricingFailure): RETRY, or any
+  // reply, prices it again — there is nothing to confirm without a price
+  if (!data.quote) {
+    return await goTo(STATES.AWAITING_CONFIRMATION, phone, data, supabase, session);
+  }
+
   if (!confirmed) {
     await sendButtonMessage(phone, {
       bodyText: 'Please confirm the booking, go BACK to edit it, or cancel.',
@@ -933,13 +972,13 @@ async function handleConfirmation(phone, text, data, supabase, session) {
       user_id: session.app_user_id || null,
     });
   } catch (err) {
+    // A transient failure can keep the price the customer just reviewed, which
+    // came from their covering zone. Losing coverage or the size's price cannot.
+    if (err.reason !== 'lookup_failed') {
+      return await handlePricingFailure(err, phone, data, supabase, session);
+    }
     console.error('[Conversation] Re-quote failed, using reviewed quote:', err.message);
     quote = data.quote;
-  }
-
-  if (!quote) {
-    await sendTextMessage(phone, 'Sorry, I could not price this booking. Please send "hi" to start again.');
-    return { newState: STATES.IDLE, newData: {}, done: true };
   }
 
   // digital_bins has no column for the requested date or time window, so they
@@ -976,6 +1015,10 @@ async function handleConfirmation(phone, text, data, supabase, session) {
 
     if (error) {
       console.error('[Conversation] Create bin error:', error);
+      // TDC01: the database's coverage trigger refused the pin
+      if (error.code === 'TDC01') {
+        return await handlePricingFailure({ reason: 'not_covered', message: error.message }, phone, data, supabase, session);
+      }
       await sendTextMessage(phone,
         'Sorry, there was an error creating your booking. Please try again in a moment, or reply "hi" to restart.'
       );

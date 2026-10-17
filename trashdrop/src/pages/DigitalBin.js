@@ -15,7 +15,7 @@ import WasteDetailsStep from '../components/digitalBin/WasteDetailsStep.js';
 import AdditionalInfoStep from '../components/digitalBin/AdditionalInfoStep.js';
 import ReviewStep from '../components/digitalBin/ReviewStep.js';
 import ScheduledQRTab from '../components/digitalBin/ScheduledQRTab.js';
-import { getCostBreakdown, getBinSizeLabelShort } from '../utils/costCalculator.js';
+import { getBinSizeLabelShort } from '../utils/costCalculator.js';
 import { prepareDigitalBinData, transformBin } from '../services/digitalBinService.js';
 import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
@@ -884,6 +884,11 @@ function DigitalBin() {
 
       if (binError) {
         console.error('[DigitalBin] Database insert failed:', binError);
+        // TDC01: the database's coverage trigger refused a location outside
+        // every service area (the location step's check was skipped or stale)
+        if (binError.code === 'TDC01') {
+          throw new Error("We haven't started operating at this location yet, so we can't take a pickup request here.");
+        }
         throw new Error(`Failed to create digital bin: ${binError.message}`);
       }
       
