@@ -59,6 +59,28 @@ async function checkServiceCoverage(supabase, latitude, longitude) {
   }
 }
 
+/**
+ * Record that a WhatsApp customer asked for a pickup somewhere we don't cover,
+ * for expansion planning. Demand only: WhatsApp launch messages need a
+ * Meta-approved template, so nobody is promised a notification. Never throws.
+ */
+async function recordCoverageDemand(supabase, { latitude, longitude, address, whatsappUserId, appUserId }) {
+  try {
+    const { error } = await supabase.rpc('record_coverage_demand', {
+      p_latitude: Number(latitude),
+      p_longitude: Number(longitude),
+      p_channel: 'whatsapp',
+      p_user_id: appUserId || null,
+      p_whatsapp_user_id: whatsappUserId || null,
+      p_address: address || null,
+      p_wants_notification: false,
+    });
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    console.warn('[Coverage] Recording demand failed:', err.message);
+  }
+}
+
 /** The chat message for a pin outside every service area. */
 function notCoveredMessage(zone) {
   const nearest = zone && zone.suburb && zone.distance_km != null
@@ -76,5 +98,6 @@ function notCoveredMessage(zone) {
 
 module.exports = {
   checkServiceCoverage,
+  recordCoverageDemand,
   notCoveredMessage,
 };

@@ -54,6 +54,7 @@ const uploaded = [];
 let savedPhotoUrls = null;
 const rpcCalls = [];
 let pricingFails = false;
+const demandCalls = [];
 let createRejectsCoverage = false;
 const sbPath = require.resolve('@supabase/supabase-js', { paths: [path.join(FN, '../..')] });
 require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
@@ -81,6 +82,7 @@ require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
         return { data: [{ is_covered: covered, zone_id: 'z1', region: 'Greater Accra', district: 'Accra Metro',
           community: 'Osu', suburb: 'Osu', distance_km: covered ? 0.4 : 312.6, service_radius_km: 5 }], error: null };
       }
+      if (n === 'record_coverage_demand') { demandCalls.push(a); return { data: 'w1', error: null }; }
       if (n === 'create_whatsapp_digital_bin') {
         if (createRejectsCoverage) return { data: null, error: { code: 'TDC01', message: 'This location is outside the TrashDrop service area' } };
         return { data: 'bin-1', error: null };
@@ -290,6 +292,15 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
       const text = sent.map(m => m.x || '').join('\n');
       assert.ok(/haven't started operating here yet/.test(text), 'no not-operating message:\n' + text);
       assert.ok(text.includes('Osu') && text.includes('313 km'), 'nearest service area not named:\n' + text);
+    });
+
+    check('an uncovered pin is recorded as demand, without promising a notification', () => {
+      assert.strictEqual(demandCalls.length, 1);
+      assert.deepStrictEqual(
+        { lat: demandCalls[0].p_latitude, channel: demandCalls[0].p_channel,
+          wa: demandCalls[0].p_whatsapp_user_id, notify: demandCalls[0].p_wants_notification },
+        { lat: 9.44, channel: 'whatsapp', wa: 'wa1', notify: false });
+      assert.ok(!/notify|let you know/i.test(sent.map(m => m.x || '').join('\n')), 'a notification was promised');
     });
 
     await go(at(0));

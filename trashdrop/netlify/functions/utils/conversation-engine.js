@@ -43,7 +43,7 @@ const {
   formatCurrency,
   quoteBooking,
 } = require('./pricing');
-const { checkServiceCoverage, notCoveredMessage } = require('./coverage');
+const { checkServiceCoverage, recordCoverageDemand, notCoveredMessage } = require('./coverage');
 
 const STATES = {
   IDLE: 'idle',
@@ -715,6 +715,13 @@ async function handleLocation(phone, message, data, supabase, session) {
 
   if (coverage.status === 'not_covered') {
     await sendTextMessage(phone, notCoveredMessage(coverage.zone));
+    await recordCoverageDemand(supabase, {
+      latitude,
+      longitude,
+      address: address || name,
+      whatsappUserId: session.whatsapp_user_id,
+      appUserId: session.app_user_id,
+    });
     return { newState: STATES.AWAITING_LOCATION, newData: data, done: true };
   }
 

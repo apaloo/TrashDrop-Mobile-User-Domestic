@@ -6,7 +6,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { useAuth } from '../../context/AuthContext.js';
 import toastService from '../../services/toastService.js';
 import GeolocationService from '../../utils/geolocationService.js';
-import { checkServiceCoverage } from '../../services/serviceCoverageService.js';
+import { checkServiceCoverage, joinCoverageWaitlist } from '../../services/serviceCoverageService.js';
 
 // Fix for default marker icon in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -98,6 +98,8 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   // Service coverage for the current pin: idle | checking | covered | not_covered | unavailable
   const [coverage, setCoverage] = useState({ status: 'idle', zone: null });
   const [coverageAttempt, setCoverageAttempt] = useState(0); // Bumped by "Try again"
+  // "Notify me" for an uncovered pin: idle | saving | joined | failed
+  const [waitlistStatus, setWaitlistStatus] = useState('idle');
   const [isGeocoding, setIsGeocoding] = useState(false); // Address lookup pending for the current pin
   const geocodeRequestRef = useRef(0); // Id of the newest address lookup
 
@@ -120,6 +122,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
 
     let isCancelled = false;
     setCoverage({ status: 'checking', zone: null });
+    setWaitlistStatus('idle'); // A new pin is a new place to be notified about
 
     checkServiceCoverage(position[0], position[1]).then(result => {
       if (!isCancelled) setCoverage(result);
@@ -512,6 +515,13 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     }
   };
   
+  const handleJoinWaitlist = async () => {
+    if (!position || waitlistStatus === 'saving') return;
+    setWaitlistStatus('saving');
+    const joined = await joinCoverageWaitlist(position[0], position[1], addressInput.trim() || null);
+    setWaitlistStatus(joined ? 'joined' : 'failed');
+  };
+
   // Handler for address input
   const handleAddressChange = (e) => {
     setAddressInput(e.target.value);
@@ -672,6 +682,27 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
             If the pin is in the wrong place, drag it to where your bin is.
           </p>
+          {waitlistStatus === 'joined' ? (
+            <p className="mt-3 text-sm font-medium text-green-700 dark:text-green-400">
+              ✓ You're on the list. We'll let you know here in the app when we start operating at this location.
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleJoinWaitlist}
+                disabled={waitlistStatus === 'saving'}
+                className="mt-3 px-4 py-2 rounded-md text-sm font-medium bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white"
+              >
+                {waitlistStatus === 'saving' ? 'Saving...' : 'Notify me when you arrive'}
+              </button>
+              {waitlistStatus === 'failed' && (
+                <p className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  We couldn't add you to the list just now. Please try again.
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
