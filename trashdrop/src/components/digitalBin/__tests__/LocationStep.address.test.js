@@ -28,8 +28,11 @@ jest.mock('../../../utils/geolocationService.js', () => ({
   default: { getCurrentPosition: jest.fn() },
 }));
 // Plain functions, not jest.fn(): CRA's resetMocks wipes mock implementations before each test
+let mockCoverageResult = { status: 'covered', zone: { suburb: 'Test' } };
+const mockWaitlistCalls = [];
 jest.mock('../../../services/serviceCoverageService.js', () => ({
-  checkServiceCoverage: async () => ({ status: 'covered', zone: { suburb: 'Test' } }),
+  checkServiceCoverage: async () => mockCoverageResult,
+  joinCoverageWaitlist: async (...args) => { mockWaitlistCalls.push(args); return true; },
 }));
 
 const POKUASE = [5.6806, -0.2826];
@@ -59,6 +62,8 @@ const Harness = ({ initial }) => {
 const addressField = () => screen.getByLabelText('Address');
 
 beforeEach(() => {
+  mockCoverageResult = { status: 'covered', zone: { suburb: 'Test' } };
+  mockWaitlistCalls.length = 0;
   global.fetch = jest.fn(async (url) => ({ ok: true, json: async () => ({ display_name: placeFor(url) }) }));
 });
 
@@ -101,5 +106,23 @@ describe('LocationStep address follows the pin', () => {
     await new Promise(resolve => setTimeout(resolve, 800)); // past the lookup debounce
     expect(addressField()).toHaveValue('Ayawaso, Pokuase');
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('LocationStep outside coverage', () => {
+  it('offers to notify the user and adds the pin to the waitlist', async () => {
+    mockCoverageResult = { status: 'not_covered', zone: { suburb: 'Berlin Top', distance_km: 101.84 } };
+    render(<Harness initial={{
+      latitude: KINTAMPO[0], longitude: KINTAMPO[1], useCurrentLocation: true,
+      address: 'Kintampo, Bono East, Ghana', address_coords: KINTAMPO,
+    }} />);
+
+    const notify = await screen.findByRole('button', { name: 'Notify me when you arrive' });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+
+    act(() => { notify.click(); });
+
+    await screen.findByText(/You're on the list/);
+    expect(mockWaitlistCalls).toEqual([[KINTAMPO[0], KINTAMPO[1], 'Kintampo, Bono East, Ghana']]);
   });
 });

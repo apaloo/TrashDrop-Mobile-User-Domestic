@@ -18,6 +18,7 @@ import realtimeManager from '../utils/realtimeOptimized.js';
 import seamlessDashboardService from '../services/seamlessDashboardService.js';
 import DataFreshnessIndicator from '../components/DataFreshnessIndicator.js';
 import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
+import CoverageArrivalBanner from '../components/CoverageArrivalBanner.js';
 
 // For development: expose cleanup function
 if (process.env.NODE_ENV === 'development') {
@@ -1557,6 +1558,9 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+
+        {/* "We've arrived" for places the user waitlisted from the location step */}
+        <CoverageArrivalBanner />
 
         {/* Recent Activity - shown when activity tab selected or no active pickup */}
         {dashboardTab === 'activity' && (

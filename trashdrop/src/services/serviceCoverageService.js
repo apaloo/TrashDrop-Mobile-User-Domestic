@@ -77,4 +77,61 @@ export const checkServiceCoverage = async (latitude, longitude) => {
   }
 };
 
-export default { checkServiceCoverage };
+/**
+ * Ask to be told when TrashDrop starts operating at a location ("Notify me")
+ *
+ * @returns {Promise<boolean>} true once the signed-in user is on the waitlist
+ */
+export const joinCoverageWaitlist = async (latitude, longitude, address = null) => {
+  const { error } = await supabase.rpc('join_coverage_waitlist', {
+    p_latitude: latitude,
+    p_longitude: longitude,
+    p_address: address
+  });
+
+  if (error) {
+    console.error('[Coverage] Joining the waitlist failed:', error.message);
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Waitlisted places of the signed-in user that are now covered
+ *
+ * @returns {Promise<Array<{waitlist_id, address, latitude, longitude, suburb, district}>>}
+ *   empty when there are none or the lookup fails — the banner simply stays hidden
+ */
+export const getCoverageArrivals = async () => {
+  const { data, error } = await supabase.rpc('get_my_coverage_arrivals');
+
+  if (error) {
+    console.warn('[Coverage] Arrival lookup failed:', error.message);
+    return [];
+  }
+  return data || [];
+};
+
+/**
+ * Close a waitlist entry once the user has acted on its arrival banner
+ *
+ * @param {string} waitlistId
+ * @param {'booked'|'dismissed'} reason
+ */
+export const closeCoverageWaitlistEntry = async (waitlistId, reason) => {
+  const { error } = await supabase.rpc('close_coverage_waitlist_entry', {
+    p_waitlist_id: waitlistId,
+    p_reason: reason
+  });
+
+  if (error) {
+    console.warn('[Coverage] Closing waitlist entry failed:', error.message);
+  }
+};
+
+export default {
+  checkServiceCoverage,
+  joinCoverageWaitlist,
+  getCoverageArrivals,
+  closeCoverageWaitlistEntry
+};
