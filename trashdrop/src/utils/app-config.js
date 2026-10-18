@@ -3,6 +3,8 @@
  * Pulls configuration from environment variables
  */
 
+import { supabaseBrowserKeyProblem } from './supabaseKeys.js';
+
 // Validate environment variables on import
 const validateEnvVars = () => {
   const requiredVars = [
@@ -30,9 +32,10 @@ const validateEnvVars = () => {
     throw new Error(errorMessage);
   }
 
-  // Validate API key format (basic validation for JWT)
-  if (!process.env.REACT_APP_SUPABASE_ANON_KEY.startsWith('eyJ')) {
-    const errorMessage = 'Invalid SUPABASE_ANON_KEY format in environment variables';
+  // Validate API key format: legacy anon JWT or new publishable key
+  const keyProblem = supabaseBrowserKeyProblem(process.env.REACT_APP_SUPABASE_ANON_KEY);
+  if (keyProblem) {
+    const errorMessage = `Invalid SUPABASE_ANON_KEY in environment variables: it ${keyProblem}`;
     console.error(errorMessage);
     throw new Error(errorMessage);
   }

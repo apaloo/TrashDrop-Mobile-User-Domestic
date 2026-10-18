@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import appConfig from './app-config.js';
+import { supabaseBrowserKeyProblem } from './supabaseKeys.js';
 
 // Import environment variables directly to avoid circular dependency or initialization timing issues
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
@@ -31,9 +32,10 @@ const validateCredentials = () => {
     return { valid: false, error };
   }
 
-  // Basic JWT validation
-  if (!supabaseAnonKey.startsWith('eyJ')) {
-    const error = new Error('Invalid Supabase anon key format. Expected JWT token.');
+  // Legacy anon JWT or new publishable key
+  const keyProblem = supabaseBrowserKeyProblem(supabaseAnonKey);
+  if (keyProblem) {
+    const error = new Error(`Invalid Supabase anon key: it ${keyProblem}`);
     console.error('[Supabase] Configuration error:', error.message);
     return { valid: false, error };
   }

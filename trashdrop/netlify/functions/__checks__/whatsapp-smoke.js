@@ -391,5 +391,32 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
     assert.strictEqual(session.state, STATES.AWAITING_FREQUENCY));
   failFlow = false;
 
+  console.log('service key');
+  {
+    const { resolveServiceRoleKey } = require(path.join(UTILS, 'supabase-admin.js'));
+    const jwt = (role) => 'h.' + Buffer.from(JSON.stringify({ role })).toString('base64url') + '.s';
+    const saved = { a: process.env.SUPABASE_SERVICE_ROLE, b: process.env.SUPABASE_SERVICE_ROLE_KEY };
+    const pick = (a, b) => {
+      process.env.SUPABASE_SERVICE_ROLE = a || '';
+      process.env.SUPABASE_SERVICE_ROLE_KEY = b || '';
+      const warn = console.warn; console.warn = () => {};
+      try { return resolveServiceRoleKey('[check]'); } catch { return null; } finally { console.warn = warn; }
+    };
+
+    check('a new sb_secret_ key is used as the service key', () =>
+      assert.strictEqual(pick('sb_secret_abc'), 'sb_secret_abc'));
+    check('a legacy service_role JWT is still used', () =>
+      assert.strictEqual(pick(jwt('service_role')), jwt('service_role')));
+    check('a publishable key or anon JWT is never used as the service key', () => {
+      assert.strictEqual(pick('sb_publishable_abc'), null);
+      assert.strictEqual(pick(jwt('anon')), null);
+    });
+    check('the secret key is found under either variable name', () =>
+      assert.strictEqual(pick('sb_publishable_abc', 'sb_secret_xyz'), 'sb_secret_xyz'));
+
+    process.env.SUPABASE_SERVICE_ROLE = saved.a;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = saved.b;
+  }
+
   console.log(`\n${passed} checks passed${process.exitCode ? ' (with failures above)' : ''}`);
 })();
