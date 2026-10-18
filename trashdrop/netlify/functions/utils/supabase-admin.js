@@ -10,8 +10,11 @@
  *
  * Picking the wrong one fails silently: every RPC is refused by RLS and every
  * booking dies with a permission error that looks like a bug in the flow. So
- * rather than trusting either name, the key is chosen by inspecting its JWT
- * role claim. An anon key is never used, whatever it is called.
+ * rather than trusting either name, the key is chosen by what it is:
+ *   - a new Supabase secret key (sb_secret_...), which has service-role access
+ *   - a legacy JWT whose role claim is service_role
+ * Anon JWTs and publishable keys (sb_publishable_...) are never used, whatever
+ * they are called.
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -29,6 +32,13 @@ function jwtRole(key) {
   }
 }
 
+/** What kind of key this is, for picking and for log messages (never the key itself). */
+function keyKind(key) {
+  if (key.startsWith('sb_secret_')) return 'secret';
+  if (key.startsWith('sb_publishable_')) return 'publishable';
+  return jwtRole(key);
+}
+
 function resolveServiceRoleKey(logPrefix) {
   const candidates = [
     ['SUPABASE_SERVICE_ROLE', process.env.SUPABASE_SERVICE_ROLE],
@@ -37,14 +47,15 @@ function resolveServiceRoleKey(logPrefix) {
 
   for (const [name, key] of candidates) {
     if (!key) continue;
-    const role = jwtRole(key);
-    if (role === 'service_role') return key;
-    console.warn(`${logPrefix} ${name} is set but its role claim is "${role}" — ignoring it`);
+    const kind = keyKind(key);
+    if (kind === 'secret' || kind === 'service_role') return key;
+    console.warn(`${logPrefix} ${name} is set but is a "${kind}" key, not a secret/service_role key — ignoring it`);
   }
 
   throw new Error(
-    `${logPrefix} No service_role key configured. Set SUPABASE_SERVICE_ROLE to the ` +
-    'service_role key from Supabase → Settings → API (the anon key will not work).'
+    `${logPrefix} No service key configured. Set SUPABASE_SERVICE_ROLE to the secret ` +
+    '(sb_secret_...) or service_role key from Supabase → Settings → API Keys ' +
+    '(the anon or publishable key will not work).'
   );
 }
 
@@ -61,4 +72,4 @@ function getServiceClient(logPrefix = '[Supabase Admin]') {
   });
 }
 
-module.exports = { getServiceClient, resolveServiceRoleKey, jwtRole };
+module.exports = { getServiceClient, resolveServiceRoleKey, jwtRole, keyKind };
