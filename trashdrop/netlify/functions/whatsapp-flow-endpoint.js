@@ -33,7 +33,7 @@
  *      trip (e.g. showing a live price before ADDITIONAL_INFO completes),
  *   3. change sendFlowMessage's `flow_action` to 'data_exchange',
  *   4. set this function's URL as the Endpoint URI in WhatsApp Manager:
- *      https://trashdrop-mobile.windsurf.build/.netlify/functions/whatsapp-flow-endpoint
+ *      https://app.trashdrops.com/.netlify/functions/whatsapp-flow-endpoint
  * Until all four are done, leaving this deployed is harmless but inert.
  *
  * Env: FLOW_PRIVATE_KEY (already set on Netlify), optionally

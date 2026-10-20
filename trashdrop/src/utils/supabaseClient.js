@@ -446,7 +446,9 @@ const authService = {
         email,
         password,
         options: {
-          data: userData
+          data: userData,
+          // Confirmation emails open this app, not the website (the Supabase Site URL)
+          emailRedirectTo: window.location.origin + '/auth/callback'
         }
       });
       
@@ -580,7 +582,9 @@ const authService = {
    */
   async resetPassword(email) {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password-confirm'
+      });
       
       if (error) throw error;
       
