@@ -3,6 +3,14 @@
   publish = "build"
   command = "CI=false npm run build"
 
+# The app moved to app.trashdrops.com: send the old Netlify address there.
+# Only the old host matches, so app.trashdrops.com and deploy previews are untouched.
+[[redirects]]
+  from = "https://trashdrop-mobile-przsu.netlify.app/*"
+  to = "https://app.trashdrops.com/:splat"
+  status = 301
+  force = true
+
 # Redirect rule to support client-side routing for the SPA
 [[redirects]]
   from = "/*"
