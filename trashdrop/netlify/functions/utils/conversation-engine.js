@@ -44,6 +44,7 @@ const {
   quoteBooking,
 } = require('./pricing');
 const { checkServiceCoverage, recordCoverageDemand, notCoveredMessage } = require('./coverage');
+const { APP_URL } = require('./app-url');
 
 const STATES = {
   IDLE: 'idle',
@@ -1053,7 +1054,7 @@ async function handleConfirmation(phone, text, data, supabase, session) {
       "A collector will be assigned shortly and you'll get updates right here.",
       '',
       'Send *STATUS* anytime to check your bookings.',
-      'Get live tracking and photo uploads in the app: https://trashdrop.app'
+      `Get live tracking and photo uploads in the app: ${APP_URL}`
     );
 
     await sendTextMessage(phone, confirmation.join('\n'));

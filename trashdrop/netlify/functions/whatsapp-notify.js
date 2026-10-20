@@ -31,6 +31,7 @@
 
 const { getServiceClient } = require('./utils/supabase-admin');
 const { sendTextMessage } = require('./utils/whatsapp-api');
+const { APP_URL } = require('./utils/app-url');
 
 function getSupabaseClient() {
   return getServiceClient('[WhatsApp Notify]');
@@ -47,7 +48,7 @@ const STATUS_MESSAGES = {
 
   en_route: (data) =>
     `Your collector is on the way! Please ensure your bins are accessible.\n\n` +
-    `Track in real-time on the app: https://trashdrop.app`,
+    `Track in real-time on the app: ${APP_URL}`,
 
   arrived: (data) =>
     `Your collector has arrived at your location.`,

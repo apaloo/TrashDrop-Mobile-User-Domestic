@@ -4,7 +4,7 @@
 # Usage:  ./scripts/verify-whatsapp-setup.sh [site-url]
 set -uo pipefail
 
-URL="${1:-https://trashdrop-mobile.windsurf.build}"
+URL="${1:-https://app.trashdrops.com}"
 # META_APP_SECRET and META_ACCESS_TOKEN carry a different value per deploy
 # context. `netlify env:list` defaults to `dev`, so without this the script signs
 # a payload with the dev secret, the production function validates it with the
