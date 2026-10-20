@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import appConfig from './app-config.js';
 import { supabaseBrowserKeyProblem } from './supabaseKeys.js';
+import { getSiteUrl } from './siteUrl.js';
 
 // Import environment variables directly to avoid circular dependency or initialization timing issues
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
@@ -448,7 +449,7 @@ const authService = {
         options: {
           data: userData,
           // Confirmation emails open this app, not the website (the Supabase Site URL)
-          emailRedirectTo: window.location.origin + '/auth/callback'
+          emailRedirectTo: getSiteUrl() + '/auth/callback'
         }
       });
       
@@ -583,7 +584,7 @@ const authService = {
   async resetPassword(email) {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password-confirm'
+        redirectTo: getSiteUrl() + '/reset-password-confirm'
       });
       
       if (error) throw error;

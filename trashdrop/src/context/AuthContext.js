@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import supabase, { isTokenValid } from '../utils/supabaseClient.js';
 import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
+import { getSiteUrl } from '../utils/siteUrl.js';
 import performanceMonitor from '../utils/performanceMonitor.js';
 import appConfigImport from '../utils/app-config.js';
 
@@ -875,7 +876,7 @@ export const AuthProvider = ({ children }) => {
         password,
         options: {
           data: userData,
-          emailRedirectTo: window.location.origin + '/auth/callback',
+          emailRedirectTo: getSiteUrl() + '/auth/callback',
         },
       });
       
@@ -923,7 +924,7 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password-confirm',
+        redirectTo: getSiteUrl() + '/reset-password-confirm',
       });
       
       if (error) {
@@ -954,7 +955,7 @@ export const AuthProvider = ({ children }) => {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: window.location.origin + '/dashboard'
+          emailRedirectTo: getSiteUrl() + '/dashboard'
         }
       });
       
@@ -990,7 +991,7 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${getSiteUrl()}/dashboard`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -1020,7 +1021,7 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`
+          redirectTo: `${getSiteUrl()}/dashboard`
         }
       });
       
