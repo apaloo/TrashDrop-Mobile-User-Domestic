@@ -434,10 +434,13 @@ const UberStyleTrackingMap = ({
         const isActuallyArrived = displayStatus === 'arrived' || displayStatus === 'collecting';
         const isEnRoute = displayStatus === 'en_route' || displayStatus === 'in_transit';
         const isPickingUp = displayStatus === 'picked_up';
-        const isCollected = displayStatus === 'collected' || displayStatus === 'completed';
+        const isDisposed = displayStatus === 'disposed';
+        const isCollected = displayStatus === 'collected' || displayStatus === 'completed' || isDisposed;
         
         let statusText = 'Collector accepted';
-        if (isCollected) {
+        if (isDisposed) {
+          statusText = 'Waste disposed';
+        } else if (isCollected) {
           statusText = 'Waste collected';
         } else if (isPickingUp) {
           statusText = 'Collector picking up waste';
@@ -609,7 +612,7 @@ const UberStyleTrackingMap = ({
                       if (displayStatus === 'in_transit' || displayStatus === 'en_route') return 'bg-purple-100 text-purple-700';
                       if (displayStatus === 'arrived') return 'bg-green-100 text-green-700';
                       if (displayStatus === 'picked_up' || displayStatus === 'collecting') return 'bg-orange-100 text-orange-700';
-                      if (displayStatus === 'collected' || displayStatus === 'completed') return 'bg-emerald-100 text-emerald-700';
+                      if (displayStatus === 'collected' || displayStatus === 'completed' || displayStatus === 'disposed') return 'bg-emerald-100 text-emerald-700';
                       return 'bg-yellow-100 text-yellow-700';
                     })()}`}>
                       {displayStatus?.replace('_', ' ').toUpperCase()}
@@ -664,12 +667,13 @@ const UberStyleTrackingMap = ({
                     {['accepted', 'en_route', 'arrived', 'collecting', 'complete'].map((stage, index) => {
                       const currentStatus = displayStatus;
                       
+                      // 'disposed' is the last step: the collector has dropped the waste at a disposal site
                       const stageStatuses = {
-                        accepted: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed'],
-                        en_route: ['en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed'],
-                        arrived: ['arrived', 'collecting', 'picked_up', 'collected', 'completed'],
-                        collecting: ['collecting', 'picked_up', 'collected', 'completed'],
-                        complete: ['collected', 'completed']
+                        accepted: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'],
+                        en_route: ['en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'],
+                        arrived: ['arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'],
+                        collecting: ['collecting', 'picked_up', 'collected', 'completed', 'disposed'],
+                        complete: ['collected', 'completed', 'disposed']
                       };
                       const isCompleted = stageStatuses[stage]?.includes(currentStatus);
                       const isCurrent = currentStatus === stage || 
