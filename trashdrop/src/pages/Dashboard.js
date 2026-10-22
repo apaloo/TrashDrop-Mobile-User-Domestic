@@ -110,6 +110,9 @@ const Dashboard = () => {
   });
   const [recentActivities, setRecentActivities] = useState([]); // Always initialize as empty array
   const [activePickups, setActivePickups] = useState([]);
+  // Latest active pickups for realtime callbacks, which outlive a render
+  const activePickupsRef = useRef(activePickups);
+  activePickupsRef.current = activePickups;
   const [dashboardTab, setDashboardTab] = useState('activity'); // 'activity' | 'pickup'
   const [isLoading, setIsLoading] = useState(false); // Start with false to improve LCP
   const [isRefreshingActivities, setIsRefreshingActivities] = useState(false); // Track activity refresh state
@@ -539,6 +542,20 @@ const Dashboard = () => {
         loadDashboardDataProgressive();
       },
       updateActivePickup: (updatedPickup) => {
+        // A collector just took the job: the update only carries collector_id,
+        // so load the full pickup (collector name, phone) instead of showing "Waiting..."
+        const current = activePickupsRef.current?.[0];
+        const collectorChanged = current?.id === updatedPickup.id
+          && updatedPickup.collector_id
+          && current.collector?.id !== updatedPickup.collector_id;
+        if (collectorChanged && user?.id) {
+          pickupService.getActivePickup(user.id).then(({ data }) => {
+            if (mountedRef.current && data?.id === updatedPickup.id) {
+              setActivePickups([data]);
+            }
+          }).catch(err => console.warn('[Dashboard] Could not load collector details:', err));
+        }
+
         setActivePickups(prev => {
           if (!prev || prev.length === 0) return prev;
           if (prev[0].id === updatedPickup.id) {

@@ -113,15 +113,17 @@ const removeToast = (toast) => {
 
 /**
  * Show collector distance notification
+ * @param {number} distance - Distance in meters
+ * @param {number} eta - ETA in minutes
  */
 export const showDistanceAlert = (distance, eta) => {
-  if (distance < 0.05) {
+  if (distance < 50) {
     showToast(`🎯 Collector has arrived at your location!`, 'success', 5000);
-  } else if (distance < 0.2) {
-    showToast(`📍 Collector is very close (${Math.round(distance * 1000)}m away)`, 'info', 4000);
-  } else if (distance < 1) {
-    showToast(`🚚 Collector is nearby (${distance.toFixed(1)} km away)`, 'info', 4000);
-  } else if (distance < 2) {
+  } else if (distance < 200) {
+    showToast(`📍 Collector is very close (${Math.round(distance)}m away)`, 'info', 4000);
+  } else if (distance < 1000) {
+    showToast(`🚚 Collector is nearby (${(distance / 1000).toFixed(1)} km away)`, 'info', 4000);
+  } else if (distance < 2000) {
     showToast(`🚛 Collector is approaching - ETA ${eta} minutes`, 'info', 4000);
   }
 };

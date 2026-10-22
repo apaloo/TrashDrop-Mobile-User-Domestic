@@ -211,6 +211,19 @@ const UberStyleTrackingMap = ({
   const [routeLine, setRouteLine] = useState([]);
   const [isCardExpanded, setIsCardExpanded] = useState(true);
 
+  // How old the collector's last location is, re-checked every 30s so the
+  // note appears even when no new location arrives
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const locationUpdatedAt = collectorData?.location_updated_at
+    ? new Date(collectorData.location_updated_at).getTime()
+    : null;
+  const locationAgeMinutes = locationUpdatedAt ? Math.floor((now - locationUpdatedAt) / 60000) : null;
+  const isLocationStale = locationAgeMinutes !== null && locationAgeMinutes >= 2;
+
   // Compute display status once — for digital bins in initial tracking phase,
   // override with distance-based visual status; otherwise use actual DB status.
   const displayStatus = useMemo(() => {
@@ -451,6 +464,11 @@ const UberStyleTrackingMap = ({
                 <p className="text-sm font-semibold text-gray-900 truncate">
                   {statusText}
                 </p>
+                {isLocationStale && !isCollected && (
+                  <p className="text-xs text-amber-600">
+                    Location last updated {locationAgeMinutes < 60 ? `${locationAgeMinutes} min` : `${Math.floor(locationAgeMinutes / 60)} h`} ago
+                  </p>
+                )}
                 <div className="flex items-center space-x-3 mt-1">
                   {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) ? (
                     isActuallyArrived ? (

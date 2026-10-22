@@ -5,6 +5,10 @@ import { useTheme } from '../context/ThemeContext.js';
 import { notificationService } from '../services/notificationService.js';
 import supabase from '../utils/supabaseClient.js';
 import SignOutModal from './SignOutModal.js';
+import { showToast } from '../utils/toastNotifications.js';
+
+// Notification types the collector app sends about an active pickup
+const COLLECTOR_MESSAGE_TYPES = ['pickup_accepted', 'collector_enroute', 'eta_update', 'collector_arrived'];
 
 /**
  * Main navigation component for the application
@@ -144,12 +148,19 @@ const NavBar = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'alerts',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
+        (payload) => {
           // Increment unread count
           setUnreadCount(prev => prev + 1);
+
+          // Pop up the collector's messages wherever the user is; the tracking
+          // page already shows its own status toasts
+          const { type, title, message } = payload.new || {};
+          if (COLLECTOR_MESSAGE_TYPES.includes(type) && !window.location.pathname.startsWith('/collector-tracking')) {
+            showToast(`${title}: ${message}`, 'info', 6000);
+          }
         }
       )
       .on(
@@ -157,14 +168,13 @@ const NavBar = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'alerts',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          // Refresh count when notifications are marked as read
-          if (payload.new.status === 'read' && payload.old.status === 'unread') {
-            setUnreadCount(prev => Math.max(0, prev - 1));
-          }
+        () => {
+          // Refresh count when notifications are marked as read (the UPDATE
+          // payload doesn't carry the old row, so recount instead of diffing)
+          fetchUnreadCount();
         }
       )
       .subscribe();

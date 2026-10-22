@@ -594,16 +594,11 @@ export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpd
     return { unsubscribe: () => {} };
   }
 
-  // Check if subscription for this collector already exists
-  const subscriptionKey = `collector_location_${collectorId}`;
-  if (activeSubscriptions[subscriptionKey]) {
-    console.log(`[Realtime] Using existing subscription for collector location (${collectorId})`);
-    return activeSubscriptions[subscriptionKey];
-  }
-
   try {
-    // Create a new channel with a unique name to prevent conflicts
-    const channelName = `collector_location_${collectorId}_${Date.now()}`;
+    // Each caller gets its own channel. Handing a second caller the first one's
+    // subscription meant the second caller's onUpdate was never called.
+    const channelName = `collector_location_${collectorId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const subscriptionKey = channelName;
     
     // Subscribe to changes in the collector_profiles table for real-time location updates
     const subscription = supabase
@@ -621,32 +616,30 @@ export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpd
             console.log('[Realtime] Collector location update received:', payload.new);
             const profileData = payload.new;
             
-            // Process location update if collector is online and has location data
-            if (profileData.is_online && profileData.current_location) {
-              // Parse EWKB or use lat/lng
-              let location = null;
-              
-              // Try to parse current_location (EWKB format)
-              if (profileData.current_location) {
-                location = parsePostGISPoint(profileData.current_location);
+            // Every location write sets current_latitude/current_longitude, so
+            // prefer them; current_location (EWKB) is the fallback. Don't gate on
+            // is_online: a collector sending their location is online.
+            let location = null;
+
+            if (profileData.current_latitude && profileData.current_longitude) {
+              const latitude = parseFloat(profileData.current_latitude);
+              const longitude = parseFloat(profileData.current_longitude);
+              if (!isNaN(latitude) && !isNaN(longitude)) {
+                location = { latitude, longitude };
               }
-              
-              // Fallback to lat/lng fields
-              if (!location && profileData.current_latitude && profileData.current_longitude) {
-                location = {
-                  latitude: parseFloat(profileData.current_latitude),
-                  longitude: parseFloat(profileData.current_longitude)
-                };
-              }
-              
-              if (location) {
-                onUpdate({
-                  location: location,
-                  lastUpdate: profileData.location_updated_at || new Date().toISOString(),
-                  isOnline: profileData.is_online,
-                  status: profileData.status
-                });
-              }
+            }
+
+            if (!location && profileData.current_location) {
+              location = parsePostGISPoint(profileData.current_location);
+            }
+
+            if (location) {
+              onUpdate({
+                location: location,
+                lastUpdate: profileData.location_updated_at || new Date().toISOString(),
+                isOnline: profileData.is_online,
+                status: profileData.status
+              });
             }
           }
         }
@@ -691,7 +684,8 @@ export function subscribeToCollectorLocation(collectorId, activeRequestId, onUpd
  * @param {Object} userLocation - User's location {latitude, longitude}
  * @param {Object} collectorLocation - Collector's location {latitude, longitude}
  * @param {number} averageSpeedKmh - Average speed in km/h (default: 30)
- * @returns {number} Estimated time in minutes
+ * @returns {{distance: number, distanceKm: number, distanceMeters: number, eta: number}|null}
+ *   distance and distanceMeters in meters, eta in minutes
  */
 export function calculateETA(userLocation, collectorLocation, averageSpeedKmh = 30) {
   if (!userLocation || !collectorLocation) return null;
@@ -714,11 +708,9 @@ export function calculateETA(userLocation, collectorLocation, averageSpeedKmh = 
   // Calculate ETA in minutes
   const etaMinutes = Math.round((distanceKm / averageSpeedKmh) * 60);
   
-  // Return distance in meters for distances < 1km, otherwise in km
+  // distance is always in meters; use formatDistance() to show it
   return {
-    distance: distanceMeters < 1000 
-      ? Math.round(distanceMeters) // Return meters (e.g., 10, 50, 250)
-      : Math.round(distanceKm * 10) / 10, // Return km with 1 decimal (e.g., 1.5, 2.3)
+    distance: Math.round(distanceMeters),
     distanceKm: distanceKm,
     distanceMeters: Math.round(distanceMeters),
     eta: etaMinutes
