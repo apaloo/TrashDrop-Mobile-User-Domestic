@@ -137,12 +137,14 @@ export const showStatusNotification = (oldStatus, newStatus, collectorName = 'Co
     en_route: `🚗 ${collectorName} is on the way`,
     in_transit: `🚗 ${collectorName} is on the way`,
     arrived: `🎯 ${collectorName} has arrived at your location`,
-    collecting: `♻️ ${collectorName} is collecting your waste`,
-    completed: `✨ Pickup completed! Thank you for using TrashDrops`
+    collecting: `♻️ ${collectorName} has picked up your waste`,
+    picked_up: `♻️ ${collectorName} has picked up your waste`,
+    completed: `✨ Pickup completed! Thank you for using TrashDrop`,
+    disposed: `✨ Your waste has been disposed of. Thank you for using TrashDrop!`
   };
   
   const message = statusMessages[newStatus] || `Status updated to ${newStatus}`;
-  const type = newStatus === 'completed' ? 'success' : 'info';
+  const type = newStatus === 'completed' || newStatus === 'disposed' ? 'success' : 'info';
   
   showToast(message, type, 6000);
 };

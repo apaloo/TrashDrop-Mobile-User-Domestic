@@ -8,7 +8,7 @@ import SignOutModal from './SignOutModal.js';
 import { showToast } from '../utils/toastNotifications.js';
 
 // Notification types the collector app sends about an active pickup
-const COLLECTOR_MESSAGE_TYPES = ['pickup_accepted', 'collector_enroute', 'eta_update', 'collector_arrived'];
+const COLLECTOR_MESSAGE_TYPES = ['pickup_accepted', 'collector_enroute', 'eta_update', 'collector_arrived', 'pickup_disposed'];
 
 /**
  * Main navigation component for the application
