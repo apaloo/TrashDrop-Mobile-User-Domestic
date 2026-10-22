@@ -1,8 +1,23 @@
 /**
- * Notification service for managing alerts and user notification preferences
+ * Notification service for the user's in-app notifications and preferences.
+ *
+ * Messages for a user (pickup accepted, collector en route / ETA / arrived,
+ * account changes) live in the `notifications` table, which the collector app,
+ * the admin app and database triggers all write to. `alerts` is the admins'
+ * incident table and isn't readable by users.
  */
 
 import supabase from '../utils/supabaseClient.js';
+
+/**
+ * The table stores a `read` boolean; the UI works with status 'read'/'unread'.
+ * @param {Object} row - Row from the notifications table
+ * @returns {Object} Notification with a status field
+ */
+export const normalizeNotification = (row) => ({
+  ...row,
+  status: row.read ? 'read' : 'unread'
+});
 
 export const notificationService = {
   // Track if notifications are disabled due to schema issues
@@ -66,11 +81,25 @@ export const notificationService = {
       }
 
       console.log('[NotificationService] Fetching notifications for user:', userId);
-      
-      // Notifications feature temporarily disabled - returning empty array
-      // This prevents console errors and maintains UI functionality
+
+      let query = supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(options.limit || 50);
+
+      if (options.status === 'unread') {
+        query = query.eq('read', false);
+      } else if (options.status === 'read') {
+        query = query.eq('read', true);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
       return {
-        data: [],
+        data: (data || []).map(normalizeNotification),
         error: null
       };
 
@@ -101,14 +130,11 @@ export const notificationService = {
       console.log('[NotificationService] Marking notifications as read:', notificationIds);
 
       const { data, error } = await supabase
-        .from('alerts')
-        .update({ 
-          status: 'read',
-          read_at: new Date().toISOString()
-        })
+        .from('notifications')
+        .update({ read: true })
         .eq('user_id', userId)
         .in('id', notificationIds)
-        .eq('status', 'unread');
+        .eq('read', false);
 
       if (error) {
         console.error('[NotificationService] Error marking notifications as read:', error);
@@ -216,7 +242,7 @@ export const notificationService = {
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
       const { data, error } = await supabase
-        .from('alerts')
+        .from('notifications')
         .delete()
         .eq('user_id', userId)
         .lt('created_at', cutoffDate.toISOString())

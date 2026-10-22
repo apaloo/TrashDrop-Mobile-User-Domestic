@@ -25,7 +25,7 @@ import {
   Settings as SettingsIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext.js';
-import { notificationService } from '../services/notificationService.js';
+import { notificationService, normalizeNotification } from '../services/notificationService.js';
 import supabase from '../utils/supabaseClient.js';
 
 const NotificationList = () => {
@@ -79,12 +79,12 @@ const NotificationList = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'alerts',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           console.log('[NotificationList] New notification received:', payload.new);
-          const newNotification = payload.new;
+          const newNotification = normalizeNotification(payload.new);
           
           // Add new notification to the list
           setNotifications(prev => [newNotification, ...prev]);
@@ -107,14 +107,14 @@ const NotificationList = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'alerts',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           console.log('[NotificationList] Notification updated:', payload.new);
           // Update notification in the list
           setNotifications(prev =>
-            prev.map(n => n.id === payload.new.id ? payload.new : n)
+            prev.map(n => n.id === payload.new.id ? normalizeNotification(payload.new) : n)
           );
         }
       )

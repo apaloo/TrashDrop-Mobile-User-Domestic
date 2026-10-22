@@ -129,26 +129,14 @@ export function toLatitudeLongitude(latLng) {
 }
 
 /**
- * Format a distance value for display.
- * Input: meters if < 1000, km (with 1 decimal) if >= 1000 from calculateETA.
- * @param {number} distance - Distance value from calculateETA
+ * Format a distance for display.
+ * @param {number} distance - Distance in meters (as returned by calculateETA)
  * @returns {string} Formatted distance string like "250m" or "1.5km"
  */
 export function formatDistance(distance) {
   if (typeof distance !== 'number' || isNaN(distance) || !isFinite(distance) || distance <= 0) return '';
-  // calculateETA returns meters for < 1km (integer like 250, 500)
-  // and km with 1 decimal for >= 1km (like 1.5, 2.3)
-  // Heuristic: if value >= 1000, it's meters; otherwise check if it has decimal
-  if (distance >= 1000) {
-    // This is meters — convert to km
-    return `${(distance / 1000).toFixed(1)}km`;
+  if (distance < 1000) {
+    return `${Math.round(distance)}m`;
   }
-  // Values < 1000 could be meters (e.g., 250) or km (e.g., 1.5)
-  // calculateETA returns km as values like 1.5, 2.3 — always < ~100
-  // and meters as integers like 50, 250, 999
-  // Best check: if it has a decimal, it's km
-  if (distance % 1 !== 0) {
-    return `${distance}km`;
-  }
-  return `${distance}m`;
+  return `${(distance / 1000).toFixed(1)}km`;
 }

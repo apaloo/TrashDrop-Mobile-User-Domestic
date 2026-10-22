@@ -31,7 +31,7 @@ const CollectorTracking = () => {
   const lastNotificationDistance = useRef(null);
   const lastStatus = useRef(null);
   const statusSubscriptionRef = useRef(null); // Store status subscription for cleanup
-  const updateThrottleMs = 15000; // Throttle updates to every 15 seconds to prevent bouncing
+  const updateThrottleMs = 5000; // Throttle updates to every 5 seconds to prevent bouncing
 
   // Thin wrapper: shared parsePostGISPoint returns {latitude, longitude},
   // but CollectorTracking uses {lat, lng} format throughout.
@@ -203,24 +203,38 @@ const CollectorTracking = () => {
             status: profileData.status
           });
           
-          // Priority 1: Try RPC function for consistent WKT format
-          try {
-            const { data: coordResult, error: rpcError } = await supabase
-              .rpc('get_collector_coordinates_wkt', { collector_user_id: activePickup.collector_id });
-            
-            if (!rpcError && coordResult) {
-              console.log('[CollectorTracking] 📍 RPC returned WKT:', coordResult);
-              const coords = parsePointToLatLng(coordResult);
-              if (coords) {
-                location = coords;
-                console.log('[CollectorTracking] ✅ Successfully parsed location from RPC WKT:', location);
-              }
+          // Priority 1: current_latitude/current_longitude - every location write
+          // from the collector app sets them, including its fallback path that
+          // used to leave current_location on an old point
+          if (profileData.current_latitude && profileData.current_longitude) {
+            const lat = parseFloat(profileData.current_latitude);
+            const lng = parseFloat(profileData.current_longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              location = { lat, lng };
+              console.log('[CollectorTracking] ✅ Using lat/lng fields:', location);
             }
-          } catch (rpcErr) {
-            console.warn('[CollectorTracking] RPC not available, falling back to EWKB parsing');
+          }
+
+          // Priority 2: Try RPC function for consistent WKT format
+          if (!location) {
+            try {
+              const { data: coordResult, error: rpcError } = await supabase
+                .rpc('get_collector_coordinates_wkt', { collector_user_id: activePickup.collector_id });
+              
+              if (!rpcError && coordResult) {
+                console.log('[CollectorTracking] 📍 RPC returned WKT:', coordResult);
+                const coords = parsePointToLatLng(coordResult);
+                if (coords) {
+                  location = coords;
+                  console.log('[CollectorTracking] ✅ Successfully parsed location from RPC WKT:', location);
+                }
+              }
+            } catch (rpcErr) {
+              console.warn('[CollectorTracking] RPC not available, falling back to EWKB parsing');
+            }
           }
           
-          // Priority 2: Try current_location (PostGIS geometry EWKB)
+          // Priority 3: Try current_location (PostGIS geometry EWKB)
           if (!location && profileData.current_location) {
             const coords = parsePointToLatLng(profileData.current_location);
             if (coords) {
@@ -229,15 +243,6 @@ const CollectorTracking = () => {
             } else {
               console.warn('[CollectorTracking] ❌ Failed to parse current_location EWKB');
             }
-          }
-          
-          // Priority 3: Fallback to current_latitude/current_longitude
-          if (!location && profileData.current_latitude && profileData.current_longitude) {
-            location = {
-              lat: parseFloat(profileData.current_latitude),
-              lng: parseFloat(profileData.current_longitude)
-            };
-            console.log('[CollectorTracking] ✅ Using lat/lng fields:', location);
           }
           
           if (location) {
@@ -384,6 +389,12 @@ const CollectorTracking = () => {
         
         if (formattedLocation) {
           setCollectorLocation(formattedLocation);
+          // Keep the "last updated" time current so the map doesn't call a live location stale
+          setCollectorProfile(prev => ({
+            ...prev,
+            location_updated_at: locationUpdate.lastUpdate,
+            is_online: locationUpdate.isOnline
+          }));
 
           // Calculate ETA and distance if we have pickup location
           if (pickupLoc) {
@@ -411,7 +422,7 @@ const CollectorTracking = () => {
               // Distance-based notifications (only notify on significant changes)
               const shouldNotify = 
                 !lastNotificationDistance.current ||
-                Math.abs(lastNotificationDistance.current - newDistance) > 0.2; // 200m threshold
+                Math.abs(lastNotificationDistance.current - newDistance) > 200; // meters
               
               if (shouldNotify) {
                 showDistanceAlert(newDistance, newEta);
@@ -444,33 +455,27 @@ const CollectorTracking = () => {
     lastStatus.current = activePickup.status;
   }, [activePickup?.status, activePickup?.collector]);
   
-  // ETA countdown timer (updates every 30 seconds when collector is moving)
+  // Recalculate ETA/distance whenever the collector or pickup location changes.
+  // (The old 30s timer only ran once an ETA already existed, so a page that
+  // missed the first calculation stayed on "Calculating..." for good.)
   useEffect(() => {
-    if (!eta || !distance || !activePickup || !collectorLocation) return;
-    
-    // Get pickup location from activePickup data
-    const pickupLoc = toLatitudeLongitude(getPickupLatLng(activePickup));
+    if (!activePickup || !collectorLocation) return;
 
+    const pickupLoc = toLatitudeLongitude(getPickupLatLng(activePickup));
     if (!pickupLoc) return;
-    
-    const countdownInterval = setInterval(() => {
-      // Recalculate ETA every 30 seconds
-      // collectorLocation is {lat, lng} format - convert to {latitude, longitude} for calculateETA
-      const collectorLoc = toLatitudeLongitude(collectorLocation);
-      const etaData = calculateETA(pickupLoc, collectorLoc);
-      if (etaData) {
-        // Only update if values are valid numbers (cache last good values)
-        if (typeof etaData.eta === 'number' && !isNaN(etaData.eta) && isFinite(etaData.eta)) {
-          setEta(etaData.eta);
-        }
-        if (typeof etaData.distance === 'number' && !isNaN(etaData.distance) && isFinite(etaData.distance)) {
-          setDistance(etaData.distance);
-        }
+
+    // collectorLocation is {lat, lng} format - convert to {latitude, longitude} for calculateETA
+    const etaData = calculateETA(pickupLoc, toLatitudeLongitude(collectorLocation));
+    if (etaData) {
+      // Only update if values are valid numbers (cache last good values)
+      if (typeof etaData.eta === 'number' && !isNaN(etaData.eta) && isFinite(etaData.eta)) {
+        setEta(etaData.eta);
       }
-    }, 30000); // Update every 30 seconds
-    
-    return () => clearInterval(countdownInterval);
-  }, [eta, distance, activePickup, collectorLocation]);
+      if (typeof etaData.distance === 'number' && !isNaN(etaData.distance) && isFinite(etaData.distance)) {
+        setDistance(etaData.distance);
+      }
+    }
+  }, [activePickup, collectorLocation]);
 
   if (loading) {
     return (
