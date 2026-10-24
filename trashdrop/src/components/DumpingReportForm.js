@@ -899,15 +899,15 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             </div>
           </div>
 
-          {/* Severity - Horizontal Scrollable Cards */}
+          {/* Severity - three cards sharing the row */}
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
               Severity <span className="text-red-500">*</span>
             </label>
             
-            {/* Horizontal scrollable container */}
+            {/* Equal-width cards */}
             <div 
-              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+              className="flex gap-3 pb-2"
               style={{
                 scrollSnapType: 'x mandatory',
                 WebkitOverflowScrolling: 'touch',
@@ -918,7 +918,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               {/* Low Severity Card */}
               <div
                 onClick={() => handleSeverityClick('Low')}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.severity === 'low'
                     ? 'bg-green-50 dark:bg-green-900 border-2 border-green-500 shadow-md'
                     : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
@@ -943,7 +943,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               {/* Medium Severity Card */}
               <div
                 onClick={() => handleSeverityClick('Medium')}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.severity === 'medium'
                     ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-500 shadow-md'
                     : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
@@ -968,7 +968,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               {/* High Severity Card */}
               <div
                 onClick={() => handleSeverityClick('High')}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.severity === 'high'
                     ? 'bg-red-50 dark:bg-red-900 border-2 border-red-500 shadow-md'
                     : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
