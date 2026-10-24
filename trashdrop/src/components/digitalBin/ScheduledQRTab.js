@@ -3,6 +3,7 @@ import { FaQrcode, FaPlus, FaSync } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext.js';
 import supabase from '../../utils/supabaseClient.js';
 import QRCodeList from './QRCodeList.js';
+import { shareOrDownloadQr } from '../../utils/shareQr.js';
 import { subscribeToPickupUpdates, handlePickupUpdate } from '../../utils/realtime.js';
 import debug from '../../utils/debug.js';
 import ConfirmModal from '../ConfirmModal.js';
@@ -282,29 +283,24 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
     }
   };
   
-  // Handle QR code sharing
+  // Share the QR image (e.g. on WhatsApp) so whoever is home can confirm the
+  // collection and pay the collector; saves it to the phone where sharing files isn't supported
   const handleShareQRCode = async (bin) => {
     if (!bin.qrCode) {
-      setAlertModal({ open: true, title: 'QR Code Unavailable', message: 'QR code not available for this digital bin.', variant: 'warning' });
+      setAlertModal({ open: true, title: 'QR Code Not Ready', message: 'The QR code is still loading. Try again in a moment.', variant: 'warning' });
       return;
     }
-    
+
+    const place = bin.location?.address || bin.location?.location_name || bin.address || 'your location';
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Digital Bin QR Code',
-          text: `QR Code for Digital Bin at ${bin.location?.address || 'Custom Location'}`,
-          url: bin.qrCode
-        });
-      } else {
-        // Fallback for browsers that don't support native sharing
-        const tempInput = document.createElement('input');
-        document.body.appendChild(tempInput);
-        tempInput.value = bin.qrCode;
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-        setAlertModal({ open: true, title: 'Link Copied', message: 'QR code link copied to clipboard!', variant: 'success' });
+      const result = await shareOrDownloadQr({
+        src: bin.qrCode,
+        fileName: `trashdrop-bin-${String(bin.id).slice(0, 8)}.png`,
+        title: 'TrashDrop Digital Bin QR Code',
+        text: `TrashDrop digital bin at ${place}. Show this QR code to the TrashDrop collector to confirm the collection and pay.`
+      });
+      if (result === 'downloaded') {
+        setAlertModal({ open: true, title: 'QR Code Saved', message: 'The QR code was saved to your device. Send it from your gallery, e.g. on WhatsApp.', variant: 'success' });
       }
     } catch (error) {
       console.error('Error sharing QR code:', error);

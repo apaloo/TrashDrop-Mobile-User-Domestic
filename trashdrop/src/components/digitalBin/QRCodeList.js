@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaChevronDown, FaChevronUp, FaQrcode, FaCalendarAlt, FaMapMarkerAlt, 
   FaTrash, FaInfoCircle, FaClock, FaCheckCircle, FaExclamationTriangle, FaShare,
-  FaSpinner, FaSync, FaExpand, FaTimes } from 'react-icons/fa';
+  FaSpinner, FaSync, FaExpand, FaTimes, FaDownload } from 'react-icons/fa';
 import supabase from '../../utils/supabaseClient.js';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { getQRCode, storeQRCode } from '../../utils/qrStorage.js';
+import { downloadQr } from '../../utils/shareQr.js';
 import { getBinSizeLabelShort } from '../../utils/costCalculator.js';
 
 // Status badge component
@@ -157,9 +158,15 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
   
   const toggleExpand = () => setIsExpanded(!isExpanded);
   
+  // Share / save the QR image shown here (it is generated on this phone, not stored on the bin)
   const handleShare = (e) => {
     e.stopPropagation();
-    onShare(pickup);
+    onShare({ ...pickup, qrCode: qrCodeUrl });
+  };
+
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    if (qrCodeUrl) downloadQr(qrCodeUrl, `trashdrop-bin-${String(pickup.id).slice(0, 8)}.png`);
   };
   
   const handleCancel = (e) => {
@@ -306,8 +313,19 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
                   onClick={handleShare}
                   className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                   title="Share QR Code"
+                  aria-label="Share QR code"
+                  disabled={!qrCodeUrl}
                 >
                   <FaShare size={16} />
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  title="Download QR Code"
+                  aria-label="Download QR code"
+                  disabled={!qrCodeUrl}
+                >
+                  <FaDownload size={16} />
                 </button>
                 <button
                   onClick={handleRefreshQR}
