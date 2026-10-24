@@ -1,0 +1,16 @@
+# Accepted TrashDrop Digital Bin Pricing (docs/DIGITAL_BIN_PRICING.md):
+# changes need the owner's review.
+/docs/DIGITAL_BIN_PRICING.md                                @apaloo
+/CLAUDE.md                                                  @apaloo
+/trashdrop/supabase/migrations/20261024*                    @apaloo
+/trashdrop/supabase/diagnostics/server_side_bin_pricing_rollback.sql @apaloo
+/trashdrop/supabase/diagnostics/digital_bin_pricing_check.sql @apaloo
+/trashdrop/src/services/digitalBinService.js                @apaloo
+/trashdrop/src/services/promotionalService.js               @apaloo
+/trashdrop/src/services/gpsPricingService.js                @apaloo
+/trashdrop/src/utils/costCalculator.js                      @apaloo
+/trashdrop/src/components/digitalBin/ReviewStep.js          @apaloo
+/trashdrop/netlify/functions/utils/pricing.js               @apaloo
+/trashdrop/src/services/__tests__/digitalBinService.promotion.test.js @apaloo
+/trashdrop/netlify/functions/__checks__/pricing-promo.js    @apaloo
+/.github/workflows/ci-cd.yml                                @apaloo
