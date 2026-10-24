@@ -186,12 +186,14 @@ async function quoteBooking(supabase, {
   const urgentCharge = is_urgent ? base * URGENT_SURCHARGE : 0;
   const standardTotal = base + urgentCharge + REQUEST_FEE;
 
-  // --- Promotional path: flat client fee, bypasses the SOP pipeline ---
+  // --- Promotional path: promotional rate × bags, not for urgent bookings ---
+  // Mirrors the database's td_price_digital_bin(), which sets the stored price
+  // and uses up the promotion when create_whatsapp_digital_bin saves the bin.
   const promoState = await getPromotionalState(supabase, user_id);
-  if (promoState.isEligible) {
+  if (promoState.isEligible && !is_urgent) {
     const promoFee = await getPromotionalFee(supabase, size);
     if (promoFee.clientFee != null) {
-      const collectorPayout = promoFee.collectorPayout ?? promoFee.clientFee;
+      const collectorPayout = (promoFee.collectorPayout ?? promoFee.clientFee) * binCount;
       return {
         bin_size_liters: size,
         bin_count: binCount,
@@ -199,7 +201,7 @@ async function quoteBooking(supabase, {
         base: round2(base),
         urgent_charge: 0,
         request_fee: 0,
-        total: round2(promoFee.clientFee),
+        total: round2(promoFee.clientFee * binCount),
         standard_total: round2(standardTotal),
         pricing_source: pricingSource,
         pricing_zone: zone,

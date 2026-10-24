@@ -491,12 +491,12 @@ async function promptReview(phone, data, supabase, session) {
   if (quote.is_promotional) {
     lines.push(
       `🎁 Promotional pricing applied (request ${quote.promo_request_number} of ${quote.promo_max_requests})`,
-      `${getBinSizeLabelShort(data.bin_size_liters)} promotional rate: ${formatCurrency(quote.total)}`,
+      `${quote.bin_count} × ${getBinSizeLabelShort(data.bin_size_liters)} at the promotional rate: ${formatCurrency(quote.total)}`,
       `Standard price: ${formatCurrency(quote.standard_total)}`,
       '',
       `*TOTAL: ${formatCurrency(quote.total)}*`,
       '',
-      '🎁 Promotional flat rate — no additional charges.'
+      '🎁 Promotional rate per bin — no additional charges. Not available for urgent pickups.'
     );
   } else {
     lines.push(

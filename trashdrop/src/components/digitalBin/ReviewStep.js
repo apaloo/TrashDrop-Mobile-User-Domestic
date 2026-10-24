@@ -12,8 +12,11 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
   const [pricingError, setPricingError] = useState(null);
   const [pricingAttempt, setPricingAttempt] = useState(0); // Bumped by "Try again"
   
-  const isPromotional = promoState?.isEligible === true;
+  // Promotions don't apply to urgent pickups (the database prices them normally)
+  const isPromotional = promoState?.isEligible === true && !formData.is_urgent;
   const promoRemaining = isPromotional ? (promoState.maxRequests - promoState.usedCount) : 0;
+  const bagCount = Math.max(1, parseInt(formData.numberOfBags || formData.bag_count) || 1);
+  const promoTotal = promoFee?.clientFee != null ? promoFee.clientFee * bagCount : null;
 
   // Fetch promotional fee when bin size changes (if user is promo-eligible)
   useEffect(() => {
@@ -274,10 +277,10 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
             <div className="bg-white p-3 rounded-md mb-3 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-700 font-medium">
-                  {getBinSizeLabelShort(formData.bin_size_liters)} — Promotional Rate
+                  {getBinSizeLabelShort(formData.bin_size_liters)} — Promotional Rate × {bagCount}
                 </span>
                 <span className="text-sm text-purple-700 font-semibold">
-                  {formatCurrency(promoFee.clientFee)}
+                  {formatCurrency(promoTotal)}
                 </span>
               </div>
               {costBreakdown && (
@@ -290,13 +293,18 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
             <div className="flex justify-between items-center pt-3 border-t-2 border-purple-300">
               <span className="text-lg font-semibold text-gray-900">TOTAL</span>
               <span className="text-3xl font-bold text-purple-700">
-                {formatCurrency(promoFee.clientFee)}
+                {formatCurrency(promoTotal)}
               </span>
             </div>
           </>
         ) : (
           /* ---- Standard SOP pricing display ---- */
           <>
+            {promoState?.isEligible && formData.is_urgent && (
+              <div className="bg-purple-50 border border-purple-200 rounded-md p-2 mb-3 text-sm text-purple-800">
+                🎁 Promotional pricing doesn't apply to urgent pickups. Untick urgent to use one of your promotional pickups.
+              </div>
+            )}
             {!costBreakdown && (
               <div className="text-center py-4 text-gray-500 text-sm">Calculating price...</div>
             )}
