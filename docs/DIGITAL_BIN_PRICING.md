@@ -44,6 +44,13 @@ urgent = 80 + 24 + 1 = **GHS 105**.
 Example (240 L schedule 22 / 40): 240 L × 2 bags = customer **GHS 44**,
 collector **GHS 80**, TrashDrop **GHS 36**.
 
+How the collector gets the promotional payout (approved 2026-10-24):
+- Paid by MoMo/e-cash: TrashDrop holds the customer's payment and pays the
+  whole payout when the collector cashes out.
+- Paid in cash: the collector keeps the customer's cash, and TrashDrop's top-up
+  (`bin_payments.platform_subsidy`) is paid when the collector cashes out
+  (collector app, `td_withdrawable_items` part D).
+
 ### Cancelling
 Cancelling a promotional bin gives the promotion back. A bin counts as
 cancelled when its status is cancelled, or it is inactive and not completed
@@ -66,7 +73,7 @@ cancelled when its status is cancelled, or it is inactive and not completed
 | Health check (read-only) | household app | `trashdrop/supabase/diagnostics/digital_bin_pricing_check.sql` |
 | Price shown before booking | household app | `trashdrop/src/services/digitalBinService.js`, `trashdrop/src/components/digitalBin/ReviewStep.js`, `trashdrop/src/utils/costCalculator.js`, `trashdrop/src/services/gpsPricingService.js` |
 | WhatsApp quote | household app | `trashdrop/netlify/functions/utils/pricing.js` |
-| Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js` |
+| Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js`, `src/services/earningsService.js` (Earnings page), `supabase/migrations/20261109_promo_cash_subsidy_withdrawable.sql` (cash-outs) |
 | Admin checks | admin site | `src/utils/pickupRequestUtils.js` (`feeBreakdown`), `supabase/migrations/20261107_fee_mismatch_pricing.sql` (alert rule 9) |
 
 ## Tests that guard it
@@ -75,7 +82,8 @@ CI runs these on every pull request (household app, `.github/workflows/ci-cd.yml
 - `trashdrop/netlify/functions/__checks__/pricing-promo.js`
 
 Also:
-- collector app: `src/utils/__tests__/promotionalPayout.test.js`
+- collector app: `src/utils/__tests__/promotionalPayout.test.js`,
+  `src/services/__tests__/earningsPromotional.test.js`
 - admin site: `src/utils/__tests__/pickupRequestUtils.test.js` (fees)
 
 In production, run `trashdrop/supabase/diagnostics/digital_bin_pricing_check.sql`
