@@ -7,6 +7,7 @@ import { subscribeToPickupUpdates, handlePickupUpdate } from '../../utils/realti
 import debug from '../../utils/debug.js';
 import ConfirmModal from '../ConfirmModal.js';
 import { transformBin } from '../../services/digitalBinService.js';
+import { shareQrImage } from '../../utils/shareQrImage.js';
 
 const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCreatedBinId = null, onNewBinExpanded = null }) => {
 
@@ -282,36 +283,22 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
     }
   };
   
-  // Handle QR code sharing
+  // Share the QR image (WhatsApp etc.) so someone at the bin can show it to
+  // the collector; where images can't be shared, it is saved instead
   const handleShareQRCode = async (bin) => {
-    if (!bin.qrCode) {
-      setAlertModal({ open: true, title: 'QR Code Unavailable', message: 'QR code not available for this digital bin.', variant: 'warning' });
-      return;
-    }
-    
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Digital Bin QR Code',
-          text: `QR Code for Digital Bin at ${bin.location?.address || 'Custom Location'}`,
-          url: bin.qrCode
-        });
-      } else {
-        // Fallback for browsers that don't support native sharing
-        const tempInput = document.createElement('input');
-        document.body.appendChild(tempInput);
-        tempInput.value = bin.qrCode;
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-        setAlertModal({ open: true, title: 'Link Copied', message: 'QR code link copied to clipboard!', variant: 'success' });
+      const result = await shareQrImage(bin);
+      if (result === 'unavailable') {
+        setAlertModal({ open: true, title: 'QR Code Unavailable', message: 'QR code not available for this digital bin.', variant: 'warning' });
+      } else if (result === 'downloaded') {
+        setAlertModal({ open: true, title: 'QR Code Saved', message: 'The QR code was saved as an image. Send it on WhatsApp to whoever will be there when the collector arrives.', variant: 'success' });
       }
     } catch (error) {
       console.error('Error sharing QR code:', error);
       setAlertModal({ open: true, title: 'Share Failed', message: 'Failed to share QR code. Please try again.', variant: 'danger' });
     }
   };
-  
+
   // Tab configuration
   const tabs = [
     {

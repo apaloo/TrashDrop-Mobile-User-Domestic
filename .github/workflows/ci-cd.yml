@@ -28,6 +28,15 @@ jobs:
       
     - name: Run linting
       run: npm run lint || echo "No linting configured"
+
+    # Accepted TrashDrop Digital Bin Pricing (docs/DIGITAL_BIN_PRICING.md).
+    # These must pass; don't weaken or skip them to make a change pass.
+    - name: Digital bin pricing guard tests
+      env:
+        CI: true
+      run: |
+        npx craco test --watchAll=false src/services/__tests__/digitalBinService.promotion.test.js
+        node netlify/functions/__checks__/pricing-promo.js
     
     # - name: Run tests
     #   run: npm test -- --watchAll=false

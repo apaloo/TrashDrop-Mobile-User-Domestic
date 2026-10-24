@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaChevronDown, FaChevronUp, FaQrcode, FaCalendarAlt, FaMapMarkerAlt, 
   FaTrash, FaInfoCircle, FaClock, FaCheckCircle, FaExclamationTriangle, FaShare,
-  FaSpinner, FaSync, FaExpand, FaTimes } from 'react-icons/fa';
+  FaSpinner, FaSync, FaExpand, FaTimes, FaDownload } from 'react-icons/fa';
 import supabase from '../../utils/supabaseClient.js';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { getQRCode, storeQRCode } from '../../utils/qrStorage.js';
 import { getBinSizeLabelShort } from '../../utils/costCalculator.js';
+import { downloadQrImage } from '../../utils/shareQrImage.js';
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -157,9 +158,15 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
   
   const toggleExpand = () => setIsExpanded(!isExpanded);
   
+  // Pass the image the card shows, so the QR itself is shared, not a link
   const handleShare = (e) => {
     e.stopPropagation();
-    onShare(pickup);
+    onShare({ ...pickup, qrImage: qrCodeUrl });
+  };
+
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    downloadQrImage({ ...pickup, qrImage: qrCodeUrl }).catch(err => console.error('Error saving QR code:', err));
   };
   
   const handleCancel = (e) => {
@@ -306,8 +313,17 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
                   onClick={handleShare}
                   className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                   title="Share QR Code"
+                  aria-label="Share QR code"
                 >
                   <FaShare size={16} />
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  title="Download QR Code"
+                  aria-label="Download QR code"
+                >
+                  <FaDownload size={16} />
                 </button>
                 <button
                   onClick={handleRefreshQR}
@@ -505,6 +521,22 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
                 Show this QR code to the service provider when they arrive. 
                 The QR code contains all necessary information about your digital bin service.
               </p>
+              <div className="mt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+                >
+                  <FaShare size={14} /> Share
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <FaDownload size={14} /> Download
+                </button>
+              </div>
             </div>
           </div>
         </div>
