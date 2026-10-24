@@ -19,6 +19,7 @@ function useMapEvents() {
 function useMap() {
   return {
     setView: jest.fn(),
+    flyTo: jest.fn(),
   };
 }
 
