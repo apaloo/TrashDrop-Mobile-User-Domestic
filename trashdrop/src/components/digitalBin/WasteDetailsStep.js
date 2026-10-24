@@ -154,6 +154,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
               <p className="text-xs text-purple-700 mt-0.5">
                 {promoState.maxRequests - promoState.usedCount} of {promoState.maxRequests} discounted pickups remaining
               </p>
+              <p className="text-xs text-purple-700 mt-0.5">Promotional price per bin; not for urgent pickups.</p>
             </div>
           </div>
         </div>

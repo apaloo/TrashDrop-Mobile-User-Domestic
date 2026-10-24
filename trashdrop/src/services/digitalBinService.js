@@ -51,8 +51,10 @@ export const prepareDigitalBinData = async ({
   promotional_collector_payout = null,
   promotional_platform_subsidy = null
 }) => {
-  // --- Promotional pricing path (flat fee, bypasses SOP pipeline) ---
-  if (is_promotional && promotional_client_fee != null) {
+  // --- Promotional pricing path (per bag, bypasses SOP pipeline) ---
+  // Mirrors the database's td_price_digital_bin(), which sets the stored price
+  // on insert: promotional rate × bags, never for urgent bookings.
+  if (is_promotional && promotional_client_fee != null && !is_urgent) {
     console.log('[DigitalBinService] Promotional pricing applied:', {
       client_fee: promotional_client_fee,
       collector_payout: promotional_collector_payout,
@@ -60,7 +62,9 @@ export const prepareDigitalBinData = async ({
       request_number: promo_request_number
     });
 
-    const collectorPayout = promotional_collector_payout ?? promotional_client_fee;
+    const binCount = Math.max(1, parseInt(bag_count) || 1);
+    const clientFee = parseFloat(promotional_client_fee) * binCount;
+    const collectorPayout = parseFloat(promotional_collector_payout ?? promotional_client_fee) * binCount;
 
     return {
       id,
@@ -78,19 +82,19 @@ export const prepareDigitalBinData = async ({
       status: 'pending',
 
       // Promotional fee fields
-      fee: parseFloat(promotional_client_fee).toFixed(2),
+      fee: clientFee.toFixed(2),
       is_promotional: true,
       promo_request_number: promo_request_number,
 
-      // Collector payout = full collector_payout from schedule
-      collector_core_payout: parseFloat(collectorPayout).toFixed(2),
+      // Collector payout = collector_payout from schedule × bags
+      collector_core_payout: collectorPayout.toFixed(2),
       collector_urgent_payout: '0.00',
       collector_distance_payout: '0.00',
       collector_surge_payout: '0.00',
       collector_tips: '0.00',
       collector_recyclables_payout: '0.00',
       collector_loyalty_cashback: '0.00',
-      collector_total_payout: parseFloat(collectorPayout).toFixed(2),
+      collector_total_payout: collectorPayout.toFixed(2),
       surge_multiplier: '1.00',
       deadhead_km: '0.00'
     };

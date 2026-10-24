@@ -19,7 +19,7 @@ import { getBinSizeLabelShort } from '../utils/costCalculator.js';
 import { prepareDigitalBinData, transformBin } from '../services/digitalBinService.js';
 import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
-import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees, incrementPromotionalUsage } from '../services/promotionalService.js';
+import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees } from '../services/promotionalService.js';
 
 
 // Pickup time windows offered in ScheduleDetailsStep
@@ -845,7 +845,7 @@ function DigitalBin() {
       
       // Fetch promotional fee for the selected bin size if eligible
       let promoFeeData = { clientFee: null, collectorPayout: null, platformSubsidy: null };
-      if (promoState.isEligible) {
+      if (promoState.isEligible && !formData.is_urgent) {
         promoFeeData = await getPromotionalFee(formData.bin_size_liters);
         console.log('[DigitalBin] Promotional fee for', formData.bin_size_liters, 'L:', promoFeeData);
       }
@@ -865,8 +865,8 @@ function DigitalBin() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         // Promotional pricing fields
-        is_promotional: promoState.isEligible && promoFeeData.clientFee != null,
-        promo_request_number: promoState.isEligible ? promoState.usedCount + 1 : null,
+        is_promotional: promoState.isEligible && !formData.is_urgent && promoFeeData.clientFee != null,
+        promo_request_number: promoState.isEligible && !formData.is_urgent ? promoState.usedCount + 1 : null,
         promotional_client_fee: promoFeeData.clientFee,
         promotional_collector_payout: promoFeeData.collectorPayout,
         promotional_platform_subsidy: promoFeeData.platformSubsidy
@@ -899,19 +899,14 @@ function DigitalBin() {
       
       debug.log('[DigitalBin] Successfully created digital bin:', binData);
 
-      // Increment promotional usage if this was a promotional bin
-      if (promoState.isEligible && digitalBinData.is_promotional) {
-        const incremented = await incrementPromotionalUsage(user.id);
-        if (incremented) {
-          setPromoState(prev => ({
-            ...prev,
-            usedCount: prev.usedCount + 1,
-            isEligible: (prev.usedCount + 1) < prev.maxRequests
-          }));
-          console.log('[DigitalBin] Promotional usage incremented');
-        } else {
-          console.warn('[DigitalBin] Promotional usage increment returned false');
-        }
+      // The database prices the bin and uses up the promotion when it saves it
+      // (td_price_digital_bin); follow what it stored
+      if (binData.is_promotional && binData.promo_request_number) {
+        setPromoState(prev => ({
+          ...prev,
+          usedCount: binData.promo_request_number,
+          isEligible: binData.promo_request_number < prev.maxRequests
+        }));
       }
 
       // Fire-and-forget background photo upload — does NOT block UI or success flow
