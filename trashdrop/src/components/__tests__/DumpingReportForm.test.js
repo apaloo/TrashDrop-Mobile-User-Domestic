@@ -22,6 +22,20 @@ jest.mock('../CameraModal.js', () => ({ onCapture, onClose }) => (
   </div>
 ));
 
+// The form uses tappable cards, not dropdowns. Cards are picked by their own
+// text; "Medium" is both a severity and a size, so sizes go by their subtitle.
+const pickWasteType = (label) => userEvent.click(screen.getByText(label));
+const pickSize = (subtitle) => userEvent.click(screen.getByText(subtitle));
+const takePhoto = async () => {
+  await userEvent.click(screen.getByRole('button', { name: /Take Photo with Camera/i }));
+  await userEvent.click(screen.getByRole('button', { name: /Mock Capture Photo/i }));
+};
+// The button reads "Submitting..." while a photo is processed, then "Submit Report"
+const submitWhenReady = async () => {
+  await waitFor(() => expect(screen.getByRole('button', { name: /Submit Report/i })).toBeEnabled());
+  await userEvent.click(screen.getByRole('button', { name: /Submit Report/i }));
+};
+
 describe('DumpingReportForm', () => {
   const mockUser = { id: 'user123' };
   const mockLocation = {
@@ -73,14 +87,14 @@ describe('DumpingReportForm', () => {
   it('renders key form sections and controls', () => {
     render(<DumpingReportForm />);
 
-    expect(screen.getByText(/Report Illegal Dumping/i)).toBeInTheDocument();
-    expect(screen.getByText(/Type of Waste/i)).toBeInTheDocument();
-    expect(screen.getByText(/Severity/i)).toBeInTheDocument();
-    expect(screen.getByText(/Size of the illegal dumping/i)).toBeInTheDocument();
-    expect(screen.getByText(/Take Photos/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Report Illegal Dumping/i })).toBeInTheDocument();
+    expect(screen.getByText(/^Type of Waste/)).toBeInTheDocument();
+    expect(screen.getByText(/^Severity/)).toBeInTheDocument();
+    expect(screen.getByText(/^Size of the illegal dumping/)).toBeInTheDocument();
+    expect(screen.getByText(/^Take Photos/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Use My Location/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Take Photo with Camera/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Submit Report/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Submit Report/i })).toBeDisabled();
   });
 
   it('gets user location on mount', async () => {
@@ -95,25 +109,12 @@ describe('DumpingReportForm', () => {
     const onSuccess = jest.fn();
     render(<DumpingReportForm onSuccess={onSuccess} />);
 
-    // Select waste type
-    const wasteTypeSelect = screen.getAllByRole('combobox')[0];
-    await userEvent.selectOptions(wasteTypeSelect, 'mixed');
-
-    // Select severity via button
-    await userEvent.click(screen.getByRole('button', { name: /Medium/i }));
-
-    // Select size (estimated_volume)
-    const sizeSelect = screen.getAllByRole('combobox')[1] || screen.getByText(/Size of the illegal dumping/i).closest('div').querySelector('select');
-    await userEvent.selectOptions(sizeSelect, 'medium');
-
-    // Open camera and capture a photo via mocked modal
-    await userEvent.click(screen.getByRole('button', { name: /Take Photo with Camera/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Mock Capture Photo/i }));
-
-    // Submit form (wait for button to be enabled after photo processing)
-    const submitBtn1 = screen.getByRole('button', { name: /Submit/i });
-    await waitFor(() => expect(submitBtn1).not.toBeDisabled());
-    await userEvent.click(submitBtn1);
+    await pickWasteType('Mixed');
+    // Severity starts on Medium; pick High to show the choice is sent
+    await userEvent.click(screen.getByText('High'));
+    await pickSize('Car load');
+    await takePhoto();
+    await submitWhenReady();
 
     await waitFor(() => {
       expect(dumpingService.createReport).toHaveBeenCalledWith(
@@ -121,26 +122,25 @@ describe('DumpingReportForm', () => {
         expect.objectContaining({
           coordinates: expect.objectContaining({ latitude: expect.any(Number), longitude: expect.any(Number) }),
           waste_type: 'mixed',
-          severity: 'medium',
+          severity: 'high',
           estimated_volume: 'medium',
           photos: expect.arrayContaining(['blob://photo-1'])
         })
       );
-
-      expect(notificationService.createNotification).toHaveBeenCalledWith(
-        'authorities',
-        'dumping_report',
-        'New Illegal Dumping Report',
-        expect.any(String),
-        expect.objectContaining({
-          report_id: 'report123',
-          severity: 'medium',
-          coordinates: expect.any(Object)
-        })
-      );
-
-      expect(onSuccess).toHaveBeenCalledWith(mockReport);
     });
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(mockReport));
+    expect(notificationService.createNotification).toHaveBeenCalledWith(
+      'authorities',
+      'dumping_report',
+      'New Illegal Dumping Report',
+      expect.any(String),
+      expect.objectContaining({
+        report_id: 'report123',
+        severity: 'high',
+        coordinates: expect.any(Object)
+      })
+    );
   });
 
   it('captures photo via camera modal (mocked)', async () => {
@@ -158,22 +158,19 @@ describe('DumpingReportForm', () => {
     });
   });
 
-  it('falls back to default coordinates when geolocation fails', async () => {
-    // Mock geolocation error
-    const mockGeolocationError = {
+  it('asks for a location when GPS fails (no default coordinates)', async () => {
+    global.navigator.geolocation = {
       getCurrentPosition: jest.fn().mockImplementation((success, error) =>
-        error({ code: 1, message: 'Geolocation error' })
+        error({ code: 1, PERMISSION_DENIED: 1, message: 'Geolocation error' })
       )
     };
-    global.navigator.geolocation = mockGeolocationError;
 
     render(<DumpingReportForm />);
 
-    // Expect default Accra coordinates to be displayed (fallback)
-    await waitFor(() => {
-      expect(screen.getByText(/Lat:\s*5\.614736/i)).toBeInTheDocument();
-      expect(screen.getByText(/Lng:\s*-0\.208811/i)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/No location set yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Location access denied/i)).toBeInTheDocument();
+    expect(screen.getByText(/A location - tap the map/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Lat:/)).not.toBeInTheDocument();
   });
 
   it('handles service error', async () => {
@@ -184,17 +181,10 @@ describe('DumpingReportForm', () => {
 
     render(<DumpingReportForm />);
 
-    // Fill minimum required fields: waste type, size, and at least one photo
-    const wasteTypeSelect = screen.getAllByRole('combobox')[0];
-    await userEvent.selectOptions(wasteTypeSelect, 'mixed');
-    const sizeSelect = screen.getAllByRole('combobox')[1] || screen.getByText(/Size of the illegal dumping/i).closest('div').querySelector('select');
-    await userEvent.selectOptions(sizeSelect, 'small');
-    await userEvent.click(screen.getByRole('button', { name: /Take Photo with Camera/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Mock Capture Photo/i }));
-
-    const submitBtn2 = screen.getByRole('button', { name: /Submit/i });
-    await waitFor(() => expect(submitBtn2).not.toBeDisabled());
-    await userEvent.click(submitBtn2);
+    await pickWasteType('Mixed');
+    await pickSize('Few bags');
+    await takePhoto();
+    await submitWhenReady();
 
     await waitFor(() => {
       expect(screen.getByText('Service error')).toBeInTheDocument();
@@ -219,28 +209,20 @@ describe('DumpingReportForm', () => {
   it('clears form after successful submission', async () => {
     render(<DumpingReportForm />);
 
-    // Fill minimum required fields and capture a photo
-    const wasteTypeSelect = screen.getAllByRole('combobox')[0];
-    await userEvent.selectOptions(wasteTypeSelect, 'mixed');
-    const sizeSelect = screen.getAllByRole('combobox')[1] || screen.getByText(/Size of the illegal dumping/i).closest('div').querySelector('select');
-    await userEvent.selectOptions(sizeSelect, 'small');
-    await userEvent.click(screen.getByRole('button', { name: /Take Photo with Camera/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Mock Capture Photo/i }));
-
-    const submitBtn3 = screen.getByRole('button', { name: /Submit/i });
-    await waitFor(() => expect(submitBtn3).not.toBeDisabled());
-    await userEvent.click(submitBtn3);
+    await pickWasteType('Mixed');
+    await pickSize('Few bags');
+    await takePhoto();
+    await submitWhenReady();
 
     await waitFor(() => {
       expect(dumpingService.createReport).toHaveBeenCalled();
     });
 
-    // Check that form resets: selects cleared and submit disabled
-    const selects = screen.getAllByRole('combobox');
-    expect(selects[0]).toHaveValue('');
-    expect(selects[1]).toHaveValue('');
-
-    // Submit button disabled after reset (no photos, no required fields)
-    expect(screen.getByRole('button', { name: /Submit/i })).toBeDisabled();
+    // Confirmation shows, and the form is empty again
+    expect(await screen.findByText(/Report submitted - reference REPORT12/i)).toBeInTheDocument();
+    expect(screen.queryByText(/photo\(s\) captured/i)).not.toBeInTheDocument();
+    expect(screen.getByText('The type of waste')).toBeInTheDocument();
+    expect(screen.getByText('The size of the illegal dumping')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Submit Report/i })).toBeDisabled();
   });
 });
