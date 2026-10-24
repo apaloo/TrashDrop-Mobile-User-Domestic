@@ -781,114 +781,6 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             </p>
           </div>
 
-          {/* Severity - Horizontal Scrollable Cards */}
-          <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
-              Severity <span className="text-red-500">*</span>
-            </label>
-            
-            {/* Horizontal scrollable container */}
-            <div 
-              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-              style={{
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-            >
-              {/* Low Severity Card */}
-              <div
-                onClick={() => handleSeverityClick('Low')}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.severity === 'low'
-                    ? 'bg-green-50 dark:bg-green-900 border-2 border-green-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🟢</div>
-                  <span className={`text-sm font-medium ${
-                    formData.severity === 'low' ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'
-                  }`}>
-                    Low
-                  </span>
-                  <span className={`text-xs ${
-                    formData.severity === 'low' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    Minor issue
-                  </span>
-                </div>
-              </div>
-
-              {/* Medium Severity Card */}
-              <div
-                onClick={() => handleSeverityClick('Medium')}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.severity === 'medium'
-                    ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🟡</div>
-                  <span className={`text-sm font-medium ${
-                    formData.severity === 'medium' ? 'text-yellow-700 dark:text-yellow-300' : 'text-gray-700 dark:text-gray-300'
-                  }`}>
-                    Medium
-                  </span>
-                  <span className={`text-xs ${
-                    formData.severity === 'medium' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    Needs attention
-                  </span>
-                </div>
-              </div>
-
-              {/* High Severity Card */}
-              <div
-                onClick={() => handleSeverityClick('High')}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.severity === 'high'
-                    ? 'bg-red-50 dark:bg-red-900 border-2 border-red-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🔴</div>
-                  <span className={`text-sm font-medium ${
-                    formData.severity === 'high' ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'
-                  }`}>
-                    High
-                  </span>
-                  <span className={`text-xs ${
-                    formData.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    Urgent
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
-              Description (optional)
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows={4}
-              placeholder="Describe the dumped waste and any relevant details..."
-              className="w-full px-3 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
-            />
-          </div>
-
           {/* Size of dumping - Horizontal Scrollable Cards */}
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
@@ -1007,6 +899,99 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             </div>
           </div>
 
+          {/* Severity - three cards sharing the row */}
+          <div className="mb-6">
+            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
+              Severity <span className="text-red-500">*</span>
+            </label>
+            
+            {/* Equal-width cards */}
+            <div 
+              className="flex gap-3 pb-2"
+              style={{
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              {/* Low Severity Card */}
+              <div
+                onClick={() => handleSeverityClick('Low')}
+                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.severity === 'low'
+                    ? 'bg-green-50 dark:bg-green-900 border-2 border-green-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🟢</div>
+                  <span className={`text-sm font-medium ${
+                    formData.severity === 'low' ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Low
+                  </span>
+                  <span className={`text-xs ${
+                    formData.severity === 'low' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Minor issue
+                  </span>
+                </div>
+              </div>
+
+              {/* Medium Severity Card */}
+              <div
+                onClick={() => handleSeverityClick('Medium')}
+                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.severity === 'medium'
+                    ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🟡</div>
+                  <span className={`text-sm font-medium ${
+                    formData.severity === 'medium' ? 'text-yellow-700 dark:text-yellow-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Medium
+                  </span>
+                  <span className={`text-xs ${
+                    formData.severity === 'medium' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Needs attention
+                  </span>
+                </div>
+              </div>
+
+              {/* High Severity Card */}
+              <div
+                onClick={() => handleSeverityClick('High')}
+                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  formData.severity === 'high'
+                    ? 'bg-red-50 dark:bg-red-900 border-2 border-red-500 shadow-md'
+                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                }`}
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="text-2xl mb-1">🔴</div>
+                  <span className={`text-sm font-medium ${
+                    formData.severity === 'high' ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    High
+                  </span>
+                  <span className={`text-xs ${
+                    formData.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Urgent
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Location */}
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
@@ -1019,10 +1004,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             
             {/* Map */}
             <div className="mb-6">
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Pin Location <span className="text-red-500">*</span>
-              </label>
-              <div className="h-64 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative">
+              <div className="h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative">
                 <MapContainer 
                   center={mapPosition} 
                   zoom={13} 
@@ -1106,7 +1088,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             </div>
           )}
           
-          <div className="border-2 border-dashed border-gray-500 dark:border-gray-600 rounded-lg p-8">
+          <div className="border-2 border-dashed border-gray-500 dark:border-gray-600 rounded-lg p-5">
             <div className="text-center">
               {capturedPhotos.length > 0 && (
                 <div className="mb-4">
@@ -1116,8 +1098,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 </div>
               )}
               
-              <div className="mb-4">
-                <svg className="w-16 h-16 mx-auto text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+              <div className="mb-2">
+                <svg className="w-10 h-10 mx-auto text-gray-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -1150,8 +1132,21 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
           />
         )}
 
-          {/* Contact consent */}
-          <div className="mb-6">
+          {/* More details (optional): description and contact consent */}
+          <div role="group" aria-labelledby="report-more-details" className="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <p id="report-more-details" className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">More details (optional)</p>
+            <label htmlFor="report-description" className="block text-gray-600 dark:text-gray-400 text-xs mb-1">
+              Description (optional)
+            </label>
+            <textarea
+              id="report-description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={2}
+              placeholder="Describe the dumped waste and any relevant details..."
+              className="w-full px-3 py-2 mb-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+            />
             <label className="flex items-start">
               <input
                 type="checkbox"
