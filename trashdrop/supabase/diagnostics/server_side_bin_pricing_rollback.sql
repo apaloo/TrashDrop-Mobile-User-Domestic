@@ -1,6 +1,6 @@
 -- Undo trashdrop/supabase/migrations/20261024000000_server_side_bin_pricing.sql
 --
--- Removes the pricing and price-protection triggers, gives customers back
+-- Removes the pricing, price-protection and cancellation-refund triggers, gives customers back
 -- insert/update on their own promotional_usage row (the policies from the
 -- collector repo's scripts/add-promotional-pricing-columns.sql) and restores
 -- increment_promotional_usage() to counting.
@@ -13,6 +13,8 @@ SET LOCAL search_path = public;
 
 DROP TRIGGER IF EXISTS digital_bins_set_price ON public.digital_bins;
 DROP TRIGGER IF EXISTS digital_bins_protect_price ON public.digital_bins;
+DROP TRIGGER IF EXISTS digital_bins_refund_promotion ON public.digital_bins;
+DROP FUNCTION IF EXISTS public.td_refund_promotion_on_cancel();
 DROP FUNCTION IF EXISTS public.td_set_digital_bin_price();
 DROP FUNCTION IF EXISTS public.td_protect_digital_bin_price();
 DROP FUNCTION IF EXISTS public.td_price_digital_bin(uuid, double precision, double precision, integer, integer, boolean, boolean);

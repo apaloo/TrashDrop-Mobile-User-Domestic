@@ -21,7 +21,9 @@
 --   2. The customer who booked a bin can't change its price or promotion
 --      fields afterwards (collectors still record payouts at disposal; staff
 --      and the backend are unaffected).
---   3. Customers can read their promotional_usage row but no longer insert,
+--   3. Cancelling a promotional bin gives the promotion back (reopening a
+--      cancelled one takes it again, so a cancel/reopen loop can't add any).
+--   4. Customers can read their promotional_usage row but no longer insert,
 --      update or delete it. increment_promotional_usage() no longer counts
 --      (the trigger does); it only reports whether the user can still get a
 --      promotion, so older app versions that still call it don't double count.
@@ -207,7 +209,39 @@ CREATE TRIGGER digital_bins_protect_price
   FOR EACH ROW
   EXECUTE FUNCTION public.td_protect_digital_bin_price();
 
--- 4. Customers can only read their promotion allowance -----------------------
+-- 4. A cancelled promotional bin gives its promotion back ---------------------
+CREATE OR REPLACE FUNCTION public.td_refund_promotion_on_cancel()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  was_cancelled boolean := lower(coalesce(OLD.status, '')) IN ('cancelled', 'canceled');
+  is_cancelled boolean := lower(coalesce(NEW.status, '')) IN ('cancelled', 'canceled');
+BEGIN
+  IF NOT coalesce(NEW.is_promotional, false) OR NEW.user_id IS NULL OR was_cancelled = is_cancelled THEN
+    RETURN NEW;
+  END IF;
+
+  UPDATE public.promotional_usage u
+  SET used_count = CASE WHEN is_cancelled THEN greatest(u.used_count - 1, 0)
+                        ELSE least(u.used_count + 1, u.max_requests) END,
+      updated_at = now()
+  WHERE u.user_id = NEW.user_id;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.td_refund_promotion_on_cancel() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS digital_bins_refund_promotion ON public.digital_bins;
+CREATE TRIGGER digital_bins_refund_promotion
+  AFTER UPDATE OF status ON public.digital_bins
+  FOR EACH ROW
+  EXECUTE FUNCTION public.td_refund_promotion_on_cancel();
+
+-- 5. Customers can only read their promotion allowance -----------------------
 DO $$
 DECLARE pol record;
 BEGIN
@@ -228,7 +262,7 @@ CREATE POLICY promotional_usage_select_own
 
 REVOKE INSERT, UPDATE, DELETE ON public.promotional_usage FROM anon, authenticated;
 
--- 5. The old counting call no longer counts -----------------------------------
+-- 6. The old counting call no longer counts -----------------------------------
 -- Same signature as before; true while the user can still get a promotion.
 CREATE OR REPLACE FUNCTION public.increment_promotional_usage(p_user_id uuid)
 RETURNS boolean
