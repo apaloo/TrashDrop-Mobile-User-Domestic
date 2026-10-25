@@ -27,9 +27,13 @@ const CameraModal = ({
   const [cameraStream, setCameraStream] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  // The count just reached ("3/6"), flashed large in the middle for a moment
+  const [flashCount, setFlashCount] = useState(null);
+  const flashCountTimer = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const flashRef = useRef(null);
+  useEffect(() => () => clearTimeout(flashCountTimer.current), []);
 
   // Initialize camera when component mounts with improved error handling
   // Force cleanup of any previously lingering camera resources on mount
@@ -288,20 +292,19 @@ const CameraModal = ({
   const capturePhoto = () => {
     console.log('CameraModal: Starting photo capture...');
     
+    // All photos taken: this tap finishes and closes the camera
+    if (photoCount >= maxPhotos) {
+      console.log('CameraModal: Maximum photos reached, closing on tap');
+      handleClose();
+      return;
+    }
+
     // Show flash effect
     if (flashRef.current) {
       flashRef.current.style.opacity = '0.7';
       setTimeout(() => {
         if (flashRef.current) flashRef.current.style.opacity = '0';
       }, 150);
-    }
-    
-    // Check photo limit early to avoid unnecessary processing
-    if (photoCount >= maxPhotos) {
-      // Auto-close modal when limit reached - parent will show toast
-      console.log('CameraModal: Maximum photos reached, auto-closing');
-      handleClose();
-      return;
     }
 
     // Extensive readiness checks
@@ -389,8 +392,11 @@ const CameraModal = ({
       // Force garbage collection after blob creation (unofficial but helps)
       if (window.gc) window.gc();
       
-      // Update count
+      // Update count, and flash it large ("3/6")
       setPhotoCount(prev => prev + 1);
+      setFlashCount(photoCount + 1);
+      clearTimeout(flashCountTimer.current);
+      flashCountTimer.current = setTimeout(() => setFlashCount(null), 1200);
       
       // Simple flash effect
       try {
@@ -612,7 +618,7 @@ const CameraModal = ({
             }}
             disabled={!cameraStream || isLoading}
             className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg disabled:opacity-50 border-4 border-white"
-            aria-label="Capture photo"
+            aria-label={photoCount >= maxPhotos ? 'Finish taking photos' : 'Capture photo'}
           >
             <div className="w-16 h-16 bg-blue-600 rounded-full"></div>
           </button>
@@ -622,9 +628,31 @@ const CameraModal = ({
         </div>
         
         {/* Photo count indicator */}
-        <div className="absolute top-4 right-16 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-sm z-20">
+        <div className="absolute top-4 right-16 bg-black bg-opacity-70 text-white px-4 py-1.5 rounded-full text-xl font-extrabold z-20" data-testid="photo-count">
           {photoCount}/{maxPhotos}
         </div>
+
+        {/* The count just reached, flashed large in the middle of the screen */}
+        {flashCount !== null && (
+          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none" role="status" aria-live="assertive">
+            <span
+              className="text-white font-black"
+              style={{ fontSize: '96px', lineHeight: 1, textShadow: '0 0 12px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.8)' }}
+              data-testid="photo-count-flash"
+            >
+              {flashCount}/{maxPhotos}
+            </span>
+          </div>
+        )}
+
+        {/* All photos taken: the next tap on the button finishes */}
+        {photoCount >= maxPhotos && (
+          <div className="absolute bottom-32 left-0 right-0 flex justify-center z-20 pointer-events-none">
+            <p className="bg-black bg-opacity-80 text-white text-base font-bold px-4 py-2 rounded-lg">
+              All {maxPhotos} photos taken. Tap the button to finish.
+            </p>
+          </div>
+        )}
       </div>
       
       {/* Hidden canvas for photo capture */}
