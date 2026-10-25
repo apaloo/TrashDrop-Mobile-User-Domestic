@@ -62,11 +62,11 @@ describe('DumpingReportForm', () => {
 
     // Mock geolocation
     const mockGeolocation = {
-      getCurrentPosition: jest.fn().mockImplementation((success) =>
-        success({
-          coords: mockLocation
-        })
-      )
+      watchPosition: jest.fn().mockImplementation((success) => {
+        success({ coords: { ...mockLocation, accuracy: 10 } });
+        return 1;
+      }),
+      clearWatch: jest.fn()
     };
     global.navigator.geolocation = mockGeolocation;
 
@@ -101,7 +101,7 @@ describe('DumpingReportForm', () => {
     render(<DumpingReportForm />);
 
     await waitFor(() => {
-      expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalled();
+      expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
     });
   });
 
@@ -160,9 +160,11 @@ describe('DumpingReportForm', () => {
 
   it('asks for a location when GPS fails (no default coordinates)', async () => {
     global.navigator.geolocation = {
-      getCurrentPosition: jest.fn().mockImplementation((success, error) =>
-        error({ code: 1, PERMISSION_DENIED: 1, message: 'Geolocation error' })
-      )
+      watchPosition: jest.fn().mockImplementation((success, error) => {
+        error({ code: 1, PERMISSION_DENIED: 1, message: 'Geolocation error' });
+        return 1;
+      }),
+      clearWatch: jest.fn()
     };
 
     render(<DumpingReportForm />);

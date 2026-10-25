@@ -14,7 +14,7 @@ jest.mock('../CameraModal.js', () => () => null);
 describe('DumpingReportForm layout', () => {
   beforeEach(() => {
     useAuth.mockReturnValue({ user: { id: 'user123' } });
-    global.navigator.geolocation = { getCurrentPosition: jest.fn() };
+    global.navigator.geolocation = { watchPosition: jest.fn(() => 1), clearWatch: jest.fn() };
   });
 
   const follows = (first, second) =>

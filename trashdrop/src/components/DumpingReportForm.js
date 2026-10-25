@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -72,6 +72,13 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isLocating, setIsLocating] = useState(true); // First GPS fix is in flight on mount
+  const [gpsAccuracy, setGpsAccuracy] = useState(null); // ± metres of the best fix so far
+  const [gpsWatching, setGpsWatching] = useState(false); // GPS keeps improving until Submit
+  // GPS keeps running (watchPosition) while the user fills in the form and takes
+  // photos, keeping the most accurate fix, and stops when the report is submitted
+  // or the user pins the spot on the map
+  const watchIdRef = useRef(null);
+  const bestAccuracyRef = useRef(Infinity);
   const [submissionSuccess, setSubmissionSuccess] = useState(null); // Summary of the submitted report
 
   // Default to Accra, Ghana coordinates so map can render immediately
@@ -143,10 +150,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     };
   }, []);
 
-  // Get user's current location on component mount
+  // Start watching the location on mount; stop when the form goes away
   useEffect(() => {
     // Try to get current location immediately - no default
     handleUseMyLocation(false);
+    return () => stopGpsWatch();
   }, []);
 
   const handleChange = (e) => {
@@ -191,12 +199,26 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     }
   }, [showWarningToast]);
 
+  const stopGpsWatch = useCallback(() => {
+    if (watchIdRef.current !== null && navigator.geolocation?.clearWatch) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    watchIdRef.current = null;
+    setGpsWatching(false);
+  }, []);
+
+  // Watch the location and keep the most accurate fix. A single
+  // getCurrentPosition returned the phone's first (often coarse) fix and
+  // stopped, so leaving for the camera early kept a rough point.
   const handleUseMyLocation = useCallback((showFeedback = true) => {
     // Clear any previous errors
     setError(null);
     setIsLocating(true);
+    stopGpsWatch();
+    bestAccuracyRef.current = Infinity;
+    setGpsAccuracy(null);
     
-    if (navigator.geolocation) {
+    if (navigator.geolocation?.watchPosition) {
       try {
         if (showFeedback) {
           setLoading(true);
@@ -204,13 +226,19 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         
         const options = {
           enableHighAccuracy: true, // REQUIRED for ≤5m accuracy
-          timeout: 30000, // 30 seconds to get GPS lock
+          timeout: 30000, // report a slow first fix; the watch keeps going
           maximumAge: 0 // NO cached positions - always fresh GPS
         };
         
-        navigator.geolocation.getCurrentPosition(
+        let gotFix = false;
+        watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
             try {
+              const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : Infinity;
+              // Keep only a fix that is more accurate than the best so far
+              if (gotFix && accuracy >= bestAccuracyRef.current) return;
+              bestAccuracyRef.current = accuracy;
+
               const location = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude
@@ -222,25 +250,34 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               }));
               
               setMapPosition([location.latitude, location.longitude]);
+              setGpsAccuracy(Number.isFinite(accuracy) ? Math.round(accuracy) : null);
               
-              setIsLocating(false);
-              
-              // Show success message only if explicitly requested
-              if (showFeedback) {
-                showSuccessToast('📍 Location updated successfully');
-                setLoading(false);
+              if (!gotFix) {
+                gotFix = true;
+                setIsLocating(false);
+                setError(null);
+                // Show success message only if explicitly requested
+                if (showFeedback) {
+                  showSuccessToast('📍 Location updated successfully');
+                  setLoading(false);
+                }
               }
             } catch (processingError) {
               console.warn('Error processing location data:', processingError);
-              handleGeolocationFallback('Could not process your location data');
-              setIsLocating(false);
-              if (showFeedback) {
-                setLoading(false);
+              if (!gotFix) {
+                handleGeolocationFallback('Could not process your location data');
+                setIsLocating(false);
+                if (showFeedback) {
+                  setLoading(false);
+                }
               }
             }
           },
           (error) => {
             console.warn('Geolocation error:', error);
+            // After a fix, a slow update is not a problem: keep the best fix and keep watching
+            if (gotFix && error.code !== error.PERMISSION_DENIED) return;
+            if (error.code === error.PERMISSION_DENIED) stopGpsWatch();
             handleGeolocationFallback(`${getGeolocationErrorMessage(error)}`);
             setIsLocating(false);
             if (showFeedback) {
@@ -249,8 +286,10 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
           },
           options
         );
+        setGpsWatching(true);
       } catch (exception) {
         console.warn('Geolocation exception:', exception);
+        stopGpsWatch();
         handleGeolocationFallback('Unexpected error accessing location services');
         setIsLocating(false);
         if (showFeedback) {
@@ -264,7 +303,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         setLoading(false);
       }
     }
-  }, [handleGeolocationFallback, getGeolocationErrorMessage, setError, showSuccessToast]);
+  }, [handleGeolocationFallback, getGeolocationErrorMessage, setError, showSuccessToast, stopGpsWatch]);
 
   const handleMapClick = (latlng) => {
     // Clear any location errors when user manually selects location
@@ -272,6 +311,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       setError(null);
     }
     
+    // The spot the user pinned wins over GPS
+    stopGpsWatch();
+    setGpsAccuracy(null);
     setMapPosition([latlng.lat, latlng.lng]);
     setIsLocating(false);
     setFormData(prev => ({
@@ -459,6 +501,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       return;
     }
 
+    // GPS stops here: the report uses the most accurate fix collected so far
+    stopGpsWatch();
     setLoading(true);
     setError(null);
 
@@ -520,6 +564,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         contact_consent: false
       });
       setCapturedPhotos([]);
+      // Locate afresh for a next report
+      handleUseMyLocation(false);
 
       // Confirm on screen - a toast alone disappears before it is read
       setSubmissionSuccess(confirmation);
@@ -1040,6 +1086,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                   <>
                     <div>Lat: {formData.coordinates.latitude?.toFixed(6)}</div>
                     <div>Lng: {formData.coordinates.longitude?.toFixed(6)}</div>
+                    {gpsAccuracy !== null && (
+                      <div className={gpsAccuracy <= 10 ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}>
+                        GPS ±{gpsAccuracy} m{gpsWatching ? ' · improving until you submit' : ''}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-amber-700 dark:text-amber-400">
