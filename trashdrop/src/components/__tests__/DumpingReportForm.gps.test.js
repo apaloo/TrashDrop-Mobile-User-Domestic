@@ -6,10 +6,14 @@ import DumpingReportForm from '../DumpingReportForm.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { dumpingService } from '../../services/dumpingService.js';
 import { notificationService } from '../../services/notificationService.js';
+import { toastService } from '../../services/toastService.js';
 
 jest.mock('../../services/dumpingService.js');
 jest.mock('../../services/notificationService.js');
 jest.mock('../../context/AuthContext.js');
+jest.mock('../../services/toastService.js', () => ({
+  toastService: { success: jest.fn(), error: jest.fn(), warning: jest.fn(), info: jest.fn() },
+}));
 jest.mock('../CameraModal.js', () => ({ onCapture }) => (
   <button onClick={() => onCapture({ id: 'photo1', url: 'blob://photo-1' })}>Mock Capture Photo</button>
 ));
@@ -59,6 +63,34 @@ describe('DumpingReportForm GPS', () => {
     expect(dumpingService.createReport).toHaveBeenCalledWith('user123', expect.objectContaining({
       coordinates: { latitude: 5.672529, longitude: -0.280795 },
     }));
+  });
+
+  it('shows no pop-up for GPS fixes or photos (the form and camera show them)', async () => {
+    jest.useFakeTimers();
+    render(<DumpingReportForm />);
+    await fix(5.61, -0.21, 60);
+    await fix(5.672529, -0.280795, 6);
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    await user.click(screen.getByRole('button', { name: /Take Photo with Camera/i }));
+    await user.click(screen.getByRole('button', { name: /Mock Capture Photo/i }));
+    // Let the capture finish and any pop-up timer run
+    act(() => { jest.advanceTimersByTime(1000); });
+    act(() => { jest.advanceTimersByTime(1000); });
+    jest.useRealTimers();
+
+    expect(await screen.findByText(/1 photo\(s\) captured/)).toBeInTheDocument();
+    expect(toastService.success).not.toHaveBeenCalled();
+    expect(toastService.warning).not.toHaveBeenCalled();
+  });
+
+  it('shows a GPS problem on the form, not as a pop-up', async () => {
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      error({ code: 1, PERMISSION_DENIED: 1, message: 'denied' });
+      return 7;
+    });
+    render(<DumpingReportForm />);
+    expect(await screen.findByText(/Location access denied/i)).toBeInTheDocument();
+    expect(toastService.warning).not.toHaveBeenCalled();
   });
 
   it('stops watching when the form closes', () => {

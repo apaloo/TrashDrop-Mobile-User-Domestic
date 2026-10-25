@@ -191,13 +191,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const handleGeolocationFallback = useCallback((errorMessage) => {
     // Keep the default Accra coordinates that map is already showing
     // User can click on map to adjust location
+    // Shown on the form under the map; no pop-up on top of it
     setError(errorMessage || 'Location not available. Please click on the map to set your location.');
-    
-    // Show warning toast
-    if (errorMessage) {
-      showWarningToast(errorMessage);
-    }
-  }, [showWarningToast]);
+  }, []);
 
   const stopGpsWatch = useCallback(() => {
     if (watchIdRef.current !== null && navigator.geolocation?.clearWatch) {
@@ -256,9 +252,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 gotFix = true;
                 setIsLocating(false);
                 setError(null);
-                // Show success message only if explicitly requested
+                // The coordinates and accuracy on the form show it; no pop-up
                 if (showFeedback) {
-                  showSuccessToast('📍 Location updated successfully');
                   setLoading(false);
                 }
               }
@@ -303,7 +298,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         setLoading(false);
       }
     }
-  }, [handleGeolocationFallback, getGeolocationErrorMessage, setError, showSuccessToast, stopGpsWatch]);
+  }, [handleGeolocationFallback, getGeolocationErrorMessage, setError, stopGpsWatch]);
 
   const handleMapClick = (latlng) => {
     // Clear any location errors when user manually selects location
@@ -323,9 +318,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         longitude: latlng.lng
       }
     }));
-    
-    // Show success toast message
-    showSuccessToast('Location selected successfully');
+    // The pin and coordinates show the chosen spot; no pop-up
   };
 
   const handleTakePhoto = (e) => {
@@ -418,9 +411,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               photos: newUrls
             }));
             
-            // Show success message with accurate count
+            // The camera flashes the count (1/6, 2/6 …); no pop-up
             console.log(`Photo captured successfully. Total photos: ${updated.length}`);
-            showSuccessToast(`📸 Photo ${updated.length} captured successfully!`);
             
             // Re-enable form after successful photo processing
             setTimeout(() => setLoading(false), 200);
