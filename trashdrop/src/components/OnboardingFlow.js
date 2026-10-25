@@ -379,36 +379,16 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
     }
   };
 
-  const handleDigitalBinCreation = async () => {
-    try {
-      setIsLoading(true);
-      console.log('[Onboarding] Creating digital bin');
-      
-      // Mark milestone
-      setProgressMilestones(prev => ({ ...prev, hasCompletedDigitalBin: true }));
-      
-      // For simplified flow, create digital bin without requiring location
-      const binId = await onboardingService.createDigitalBin(
-        user.id,
-        null // No location required for simplified flow
-      );
-      
-      console.log('[Onboarding] Digital bin created successfully:', binId);
-      
-      // Dismiss onboarding since digital bin creation is complete
-      if (user?.id) {
-        onboardingService.dismissOnboarding(user.id);
-      }
-      
-      setCurrentStep('success');
-      
-    } catch (error) {
-      console.error('[Onboarding] Error creating digital bin:', error);
-      setError('Failed to create digital bin');
-      setProgressMilestones(prev => ({ ...prev, hasCompletedDigitalBin: false })); // Reset on error
-    } finally {
-      setIsLoading(false);
+  // Request Bin Pickup opens the Digital Bin request page, where the user adds
+  // the location, waste details and photos. It used to create a bin straight
+  // away (create_digital_bin RPC) with none of those.
+  const handleDigitalBinStep = () => {
+    setProgressMilestones(prev => ({ ...prev, hasCompletedDigitalBin: true }));
+    if (user?.id) {
+      onboardingService.dismissOnboarding(user.id);
     }
+    navigate('/digital-bin?source=onboarding');
+    onComplete();
   };
 
   const handlePickupRequest = async () => {
@@ -464,7 +444,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
         return <ScanResultStep batchDetails={scanBatchDetails} onContinue={() => setCurrentStep('request_pickup')} isLoading={isLoading} />;
         
       case 'digital_bin':
-        return <DigitalBinStep onBinCreate={handleDigitalBinCreation} isLoading={isLoading} />;
+        return <DigitalBinStep onRequest={handleDigitalBinStep} isLoading={isLoading} />;
         
       case 'request_pickup':
         return <PickupRequestStep onPickupRequest={handlePickupRequest} isLoading={isLoading} />;
@@ -751,14 +731,14 @@ const QRScanStep = ({ onScanComplete, isLoading }) => {
   );
 };
 
-const DigitalBinStep = ({ onBinCreate, isLoading }) => {
+const DigitalBinStep = ({ onRequest, isLoading }) => {
   return (
     <div>
       <h3 className="text-lg font-semibold mb-4">Request Bin Pickup</h3>
       <p className="text-gray-600 mb-6">Get instant access to digital bin service for waste pickup</p>
       
       <button
-        onClick={() => onBinCreate()}
+        onClick={() => onRequest()}
         disabled={isLoading}
         className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
       >
