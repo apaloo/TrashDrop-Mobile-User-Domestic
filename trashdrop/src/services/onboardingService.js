@@ -469,33 +469,6 @@ export const onboardingService = {
   },
 
   /**
-   * Create digital bin
-   * Uses RPC function to create digital bin with proper expiration
-   */
-  async createDigitalBin(userId, locationId) {
-    try {
-      console.log('[Onboarding] createDigitalBin called:', { userId, locationId });
-      
-      const { data, error } = await supabase
-        .rpc('create_digital_bin', {
-          user_uuid: userId,
-          location_id: locationId
-        });
-      
-      if (error) {
-        console.error('[Onboarding] Error creating digital bin:', error);
-        throw error;
-      }
-      
-      console.log('[Onboarding] Digital bin created successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('[Onboarding] Error creating digital bin:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Create onboarding pickup request
    * Uses RPC function to create pickup request in pickup_requests table
    */
@@ -569,6 +542,13 @@ export const onboardingService = {
         if (hasDismissed) {
           console.log('[Onboarding] User has dismissed onboarding, not showing');
           return { show: false, startingStep: null };
+        }
+        // Someone who already has a digital bin or a pickup request has set up.
+        // The dismissal above is only kept on this device, so check the account.
+        if (await this.hasStartedService(userId)) {
+          console.log('[Onboarding] User already has a bin or pickup, not showing');
+          this.dismissOnboarding(userId);
+          return { show: false, startingStep: 'success' };
         }
       } else {
         console.log('[Onboarding] Force parameter detected, showing onboarding regardless');
@@ -695,6 +675,23 @@ export const onboardingService = {
       return shouldShow;
     } catch (error) {
       console.error('[Onboarding] Error in fallback shouldShowOnboarding:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Whether the account already has a digital bin or a pickup request (any
+   * status). False when it can't be checked, so onboarding still shows.
+   */
+  async hasStartedService(userId) {
+    try {
+      const [bins, pickups] = await Promise.all([
+        supabase.from('digital_bins').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+        supabase.from('pickup_requests').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      ]);
+      return (bins?.count || 0) + (pickups?.count || 0) > 0;
+    } catch (error) {
+      console.warn('[Onboarding] Could not check existing bins/pickups:', error?.message);
       return false;
     }
   },
