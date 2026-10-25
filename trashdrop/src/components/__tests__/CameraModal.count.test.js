@@ -54,19 +54,17 @@ describe('CameraModal photo count', () => {
     expect(screen.getByTestId('photo-count')).toHaveTextContent('2/6');
   });
 
-  it('stays open at 6/6 and closes only when the button is tapped again', async () => {
+  it('shows 6/6, then closes by itself (no extra tap, no 7th photo)', async () => {
     const { user, button, onCapture, onClose } = await setup({ currentCount: 5 });
 
     await user.click(button); // the 6th photo
     expect(onCapture).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('photo-count-flash')).toHaveTextContent('6/6');
-    expect(screen.getByText('All 6 photos taken. Tap the button to finish.')).toBeInTheDocument();
-    act(() => { jest.advanceTimersByTime(2000); });
+    expect(button).toBeDisabled(); // a quick extra tap can't take a 7th
     expect(onClose).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole('button', { name: 'Finish taking photos' }));
-    act(() => { jest.advanceTimersByTime(100); });
+    act(() => { jest.advanceTimersByTime(1300); });
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onCapture).toHaveBeenCalledTimes(1); // no 7th photo
+    expect(onCapture).toHaveBeenCalledTimes(1);
   });
 });

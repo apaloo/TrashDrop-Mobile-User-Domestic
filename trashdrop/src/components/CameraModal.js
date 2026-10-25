@@ -292,9 +292,8 @@ const CameraModal = ({
   const capturePhoto = () => {
     console.log('CameraModal: Starting photo capture...');
     
-    // All photos taken: this tap finishes and closes the camera
+    // Already full (the camera is closing after the last photo)
     if (photoCount >= maxPhotos) {
-      console.log('CameraModal: Maximum photos reached, closing on tap');
       handleClose();
       return;
     }
@@ -392,11 +391,15 @@ const CameraModal = ({
       // Force garbage collection after blob creation (unofficial but helps)
       if (window.gc) window.gc();
       
-      // Update count, and flash it large ("3/6")
-      setPhotoCount(prev => prev + 1);
-      setFlashCount(photoCount + 1);
+      // Update count, and flash it large ("3/6"). After the last photo the
+      // count shows for a moment and the camera closes by itself.
+      const newCount = photoCount + 1;
+      setPhotoCount(newCount);
+      setFlashCount(newCount);
       clearTimeout(flashCountTimer.current);
-      flashCountTimer.current = setTimeout(() => setFlashCount(null), 1200);
+      flashCountTimer.current = newCount >= maxPhotos
+        ? setTimeout(() => handleClose(), 1200)
+        : setTimeout(() => setFlashCount(null), 1200);
       
       // Simple flash effect
       try {
@@ -616,9 +619,9 @@ const CameraModal = ({
               e.stopPropagation();
               capturePhoto();
             }}
-            disabled={!cameraStream || isLoading}
+            disabled={!cameraStream || isLoading || photoCount >= maxPhotos}
             className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg disabled:opacity-50 border-4 border-white"
-            aria-label={photoCount >= maxPhotos ? 'Finish taking photos' : 'Capture photo'}
+            aria-label="Capture photo"
           >
             <div className="w-16 h-16 bg-blue-600 rounded-full"></div>
           </button>
@@ -642,15 +645,6 @@ const CameraModal = ({
             >
               {flashCount}/{maxPhotos}
             </span>
-          </div>
-        )}
-
-        {/* All photos taken: the next tap on the button finishes */}
-        {photoCount >= maxPhotos && (
-          <div className="absolute bottom-32 left-0 right-0 flex justify-center z-20 pointer-events-none">
-            <p className="bg-black bg-opacity-80 text-white text-base font-bold px-4 py-2 rounded-lg">
-              All {maxPhotos} photos taken. Tap the button to finish.
-            </p>
           </div>
         )}
       </div>
