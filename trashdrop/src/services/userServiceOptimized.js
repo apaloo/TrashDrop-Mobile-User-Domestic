@@ -51,22 +51,24 @@ export const userServiceOptimized = {
                 .select('id', { count: 'exact', head: true })
                 .eq('reported_by', userId)
             ]);
-            if (directStats) {
-              console.log('[UserServiceOptimized] Found direct user_stats:', directStats);
+            // Reports count even without a user_stats row (accounts with no
+            // profiles/user_stats row still have their own reports)
+            if (directStats || reportCount) {
+              console.log('[UserServiceOptimized] Stats without the dashboard view:', { directStats, reportCount });
               return {
                 data: {
                   points: 0,
                   pickups: 0,
                   reports: reportCount || 0,
-                  batches: directStats.total_batches || 0,
-                  totalBags: directStats.total_bags || directStats.available_bags || 0,
-                  available_bags: directStats.available_bags || 0,
+                  batches: directStats?.total_batches || 0,
+                  totalBags: directStats?.total_bags || directStats?.available_bags || 0,
+                  available_bags: directStats?.available_bags || 0,
                   level: 'Eco Starter',
                   email: '',
                   firstName: '',
                   lastName: '',
                   avatar: '',
-                  last_updated: directStats.created_at || new Date().toISOString(),
+                  last_updated: directStats?.created_at || new Date().toISOString(),
                   _source: 'direct_user_stats',
                   _query_count: 3
                 },
@@ -235,15 +237,16 @@ export const userServiceOptimized = {
               .select('id', { count: 'exact', head: true })
               .eq('reported_by', userId)
           ]);
-          if (directStats) {
-            console.log('[UserServiceOptimized] Found direct user_stats:', directStats);
+          // Reports count even without a user_stats row
+          if (directStats || reportCount) {
+            console.log('[UserServiceOptimized] Critical stats without the dashboard view:', { directStats, reportCount });
             return {
               points: 0,
               pickups: 0,
               reports: reportCount || 0,
-              batches: directStats.total_batches || 0,
-              totalBags: directStats.total_bags || directStats.available_bags || 0,
-              available_bags: directStats.available_bags || 0,
+              batches: directStats?.total_batches || 0,
+              totalBags: directStats?.total_bags || directStats?.available_bags || 0,
+              available_bags: directStats?.available_bags || 0,
               _source: 'direct_user_stats',
               _query_count: 3
             };
