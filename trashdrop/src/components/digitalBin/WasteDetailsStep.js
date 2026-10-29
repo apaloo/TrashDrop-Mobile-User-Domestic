@@ -23,11 +23,11 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
   
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Digital Bin Details</h2>
+      <h2 className="text-xl font-semibold mb-4 text-td-ink">Digital Bin Details</h2>
       
       {/* Number of Bins - Horizontal Scrollable Cards */}
       <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-900 mb-2">
+        <label className="block text-sm font-medium text-td-ink mb-2">
           Number of Digital Bins Needed
         </label>
         
@@ -51,7 +51,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
               className={`flex-shrink-0 w-20 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                 parseInt(formData.numberOfBags) === num
                   ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                  : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                  : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
               }`}
               style={{ scrollSnapAlign: 'start' }}
             >
@@ -62,7 +62,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
                   {num}
                 </div>
                 <span className={`text-xs font-medium ${
-                  parseInt(formData.numberOfBags) === num ? 'text-green-700' : 'text-gray-700'
+                  parseInt(formData.numberOfBags) === num ? 'text-green-700' : 'text-td-ink'
                 }`}>
                   {num === 1 ? 'Bin' : 'Bins'}
                 </span>
@@ -71,21 +71,21 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
           ))}
         </div>
         
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-td-sage mt-2">
           Select the number of digital bins you need for your waste collection
         </p>
       </div>
       
       {/* Bin Size - NEW (MANDATORY) */}
       <div className="mb-5">
-        <label htmlFor="binSize" className="block text-sm font-medium text-gray-900 mb-1">
+        <label htmlFor="binSize" className="block text-sm font-medium text-td-ink mb-1">
           Bin Size (Liters) <span className="text-red-500">*</span>
         </label>
         <select
           id="binSize"
           value={formData.bin_size_liters}
           onChange={(e) => updateFormData({ bin_size_liters: parseInt(e.target.value) })}
-          className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          className="w-full p-3 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-td-ink font-medium"
           style={{color: '#333'}}
           required
         >
@@ -95,14 +95,14 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
             </option>
           ))}
         </select>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-td-sage mt-1">
           Larger bins cost more but accommodate more waste. Collection cost is calculated based on bin size.
         </p>
       </div>
       
       {/* Waste Type - Horizontal Scrollable Cards */}
       <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-900 mb-2">
+        <label className="block text-sm font-medium text-td-ink mb-2">
           Bin Type
         </label>
         
@@ -123,14 +123,14 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
               className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                 formData.wasteType === value
                   ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                  : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                  : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
               }`}
               style={{ scrollSnapAlign: 'start' }}
             >
               <div className="flex flex-col items-center text-center">
                 <div className="text-3xl mb-2">{icon}</div>
                 <span className={`text-xs font-medium ${
-                  formData.wasteType === value ? 'text-green-700' : 'text-gray-700'
+                  formData.wasteType === value ? 'text-green-700' : 'text-td-ink'
                 }`}>
                   {label}
                 </span>
@@ -139,7 +139,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
           ))}
         </div>
         
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-td-sage mt-2">
           Choose the type that matches your waste
         </p>
       </div>
@@ -168,13 +168,13 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
             type="checkbox"
             checked={formData.is_urgent}
             onChange={(e) => updateFormData({ is_urgent: e.target.checked })}
-            className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5"
+            className="h-5 w-5 text-primary focus:ring-primary border-td-border-strong rounded mt-0.5"
           />
           <div className="ml-3 flex-1">
-            <label htmlFor="isUrgent" className="block text-sm font-medium text-gray-900">
+            <label htmlFor="isUrgent" className="block text-sm font-medium text-td-ink">
               ⚡ Mark as Urgent
             </label>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-td-sage mt-1">
               Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+30%). It takes up to 2 hours for urgent pickup to be collected.
             </p>
           </div>
@@ -191,7 +191,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
         <button
           type="button"
           onClick={prevStep}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          className="px-6 py-2 border border-td-border-strong text-td-ink rounded-md hover:bg-td-cream transition-colors"
         >
           Back
         </button>
@@ -203,7 +203,7 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
           className={`px-6 py-2 rounded-md transition-colors ${
             isValid()
               ? 'bg-primary hover:bg-primary-dark text-white'
-              : 'bg-gray-300 cursor-not-allowed text-gray-500'
+              : 'bg-gray-300 cursor-not-allowed text-td-sage'
           }`}
         >
           Continue

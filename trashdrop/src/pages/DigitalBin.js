@@ -1048,10 +1048,10 @@ function DigitalBin() {
   // Show loading spinner while auth is loading
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-td-cream dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          <p className="text-td-sage dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -1073,12 +1073,12 @@ function DigitalBin() {
           className="absolute top-4 right-4 z-20 p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
           aria-label={viewMode === 'create' ? 'Back to list' : 'Close modal'}
         >
-          <FaTimes className="text-gray-600 dark:text-gray-300 text-xl" />
+          <FaTimes className="text-td-sage dark:text-gray-300 text-xl" />
         </button>
         
         {/* Header */}
-        <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-4 flex-shrink-0 pr-16">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+        <div className="border-b border-td-border dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-4 flex-shrink-0 pr-16">
+          <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100 flex items-center gap-2">
             {viewMode === 'list' ? (
               <>
                 <FaQrcode className="text-primary" />
@@ -1153,7 +1153,7 @@ function DigitalBin() {
                       style={{ minWidth: '60px' }}
                     >
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1
-                        ${currentStep >= step ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                        ${currentStep >= step ? 'bg-primary text-white' : 'bg-gray-200 text-td-sage dark:bg-gray-700 dark:text-gray-300'}`}>
                         {step}
                       </div>
                       <span className="text-xs text-center hidden sm:block dark:text-gray-300">{getStepTitle(step)}</span>
@@ -1162,14 +1162,14 @@ function DigitalBin() {
                 </div>
                 
                 {/* GPS Accuracy Indicator - shows during pages 1-4 when we have coordinates */}
-                <div className={`mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-between text-sm ${currentStep < 5 && formData.latitude && formData.longitude ? 'block' : 'hidden'}`}>
+                <div className={`mb-4 px-3 py-2 bg-td-tonal dark:bg-blue-900/20 rounded-lg flex items-center justify-between text-sm ${currentStep < 5 && formData.latitude && formData.longitude ? 'block' : 'hidden'}`}>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${isRefining ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></span>
-                    <span className="text-blue-700 dark:text-blue-300">
+                    <span className={`inline-block w-2 h-2 rounded-full ${isRefining ? 'bg-yellow-500 animate-pulse' : 'bg-green-600'}`}></span>
+                    <span className="text-td-forest dark:text-blue-300">
                       GPS Accuracy: {formData.gps_accuracy ? `${formData.gps_accuracy.toFixed(1)}m` : 'Measuring...'}
                     </span>
                   </div>
-                  <span className={`text-xs ${isRefining ? 'text-blue-600 dark:text-blue-400' : refinementCount > 0 ? 'text-green-600 dark:text-green-400' : 'hidden'}`}>
+                  <span className={`text-xs ${isRefining ? 'text-td-forest dark:text-blue-400' : refinementCount > 0 ? 'text-green-600 dark:text-green-400' : 'hidden'}`}>
                     {isRefining ? 'Refining...' : refinementCount > 0 ? `✓ Improved ${refinementCount}x` : ''}
                   </span>
                 </div>
