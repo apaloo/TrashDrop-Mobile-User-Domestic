@@ -91,12 +91,12 @@ const NavBar = () => {
   };
 
   // Active link style
-  const activeStyle = "text-[#4CAF50] font-bold";
-  const inactiveStyle = "text-gray-600 hover:text-[#4CAF50]";
+  const activeStyle = "text-td-forest dark:text-green-300 font-bold";
+  const inactiveStyle = "text-td-sage dark:text-gray-300 hover:text-td-forest dark:hover:text-green-300";
   
   // Active style for bottom navigation
-  const activeBottomNavStyle = "text-[#4CAF50] font-bold";
-  const inactiveBottomNavStyle = "text-gray-500";
+  const activeBottomNavStyle = "text-td-forest dark:text-green-300 font-bold";
+  const inactiveBottomNavStyle = "text-td-sage dark:text-gray-300";
 
   // Toggle profile dropdown
   const toggleProfileDropdown = () => {
@@ -189,7 +189,7 @@ const NavBar = () => {
       <nav className="bg-white dark:bg-gray-800 py-2 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
         <div className="container mx-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
-          <NavLink to="/" className="flex items-center space-x-3 text-[#4CAF50] dark:text-[#66BB6A] text-2xl font-bold">
+          <NavLink to="/" className="flex items-center space-x-3 text-td-forest dark:text-[#66BB6A] text-2xl font-bold">
             {/* Light mode logo */}
             <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center p-1 dark:hidden">
               <img src="/logo.svg" alt="TrashDrop Logo" className="w-full h-full object-contain" />
@@ -206,10 +206,10 @@ const NavBar = () => {
             <div className="md:hidden relative" ref={dropdownRef}>
               <button 
                 onClick={toggleProfileDropdown}
-                className="flex items-center space-x-2 p-2 text-[#4CAF50] focus:outline-none focus:ring-2 focus:ring-[#4CAF50] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="flex items-center space-x-2 p-2 text-td-forest focus:outline-none focus:ring-2 focus:ring-td-forest rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 aria-label="Profile menu"
               >
-                <div className="w-10 h-10 rounded-full bg-[#4CAF50] flex items-center justify-center text-white text-sm font-medium">
+                <div className="w-10 h-10 rounded-full bg-td-forest flex items-center justify-center text-white text-sm font-medium">
                   {getUserInitials()}
                 </div>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -219,11 +219,11 @@ const NavBar = () => {
               
               {/* Mobile Profile Dropdown */}
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-700 rounded-md shadow-lg py-2 z-60 border border-gray-200 dark:border-gray-600">
-                  <NavLink to="/profile" className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-700 rounded-md shadow-lg py-2 z-60 border border-td-border dark:border-gray-600">
+                  <NavLink to="/profile" className="block px-4 py-3 text-sm text-td-ink dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
                     Your Profile
                   </NavLink>
-                  <div className="border-t border-gray-200 dark:border-gray-600"></div>
+                  <div className="border-t border-td-border dark:border-gray-600"></div>
                   <button
                     onClick={handleSignOut}
                     disabled={isSigningOut}
@@ -311,6 +311,7 @@ const NavBar = () => {
                 </NavLink>
                 <NavLink 
                   to="/notifications" 
+                  aria-label="Notifications"
                   className={({ isActive }) => `
                     px-3 py-2 rounded-md text-sm font-medium transition-colors relative
                     ${isActive ? activeStyle : inactiveStyle}
@@ -339,7 +340,7 @@ const NavBar = () => {
                 <button
                   onClick={handleSignOut}
                   disabled={isSigningOut}
-                  className="px-3 py-2 rounded-md text-sm font-medium text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-3 py-2 rounded-md text-sm font-medium text-red-600 border border-red-600 dark:text-red-400 dark:border-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   {isSigningOut ? (
                     <>

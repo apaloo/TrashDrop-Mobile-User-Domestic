@@ -83,8 +83,9 @@ const DataFreshnessIndicator = ({ dataSource, updateType, lastUpdate }) => {
               <span className="ml-1 text-xs">{getUpdateIndicator()}</span>
             )}
           </span>
+          {/* Set apart by weight, not faded: faded text fell below 4.5:1 */}
           {lastUpdate && (
-            <span className="text-xs opacity-75">
+            <span className="text-xs font-normal">
               {formatRelativeTime(lastUpdate)}
             </span>
           )}

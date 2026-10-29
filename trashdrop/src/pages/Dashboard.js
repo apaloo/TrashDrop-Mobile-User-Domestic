@@ -70,7 +70,7 @@ const ActivityListSkeleton = () => (
     {[1, 2, 3].map(i => (
       <div
         key={i}
-        className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-3"
+        className="bg-td-cream dark:bg-gray-700 border border-td-border dark:border-gray-600 rounded-lg p-4 mb-3"
         aria-hidden="true"
       >
         <ActivityItemSkeleton />
@@ -1122,7 +1122,7 @@ const Dashboard = () => {
   const ActivityIcon = ({ type }) => {
     if (type === 'pickup') {
       return (
-        <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className="w-6 h-6 text-td-forest" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
         </svg>
       );
@@ -1147,7 +1147,7 @@ const Dashboard = () => {
           {!activitiesLoaded && (!Array.isArray(recentActivities) || recentActivities.length === 0) ? (
             <ActivityListSkeleton />
           ) : !recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
-            <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-6 text-td-sage dark:text-gray-400">
               <p>No recent activities yet</p>
             </div>
           ) : (
@@ -1156,7 +1156,7 @@ const Dashboard = () => {
               return Array.isArray(recentActivities) && recentActivities.map((activity, index) => (
               <div 
                 key={activity.id || `activity-${index}`}
-                className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-3 flex items-center"
+                className="bg-td-cream dark:bg-gray-700 border border-td-border dark:border-gray-600 rounded-lg p-4 mb-3 flex items-center"
                 loading={index > 2 ? "lazy" : "eager"}
               >
                 <div className="flex-shrink-0 mr-4">
@@ -1194,8 +1194,8 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="flex-grow">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.description || activity.message}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-sm font-medium text-td-ink dark:text-gray-100">{activity.description || activity.message}</p>
+                  <p className="text-xs text-td-sage dark:text-gray-400">
                     {new Date(activity.timestamp).toLocaleString()}
                   </p>
                 </div>
@@ -1283,14 +1283,15 @@ const Dashboard = () => {
       <DashboardOptimizer />
       {/* Sticky Stats Cards - Horizontal scroll only */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2" style={{position: "fixed", top: "65px", width: "100%"}}>
-        <div className="overflow-x-auto scrollbar-hide px-4">
+        {/* Scrolls sideways on phones; focusable so it scrolls from the keyboard too */}
+        <div className="overflow-x-auto scrollbar-hide px-4" tabIndex={0} role="region" aria-label="Your totals">
           <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-emerald-400 dark:border-emerald-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
-                  <svg className="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12,2A3,3 0 0,1 15,5V6H20A1,1 0 0,1 21,7V19A3,3 0 0,1 18,22H6A3,3 0 0,1 3,19V7A1,1 0 0,1 4,6H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V6H13V5A1,1 0 0,0 12,4M5,8V19A1,1 0 0,0 6,20H18A1,1 0 0,0 19,19V8H5Z" />
                   </svg>
                 </div>
@@ -1299,50 +1300,50 @@ const Dashboard = () => {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12,2A3,3 0 0,1 15,5V6H20A1,1 0 0,1 21,7V19A3,3 0 0,1 18,22H6A3,3 0 0,1 3,19V7A1,1 0 0,1 4,6H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V6H13V5A1,1 0 0,0 12,4M5,8V19A1,1 0 0,0 6,20H18A1,1 0 0,0 19,19V8H5Z" />
                       </svg>
-                      <h3 className="text-emerald-700 text-lg font-bold">Batches & Bags</h3>
+                      <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Batches & Bags</h3>
                     </div>
-                    <div className="bg-emerald-100 text-emerald-700 border border-emerald-300 px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="bg-td-tonal text-td-forest dark:bg-green-900/30 dark:text-green-300 px-3 py-1 rounded-full text-sm font-bold">
                       Lv {Math.floor((stats.points || 0) / 100) + 1}
                     </div>
                   </div>
                   
                   <div className="flex items-center justify-around">
                     <div className="text-center">
-                      <p className="text-emerald-600 text-xs mb-1">Batches</p>
-                      <p className={`text-emerald-700 text-3xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
+                      <p className="text-td-sage dark:text-gray-400 text-xs mb-1">Batches</p>
+                      <p className={`text-td-ink dark:text-gray-100 text-3xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
                         {stats.batches || 0}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-emerald-600 text-xs mb-1">Bags</p>
-                      <p className={`text-emerald-700 text-3xl font-bold ${bagsPulse ? 'animate-pulse' : ''}`}>
+                      <p className="text-td-sage dark:text-gray-400 text-xs mb-1">Bags</p>
+                      <p className={`text-td-ink dark:text-gray-100 text-3xl font-bold ${bagsPulse ? 'animate-pulse' : ''}`}>
                         {stats.totalBags || 0}
                       </p>
                     </div>
                   </div>
                   
                   {/* Progress Bar */}
-                  <div className="w-full bg-emerald-100 rounded-full h-2 mb-2">
+                  <div className="w-full bg-td-tonal dark:bg-gray-700 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-emerald-500 h-2 rounded-full transition-all duration-300" 
+                      className="bg-td-forest h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((stats.points || 0) % 100) / 100 * 100, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <p className="text-emerald-600 text-sm text-center">
+                  <p className="text-td-sage dark:text-gray-400 text-sm text-center">
                     {100 - ((stats.points || 0) % 100)} more to level up
                   </p>
                 </div>
               </div>
               
               {/* Pickups Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-teal-400 dark:border-teal-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
-                  <svg className="w-16 h-16 text-teal-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
                   </svg>
                 </div>
@@ -1351,41 +1352,41 @@ const Dashboard = () => {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-teal-600" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
                       </svg>
-                      <h3 className="text-teal-700 text-lg font-bold">Pickups</h3>
+                      <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Pickups</h3>
                     </div>
-                    <div className="bg-teal-100 text-teal-700 border border-teal-300 px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="bg-td-tonal text-td-forest dark:bg-green-900/30 dark:text-green-300 px-3 py-1 rounded-full text-sm font-bold">
                       Lv {Math.floor((stats.pickups || 0) / 5) + 1}
                     </div>
                   </div>
                   
                   <div className="text-center mb-4">
-                    <p className={`text-teal-700 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
+                    <p className={`text-td-ink dark:text-gray-100 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
                       {stats.pickups || 0}
                     </p>
                   </div>
                   
                   {/* Progress Bar */}
-                  <div className="w-full bg-teal-100 rounded-full h-2 mb-2">
+                  <div className="w-full bg-td-tonal dark:bg-gray-700 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-teal-500 h-2 rounded-full transition-all duration-300" 
+                      className="bg-td-forest h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((stats.pickups || 0) % 5) / 5 * 100, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <p className="text-teal-600 text-sm text-center">
+                  <p className="text-td-sage dark:text-gray-400 text-sm text-center">
                     {5 - ((stats.pickups || 0) % 5)} more to level up
                   </p>
                 </div>
               </div>
 
               {/* Reports Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border-2 border-amber-400 dark:border-amber-500 rounded-lg shadow-lg p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
-                  <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                   </svg>
                 </div>
@@ -1394,31 +1395,31 @@ const Dashboard = () => {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                       </svg>
-                      <h3 className="text-amber-700 text-lg font-bold">Reports</h3>
+                      <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Reports</h3>
                     </div>
-                    <div className="bg-amber-100 text-amber-700 border border-amber-300 px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="bg-td-tonal text-td-forest dark:bg-green-900/30 dark:text-green-300 px-3 py-1 rounded-full text-sm font-bold">
                       Lv {Math.floor((stats.reports || 0) / 3) + 1}
                     </div>
                   </div>
                   
                   <div className="text-center mb-4">
-                    <p className={`text-amber-700 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
+                    <p className={`text-td-ink dark:text-gray-100 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
                       {stats.reports || 0}
                     </p>
                   </div>
                   
                   {/* Progress Bar */}
-                  <div className="w-full bg-amber-100 rounded-full h-2 mb-2">
+                  <div className="w-full bg-td-tonal dark:bg-gray-700 rounded-full h-2 mb-2">
                     <div 
-                      className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
+                      className="bg-td-orange h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((stats.reports || 0) % 3) / 3 * 100, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <p className="text-amber-600 text-sm text-center">
+                  <p className="text-td-sage dark:text-gray-400 text-sm text-center">
                     {3 - ((stats.reports || 0) % 3)} more to level up
                   </p>
                 </div>
@@ -1430,13 +1431,13 @@ const Dashboard = () => {
 
       {/* Onboarding Progress Banner - Show when user needs guidance */}
       {!showOnboarding && nextAction && userOnboardingState?.state !== 'READY_FOR_PICKUP' && (
-        <div className="mx-4 mt-4 mb-2 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900 dark:to-green-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+        <div className="mx-4 mt-4 mb-2 bg-td-tonal dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-1">
+              <h3 className="text-lg font-semibold text-td-ink dark:text-gray-100 mb-1">
                 Complete Your First Cleanup
               </h3>
-              <p className="text-blue-700 dark:text-blue-300 text-sm">
+              <p className="text-td-sage dark:text-gray-300 text-sm">
                 Get started in under 60 seconds
               </p>
               <div className="mt-2 space-y-1">
@@ -1446,7 +1447,7 @@ const Dashboard = () => {
                   }`}>
                     {userOnboardingState?.location_count > 0 && '✓'}
                   </span>
-                  <span className={userOnboardingState?.location_count > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-blue-700 dark:text-blue-300'}>
+                  <span className={userOnboardingState?.location_count > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-td-ink dark:text-gray-200'}>
                     Set location
                   </span>
                 </div>
@@ -1456,7 +1457,7 @@ const Dashboard = () => {
                   }`}>
                     {userOnboardingState?.total_bags_scanned > 0 && '✓'}
                   </span>
-                  <span className={userOnboardingState?.total_bags_scanned > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-blue-700 dark:text-blue-300'}>
+                  <span className={userOnboardingState?.total_bags_scanned > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-td-ink dark:text-gray-200'}>
                     Scan QR code or choose service
                   </span>
                 </div>
@@ -1466,7 +1467,7 @@ const Dashboard = () => {
                   }`}>
                     {userOnboardingState?.available_bags > 0 && '✓'}
                   </span>
-                  <span className={userOnboardingState?.available_bags > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-blue-700 dark:text-blue-300'}>
+                  <span className={userOnboardingState?.available_bags > 0 ? 'text-green-700 dark:text-green-300 line-through' : 'text-td-ink dark:text-gray-200'}>
                     Request pickup
                   </span>
                 </div>
@@ -1475,7 +1476,7 @@ const Dashboard = () => {
             <div className="text-right">
               <button
                 onClick={() => setShowOnboarding(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold"
               >
                 {nextAction.title}
               </button>
@@ -1490,7 +1491,7 @@ const Dashboard = () => {
             {/* Digital Bin Button */}
             <button 
               onClick={() => navigate('/digital-bin')}
-              className="w-full bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-600 hover:border-blue-400 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+              className="w-full bg-green-600 dark:bg-green-600 border-2 border-transparent hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1501,7 +1502,7 @@ const Dashboard = () => {
             {/* View Rewards Button */}
             <button 
               onClick={() => navigate('/rewards')}
-              className="w-full bg-white dark:bg-gray-800 border-2 border-amber-300 dark:border-amber-600 hover:border-amber-400 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-semibold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center space-x-2"
+              className="w-full bg-white dark:bg-gray-800 border-2 border-td-orange hover:bg-orange-50 dark:hover:bg-gray-700 text-td-orange-text dark:text-td-orange font-semibold py-4 px-6 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
@@ -1519,8 +1520,8 @@ const Dashboard = () => {
               onClick={() => setDashboardTab('activity')}
               className={`flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all duration-200 ${
                 dashboardTab === 'activity'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  ? 'bg-white dark:bg-gray-700 text-td-ink dark:text-gray-100 shadow-sm'
+                  : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
               }`}
             >
               Recent Activity
@@ -1529,8 +1530,8 @@ const Dashboard = () => {
               onClick={() => setDashboardTab('pickup')}
               className={`flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
                 dashboardTab === 'pickup'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  ? 'bg-white dark:bg-gray-700 text-td-ink dark:text-gray-100 shadow-sm'
+                  : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
               }`}
             >
               Active Pickup
@@ -1581,19 +1582,19 @@ const Dashboard = () => {
 
         {/* Recent Activity - shown when activity tab selected or no active pickup */}
         {dashboardTab === 'activity' && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
+        <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-900 dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
+            <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
             <div className="flex items-center gap-3">
               {isRefreshingActivities && (
-                <div className="flex items-center text-gray-600 text-sm">
+                <div className="flex items-center text-td-sage text-sm">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
                   Updating...
                 </div>
               )}
               <Link
                 to="/activity"
-                className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2"
+                className="text-sm text-td-forest dark:text-green-300 hover:text-td-forest-dk underline underline-offset-2"
               >
                 View all activity →
               </Link>
@@ -1605,10 +1606,10 @@ const Dashboard = () => {
 
         {/* Active Pickup Card - shown when pickup tab selected */}
         {dashboardTab === 'pickup' && activePickups && activePickups.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden mt-6">
+          <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-lg overflow-hidden mt-6">
             {/* Card Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-gray-50 dark:bg-gray-700/60">
-              <h3 className="text-gray-900 dark:text-gray-100 text-base font-bold">
+            <div className="flex items-center justify-between px-5 py-3 bg-td-cream dark:bg-gray-700/60">
+              <h3 className="text-td-ink dark:text-gray-100 text-base font-bold">
                 {activePickups[0].is_digital_bin ? 'Active Digital Bin' : 'Active Pickup'}
               </h3>
               <span 
@@ -1628,22 +1629,22 @@ const Dashboard = () => {
               {/* Row 1: Collector + Bags/Points */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-9 h-9 rounded-full bg-td-tonal dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-td-forest dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Collector</p>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                    <p className="text-xs text-td-sage dark:text-gray-400">Collector</p>
+                    <p className="text-sm font-semibold text-td-ink dark:text-gray-100 truncate">
                       {activePickups[0].collector_name || (activePickups[0].collector ? `${activePickups[0].collector.first_name || ''} ${activePickups[0].collector.last_name || ''}`.trim() : null) || 'Waiting...'}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                   <div className="text-center px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                    <p className="text-base font-bold text-gray-900 dark:text-gray-100">{activePickups[0].estimated_volume || activePickups[0].bag_count || activePickups[0].number_of_bags || 0}</p>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Bags</p>
+                    <p className="text-base font-bold text-td-ink dark:text-gray-100">{activePickups[0].estimated_volume || activePickups[0].bag_count || activePickups[0].number_of_bags || 0}</p>
+                    <p className="text-[10px] text-td-sage dark:text-gray-400 uppercase tracking-wide">Bags</p>
                   </div>
                   <div className="text-center px-3 py-1 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <p className="text-base font-bold text-green-600 dark:text-green-400">+{activePickups[0].points_earned || activePickups[0].points || 0}</p>
@@ -1661,8 +1662,8 @@ const Dashboard = () => {
                   </svg>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Pickup Location</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
+                  <p className="text-xs text-td-sage dark:text-gray-400">Pickup Location</p>
+                  <p className="text-sm font-medium text-td-ink dark:text-gray-100 line-clamp-2">
                     {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
                   </p>
                 </div>
@@ -1671,7 +1672,7 @@ const Dashboard = () => {
               {/* Digital bin frequency badge */}
               {activePickups[0].is_digital_bin && activePickups[0].frequency && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2.5 py-1 rounded-full font-medium">
+                  <span className="text-xs bg-td-tonal dark:bg-blue-900 text-td-forest dark:text-blue-300 px-2.5 py-1 rounded-full font-medium">
                     {activePickups[0].frequency}
                   </span>
                 </div>
@@ -1689,7 +1690,7 @@ const Dashboard = () => {
                       {/* Track Collector Button */}
                       <Link 
                         to={`/collector-tracking?pickupId=${activePickups[0].id}`}
-                        className="flex items-center justify-center bg-blue-500 hover:bg-blue-600 rounded-lg p-3 transition-colors cursor-pointer shadow-md"
+                        className="flex items-center justify-center bg-green-600 hover:bg-green-700 rounded-lg p-3 transition-colors cursor-pointer shadow-md"
                       >
                         <div className="flex items-center space-x-2">
                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1703,13 +1704,13 @@ const Dashboard = () => {
                       {/* Alerts/Notifications Button */}
                       <Link 
                         to="/notifications" 
-                        className="flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-lg p-3 transition-colors cursor-pointer"
+                        className="flex items-center justify-center bg-td-tonal dark:bg-blue-900/30 hover:bg-green-100 dark:hover:bg-blue-900/50 border border-td-border dark:border-blue-700 rounded-lg p-3 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center space-x-2 relative">
-                          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <svg className="w-5 h-5 text-td-forest dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                           </svg>
-                          <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Alerts</span>
+                          <span className="text-td-forest dark:text-blue-300 font-medium text-sm">Alerts</span>
                           {unreadNotifications > 0 && (
                             <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                               {unreadNotifications > 9 ? '9+' : unreadNotifications}
