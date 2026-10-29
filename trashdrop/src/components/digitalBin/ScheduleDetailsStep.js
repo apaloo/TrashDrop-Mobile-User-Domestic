@@ -36,11 +36,11 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Service Schedule</h2>
+      <h2 className="text-xl font-semibold mb-4 text-td-ink">Service Schedule</h2>
       
       {/* Service Frequency - Horizontal Scrollable Cards */}
       <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-900 mb-2">
+        <label className="block text-sm font-medium text-td-ink mb-2">
           Service Frequency
         </label>
         
@@ -60,14 +60,14 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'one-time'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">1️⃣</div>
               <span className={`text-xs font-medium ${
-                formData.frequency === 'one-time' ? 'text-green-700' : 'text-gray-700'
+                formData.frequency === 'one-time' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 One-time
               </span>
@@ -80,14 +80,14 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'weekly'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">📅</div>
               <span className={`text-xs font-medium ${
-                formData.frequency === 'weekly' ? 'text-green-700' : 'text-gray-700'
+                formData.frequency === 'weekly' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Weekly
               </span>
@@ -100,14 +100,14 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'biweekly'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">📆</div>
               <span className={`text-xs font-medium ${
-                formData.frequency === 'biweekly' ? 'text-green-700' : 'text-gray-700'
+                formData.frequency === 'biweekly' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Bi-weekly
               </span>
@@ -120,14 +120,14 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'monthly'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">🗓️</div>
               <span className={`text-xs font-medium ${
-                formData.frequency === 'monthly' ? 'text-green-700' : 'text-gray-700'
+                formData.frequency === 'monthly' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Monthly
               </span>
@@ -135,14 +135,14 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           </div>
         </div>
         
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-td-sage mt-2">
           {getFrequencyHelperText()}
         </p>
       </div>
       
       {/* Start Date */}
       <div className="mb-5">
-        <label htmlFor="startDate" className="block text-sm font-medium text-gray-900 mb-1">
+        <label htmlFor="startDate" className="block text-sm font-medium text-td-ink mb-1">
           Pickup Date
         </label>
         <div className="relative">
@@ -151,13 +151,13 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             id="startDate"
             value={formData.startDate}
             onChange={handleDateChange}
-            className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+            className="w-full p-3 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-td-ink font-medium"
             placeholder="dd/mm/yyyy"
             min={new Date().toISOString().split('T')[0]} // Prevent past dates
             style={{color: '#333'}}
           />
           <div className="absolute top-0 right-0 px-3 py-3 pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="h-5 w-5 text-td-sage" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
             </svg>
           </div>
@@ -166,7 +166,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
       
       {/* Preferred Time - Horizontal Scrollable Cards */}
       <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-900 mb-2">
+        <label className="block text-sm font-medium text-td-ink mb-2">
           Preferred Pickup Time (not guaranteed)
         </label>
         
@@ -186,18 +186,18 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.preferredTime === 'morning'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">🌅</div>
               <span className={`text-xs font-medium ${
-                formData.preferredTime === 'morning' ? 'text-green-700' : 'text-gray-700'
+                formData.preferredTime === 'morning' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Morning
               </span>
-              <span className="text-[10px] text-gray-400">8am - 12pm</span>
+              <span className="text-[10px] text-td-sage">8am - 12pm</span>
             </div>
           </div>
 
@@ -207,18 +207,18 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.preferredTime === 'afternoon'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">☀️</div>
               <span className={`text-xs font-medium ${
-                formData.preferredTime === 'afternoon' ? 'text-green-700' : 'text-gray-700'
+                formData.preferredTime === 'afternoon' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Afternoon
               </span>
-              <span className="text-[10px] text-gray-400">12pm - 4pm</span>
+              <span className="text-[10px] text-td-sage">12pm - 4pm</span>
             </div>
           </div>
 
@@ -228,18 +228,18 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.preferredTime === 'evening'
                 ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
+                : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="flex flex-col items-center text-center">
               <div className="text-3xl mb-2">🌆</div>
               <span className={`text-xs font-medium ${
-                formData.preferredTime === 'evening' ? 'text-green-700' : 'text-gray-700'
+                formData.preferredTime === 'evening' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Evening
               </span>
-              <span className="text-[10px] text-gray-400">4pm - 8pm</span>
+              <span className="text-[10px] text-td-sage">4pm - 8pm</span>
             </div>
           </div>
         </div>
@@ -255,7 +255,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
         <button
           type="button"
           onClick={prevStep}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          className="px-6 py-2 border border-td-border-strong text-td-ink rounded-md hover:bg-td-cream transition-colors"
         >
           Back
         </button>
@@ -267,7 +267,7 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           className={`px-6 py-2 rounded-md transition-colors ${
             isValid()
               ? 'bg-primary hover:bg-primary-dark text-white'
-              : 'bg-gray-300 cursor-not-allowed text-gray-500'
+              : 'bg-gray-300 cursor-not-allowed text-td-sage'
           }`}
         >
           Continue

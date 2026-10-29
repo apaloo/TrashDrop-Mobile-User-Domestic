@@ -572,7 +572,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Digital Bin Location</h2>
+      <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-white">Digital Bin Location</h2>
       
       <div className="mb-4">
         <button
@@ -616,7 +616,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       </div>
       
       <div className="mb-4">
-        <label htmlFor="address" className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
+        <label htmlFor="address" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
           Address
         </label>
         <input
@@ -625,7 +625,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           value={isGeocoding ? '' : addressInput}
           readOnly
           placeholder={isGeocoding ? 'Looking up address...' : 'Use current location to auto-fill'}
-          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white font-medium placeholder-gray-400 dark:placeholder-gray-500 cursor-not-allowed"
+          className="w-full p-3 border border-td-border-strong dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-td-ink dark:text-white font-medium placeholder-gray-400 dark:placeholder-gray-500 cursor-not-allowed"
         />
         {addressError && (
           <p className="text-red-500 text-sm mt-1">{addressError}</p>
@@ -633,10 +633,10 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       </div>
       
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-900 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
           Confirm on Map
         </label>
-        <div className="h-48 rounded-lg overflow-hidden border border-gray-300">
+        <div className="h-48 rounded-lg overflow-hidden border border-td-border-strong">
           <MapContainer 
             center={position || [5.6037, -0.1870]} 
             zoom={13} 
@@ -658,7 +658,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       </div>
       
       {coverage.status === 'checking' && (
-        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Checking service availability at this location...</p>
+        <p className="mb-4 text-sm text-td-sage dark:text-gray-400">Checking service availability at this location...</p>
       )}
 
       {coverage.status === 'covered' && coverage.zone && (

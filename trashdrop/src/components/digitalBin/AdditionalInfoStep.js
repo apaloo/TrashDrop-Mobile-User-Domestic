@@ -71,14 +71,14 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Waste Bin Photos</h2>
+      <h2 className="text-xl font-semibold mb-4 text-td-ink">Waste Bin Photos</h2>
       
       {/* Photo Capture Section */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-900 mb-1">
+        <label className="block text-sm font-medium text-td-ink mb-1">
           Photos of waste Bin (Required)
         </label>
-        <p className="text-sm text-gray-600 mb-3">
+        <p className="text-sm text-td-sage mb-3">
           Take photos of your filled up waste bin for service. This helps our collectors locate and service your bin efficiently.
         </p>
 
@@ -87,15 +87,15 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           type="button"
           onClick={() => setShowCamera(true)}
           disabled={photos.length >= MAX_BIN_PHOTOS}
-          className={`w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center
-            ${photos.length >= MAX_BIN_PHOTOS ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}
+          className={`w-full h-32 border-2 border-dashed border-td-border-strong rounded-lg flex flex-col items-center justify-center
+            ${photos.length >= MAX_BIN_PHOTOS ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-td-cream cursor-pointer'}
             transition-colors`}
         >
-          <FaCamera className={`text-2xl mb-2 ${photos.length >= MAX_BIN_PHOTOS ? 'text-gray-400' : 'text-primary'}`} />
-          <span className="text-sm font-medium text-gray-700">
+          <FaCamera className={`text-2xl mb-2 ${photos.length >= MAX_BIN_PHOTOS ? 'text-td-sage' : 'text-primary'}`} />
+          <span className="text-sm font-medium text-td-ink">
             {photos.length === 0 ? 'Take Photos' : 'Add More Photos'}
           </span>
-          <span className="text-xs text-gray-500 mt-1">
+          <span className="text-xs text-td-sage mt-1">
             {photos.length}/{MAX_BIN_PHOTOS} photos taken
           </span>
         </button>
@@ -113,13 +113,13 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         {/* Photo Previews */}
         {photos.length > 0 && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">
+            <h4 className="text-sm font-medium text-td-ink mb-2">
               Your Photos ({photos.length}/{MAX_BIN_PHOTOS})
             </h4>
             <div className="grid grid-cols-3 gap-2">
               {photos.map((photo, index) => (
                 <div key={index} className="relative group">
-                  <div className="w-full aspect-square bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="w-full aspect-square bg-gray-100 rounded-lg border border-td-border overflow-hidden">
                     <img 
                       src={photo} 
                       alt={`Waste Bin ${index + 1}`}
@@ -145,7 +145,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
 
       {/* Additional Notes */}
       <div className="mb-5">
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-1">
+        <label htmlFor="notes" className="block text-sm font-medium text-td-ink mb-1">
           Additional Notes (Optional)
         </label>
         <textarea
@@ -154,21 +154,21 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           onChange={handleNotesChange}
           placeholder="Any special instructions for servicing your waste bin?"
           rows={3}
-          className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 font-medium"
+          className="w-full p-3 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-td-ink font-medium"
           style={{color: '#333'}}
         />
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-td-sage mt-1">
           Add any special instructions or notes for the service provider
         </p>
       </div>
       
       {/* Service Information */}
-      <div className="mb-5 bg-gray-50 p-4 rounded-md">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900">Service Details</h3>
-        <p className="text-sm text-gray-700 font-medium mb-2">
+      <div className="mb-5 bg-td-cream p-4 rounded-md">
+        <h3 className="text-lg font-semibold mb-3 text-td-ink">Service Details</h3>
+        <p className="text-sm text-td-ink font-medium mb-2">
           Service fee will be calculated based on waste type, size, and number of bins
         </p>
-        <p className="text-sm text-gray-700 font-medium">
+        <p className="text-sm text-td-ink font-medium">
           Based on your selected frequency: {FREQUENCY_LABELS[formData.frequency] || formData.frequency}
         </p>
       </div>
@@ -177,7 +177,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         <button
           type="button"
           onClick={prevStep}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          className="px-6 py-2 border border-td-border-strong text-td-ink rounded-md hover:bg-td-cream transition-colors"
         >
           Back
         </button>
@@ -187,7 +187,7 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           disabled={photos.length === 0}
           className={`px-6 py-2 rounded-md transition-colors ${
             photos.length === 0
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ? 'bg-gray-300 text-td-sage cursor-not-allowed'
               : 'bg-primary hover:bg-primary-dark text-white'
           }`}
         >

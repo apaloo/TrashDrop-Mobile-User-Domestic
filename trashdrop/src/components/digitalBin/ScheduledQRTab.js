@@ -306,6 +306,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       label: 'Active',
       count: activeBins.length,
       color: 'text-green-600',
+      darkColor: 'dark:text-green-200',
       bgColor: 'bg-green-50',
       borderColor: 'border-green-600',
       hoverColor: 'hover:bg-green-50'
@@ -314,16 +315,18 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       id: 'completed',
       label: 'Completed',
       count: completedBins.length,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-600',
-      hoverColor: 'hover:bg-blue-50'
+      color: 'text-td-forest',
+      darkColor: 'dark:text-green-200',
+      bgColor: 'bg-td-tonal',
+      borderColor: 'border-td-forest',
+      hoverColor: 'hover:bg-green-100'
     },
     {
       id: 'cancelled',
       label: 'Cancelled',
       count: cancelledBins.length,
       color: 'text-red-600',
+      darkColor: 'dark:text-red-200',
       bgColor: 'bg-red-50',
       borderColor: 'border-red-600',
       hoverColor: 'hover:bg-red-50'
@@ -363,8 +366,8 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
     <div className="flex flex-col h-full">
       {/* Enhanced Tabs - Sticky */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-0">
-        <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 overflow-hidden">
-          <nav className="flex divide-x divide-gray-200 dark:divide-gray-600" aria-label="Tabs">
+        <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-td-border dark:border-gray-600 overflow-hidden">
+          <nav className="flex divide-x divide-td-border dark:divide-gray-600" aria-label="Tabs">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -373,8 +376,8 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-4 px-2 text-center group relative min-w-0 flex-1 overflow-hidden ${
                   isActive 
-                    ? `${tab.bgColor} dark:bg-opacity-20 ${tab.color} font-semibold`
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 font-medium'
+                    ? `${tab.bgColor} dark:bg-opacity-20 ${tab.color} ${tab.darkColor} font-semibold`
+                    : 'text-td-sage dark:text-gray-300 hover:text-td-ink dark:hover:text-gray-200 hover:bg-td-cream dark:hover:bg-gray-600 font-medium'
                 } transition-colors duration-150`}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -385,7 +388,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
                     className={`ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full text-xs ${
                       isActive 
                         ? `${tab.color.replace('text-', 'bg-')} bg-opacity-20`
-                        : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                        : 'bg-gray-100 dark:bg-gray-600 text-td-sage dark:text-gray-300'
                     }`}
                   >
                     {tab.count}
@@ -409,12 +412,12 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       <div className="flex-1 overflow-y-auto">
         {/* Empty state for no digital bins */}
         {localPickups.length === 0 && !isLoading ? (
-          <div className="text-center py-12">
+          <div className="text-center pt-12 pb-24">
             <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-              <FaQrcode className="text-gray-400 dark:text-gray-500 text-2xl" />
+              <FaQrcode className="text-td-sage dark:text-gray-500 text-2xl" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Digital Bins</h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+            <h3 className="text-lg font-medium text-td-ink dark:text-white mb-2">No Digital Bins</h3>
+            <p className="text-td-sage dark:text-gray-400 max-w-md mx-auto">
               You don't have any digital bins yet.
             </p>
           </div>
@@ -432,8 +435,8 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
             />
             
             {/* Help Text */}
-            <div className="bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20 p-4 rounded-lg text-blue-800 dark:text-blue-300 text-sm mt-6 flex items-start">
-              <FaQrcode className="text-blue-500 dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="bg-td-tonal dark:bg-blue-900 dark:bg-opacity-20 p-4 rounded-lg text-td-forest dark:text-blue-300 text-sm mt-6 flex items-start">
+              <FaQrcode className="text-td-forest dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
               <p>Show this QR code to the service provider when they arrive. The QR code contains all the necessary information about your digital bin service.</p>
             </div>
           </>
