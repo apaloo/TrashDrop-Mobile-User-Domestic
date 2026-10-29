@@ -69,7 +69,7 @@ const Profile = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 whitespace-nowrap ${
                 activeTab === tab.id 
-                  ? 'text-td-forest dark:text-blue-400 border-b-2 border-td-forest dark:border-blue-400 font-medium' 
+                  ? 'text-td-forest dark:text-green-300 border-b-2 border-td-forest dark:border-green-300 font-medium' 
                   : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
               }`}
             >

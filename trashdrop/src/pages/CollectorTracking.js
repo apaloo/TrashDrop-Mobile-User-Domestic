@@ -495,7 +495,7 @@ const CollectorTracking = () => {
         <button
           onClick={() => navigate(-1)}
           aria-label="Go back"
-          className="fixed top-20 left-4 z-[1001] p-3 bg-white/95 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
+          className="fixed top-20 md:top-24 left-4 z-[1001] p-3 bg-white/95 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
         >
           <svg className="w-6 h-6 text-td-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -539,7 +539,7 @@ const CollectorTracking = () => {
       <button
         onClick={() => navigate(-1)}
         aria-label="Go back"
-        className="fixed top-20 left-4 z-[1001] p-3 bg-white/95 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
+        className="fixed top-20 md:top-24 left-4 z-[1001] p-3 bg-white/95 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
       >
         <svg className="w-6 h-6 text-td-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
