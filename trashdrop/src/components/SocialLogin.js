@@ -26,10 +26,10 @@ const SocialLogin = ({ isSubmitting = false, onError = null }) => {
     <div className="mt-6">
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300 dark:border-gray-600" />
+          <div className="w-full border-t border-td-border-strong dark:border-gray-600" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+          <span className="px-2 bg-white dark:bg-gray-800 text-td-sage dark:text-gray-400">
             Or continue with Google
           </span>
         </div>
@@ -40,7 +40,7 @@ const SocialLogin = ({ isSubmitting = false, onError = null }) => {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={isSubmitting}
-          className="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-md"
+          className="w-full inline-flex justify-center items-center py-3 px-4 border border-td-border-strong dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-td-ink dark:text-gray-200 hover:bg-td-cream dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-md"
         >
           <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
             <path

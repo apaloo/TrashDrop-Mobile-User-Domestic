@@ -38,14 +38,14 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50" style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg" style={{ backgroundColor: '#ffffff' }}>
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border" style={{ backgroundColor: '#ffffff' }}>
         <div className="text-center">
           <div className="flex justify-center mb-4">
             <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
           </div>
-          <h1 className="text-3xl font-bold text-primary dark:text-primary-light">Reset Password</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">
+          <h1 className="text-3xl font-bold text-td-ink dark:text-white">Reset Password</h1>
+          <p className="mt-2 text-td-sage dark:text-gray-300">
             Enter your email address and we'll send you a link to reset your password.
           </p>
         </div>
@@ -64,7 +64,7 @@ const ResetPassword = () => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor="email" className="block text-sm font-medium text-td-ink dark:text-gray-300">
               Email Address
             </label>
             <input
@@ -75,7 +75,7 @@ const ResetPassword = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
+              className="mt-1 block w-full px-3 py-2 border border-td-border-strong dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
               placeholder="your.email@example.com"
             />
           </div>
@@ -92,7 +92,7 @@ const ResetPassword = () => {
         </form>
         
         <div className="text-center mt-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-td-sage dark:text-gray-400">
             Remembered your password?{' '}
             <Link to="/login" className="font-medium text-primary hover:text-primary-dark dark:text-primary-light dark:hover:text-primary">
               Back to Login

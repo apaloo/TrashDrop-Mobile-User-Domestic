@@ -81,16 +81,16 @@ const AuthCallback = () => {
   }, [isAuthenticated, status, navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50" style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg text-center" style={{ backgroundColor: '#ffffff' }}>
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border text-center" style={{ backgroundColor: '#ffffff' }}>
         <div className="flex justify-center mb-4">
           <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
         </div>
         
         {status === 'verifying' && (
           <>
-            <h1 className="text-2xl font-bold text-primary">Verifying Your Email</h1>
-            <p className="text-gray-600 mt-2">Please wait while we verify your email address...</p>
+            <h1 className="text-2xl font-bold text-td-ink">Verifying Your Email</h1>
+            <p className="text-td-sage mt-2">Please wait while we verify your email address...</p>
             <div className="flex justify-center mt-6">
               <LoadingSpinner size="lg" />
             </div>
@@ -101,7 +101,7 @@ const AuthCallback = () => {
           <>
             <div className="text-6xl mb-4">✅</div>
             <h1 className="text-2xl font-bold text-green-600">Email Verified!</h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-td-sage mt-2">
               Your email has been successfully verified.
               {isAuthenticated 
                 ? ' Redirecting to your dashboard...' 
@@ -117,7 +117,7 @@ const AuthCallback = () => {
           <>
             <div className="text-6xl mb-4">❌</div>
             <h1 className="text-2xl font-bold text-red-600">Verification Failed</h1>
-            <p className="text-gray-600 mt-2">{errorMessage}</p>
+            <p className="text-td-sage mt-2">{errorMessage}</p>
             <div className="mt-6 space-y-3">
               <button
                 onClick={() => navigate('/login')}
@@ -127,7 +127,7 @@ const AuthCallback = () => {
               </button>
               <button
                 onClick={() => navigate('/register')}
-                className="w-full py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="w-full py-2 px-4 border border-td-border-strong text-sm font-medium rounded-md text-td-ink bg-white hover:bg-td-cream focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
               >
                 Register Again
               </button>
