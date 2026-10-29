@@ -584,8 +584,8 @@ const Activity = () => {
       switch (activity.type) {
         case 'pickup_request':
           return (
-            <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
-              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <div className="p-2 rounded-full bg-td-tonal dark:bg-blue-900/30">
+              <svg className="w-5 h-5 text-td-forest" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
             </div>
@@ -601,7 +601,7 @@ const Activity = () => {
         case 'qr_scan':
           return (
             <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-5 h-5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
             </div>
@@ -616,8 +616,8 @@ const Activity = () => {
           );
         case 'digital_bin':
           return (
-            <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
-              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <div className="p-2 rounded-full bg-td-tonal dark:bg-blue-900/30">
+              <svg className="w-5 h-5 text-td-forest" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
             </div>
@@ -625,7 +625,7 @@ const Activity = () => {
         default:
           return (
             <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-5 h-5 text-td-sage" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -634,23 +634,23 @@ const Activity = () => {
     };
     
     return (
-      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 mb-4 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 mb-4 border border-td-border dark:border-gray-700">
         <div className="flex items-start">
           {getActivityIcon()}
           <div className="ml-4 flex-1">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
               <div>
-                <h3 className="text-lg font-medium text-gray-800 dark:text-white capitalize">
+                <h3 className="text-lg font-medium text-td-ink dark:text-white capitalize">
                   {activity.type === 'pickup_request' ? 'Waste Pickup' : 
                    activity.type === 'dumping_report' ? 'Dumping Report' : 
                    activity.type === 'qr_scan' ? 'QR Code Scan' : 
                    activity.type === 'digital_bin' ? 'Request Bin Pickup' : 'Reward Redemption'}
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                <p className="text-sm text-td-sage dark:text-gray-400 mb-1">
                   {activity.date} • {activity.description}
                 </p>
                 {activity.address && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                  <p className="text-sm text-td-sage dark:text-gray-400 flex items-center">
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -664,7 +664,7 @@ const Activity = () => {
                   ${activity.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 
                     activity.status === 'scheduled' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' : 
                     activity.status === 'canceled' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' : 
-                    'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'}`}>
+                    'bg-gray-100 dark:bg-gray-700 text-td-ink dark:text-gray-300'}`}>
                   {activity.status.charAt(0).toUpperCase() + activity.status.slice(1)}
                 </span>
                 {activity.isLocal && activity.sync_status === 'pending_sync' && (
@@ -691,7 +691,7 @@ const Activity = () => {
   const InfiniteScrollLoader = () => {
     if (!hasMoreData) {
       return (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+        <div className="text-center py-8 text-td-sage dark:text-gray-400">
           <p>No more activities to load</p>
         </div>
       );
@@ -701,56 +701,56 @@ const Activity = () => {
       return (
         <div className="flex justify-center items-center py-8">
           <LoadingSpinner />
-          <span className="ml-2 text-gray-600 dark:text-gray-400">Loading more activities...</span>
+          <span className="ml-2 text-td-sage dark:text-gray-400">Loading more activities...</span>
         </div>
       );
     }
     
     return (
-      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-4 text-td-sage dark:text-gray-400">
         <p>Scroll down to load more activities</p>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col min-h-screen bg-td-cream dark:bg-gray-900">
       {/* Fixed Header - positioned below navbar */}
-      <div className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700" style={{top: '70px'}}>
+      <div className="sticky top-0 bg-td-cream dark:bg-gray-900 z-10 border-b border-td-border dark:border-gray-700" style={{top: '70px'}}>
         <div className="container mx-auto px-4 pt-2 pb-3">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Activity History</h1>
+          <h1 className="text-2xl font-bold text-td-ink dark:text-gray-100">Activity History</h1>
         </div>
         
         {/* Filter tabs - Sticky below header */}
         <div className="container mx-auto px-4 pb-3">
-          <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-td-border dark:border-gray-700">
             <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'all' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               onClick={() => handleFilterChange('all')}
             >
               All
             </button>
             <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               onClick={() => handleFilterChange('pickup_request')}
             >
               Pickups
             </button>
             <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               onClick={() => handleFilterChange('dumping_report')}
             >
               Reports
             </button>
             <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               onClick={() => handleFilterChange('qr_scan')}
             >
               Scans
             </button>
             <button 
               onClick={handleRefresh}
-              className="px-3 py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 flex items-center justify-center flex-shrink-0"
+              className="px-3 py-3 text-td-forest dark:text-blue-400 hover:bg-green-100 dark:hover:bg-gray-700 flex items-center justify-center flex-shrink-0"
               aria-label="Refresh activity data"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -800,8 +800,8 @@ const Activity = () => {
                   </div>
                 </>
               ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center border border-gray-200 dark:border-gray-700">
-                  <div className="text-gray-500 dark:text-gray-400 mb-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center border border-td-border dark:border-gray-700">
+                  <div className="text-td-sage dark:text-gray-400 mb-4">
                     <svg className="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
                     </svg>
@@ -809,10 +809,10 @@ const Activity = () => {
                     <p>Your activity history will appear here as you use the app.</p>
                   </div>
                   <div className="flex flex-col space-y-2">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Try these activities to get started:</p>
-                    <a href="/pickup-request" className="text-blue-600 hover:underline">Request a trash pickup</a>
-                    <a href="/dumping-report" className="text-blue-600 hover:underline">Report illegal dumping</a>
-                    <a href="/scan" className="text-blue-600 hover:underline">Scan a QR code at a public bin</a>
+                    <p className="text-sm text-td-sage dark:text-gray-400">Try these activities to get started:</p>
+                    <a href="/pickup-request" className="text-td-forest hover:underline">Request a trash pickup</a>
+                    <a href="/dumping-report" className="text-td-forest hover:underline">Report illegal dumping</a>
+                    <a href="/scan" className="text-td-forest hover:underline">Scan a QR code at a public bin</a>
                   </div>
                 </div>
               )}

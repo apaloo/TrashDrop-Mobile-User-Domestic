@@ -23,7 +23,7 @@ const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut }) => {
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            className="absolute top-4 right-4 text-td-sage hover:text-td-ink dark:hover:text-gray-200"
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -38,11 +38,11 @@ const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut }) => {
               </svg>
             </div>
             
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            <h3 className="text-lg font-medium text-td-ink dark:text-white mb-2">
               Sign Out Confirmation
             </h3>
             
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            <p className="text-sm text-td-sage dark:text-gray-400 mb-6">
               Are you sure you want to sign out? You'll need to sign in again to access your account.
             </p>
             
@@ -50,7 +50,7 @@ const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut }) => {
               <button
                 onClick={onClose}
                 disabled={isSigningOut}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
+                className="flex-1 px-4 py-2 text-sm font-medium text-td-ink bg-white border border-td-border-strong rounded-md hover:bg-td-cream dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
               >
                 Cancel
               </button>

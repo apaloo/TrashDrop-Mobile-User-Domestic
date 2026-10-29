@@ -180,8 +180,8 @@ const Preferences = () => {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading preferences...</span>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-td-forest"></div>
+          <span className="ml-3 text-td-sage dark:text-gray-300">Loading preferences...</span>
         </div>
       </div>
     );
@@ -194,7 +194,7 @@ const Preferences = () => {
         <div className={`mb-4 p-3 rounded-md ${
           saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
-          'bg-blue-100 text-blue-700'
+          'bg-td-tonal text-td-forest'
         }`}>
           {saveMessage.text}
         </div>
@@ -202,7 +202,7 @@ const Preferences = () => {
       <form onSubmit={handleSubmit}>
         {/* Theme Section */}
         <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Theme</h2>
+          <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Theme</h2>
           <div className="flex items-center">
             <div className="relative inline-block w-12 mr-2 align-middle select-none">
               <input 
@@ -226,29 +226,29 @@ const Preferences = () => {
                 }`}
               ></label>
             </div>
-            <label htmlFor="dark-mode" className="cursor-pointer text-gray-900 dark:text-gray-100">
+            <label htmlFor="dark-mode" className="cursor-pointer text-td-ink dark:text-gray-100">
               Dark Mode
             </label>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-14">Enable dark theme for better viewing in low light</p>
+          <p className="text-sm text-td-sage dark:text-gray-400 mt-1 ml-14">Enable dark theme for better viewing in low light</p>
         </section>
 
         {/* Language Section */}
         <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Language</h2>
+          <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Language</h2>
           <div>
             <select
               id="language"
               name="language"
               value={preferences.language}
               onChange={handleLanguageChange}
-              className="w-full md:w-72 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full md:w-72 px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
             >
               {languages.map(lang => (
                 <option key={lang.code} value={lang.code}>{lang.label}</option>
               ))}
             </select>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-td-sage dark:text-gray-400 mt-1">
               Select your preferred language for the application
             </p>
           </div>
@@ -256,7 +256,7 @@ const Preferences = () => {
 
         {/* Accessibility Section */}
         <section>
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Accessibility</h2>
+          <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Accessibility</h2>
           <div className="space-y-4">
             {/* High Contrast */}
             <div className="flex items-center">
@@ -282,7 +282,7 @@ const Preferences = () => {
                   }`}
                 ></label>
               </div>
-              <label htmlFor="high-contrast" className="cursor-pointer text-gray-900 dark:text-gray-100">
+              <label htmlFor="high-contrast" className="cursor-pointer text-td-ink dark:text-gray-100">
                 High Contrast
               </label>
             </div>
@@ -311,7 +311,7 @@ const Preferences = () => {
                   }`}
                 ></label>
               </div>
-              <label htmlFor="larger-text" className="cursor-pointer text-gray-900 dark:text-gray-100">
+              <label htmlFor="larger-text" className="cursor-pointer text-td-ink dark:text-gray-100">
                 Larger Text
               </label>
             </div>
@@ -340,7 +340,7 @@ const Preferences = () => {
                   }`}
                 ></label>
               </div>
-              <label htmlFor="reduce-motion" className="cursor-pointer text-gray-900 dark:text-gray-100">
+              <label htmlFor="reduce-motion" className="cursor-pointer text-td-ink dark:text-gray-100">
                 Reduce Motion
               </label>
             </div>

@@ -50,9 +50,9 @@ const ConfirmModal = ({
       )
     },
     info: {
-      iconBg: 'bg-blue-100 dark:bg-blue-900/40',
-      iconColor: 'text-blue-600 dark:text-blue-400',
-      confirmBg: 'bg-blue-600 hover:bg-blue-700',
+      iconBg: 'bg-td-tonal dark:bg-blue-900/40',
+      iconColor: 'text-td-forest dark:text-blue-400',
+      confirmBg: 'bg-green-600 hover:bg-green-700',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -92,12 +92,12 @@ const ConfirmModal = ({
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            <h3 className="text-lg font-semibold text-td-ink dark:text-white mb-2">
               {title}
             </h3>
 
             {/* Message */}
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
+            <p className="text-sm text-td-sage dark:text-gray-400 mb-6 leading-relaxed">
               {message}
             </p>
 
@@ -116,7 +116,7 @@ const ConfirmModal = ({
                   <button
                     onClick={onClose}
                     disabled={isProcessing}
-                    className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                    className="flex-1 px-4 py-2.5 text-sm font-medium text-td-ink bg-gray-100 border border-td-border-strong rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
                   >
                     {cancelText}
                   </button>

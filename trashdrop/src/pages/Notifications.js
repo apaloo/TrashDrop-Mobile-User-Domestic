@@ -15,7 +15,7 @@ const Notifications = () => {
         <div className="mb-6">
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center text-primary hover:text-primary-dark transition-colors mb-4"
+            className="flex items-center text-primary dark:text-green-300 hover:text-primary-dark transition-colors mb-4"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -24,10 +24,10 @@ const Notifications = () => {
           </button>
           
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-2xl font-bold text-td-ink dark:text-white mb-2">
               Notifications
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-td-sage dark:text-gray-400">
               Stay updated with pickup requests, system alerts, and more
             </p>
           </div>

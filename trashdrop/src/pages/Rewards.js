@@ -449,7 +449,7 @@ const Rewards = () => {
       {/* Fixed Points summary header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6" style={{top: '65px'}}>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">My Rewards</h1>
+          <h1 className="text-2xl font-bold text-td-ink dark:text-white">My Rewards</h1>
           
           <div className="bg-primary/10 dark:bg-primary-dark/20 px-4 py-2 rounded-full">
             <span className="text-primary dark:text-primary-light font-semibold flex items-center">
@@ -461,7 +461,7 @@ const Rewards = () => {
           </div>
         </div>
         
-        <p className="mt-2 text-gray-600 dark:text-gray-300">
+        <p className="mt-2 text-td-sage dark:text-gray-300">
           Earn points by requesting pickups, reporting illegal dumping, and scanning QR codes.
         </p>
       </div>
@@ -477,13 +477,13 @@ const Rewards = () => {
         
         {/* Rewards list */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Available Rewards</h2>
+        <h2 className="text-xl font-bold text-td-ink dark:text-white mb-4">Available Rewards</h2>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {rewards.map((reward) => (
             <div 
               key={reward.id} 
-              className={`bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden shadow-sm border border-gray-200 dark:border-gray-600 transition-all ${
+              className={`bg-td-cream dark:bg-gray-700 rounded-lg overflow-hidden shadow-sm border border-td-border dark:border-gray-600 transition-all ${
                 userPoints >= reward.pointsCost 
                   ? 'hover:shadow-md hover:-translate-y-1' 
                   : 'opacity-70'
@@ -505,17 +505,17 @@ const Rewards = () => {
               
               <div className="p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-medium text-gray-800 dark:text-white">{reward.name}</h3>
+                  <h3 className="text-lg font-medium text-td-ink dark:text-white">{reward.name}</h3>
                   <span className="bg-primary/10 dark:bg-primary-dark/20 text-primary dark:text-primary-light text-sm px-2 py-1 rounded-full">
                     {reward.pointsCost} Points
                   </span>
                 </div>
                 
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                <p className="text-sm text-td-sage dark:text-gray-300 mb-4">
                   {reward.description}
                 </p>
                 
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                <div className="text-xs text-td-sage dark:text-gray-400 mb-4">
                   Expires: {new Date(reward.expiresAt).toLocaleDateString()}
                 </div>
                 
@@ -531,7 +531,7 @@ const Rewards = () => {
                     className={`w-full px-4 py-2 text-sm font-medium rounded-md ${
                       userPoints >= reward.pointsCost 
                         ? 'bg-primary hover:bg-primary-dark text-white' 
-                        : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
+                        : 'bg-gray-300 dark:bg-gray-600 text-td-sage dark:text-gray-400 cursor-not-allowed'
                     }`}
                   >
                     {isRedeeming ? (
@@ -550,14 +550,14 @@ const Rewards = () => {
         
         {rewards.length === 0 && !isLoading && (
           <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">No rewards available at this time.</p>
+            <p className="text-td-sage dark:text-gray-400">No rewards available at this time.</p>
           </div>
         )}
       </div>
       
       {/* Recent Redemptions */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Recent Redemptions</h2>
+        <h2 className="text-xl font-bold text-td-ink dark:text-white mb-4">Recent Redemptions</h2>
         
         {isRedemptionsLoading ? (
           <div className="py-8 text-center">
@@ -566,7 +566,7 @@ const Rewards = () => {
         ) : recentRedemptions.length > 0 ? (
           <div className="space-y-4">
             {recentRedemptions.map(redemption => (
-              <div key={redemption.id} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div key={redemption.id} className="flex items-center p-4 bg-td-cream dark:bg-gray-700 rounded-lg">
                 {redemption.rewardImage && (
                   <img 
                     src={redemption.rewardImage} 
@@ -575,10 +575,10 @@ const Rewards = () => {
                   />
                 )}
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-800 dark:text-white">{redemption.rewardName}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{redemption.rewardDescription}</p>
+                  <h3 className="font-semibold text-td-ink dark:text-white">{redemption.rewardName}</h3>
+                  <p className="text-sm text-td-sage dark:text-gray-300">{redemption.rewardDescription}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-sm text-td-sage dark:text-gray-400">
                       Redeemed on {redemption.redeemedAt}
                     </span>
                     <div className="flex items-center">
@@ -600,8 +600,8 @@ const Rewards = () => {
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-gray-500 dark:text-gray-400">You haven't redeemed any rewards yet.</p>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Redeem a reward to see it here.</p>
+            <p className="text-td-sage dark:text-gray-400">You haven't redeemed any rewards yet.</p>
+            <p className="text-td-sage dark:text-gray-400 mt-1">Redeem a reward to see it here.</p>
           </div>
         )}
       </div>
@@ -609,7 +609,7 @@ const Rewards = () => {
       {/* Points history */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">Points History</h2>
+          <h2 className="text-xl font-bold text-td-ink dark:text-white">Points History</h2>
           <button 
             className="text-sm text-primary dark:text-primary-light hover:underline focus:outline-none"
             onClick={() => {
@@ -633,32 +633,32 @@ const Rewards = () => {
               <LoadingSpinner size="md" />
             </div>
           ) : pointsHistory.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+            <table className="min-w-full divide-y divide-td-border dark:divide-gray-700">
+              <thead className="bg-td-cream dark:bg-gray-700">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-td-sage dark:text-gray-300 uppercase tracking-wider">
                     Activity
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-td-sage dark:text-gray-300 uppercase tracking-wider">
                     Date
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-td-sage dark:text-gray-300 uppercase tracking-wider">
                     Points
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-td-border dark:divide-gray-700">
                 {pointsHistory.map(item => (
                   <tr key={item.id}>
-                    <td className="px-6 py-4 text-sm text-gray-800 dark:text-white">
+                    <td className="px-6 py-4 text-sm text-td-ink dark:text-white">
                       <div className="font-medium">{item.activity}</div>
                       {item.details && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <div className="text-xs text-td-sage dark:text-gray-400 mt-1">
                           {item.details}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-td-sage dark:text-gray-300">
                       {item.date}
                     </td>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${item.points >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -670,8 +670,8 @@ const Rewards = () => {
             </table>
           ) : (
             <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-gray-400">No points history found.</p>
-              <p className="text-gray-500 dark:text-gray-400 mt-1">Earn points by requesting pickups, reporting illegal dumping, and scanning QR codes.</p>
+              <p className="text-td-sage dark:text-gray-400">No points history found.</p>
+              <p className="text-td-sage dark:text-gray-400 mt-1">Earn points by requesting pickups, reporting illegal dumping, and scanning QR codes.</p>
             </div>
           )}
         </div>

@@ -833,7 +833,7 @@ const Locations = () => {
       {/* Header with Add Location button */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Saved Locations</h2>
+          <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100">Saved Locations</h2>
           <OnlineStatus />
         </div>
         <button
@@ -851,12 +851,12 @@ const Locations = () => {
       {/* Connection Status Indicator */}
       <div className={`flex items-center justify-between mb-4 p-2 ${connectionStatus === 'online' ? 'bg-green-100' : 'bg-amber-100'} rounded-md`}>
         <div className="flex items-center">
-          <div className={`w-3 h-3 rounded-full mr-2 ${connectionStatus === 'online' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+          <div className={`w-3 h-3 rounded-full mr-2 ${connectionStatus === 'online' ? 'bg-green-600' : 'bg-amber-500'}`}></div>
           <span className="text-sm font-medium">
             {connectionStatus === 'online' ? 'Online' : 'Offline'} Mode
           </span>
         </div>
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-td-sage dark:text-gray-300">
           {connectionStatus === 'online' 
             ? 'Locations will sync with server' 
             : 'Locations will be saved locally'}
@@ -865,24 +865,24 @@ const Locations = () => {
       
       {/* Status message */}
       {syncStatus && (
-        <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-md">
+        <div className="mb-4 p-3 bg-td-tonal text-td-forest rounded-md">
           {syncStatus}
         </div>
       )}
       
       {/* Backend Status */}
       {backendStatus && (
-        <div className="mb-4 p-3 bg-gray-100 text-gray-700 rounded-md">
+        <div className="mb-4 p-3 bg-gray-100 text-td-ink rounded-md">
           {backendStatus}
         </div>
       )}
       
       {/* Tip Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="bg-td-tonal border border-td-border rounded-lg p-4 mb-6 flex items-start">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-td-forest mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p className="text-blue-800">
+        <p className="text-td-forest">
           Tip: Save locations you use frequently to quickly select them when requesting pickups.
         </p>
       </div>
@@ -891,12 +891,12 @@ const Locations = () => {
       {isLoading ? (
         <div className="text-center py-6">
           <div className="flex justify-center">
-            <div className="w-10 h-10 border-4 border-gray-200 rounded-full border-t-primary animate-spin"></div>
+            <div className="w-10 h-10 border-4 border-td-border rounded-full border-t-primary animate-spin"></div>
           </div>
-          <p className="mt-3 text-gray-600 dark:text-gray-300">Loading your saved locations...</p>
+          <p className="mt-3 text-td-sage dark:text-gray-300">Loading your saved locations...</p>
         </div>
       ) : showAddForm ? (
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6 border border-gray-200 dark:border-gray-600">
+        <div className="bg-td-cream dark:bg-gray-700 p-4 rounded-lg mb-6 border border-td-border dark:border-gray-600">
           <form onSubmit={handleSubmit}>
             {/* Location actions (top): buttons above form fields for mobile and desktop */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-start gap-3 mb-4">
@@ -904,7 +904,7 @@ const Locations = () => {
                 <button
                   type="button"
                   onClick={getUserLocation}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center"
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -916,7 +916,7 @@ const Locations = () => {
                 <button
                   type="button"
                   onClick={() => setShowManualCoords(!showManualCoords)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 flex items-center justify-center"
+                  className="px-4 py-2 bg-gray-200 text-td-ink rounded-md hover:bg-gray-300 flex items-center justify-center"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -928,7 +928,7 @@ const Locations = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="name" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                   Location Name
                 </label>
                 <input
@@ -938,13 +938,13 @@ const Locations = () => {
                   value={newLocation.name}
                   onChange={handleChange}
                   placeholder="Home, Work, etc."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
                   required
                 />
               </div>
               
               <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="address" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                   Street Address
                 </label>
                 <input
@@ -953,7 +953,7 @@ const Locations = () => {
                   name="address"
                   value={newLocation.address}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
                   required
                 />
               </div>
@@ -962,10 +962,10 @@ const Locations = () => {
 
             {/* Map Component */}
             <div className="mt-6 mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                 Location on Map
               </label>
-              <div className="h-64 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+              <div className="h-64 rounded-lg overflow-hidden border border-td-border-strong dark:border-gray-600">
                 <MapContainer 
                   key={`${mapPosition[0]}-${mapPosition[1]}`}
                   center={mapPosition} 
@@ -988,19 +988,19 @@ const Locations = () => {
                   />
                 </MapContainer>
               </div>
-              <p className="text-sm text-gray-500 mt-1">Click anywhere on the map to set location manually</p>
+              <p className="text-sm text-td-sage dark:text-gray-300 mt-1">Click anywhere on the map to set location manually</p>
               
               <div className="mt-2 flex flex-col space-y-3 items-center">
               {showManualCoords && (
-                <div className="w-full max-w-md p-4 border border-gray-300 rounded-md bg-gray-50">
+                <div className="w-full max-w-md p-4 border border-td-border-strong rounded-md bg-td-cream">
                   <h4 className="text-sm font-semibold mb-2">Manual Coordinate Entry</h4>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-600">Latitude</label>
+                      <label className="block text-xs text-td-sage dark:text-gray-300">Latitude</label>
                       <input
                         type="number"
                         step="any"
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        className="mt-1 block w-full px-3 py-2 border border-td-border-strong rounded-md shadow-sm focus:outline-none focus:ring-green-600 focus:border-green-600"
                         value={newLocation.latitude || ''}
                         onChange={(e) => {
                           const lat = parseFloat(e.target.value);
@@ -1016,11 +1016,11 @@ const Locations = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600">Longitude</label>
+                      <label className="block text-xs text-td-sage dark:text-gray-300">Longitude</label>
                       <input
                         type="number"
                         step="any"
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        className="mt-1 block w-full px-3 py-2 border border-td-border-strong rounded-md shadow-sm focus:outline-none focus:ring-green-600 focus:border-green-600"
                         value={newLocation.longitude || ''}
                         onChange={(e) => {
                           const lng = parseFloat(e.target.value);
@@ -1039,7 +1039,7 @@ const Locations = () => {
                   <div className="mt-2">
                     <button
                       type="button"
-                      className="w-full px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                      className="w-full px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                       onClick={() => {
                         if (newLocation.latitude && newLocation.longitude) {
                           setMapPosition([newLocation.latitude, newLocation.longitude]);
@@ -1055,7 +1055,7 @@ const Locations = () => {
                       Apply Coordinates
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-td-sage dark:text-gray-300 mt-2">
                     Enter decimal coordinates (e.g., 37.7749, -122.4194 for San Francisco)
                   </p>
                 </div>
@@ -1067,13 +1067,13 @@ const Locations = () => {
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100"
+                className="px-4 py-2 border border-td-border-strong text-td-ink rounded-md hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Save Location
               </button>
@@ -1088,13 +1088,13 @@ const Locations = () => {
               {locations.map(location => (
                 <div 
                   key={location.id}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex justify-between items-start"
+                  className="border border-td-border dark:border-gray-700 rounded-lg p-4 flex justify-between items-start"
                 >
                   <div>
                     <h3 className="font-medium text-lg">{location.name}</h3>
-                    <p className="text-gray-600 dark:text-gray-400">{location.address}</p>
+                    <p className="text-td-sage dark:text-gray-400">{location.address}</p>
                     {location.city && (
-                      <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                      <p className="text-td-sage dark:text-gray-400 text-sm mt-1">
                         {location.city}
                       </p>
                     )}
@@ -1114,13 +1114,13 @@ const Locations = () => {
           ) : (
             <div className="text-center py-6">
               <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-td-sage dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
               <p>No saved locations yet.</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add locations to easily select them when requesting pickups.</p>
+              <p className="text-sm text-td-sage dark:text-gray-400 mt-1">Add locations to easily select them when requesting pickups.</p>
             </div>
           )}
           
@@ -1129,7 +1129,7 @@ const Locations = () => {
             <button
               type="button"
               onClick={() => setShowAddForm(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

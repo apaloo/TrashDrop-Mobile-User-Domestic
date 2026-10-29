@@ -87,10 +87,10 @@ const PaymentMethods = () => {
     <div className="container mx-auto px-4 py-6">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl font-bold text-td-ink dark:text-white mb-2">
             Payment Methods
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-td-sage dark:text-gray-400">
             Manage your payment methods for pickup services
           </p>
         </div>
@@ -105,7 +105,7 @@ const PaymentMethods = () => {
           {/* Existing Payment Methods */}
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-td-ink dark:text-white">
                 Your Payment Methods
               </h2>
               <button
@@ -121,13 +121,13 @@ const PaymentMethods = () => {
                 {paymentMethods.map((method) => (
                   <div
                     key={method.id}
-                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+                    className="bg-white dark:bg-gray-800 rounded-lg border border-td-border dark:border-gray-700 p-4"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="flex-shrink-0">
                           {method.type === 'card' && (
-                            <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="w-8 h-8 text-td-forest" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" />
                             </svg>
                           )}
@@ -143,11 +143,11 @@ const PaymentMethods = () => {
                           )}
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          <div className="text-sm font-medium text-td-ink dark:text-white">
                             {method.provider.charAt(0).toUpperCase() + method.provider.slice(1)}
                             {method.details?.last4 && ` •••• ${method.details.last4}`}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-sm text-td-sage dark:text-gray-400">
                             {method.type.charAt(0).toUpperCase() + method.type.slice(1)}
                             {method.is_default && (
                               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -161,7 +161,7 @@ const PaymentMethods = () => {
                         {!method.is_default && (
                           <button
                             onClick={() => handleSetDefault(method.id)}
-                            className="text-sm text-blue-600 hover:text-blue-700"
+                            className="text-sm text-td-forest hover:text-td-forest-dk"
                           >
                             Set Default
                           </button>
@@ -179,11 +179,11 @@ const PaymentMethods = () => {
               </div>
             ) : (
               <div className="text-center py-8">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="mx-auto h-12 w-12 text-td-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No payment methods</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <h3 className="mt-2 text-sm font-medium text-td-ink dark:text-white">No payment methods</h3>
+                <p className="mt-1 text-sm text-td-sage dark:text-gray-400">
                   Add a payment method to start using our services.
                 </p>
               </div>
@@ -194,12 +194,12 @@ const PaymentMethods = () => {
           {showAddForm && (
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h2 className="text-lg font-semibold text-td-ink dark:text-white">
                   Add Payment Method
                 </h2>
                 <button
                   onClick={() => setShowAddForm(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-td-sage hover:text-td-ink"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

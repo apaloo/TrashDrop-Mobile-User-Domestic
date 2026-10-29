@@ -221,12 +221,12 @@ const NotificationList = () => {
           Notifications
         </Typography>
         <Box>
-          <IconButton onClick={() => setShowPreferences(!showPreferences)}>
+          <IconButton onClick={() => setShowPreferences(!showPreferences)} aria-label="Notification settings">
             <Badge color="primary" variant="dot" invisible={!showPreferences}>
               <SettingsIcon />
             </Badge>
           </IconButton>
-          <IconButton onClick={handleDeleteOld}>
+          <IconButton onClick={handleDeleteOld} aria-label="Delete old notifications">
             <DeleteOutline />
           </IconButton>
         </Box>
@@ -290,6 +290,7 @@ const NotificationList = () => {
                     notification.status === 'unread' && (
                       <IconButton
                         edge="end"
+                        aria-label="Mark as read"
                         onClick={() => handleMarkAsRead(notification.id)}
                       >
                         <CheckCircleOutline />

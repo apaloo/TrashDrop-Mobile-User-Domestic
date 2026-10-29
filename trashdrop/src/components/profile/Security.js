@@ -126,11 +126,11 @@ const Security = () => {
       case 'Medium':
         return 'text-yellow-500';
       case 'Strong':
-        return 'text-green-500';
+        return 'text-green-700';
       case 'Very strong':
         return 'text-green-600';
       default:
-        return 'text-gray-500';
+        return 'text-td-sage dark:text-gray-300';
     }
   };
 
@@ -254,19 +254,19 @@ const Security = () => {
         <div className={`mb-4 p-3 rounded-md ${
           saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
-          'bg-blue-100 text-blue-700'
+          'bg-td-tonal text-td-forest'
         }`}>
           {saveMessage.text}
         </div>
       )}
       {/* Change Password Section */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Change Password</h2>
+        <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Change Password</h2>
         
         <form onSubmit={handlePasswordUpdate}>
           {/* Current Password */}
           <div className="mb-4">
-            <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="currentPassword" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
               Current Password
             </label>
             <input
@@ -275,13 +275,13 @@ const Security = () => {
               name="currentPassword"
               value={passwordForm.currentPassword}
               onChange={handlePasswordChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
             />
           </div>
           
           {/* New Password */}
           <div className="mb-2">
-            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="newPassword" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
               New Password
             </label>
             <input
@@ -290,7 +290,7 @@ const Security = () => {
               name="newPassword"
               value={passwordForm.newPassword}
               onChange={handlePasswordChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
             />
           </div>
           
@@ -305,7 +305,7 @@ const Security = () => {
           
           {/* Confirm New Password */}
           <div className="mb-6">
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
               Confirm New Password
             </label>
             <input
@@ -314,7 +314,7 @@ const Security = () => {
               name="confirmPassword"
               value={passwordForm.confirmPassword}
               onChange={handlePasswordChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
             />
           </div>
           
@@ -323,7 +323,7 @@ const Security = () => {
             <button
               type="submit"
               disabled={isUpdating}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isUpdating ? (
                 <>
@@ -347,17 +347,17 @@ const Security = () => {
       </section>
 
       {/* Divider */}
-      <hr className="my-8 border-gray-200 dark:border-gray-700" />
+      <hr className="my-8 border-td-border dark:border-gray-700" />
 
       {/* Login Sessions Section */}
       <section>
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Login Sessions</h2>
+        <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Login Sessions</h2>
         
         {/* Current Device */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-gray-100">Current Device</h3>
-          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-            <p className="text-gray-800 dark:text-gray-200">{deviceInfo.device} • {deviceInfo.status}</p>
+          <h3 className="text-lg font-medium mb-2 text-td-ink dark:text-gray-100">Current Device</h3>
+          <div className="bg-td-cream dark:bg-gray-700 p-4 rounded-lg">
+            <p className="text-td-ink dark:text-gray-200">{deviceInfo.device} • {deviceInfo.status}</p>
           </div>
         </div>
         
