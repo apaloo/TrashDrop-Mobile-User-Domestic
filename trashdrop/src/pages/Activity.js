@@ -367,6 +367,11 @@ const Activity = () => {
         }
       }
       
+      // Only text can be shown as an address: pickup_requests.location is a
+      // map geometry, which the API returns as an object, and rendering that
+      // crashed the page (React error #31)
+      const asText = (...values) => values.find(v => typeof v === 'string' && v.trim()) || null;
+
       // Format activities
       const formattedActivities = newActivities.map(activity => {
         let formattedActivity;
@@ -380,7 +385,7 @@ const Activity = () => {
             points: 10,
             related_id: activity.id,
             description: `Reported ${activity.waste_type || 'illegal dumping'} (${activity.severity || 'medium'} severity)`,
-            address: activity.location || 'Unknown location',
+            address: asText(activity.location) || 'Unknown location',
             created_at: activity.created_at
           };
         } else if (activity._source === 'pickup_requests') {
@@ -392,7 +397,7 @@ const Activity = () => {
             points: activity.points_earned || 0,
             related_id: activity.id,
             description: `${activity.waste_type || 'Waste'} Pickup - ${activity.estimated_volume || activity.bag_count || 1} bag(s)`,
-            address: activity.location || 'Custom location',
+            address: asText(activity.address, activity.location) || 'Custom location',
             created_at: activity.created_at
           };
         } else if (activity._source === 'digital_bins') {
@@ -424,7 +429,7 @@ const Activity = () => {
             points: 0,
             related_id: activity.id,
             description: `Activated batch ${batchNumber}${bagCount ? ` - ${bagCount} bag(s)` : ''}`,
-            address: activity.distribution_center || activity.location || 'Batch activation',
+            address: asText(activity.distribution_center, activity.location) || 'Batch activation',
             created_at: activity.created_at
           };
 
@@ -443,7 +448,7 @@ const Activity = () => {
           
           if (activity.activity_type === 'qr_scan') {
             formattedActivity.description = 'QR Code Scan';
-            formattedActivity.address = activity.details?.location_name || 'Public Bin';
+            formattedActivity.address = asText(activity.details?.location_name) || 'Public Bin';
           } else if (activity.activity_type === 'reward_redemption') {
             formattedActivity.description = activity.details?.reward_name || 'Reward Redeemed';
             formattedActivity.address = '';
