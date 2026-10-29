@@ -97,6 +97,11 @@ code {
     monospace;
 }
 
+/* Checkboxes and radio buttons in the brand green (they were the browser's blue) */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #1b6e35;
+}
+
 /* Form fields: ink text on light screens */
 select, input, textarea, option {
   color: #0a0f0a !important;

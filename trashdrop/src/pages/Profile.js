@@ -66,8 +66,13 @@ const Profile = () => {
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 whitespace-nowrap ${
+              onClick={(e) => {
+                setActiveTab(tab.id);
+                // The row scrolls sideways on phones: bring the chosen tab fully into view
+                e.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+              }}
+              // The row scrolls sideways, which clips anything outside it: keep the focus ring inside the tab
+              className={`px-4 py-2 whitespace-nowrap focus-visible:outline-offset-[-3px] ${
                 activeTab === tab.id 
                   ? 'text-td-forest dark:text-green-300 border-b-2 border-td-forest dark:border-green-300 font-medium' 
                   : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
