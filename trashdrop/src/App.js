@@ -287,7 +287,10 @@ const App = () => {
                   </div>
                 }
               >
-                <AppContent />
+                {/* MUI parts (Activity, notifications, payment form) in the design system */}
+                <MuiThemeProvider theme={theme}>
+                  <AppContent />
+                </MuiThemeProvider>
               </Suspense>
             </AuthErrorBoundary>
           </AuthProvider>

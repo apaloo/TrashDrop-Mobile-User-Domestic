@@ -1,0 +1,97 @@
+/*
+ * TrashDrop design tokens, the same as the website and admin dashboard
+ * (apaloo/TrashDrop_Management_webApp_admins, docs/DESIGN_SYSTEM.md). One
+ * source for type, colour, spacing, radius and focus. src/theme/brand.js
+ * mirrors the colours for inline styles.
+ */
+:root {
+  /* Type: DM Sans only */
+  --td-font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --td-text-xs: 13px;   /* eyebrows, labels: the smallest text */
+  --td-text-sm: 14px;   /* supporting text */
+  --td-text-md: 16px;   /* body */
+  --td-text-lg: 18px;   /* lead paragraphs */
+  --td-h3: clamp(22px, 2.4vw, 26px);
+  --td-h2: clamp(28px, 3.6vw, 40px);
+  --td-h1: clamp(36px, 5vw, 56px);
+  --td-leading-body: 1.6;
+  --td-leading-heading: 1.12;
+
+  /* Brand */
+  --td-brand: #b6ee69;        /* logo green: fills, highlights, actions on dark */
+  --td-action: #1b6e35;       /* buttons and links on light surfaces */
+  --td-action-hover: #155a2b;
+  --td-accent-orange: #f98b38;
+  --td-ink: #0a0f0a;
+
+  /* Surfaces and text */
+  --td-surface: #ffffff;
+  --td-surface-2: #f6f8f4;
+  --td-text: #0a0f0a;
+  --td-text-2: #525c52;
+  --td-text-on-dark: #f0f5f0;
+  --td-text-2-on-dark: #a9b2a9;
+  --td-border: #dfe4dc;
+  --td-border-strong: #8a8f9c;
+
+  /* Status */
+  --td-success: #15803d;
+  --td-warning: #b45309;
+  --td-error: #b91c1c;
+  --td-info: #1d4ed8;
+  --td-disabled-bg: #e5e8e3;
+  --td-disabled-text: #6b7280;
+
+  /* Spacing (4px base) */
+  --td-space-1: 4px;
+  --td-space-2: 8px;
+  --td-space-3: 12px;
+  --td-space-4: 16px;
+  --td-space-5: 24px;
+  --td-space-6: 32px;
+  --td-space-7: 48px;
+  --td-space-8: 64px;
+  --td-space-9: 96px;
+
+  /* Radius */
+  --td-radius-control: 8px;
+  --td-radius-card: 12px;
+  --td-radius-panel: 20px;
+  --td-radius-pill: 999px;
+
+  /* Focus */
+  --td-focus: #1b6e35;
+}
+
+body {
+  font-family: var(--td-font);
+}
+
+/* Emphasis inside headings is carried by colour, not a slanted face */
+h1 em, h2 em, h3 em { font-style: normal; }
+
+/* A visible focus ring on every link and control */
+:focus-visible {
+  outline: 3px solid var(--td-focus);
+  outline-offset: 2px;
+}
+/* Dark surfaces (and the app in dark mode): the brand green ring reads there */
+[data-surface="dark"] :focus-visible,
+html.app-loaded[data-theme="dark"] :focus-visible {
+  outline-color: var(--td-brand);
+}
+
+/* Map credits: Leaflet sets 12px Helvetica; keep the 13px floor and the site face */
+.leaflet-container .leaflet-control-attribution {
+  font-family: var(--td-font);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

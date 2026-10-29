@@ -6,16 +6,18 @@
 export const themeOptions = {
   palette: {
     mode: 'light', // Default mode, will be overridden by the theme context
+    // The design system (src/theme/tokens.css): the dark green for actions,
+    // ink and sage text, the pale page
     primary: {
-      main: '#0073e6', // Brand primary color
-      light: '#4d9fff',
-      dark: '#004a99',
+      main: '#1b6e35',
+      light: '#e6f2e9',
+      dark: '#155a2b',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#ff6b6b', // Brand secondary color
-      light: '#ff9e9e',
-      dark: '#c73e3e',
+      main: '#b4530e', // orange as text on light surfaces
+      light: '#f98b38',
+      dark: '#8a3f0b',
       contrastText: '#ffffff',
     },
     error: {
@@ -39,28 +41,17 @@ export const themeOptions = {
       dark: '#388e3c',
     },
     background: {
-      default: '#f5f5f5',
+      default: '#f6f8f4',
       paper: '#ffffff',
     },
     text: {
-      primary: 'rgba(0, 0, 0, 0.87)',
-      secondary: 'rgba(0, 0, 0, 0.6)',
-      disabled: 'rgba(0, 0, 0, 0.38)',
+      primary: '#0a0f0a',
+      secondary: '#525c52',
+      disabled: '#6b7280',
     },
   },
   typography: {
-    fontFamily: [
-      '-apple-system',
-      'BlinkMacSystemFont',
-      '"Segoe UI"',
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
-      'sans-serif',
-      '"Apple Color Emoji"',
-      '"Segoe UI Emoji"',
-      '"Segoe UI Symbol"',
-    ].join(','),
+    fontFamily: "'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     h1: {
       fontSize: '2.5rem',
       fontWeight: 600,
