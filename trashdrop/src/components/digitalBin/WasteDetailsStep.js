@@ -42,8 +42,10 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
           }}
         >
           {[1, 2, 3, 4, 5].map((num) => (
-            <div
+            <button
+              type="button"
               key={num}
+              aria-pressed={parseInt(formData.numberOfBags) === num}
               onClick={() => updateFormData({ 
                 numberOfBags: String(num),
                 bag_count: num
@@ -55,19 +57,19 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
               }`}
               style={{ scrollSnapAlign: 'start' }}
             >
-              <div className="flex flex-col items-center text-center">
-                <div className="text-2xl font-bold mb-1" style={{
+              <span className="flex flex-col items-center text-center">
+                <span className="block text-2xl font-bold mb-1" style={{
                   color: parseInt(formData.numberOfBags) === num ? '#15803d' : '#374151'
                 }}>
                   {num}
-                </div>
+                </span>
                 <span className={`text-xs font-medium ${
                   parseInt(formData.numberOfBags) === num ? 'text-green-700' : 'text-td-ink'
                 }`}>
                   {num === 1 ? 'Bin' : 'Bins'}
                 </span>
-              </div>
-            </div>
+              </span>
+            </button>
           ))}
         </div>
         
@@ -117,8 +119,10 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
           }}
         >
           {WASTE_TYPES.map(({ value, label, icon }) => (
-            <div
+            <button
+              type="button"
               key={value}
+              aria-pressed={formData.wasteType === value}
               onClick={() => updateFormData({ wasteType: value, waste_type: value })}
               className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                 formData.wasteType === value
@@ -127,15 +131,15 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
               }`}
               style={{ scrollSnapAlign: 'start' }}
             >
-              <div className="flex flex-col items-center text-center">
-                <div className="text-3xl mb-2">{icon}</div>
+              <span className="flex flex-col items-center text-center">
+                <span className="block text-3xl mb-2">{icon}</span>
                 <span className={`text-xs font-medium ${
                   formData.wasteType === value ? 'text-green-700' : 'text-td-ink'
                 }`}>
                   {label}
                 </span>
-              </div>
-            </div>
+              </span>
+            </button>
           ))}
         </div>
         
