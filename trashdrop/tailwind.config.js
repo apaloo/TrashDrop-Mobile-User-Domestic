@@ -10,17 +10,49 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // The design system (src/theme/tokens.css): DM Sans only, 13px the
+      // smallest text, and the brand's dark green for actions.
+      fontFamily: {
+        sans: ["'DM Sans'", 'system-ui', '-apple-system', "'Segoe UI'", 'Roboto', 'sans-serif'],
+      },
+      fontSize: {
+        xs: ['0.8125rem', { lineHeight: '1.125rem' }],
+      },
       colors: {
+        // primary was blue (#0073e6); it is the action colour, now the dark
+        // green (white on it 6.3:1). light is the same green for dark mode.
         primary: {
-          light: '#4da6ff',
-          DEFAULT: '#0073e6',
-          dark: '#0059b3',
+          light: '#8fd6a0',
+          DEFAULT: '#1b6e35',
+          dark: '#155a2b',
         },
         secondary: {
-          light: '#84e184',
-          DEFAULT: '#4caf50',
-          dark: '#388e3c',
-        }
+          light: '#8fd6a0',
+          DEFAULT: '#1b6e35',
+          dark: '#155a2b',
+        },
+        // Green buttons, links and text in the dark green family, so white
+        // on them and them on white pass contrast (#16a34a was 3.3:1).
+        green: {
+          '600': '#1b6e35',
+          '700': '#155a2b',
+          '800': '#114a23',
+        },
+        td: {
+          lime: '#b6ee69',
+          orange: '#f98b38',
+          'orange-text': '#b4530e',
+          forest: '#1b6e35',
+          'forest-dk': '#155a2b',
+          tonal: '#e6f2e9',
+          ink: '#0a0f0a',
+          sage: '#525c52',
+          'sage-dark': '#a9b2a9',
+          cream: '#f6f8f4',
+          border: '#dfe4dc',
+          'border-strong': '#8a8f9c',
+          error: '#b91c1c',
+        },
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
