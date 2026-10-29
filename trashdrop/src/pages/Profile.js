@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import PersonalInfo from '../components/profile/PersonalInfo.js';
 import Locations from '../components/profile/Locations.js';
 import Preferences from '../components/profile/Preferences.js';
-import Notifications from '../components/profile/Notifications.js';
 import Security from '../components/profile/Security.js';
 
 /**
@@ -18,7 +17,8 @@ const Profile = () => {
     { id: 'personal', label: 'Personal Info' },
     { id: 'locations', label: 'Locations' },
     { id: 'preferences', label: 'Preferences' },
-    { id: 'notifications', label: 'Notifications' },
+    // Notifications returns when the app sends push and email by these settings
+    // (components/profile/Notifications.js); nothing sends them yet
     { id: 'security', label: 'Security' }
   ];
 
@@ -47,8 +47,6 @@ const Profile = () => {
         return <Locations />;
       case 'preferences':
         return <Preferences />;
-      case 'notifications':
-        return <Notifications />;
       case 'security':
         return <Security />;
       default:

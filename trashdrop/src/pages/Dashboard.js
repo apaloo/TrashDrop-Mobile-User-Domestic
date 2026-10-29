@@ -1281,14 +1281,15 @@ const Dashboard = () => {
       )}
       
       <DashboardOptimizer />
+      {/* Positions are in rem (16px each), so they grow with Profile > Preferences > Larger Text */}
       {/* Sticky Stats Cards - Horizontal scroll only */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2" style={{position: "fixed", top: "65px", width: "100%"}}>
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2" style={{position: "fixed", top: "4.0625rem", width: "100%"}}>
         {/* Scrolls sideways on phones; focusable so it scrolls from the keyboard too */}
         <div className="overflow-x-auto scrollbar-hide px-4" tabIndex={0} role="region" aria-label="Your totals">
           <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
               
               {/* Batches & Bags Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[17.5rem] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
                   <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
@@ -1340,7 +1341,7 @@ const Dashboard = () => {
               </div>
               
               {/* Pickups Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[17.5rem] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
                   <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
@@ -1383,7 +1384,7 @@ const Dashboard = () => {
               </div>
 
               {/* Reports Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[280px] h-32 relative overflow-hidden" fetchpriority="high">
+              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[17.5rem] h-32 relative overflow-hidden" fetchpriority="high">
                 {/* Decorative Background Icon */}
                 <div className="absolute top-2 left-2 opacity-10">
                   <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
@@ -1486,7 +1487,7 @@ const Dashboard = () => {
       )}
 
       {/* Sticky Action Buttons - Sticks below stats cards */}
-      <div className="sticky top-[152px] z-10 bg-white dark:bg-gray-900 px-4 pb-4" style={{position: "fixed", top: "230px", width: "96%"}}>
+      <div className="sticky top-[9.5rem] z-10 bg-white dark:bg-gray-900 px-4 pb-4" style={{position: "fixed", top: "14.375rem", width: "96%"}}>
         <div className="grid gap-4">
             {/* Digital Bin Button */}
             <button 
@@ -1514,7 +1515,7 @@ const Dashboard = () => {
 
       {/* Segmented Control - Only visible when active pickup with collector */}
       {hasCollectorAssigned && (
-        <div className="px-4 pb-3" style={{position: "fixed", top: "380px", width: "96%", zIndex: 10, backgroundColor: "inherit"}}>
+        <div className="px-4 pb-3" style={{position: "fixed", top: "calc(23.75rem + var(--td-larger-text-space, 0px))", width: "96%", zIndex: 10, backgroundColor: "inherit"}}>
           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1 flex">
             <button
               onClick={() => setDashboardTab('activity')}
@@ -1545,7 +1546,7 @@ const Dashboard = () => {
       )}
 
       {/* Scrollable Content - Tab-based: Recent Activity or Active Pickup */}
-      <div className="px-4 pb-4 space-y-6" style={{marginTop: hasCollectorAssigned ? "375px" : "325px" }}>
+      <div className="px-4 pb-4 space-y-6" style={{marginTop: hasCollectorAssigned ? "calc(23.4375rem + var(--td-larger-text-space, 0px))" : "calc(20.3125rem + var(--td-larger-text-space, 0px))" }}>
         {/* Initial load gave up after retries - plain language plus a way out,
             never a raw error dump */}
         {loadFailed && (

@@ -97,6 +97,27 @@ code {
     monospace;
 }
 
+/* Profile > Preferences > Larger Text: everything sized in rem grows by an eighth */
+html.td-larger-text {
+  font-size: 112.5%;
+  /* Room for the dashboard buttons above the activity list when their labels wrap */
+  --td-larger-text-space: 1.5rem;
+}
+html.td-larger-text body {
+  font-size: 1rem;
+}
+
+/* Profile > Preferences > Reduce Motion: no animations or smooth scrolling
+   (the same as the phone's own reduce-motion setting, in tokens.css) */
+html.td-reduce-motion *,
+html.td-reduce-motion *::before,
+html.td-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Checkboxes and radio buttons in the brand green (they were the browser's blue) */
 input[type="checkbox"], input[type="radio"] {
   accent-color: #1b6e35;
@@ -129,7 +150,7 @@ html.app-loaded[data-theme='dark'] textarea {
    16px on phones. */
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]), select, textarea {
-    font-size: 16px !important;
+    font-size: 1rem !important; /* 16px, more with Larger Text */
   }
 }
 
