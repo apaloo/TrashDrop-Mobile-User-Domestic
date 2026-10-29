@@ -4,6 +4,14 @@ import supabase from '../utils/supabaseClient.js';
 
 const ThemeContext = createContext(null);
 
+// Profile > Preferences > Accessibility: classes on <html> (see index.css)
+const ACCESSIBILITY_CLASSES = { largerText: 'td-larger-text', reduceMotion: 'td-reduce-motion' };
+export const applyAccessibility = (settings = {}) => {
+  Object.entries(ACCESSIBILITY_CLASSES).forEach(([key, cls]) => {
+    document.documentElement.classList.toggle(cls, !!settings[key]);
+  });
+};
+
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {
@@ -31,6 +39,7 @@ export const ThemeProvider = ({ children }) => {
         setUserId(null);
         setIsInitialized(false);
         setTheme('light');
+        applyAccessibility({});
       }
     });
 
@@ -63,12 +72,13 @@ export const ThemeProvider = ({ children }) => {
         if (session) {
           const { data: profileData, error } = await supabase
             .from('profiles')
-            .select('dark_mode')
+            .select('dark_mode, notification_preferences')
             .eq('id', userId)
             .maybeSingle();
           
           if (!error && profileData) {
             themeToApply = profileData.dark_mode ? 'dark' : 'light';
+            applyAccessibility(profileData.notification_preferences?.accessibility);
             console.log('[ThemeContext] Theme from database:', themeToApply);
           }
         }

@@ -1,28 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
-import { useTheme } from '../../context/ThemeContext.js';
+import { useTheme, applyAccessibility } from '../../context/ThemeContext.js';
 import supabase from '../../utils/supabaseClient.js';
 import Switch from './Switch.js';
 
+// One setting: a switch and its label (outside the component so a change keeps keyboard focus)
+const Row = ({ id, label, hint, checked, onChange }) => (
+  <div>
+    <div className="flex items-center">
+      <Switch id={id} checked={checked} onChange={onChange} labelledBy={`${id}-label`} />
+      <label htmlFor={id} id={`${id}-label`} className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
+        {label}
+      </label>
+    </div>
+    {hint && <p className="text-sm text-td-sage dark:text-gray-300 mt-1 ml-[60px]">{hint}</p>}
+  </div>
+);
+
 /**
- * Preferences tab component for the Profile page
- * Allows users to configure theme, language, and accessibility settings
+ * Preferences tab component for the Profile page.
+ * Each setting applies the moment it is switched and is saved straight away.
+ * (High contrast and language were offered here but nothing used them; they
+ * return when they are built. Saved values are left as they are.)
  */
 const Preferences = () => {
   const { user } = useAuth();
   const { setThemeMode } = useTheme();
-  
-  // State for user preferences
+
   const [preferences, setPreferences] = useState({
     darkMode: false,
-    language: 'en-US',
-    highContrast: false,
     largerText: false,
     reduceMotion: false
   });
-  
+
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
 
   // Load preferences from database on mount
@@ -32,37 +43,27 @@ const Preferences = () => {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         setIsLoading(true);
-        console.log('[Preferences] Loading preferences for user:', user.id);
-        
-        // Fetch user preferences from Supabase profiles table
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('dark_mode, language, notification_preferences')
+          .select('dark_mode, notification_preferences')
           .eq('id', user.id)
           .maybeSingle();
-        
+
         if (error && error.code !== 'PGRST116') {
           console.error('[Preferences] Error loading preferences:', error);
           throw error;
         }
-        
+
         if (profileData) {
-          // Extract accessibility settings from notification_preferences if available
-          const accessibilitySettings = profileData.notification_preferences?.accessibility || {};
-          
-          const loadedPreferences = {
+          const accessibility = profileData.notification_preferences?.accessibility || {};
+          setPreferences({
             darkMode: profileData.dark_mode || false,
-            language: profileData.language || 'en-US',
-            highContrast: accessibilitySettings.highContrast || false,
-            largerText: accessibilitySettings.largerText || false,
-            reduceMotion: accessibilitySettings.reduceMotion || false
-          };
-          
-          setPreferences(loadedPreferences);
-          console.log('[Preferences] Preferences loaded successfully:', loadedPreferences);
+            largerText: accessibility.largerText || false,
+            reduceMotion: accessibility.reduceMotion || false
+          });
         }
       } catch (error) {
         console.error('[Preferences] Error in loadPreferences:', error);
@@ -72,19 +73,16 @@ const Preferences = () => {
         setIsLoading(false);
       }
     };
-    
+
     loadPreferences();
   }, [user?.id]);
-  
-  // Handle toggle changes
-  const handleToggleChange = (name) => {
-    setPreferences({
-      ...preferences,
-      [name]: !preferences[name]
-    });
+
+  const showSaveError = () => {
+    setSaveMessage({ type: 'error', text: 'This is on for now, but could not be saved. Please try again.' });
+    setTimeout(() => setSaveMessage(null), 5000);
   };
 
-  // Dark mode applies at once and is saved straight away (no Save or reload)
+  // Dark mode: applies at once and is saved straight away
   const handleDarkModeChange = async (on) => {
     setPreferences(prev => ({ ...prev, darkMode: on }));
     setThemeMode(on ? 'dark' : 'light');
@@ -95,96 +93,40 @@ const Preferences = () => {
       .eq('id', user.id);
     if (error) {
       console.error('[Preferences] Error saving dark mode:', error);
-      setSaveMessage({ type: 'error', text: 'Dark mode is on for now, but could not be saved. Please try again.' });
-      setTimeout(() => setSaveMessage(null), 5000);
+      showSaveError();
     }
   };
 
-  // Handle language selection change
-  const handleLanguageChange = (e) => {
-    setPreferences({
-      ...preferences,
-      language: e.target.value
-    });
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!user?.id) {
-      setSaveMessage({ type: 'error', text: 'You must be logged in to save preferences' });
-      setTimeout(() => setSaveMessage(null), 3000);
-      return;
-    }
-    
+  // Larger text and reduce motion: apply at once and are saved straight away,
+  // kept with the other accessibility values in notification_preferences
+  const handleAccessibilityChange = async (name, on) => {
+    const next = { ...preferences, [name]: on };
+    setPreferences(next);
+    applyAccessibility({ largerText: next.largerText, reduceMotion: next.reduceMotion });
+    if (!user?.id) return;
     try {
-      setIsSaving(true);
-      console.log('[Preferences] Saving preferences for user:', user.id);
-      
-      // First, get the current notification_preferences to merge with
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('notification_preferences')
         .eq('id', user.id)
         .maybeSingle();
-      
-      // Prepare accessibility settings
-      const accessibilitySettings = {
-        highContrast: preferences.highContrast,
-        largerText: preferences.largerText,
-        reduceMotion: preferences.reduceMotion
-      };
-      
-      // Merge with existing notification_preferences
-      const updatedNotificationPrefs = {
-        ...(currentProfile?.notification_preferences || {}),
-        accessibility: accessibilitySettings
-      };
-      
-      console.log('[Preferences] Saving notification_preferences:', updatedNotificationPrefs);
-      
-      // Update preferences in Supabase
+      const current = currentProfile?.notification_preferences || {};
       const { error } = await supabase
         .from('profiles')
         .update({
-          dark_mode: preferences.darkMode,
-          language: preferences.language,
-          notification_preferences: updatedNotificationPrefs,
+          notification_preferences: {
+            ...current,
+            accessibility: { ...(current.accessibility || {}), [name]: on }
+          },
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
-      
-      if (error) {
-        console.error('[Preferences] Error saving preferences:', error);
-        throw error;
-      }
-      
-      console.log('[Preferences] Preferences saved successfully');
-      setSaveMessage({ type: 'success', text: 'Preferences saved.' });
-      setTimeout(() => setSaveMessage(null), 3000);
-      // The theme is applied as soon as the switch changes, so no reload
-      setThemeMode(preferences.darkMode ? 'dark' : 'light');
-      
+      if (error) throw error;
     } catch (error) {
-      console.error('[Preferences] Error in handleSubmit:', error);
-      setSaveMessage({ type: 'error', text: 'Failed to save preferences. Please try again.' });
-      setTimeout(() => setSaveMessage(null), 5000);
-    } finally {
-      setIsSaving(false);
+      console.error('[Preferences] Error saving accessibility setting:', error);
+      showSaveError();
     }
   };
-
-  // Available languages
-  const languages = [
-    { code: 'en-US', label: 'English (US)' },
-    { code: 'en-GB', label: 'English (UK)' },
-    { code: 'es', label: 'Español' },
-    { code: 'fr', label: 'Français' },
-    { code: 'de', label: 'Deutsch' },
-    { code: 'pt', label: 'Português' },
-    { code: 'zh', label: '中文' }
-  ];
 
   if (isLoading) {
     return (
@@ -196,110 +138,49 @@ const Preferences = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-      {/* Save status message */}
       {saveMessage && (
-        <div className={`mb-4 p-3 rounded-md ${
-          saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
-          saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
-          'bg-td-tonal text-td-forest'
+        <div role="alert" className={`mb-4 p-3 rounded-md ${
+          saveMessage.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
         }`}>
           {saveMessage.text}
         </div>
       )}
-      <form onSubmit={handleSubmit}>
-        {/* Theme Section */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Theme</h2>
-          <div className="flex items-center">
-            <Switch id="dark-mode" checked={preferences.darkMode} onChange={handleDarkModeChange} labelledBy="dark-mode-label" />
-            <label htmlFor="dark-mode" id="dark-mode-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
-              Dark Mode
-            </label>
-          </div>
-          <p className="text-sm text-td-sage dark:text-gray-400 mt-1 ml-14">Enable dark theme for better viewing in low light</p>
-        </section>
 
-        {/* Language Section */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Language</h2>
-          <div>
-            <select
-              id="language"
-              name="language"
-              aria-label="Language"
-              value={preferences.language}
-              onChange={handleLanguageChange}
-              className="w-full md:w-72 px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
-            >
-              {languages.map(lang => (
-                <option key={lang.code} value={lang.code}>{lang.label}</option>
-              ))}
-            </select>
-            <p className="text-sm text-td-sage dark:text-gray-400 mt-1">
-              Select your preferred language for the application
-            </p>
-          </div>
-        </section>
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Theme</h2>
+        <Row
+          id="dark-mode"
+          label="Dark Mode"
+          hint="Enable dark theme for better viewing in low light"
+          checked={preferences.darkMode}
+          onChange={handleDarkModeChange}
+        />
+      </section>
 
-        {/* Accessibility Section */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Accessibility</h2>
-          <div className="space-y-4">
-            {/* High Contrast */}
-            <div className="flex items-center">
-              <Switch id="high-contrast" checked={preferences.highContrast} onChange={() => handleToggleChange('highContrast')} labelledBy="high-contrast-label" />
-              <label htmlFor="high-contrast" id="high-contrast-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
-                High Contrast
-              </label>
-            </div>
-
-            {/* Larger Text */}
-            <div className="flex items-center">
-              <Switch id="larger-text" checked={preferences.largerText} onChange={() => handleToggleChange('largerText')} labelledBy="larger-text-label" />
-              <label htmlFor="larger-text" id="larger-text-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
-                Larger Text
-              </label>
-            </div>
-
-            {/* Reduce Motion */}
-            <div className="flex items-center">
-              <Switch id="reduce-motion" checked={preferences.reduceMotion} onChange={() => handleToggleChange('reduceMotion')} labelledBy="reduce-motion-label" />
-              <label htmlFor="reduce-motion" id="reduce-motion-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
-                Reduce Motion
-              </label>
-            </div>
-          </div>
-        </section>
-
-        {/* Save Button */}
-        <div className="mt-8 flex justify-end">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <>
-                <svg className="animate-spin h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Saving...
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-                Save Preferences
-              </>
-            )}
-          </button>
+      <section>
+        <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Accessibility</h2>
+        <div className="space-y-4">
+          <Row
+            id="larger-text"
+            label="Larger Text"
+            hint="Makes text across the app bigger"
+            checked={preferences.largerText}
+            onChange={(on) => handleAccessibilityChange('largerText', on)}
+          />
+          <Row
+            id="reduce-motion"
+            label="Reduce Motion"
+            hint="Turns off animations and smooth scrolling"
+            checked={preferences.reduceMotion}
+            onChange={(on) => handleAccessibilityChange('reduceMotion', on)}
+          />
         </div>
-      </form>
+      </section>
+
+      <p className="mt-8 text-sm text-td-sage dark:text-gray-300">Changes are saved as you make them.</p>
     </div>
   );
 };
