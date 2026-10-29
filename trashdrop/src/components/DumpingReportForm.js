@@ -584,7 +584,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     <div className="min-h-screen pt-2 bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
       {/* Fixed Header (positioned below navbar) */}
       <div className="px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md bg-white dark:bg-gray-800">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-center">
+        <h1 className="text-2xl font-bold text-td-ink dark:text-gray-100 text-center">
           Report Illegal Dumping
         </h1>
       </div>
@@ -643,13 +643,13 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         )}
 
         {/* Info Box */}
-        <div className="bg-blue-50 dark:bg-blue-900 dark:bg-opacity-20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 flex items-start">
-          <div className="bg-blue-600 rounded-full p-2 mr-3 mt-1 flex-shrink-0">
+        <div className="bg-td-tonal dark:bg-blue-900 dark:bg-opacity-20 border border-td-border dark:border-blue-800 rounded-lg p-4 mb-6 flex items-start">
+          <div className="bg-green-600 rounded-full p-2 mr-3 mt-1 flex-shrink-0">
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
           </div>
-          <div className="text-gray-700 dark:text-gray-300">
+          <div className="text-td-ink dark:text-gray-300">
             <p className="text-sm">
               Help keep our community clean by reporting illegal waste dumps. Your report will be sent to local authorities for cleanup. Photos can only be taken with your device's camera.
             </p>
@@ -659,7 +659,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         <form onSubmit={handleSubmit} autoComplete="off" noValidate>
           {/* Type of Waste - Horizontal Scrollable Cards */}
           <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
+            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
               Type of Waste <span className="text-red-500">*</span>
             </label>
             
@@ -674,154 +674,168 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               }}
             >
               {/* Mixed Waste Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'mixed'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'mixed' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'mixed'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🗑️</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🗑️</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'mixed' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'mixed' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Mixed
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Construction Debris Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'construction'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'construction' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'construction'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🧱</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🧱</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'construction' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'construction' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Construction
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Household Waste Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'household'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'household' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'household'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🏠</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🏠</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'household' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'household' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Household
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Electronic Waste Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'electronic'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'electronic' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'electronic'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">📱</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">📱</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'electronic' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'electronic' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Electronic
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Organic Waste Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'organic'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'organic' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'organic'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🥬</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🥬</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'organic' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'organic' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Organic
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Recyclables Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'recyclables'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'recyclables' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'recyclables'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">♻️</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">♻️</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'recyclables' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'recyclables' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Recyclables
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Hazardous Materials Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.waste_type === 'hazardous'}
                 onClick={() => setFormData(prev => ({ ...prev, waste_type: 'hazardous' }))}
                 className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.waste_type === 'hazardous'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">☣️</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">☣️</span>
                   <span className={`text-xs font-medium ${
-                    formData.waste_type === 'hazardous' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.waste_type === 'hazardous' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Hazardous
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
             </div>
             
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-sm text-td-sage dark:text-gray-300 mt-2">
               Swipe to see more options
             </p>
           </div>
 
           {/* Size of dumping - Horizontal Scrollable Cards */}
           <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
+            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
               Size of the illegal dumping <span className="text-red-500">*</span>
             </label>
             
@@ -836,110 +850,118 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               }}
             >
               {/* Small Size Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.estimated_volume === 'small'}
                 onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'small' }))}
                 className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.estimated_volume === 'small'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🛍️</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🛍️</span>
                   <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'small' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.estimated_volume === 'small' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Small
                   </span>
                   <span className={`text-xs ${
-                    formData.estimated_volume === 'small' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.estimated_volume === 'small' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Few bags
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Medium Size Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.estimated_volume === 'medium'}
                 onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'medium' }))}
                 className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.estimated_volume === 'medium'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🚗</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🚗</span>
                   <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'medium' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.estimated_volume === 'medium' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Medium
                   </span>
                   <span className={`text-xs ${
-                    formData.estimated_volume === 'medium' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.estimated_volume === 'medium' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Car load
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Large Size Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.estimated_volume === 'large'}
                 onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'large' }))}
                 className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.estimated_volume === 'large'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🚚</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🚚</span>
                   <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'large' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.estimated_volume === 'large' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Large
                   </span>
                   <span className={`text-xs ${
-                    formData.estimated_volume === 'large' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.estimated_volume === 'large' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Truck load
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
 
               {/* Massive Size Card */}
-              <div
+              <button
+                type="button"
+                aria-pressed={formData.estimated_volume === 'massive'}
                 onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'massive' }))}
                 className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.estimated_volume === 'massive'
-                    ? 'bg-blue-50 dark:bg-blue-900 border-2 border-blue-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🚛</div>
+                <span className="flex flex-col items-center text-center">
+                  <span className="block text-2xl mb-1">🚛</span>
                   <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'massive' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.estimated_volume === 'massive' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Massive
                   </span>
                   <span className={`text-xs ${
-                    formData.estimated_volume === 'massive' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.estimated_volume === 'massive' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Multiple trucks
                   </span>
-                </div>
-              </div>
+                </span>
+              </button>
             </div>
           </div>
 
           {/* Severity - three cards sharing the row */}
           <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
+            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
               Severity <span className="text-red-500">*</span>
             </label>
             
@@ -959,19 +981,19 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.severity === 'low'
                     ? 'bg-green-50 dark:bg-green-900 border-2 border-green-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
                 <div className="flex flex-col items-center text-center">
                   <div className="text-2xl mb-1">🟢</div>
                   <span className={`text-sm font-medium ${
-                    formData.severity === 'low' ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.severity === 'low' ? 'text-green-700 dark:text-green-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Low
                   </span>
                   <span className={`text-xs ${
-                    formData.severity === 'low' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.severity === 'low' ? 'text-green-600 dark:text-green-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Minor issue
                   </span>
@@ -984,19 +1006,19 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.severity === 'medium'
                     ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
                 <div className="flex flex-col items-center text-center">
                   <div className="text-2xl mb-1">🟡</div>
                   <span className={`text-sm font-medium ${
-                    formData.severity === 'medium' ? 'text-yellow-700 dark:text-yellow-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.severity === 'medium' ? 'text-yellow-700 dark:text-yellow-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     Medium
                   </span>
                   <span className={`text-xs ${
-                    formData.severity === 'medium' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.severity === 'medium' ? 'text-amber-700 dark:text-yellow-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Needs attention
                   </span>
@@ -1009,19 +1031,19 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                   formData.severity === 'high'
                     ? 'bg-red-50 dark:bg-red-900 border-2 border-red-500 shadow-md'
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
               >
                 <div className="flex flex-col items-center text-center">
                   <div className="text-2xl mb-1">🔴</div>
                   <span className={`text-sm font-medium ${
-                    formData.severity === 'high' ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'
+                    formData.severity === 'high' ? 'text-red-700 dark:text-red-300' : 'text-td-ink dark:text-gray-300'
                   }`}>
                     High
                   </span>
                   <span className={`text-xs ${
-                    formData.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
+                    formData.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-td-sage dark:text-gray-300'
                   }`}>
                     Urgent
                   </span>
@@ -1032,11 +1054,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
 
           {/* Location */}
           <div className="mb-6">
-            <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
+            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
               Location <span className="text-red-500">*</span>
             </label>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <p className="text-sm text-td-sage dark:text-gray-300 mb-2">
                 Please click on the map to select a location or use the button below to detect your current location.
               </p>
             
@@ -1063,11 +1085,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             
             {/* Location coordinates */}
             <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-gray-600 dark:text-gray-400" role="status" aria-live="polite">
+              <div className="text-sm text-td-sage dark:text-gray-300" role="status" aria-live="polite">
                 {isLocating && !formData?.coordinates ? (
                   <div className="animate-pulse">
                     <div className="flex items-center">
-                      <svg className="animate-spin mr-2 h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin mr-2 h-4 w-4 text-td-forest" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -1093,7 +1115,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               <button
                 type="button"
                 onClick={() => handleUseMyLocation(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
               >
                 Use My Location
               </button>
@@ -1103,7 +1125,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
 
         {/* Take Photos */}
         <div className="mb-6">
-          <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">
+          <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
             Take Photos <span className="text-red-500">*</span>
           </label>
           
@@ -1142,7 +1164,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               )}
               
               <div className="mb-2">
-                <svg className="w-10 h-10 mx-auto text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-10 h-10 mx-auto text-td-sage" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -1150,15 +1172,15 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               <button
                 type="button"
                 onClick={handleTakePhoto}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg mb-3 transition-colors"
+                className="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg mb-3 transition-colors"
               >
                 Take Photo with Camera
               </button>
               
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-td-sage dark:text-gray-300">
                 Add at least 1 photo (up to 6) to document the illegal dumping
               </p>
-              <p className="text-xs text-blue-600 mt-2">
+              <p className="text-xs text-td-forest dark:text-green-300 mt-2">
                 Note: Photos can only be taken with your device's camera
               </p>
             </div>
@@ -1176,9 +1198,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         )}
 
           {/* More details (optional): description and contact consent */}
-          <div role="group" aria-labelledby="report-more-details" className="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <p id="report-more-details" className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-2">More details (optional)</p>
-            <label htmlFor="report-description" className="block text-gray-600 dark:text-gray-400 text-xs mb-1">
+          <div role="group" aria-labelledby="report-more-details" className="mb-6 border border-td-border dark:border-gray-700 rounded-lg p-4">
+            <p id="report-more-details" className="text-td-ink dark:text-gray-300 text-sm font-medium mb-2">More details (optional)</p>
+            <label htmlFor="report-description" className="block text-td-sage dark:text-gray-300 text-xs mb-1">
               Description (optional)
             </label>
             <textarea
@@ -1188,7 +1210,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               onChange={handleChange}
               rows={2}
               placeholder="Describe the dumped waste and any relevant details..."
-              className="w-full px-3 py-2 mb-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+              className="w-full px-3 py-2 mb-3 bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-600 rounded-lg text-td-ink dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 resize-none"
             />
             <label className="flex items-start">
               <input
@@ -1196,16 +1218,16 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 name="contact_consent"
                 checked={formData.contact_consent}
                 onChange={handleChange}
-                className="w-4 h-4 text-blue-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 mt-0.5 mr-3"
+                className="w-4 h-4 text-td-forest bg-white dark:bg-gray-700 border-td-border-strong dark:border-gray-600 rounded focus:ring-green-600 mt-0.5 mr-3"
               />
-              <span className="text-gray-700 dark:text-gray-300 text-sm">
+              <span className="text-td-ink dark:text-gray-300 text-sm">
                 I'm willing to be contacted for more information about this report
               </span>
             </label>
           </div>
 
           {/* Disclaimer */}
-          <div className="mb-6 text-gray-600 dark:text-gray-400 text-sm">
+          <div className="mb-6 text-td-sage dark:text-gray-300 text-sm">
             <p className="mb-2">
               By submitting this report, you confirm that the information provided is accurate to the best of your knowledge.
             </p>
@@ -1238,7 +1260,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             disabled={!canSubmit}
             aria-describedby={missingRequirements.length > 0 ? 'report-missing-requirements' : undefined}
             title={missingRequirements.length > 0 ? `Still needed: ${missingRequirements.join('; ')}` : undefined}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-lg transition-colors"
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-lg transition-colors"
           >
             {loading ? (
               <div className="flex items-center justify-center">

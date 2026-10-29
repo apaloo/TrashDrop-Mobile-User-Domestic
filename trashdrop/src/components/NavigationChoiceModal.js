@@ -51,21 +51,21 @@ const NavigationChoiceModal = ({
         position === 'bottom' ? 'mb-8' : ''
       }`}>
         {/* Header */}
-        <div className="p-6 text-center border-b border-gray-100">
+        <div className="p-6 text-center border-b border-td-border">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🎉</span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-td-ink mb-2">
             Collector Assigned!
           </h2>
-          <p className="text-gray-600">
+          <p className="text-td-sage">
             Your collector is ready to help with your request
           </p>
         </div>
 
         {/* Collector Info */}
         {pickup.collector && (
-          <div className="p-6 border-b border-gray-100">
+          <div className="p-6 border-b border-td-border">
             <div className="flex items-center space-x-4 mb-4">
               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
                 {pickup.collector.profile_image_url ? (
@@ -75,14 +75,14 @@ const NavigationChoiceModal = ({
                     className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
-                  <span className="text-gray-500">👤</span>
+                  <span className="text-td-sage">👤</span>
                 )}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="font-semibold text-td-ink">
                   {pickup.collector.first_name} {pickup.collector.last_name}
                 </h3>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <div className="flex items-center space-x-2 text-sm text-td-sage">
                   <div className="flex items-center">
                     <FaStar className="text-yellow-400 mr-1" />
                     <span>{pickup.collector.rating || '4.5'}</span>
@@ -99,7 +99,7 @@ const NavigationChoiceModal = ({
             {pickup.collector.phone && (
               <button
                 onClick={handleCallCollector}
-                className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center space-x-2 p-3 bg-td-cream hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <FaPhone className="text-green-600" />
                 <span className="text-green-600 font-medium">Call Collector</span>
@@ -109,28 +109,28 @@ const NavigationChoiceModal = ({
         )}
 
         {/* Pickup Details */}
-        <div className="p-6 border-b border-gray-100">
-          <h4 className="font-semibold text-gray-900 mb-3">Request Details</h4>
+        <div className="p-6 border-b border-td-border">
+          <h4 className="font-semibold text-td-ink mb-3">Request Details</h4>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">Type:</span>
+              <span className="text-td-sage">Type:</span>
               <span className="font-medium capitalize">
                 {pickup.is_digital_bin ? 'Digital Bin' : 'Pickup Request'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Bags:</span>
+              <span className="text-td-sage">Bags:</span>
               <span className="font-medium">{pickup.bag_count || 1}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Waste Type:</span>
+              <span className="text-td-sage">Waste Type:</span>
               <span className="font-medium capitalize">
                 {pickup.waste_type || 'General'}
               </span>
             </div>
             {pickup.address && (
               <div className="flex justify-between">
-                <span className="text-gray-600">Address:</span>
+                <span className="text-td-sage">Address:</span>
                 <span className="font-medium text-right max-w-[200px] truncate">
                   {pickup.address}
                 </span>
@@ -138,7 +138,7 @@ const NavigationChoiceModal = ({
             )}
             {pickup.fee && (
               <div className="flex justify-between">
-                <span className="text-gray-600">Fee:</span>
+                <span className="text-td-sage">Fee:</span>
                 <span className="font-medium">GHS {pickup.fee}</span>
               </div>
             )}
@@ -157,7 +157,7 @@ const NavigationChoiceModal = ({
           
           <button
             onClick={handleStayHere}
-            className="w-full flex items-center justify-center space-x-2 p-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+            className="w-full flex items-center justify-center space-x-2 p-4 bg-gray-100 hover:bg-gray-200 text-td-ink rounded-lg font-medium transition-colors"
           >
             <FaHome />
             <span>Stay on Dashboard</span>
@@ -166,7 +166,7 @@ const NavigationChoiceModal = ({
 
         {/* Footer Note */}
         <div className="px-6 pb-6">
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-td-sage">
             You can always track from your dashboard later
           </p>
         </div>
@@ -174,7 +174,7 @@ const NavigationChoiceModal = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-4 right-4 p-2 text-td-sage hover:text-td-ink transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

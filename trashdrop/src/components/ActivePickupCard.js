@@ -297,14 +297,14 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
         <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl flex flex-col items-center relative">
           <button 
             onClick={() => setShowQRCode(false)}
-            className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 transition-colors"
+            className="absolute top-4 right-4 text-td-sage hover:text-td-ink transition-colors"
             aria-label="Close QR code view"
           >
             <FaTimes size={24} />
           </button>
           
-          <h3 className="text-xl font-bold mb-4 text-center text-gray-800">Scan this QR Code</h3>
-          <p className="text-gray-600 mb-6 text-center">Present this QR code to your collector for pickup verification</p>
+          <h3 className="text-xl font-bold mb-4 text-center text-td-ink">Scan this QR Code</h3>
+          <p className="text-td-sage mb-6 text-center">Present this QR code to your collector for pickup verification</p>
           
           <div className="bg-white p-4 rounded-lg shadow-inner">
             <QRCodeSVG 
@@ -320,7 +320,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
             />
           </div>
           
-          <p className="mt-6 text-sm text-gray-500">Pickup ID: {activePickup?.id || 'Unknown'}</p>
+          <p className="mt-6 text-sm text-td-sage">Pickup ID: {activePickup?.id || 'Unknown'}</p>
         </div>
       </div>,
       document.body
@@ -329,8 +329,8 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-6">
-      <div className="flex justify-between items-center bg-blue-50 dark:bg-blue-900/30 p-6">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-white">Active Pickup Request</h2>
+      <div className="flex justify-between items-center bg-td-tonal dark:bg-blue-900/30 p-6">
+        <h2 className="text-xl font-bold text-td-ink dark:text-white">Active Pickup Request</h2>
         {renderStatusBadge(activePickup.status)}
       </div>
 
@@ -339,20 +339,20 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
         <div className="grid grid-cols-2 gap-4 mb-6">
           {/* Row 1: Collector, Distance, ETA */}
           {/* Collector information with gamification */}
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="bg-td-tonal dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300">Collector</h3>
-              <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Pro</span>
+              <h3 className="text-sm font-semibold text-td-forest dark:text-blue-300">Collector</h3>
+              <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Pro</span>
             </div>
-            <p className="text-lg font-medium text-gray-800 dark:text-white">{activePickup.collector_name || 'John (Demo)'}</p>
+            <p className="text-lg font-medium text-td-ink dark:text-white">{activePickup.collector_name || 'John (Demo)'}</p>
             <div className="mt-2 flex items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center">
-                <svg className="w-4 h-4 text-blue-700 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <div className="w-8 h-8 rounded-full bg-td-tonal dark:bg-blue-800 flex items-center justify-center">
+                <svg className="w-4 h-4 text-td-forest dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <div className="ml-2">
-                <span className="text-xs text-blue-700 dark:text-blue-300">5★ Rating</span>
+                <span className="text-xs text-td-forest dark:text-blue-300">5★ Rating</span>
               </div>
             </div>
           </div>
@@ -363,7 +363,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
               <h3 className="text-sm font-semibold text-green-700 dark:text-green-300">Distance</h3>
               <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Near</span>
             </div>
-            <p className="text-lg font-medium text-gray-800 dark:text-white">
+            <p className="text-lg font-medium text-td-ink dark:text-white">
               {distance !== null ? `${distance} km` : 'Distance unavailable'}
             </p>
             {/* Progress animation showing collector getting closer */}
@@ -378,25 +378,25 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
           </div>
 
           {/* ETA information with gamification */}
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden">
+          <div className="bg-td-tonal dark:bg-blue-900/30 p-3 rounded-lg relative overflow-hidden">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300">ETA</h3>
+              <h3 className="text-sm font-semibold text-td-forest dark:text-blue-300">ETA</h3>
               {etaMinutes && etaMinutes < 15 ? (
-                <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Soon!</span>
+                <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">Soon!</span>
               ) : (
                 <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">On the way</span>
               )}
             </div>
-            <p className="text-lg font-medium text-gray-800 dark:text-white">
+            <p className="text-lg font-medium text-td-ink dark:text-white">
               {etaMinutes !== null ? `${etaMinutes} minutes` : 'ETA unavailable'}
             </p>
             {/* Countdown timer visualization */}
             <div className="w-full h-2 bg-blue-200 dark:bg-blue-700 rounded-full mt-2">
-              <div className="h-2 bg-blue-600 dark:bg-blue-400 rounded-full" 
+              <div className="h-2 bg-green-600 dark:bg-blue-400 rounded-full" 
                 style={{ width: etaMinutes ? `${Math.max(0, 100 - (etaMinutes * 3))}%` : '0%' }}>
               </div>
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+            <p className="text-xs text-td-forest dark:text-blue-300 mt-1">
               {etaMinutes ? `Arrives in ${etaMinutes} min` : 'Calculating arrival time...'}
             </p>
           </div>
@@ -410,7 +410,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
                 {activePickup.waste_type === 'Recyclables' ? 'Eco+' : 'Standard'}
               </span>
             </div>
-            <p className="text-lg font-medium text-gray-800 dark:text-white">
+            <p className="text-lg font-medium text-td-ink dark:text-white">
               {activePickup.waste_type} ({activePickup.number_of_bags} {parseInt(activePickup.number_of_bags) === 1 ? 'bag' : 'bags'})
             </p>
             {/* Visual indicator of waste type */}
@@ -430,7 +430,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
               <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">Location</h3>
               <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">Verified</span>
             </div>
-            <p className="text-lg font-medium text-gray-800 dark:text-white truncate">
+            <p className="text-lg font-medium text-td-ink dark:text-white truncate">
               {activePickup.address || 'Location unavailable'}
             </p>
             {/* Map pin animation */}
@@ -448,7 +448,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
               <h3 className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">Points</h3>
               <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">+{activePickup.points || 0}</span>
             </div>
-            <p className="text-lg font-medium text-gray-800 dark:text-white">
+            <p className="text-lg font-medium text-td-ink dark:text-white">
               {activePickup.points || 0}
             </p>
             {/* Points sparkle animation */}
@@ -472,16 +472,16 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
 
           {/* ETA Section */}
           <div className="w-full">
-            <p className="text-lg font-medium text-gray-800 dark:text-white">
+            <p className="text-lg font-medium text-td-ink dark:text-white">
               {etaMinutes !== null ? `${etaMinutes} minutes` : 'ETA unavailable'}
             </p>
             {/* Countdown timer visualization */}
             <div className="w-full h-2 bg-blue-200 dark:bg-blue-700 rounded-full mt-2">
-              <div className="h-2 bg-blue-600 dark:bg-blue-400 rounded-full" 
+              <div className="h-2 bg-green-600 dark:bg-blue-400 rounded-full" 
                 style={{ width: etaMinutes ? `${Math.max(0, 100 - (etaMinutes * 3))}%` : '0%' }}>
               </div>
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+            <p className="text-xs text-td-forest dark:text-blue-300 mt-1">
               {etaMinutes ? `Arrives in ${etaMinutes} min` : 'Calculating arrival time...'}
             </p>
           </div>
@@ -496,7 +496,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
               {activePickup.waste_type === 'Recyclables' ? 'Eco+' : 'Standard'}
             </span>
           </div>
-          <p className="text-lg font-medium text-gray-800 dark:text-white">
+          <p className="text-lg font-medium text-td-ink dark:text-white">
             {activePickup.waste_type} ({activePickup.number_of_bags} {parseInt(activePickup.number_of_bags) === 1 ? 'bag' : 'bags'})
           </p>
           {/* Visual indicator of waste type */}
@@ -516,7 +516,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
             <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">Location</h3>
             <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">Verified</span>
           </div>
-          <p className="text-lg font-medium text-gray-800 dark:text-white truncate">
+          <p className="text-lg font-medium text-td-ink dark:text-white truncate">
             {activePickup.address || 'Location unavailable'}
           </p>
           {/* Map pin animation */}
@@ -534,7 +534,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
             <h3 className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">Points</h3>
             <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">+{activePickup.points || 0}</span>
           </div>
-          <p className="text-lg font-medium text-gray-800 dark:text-white">
+          <p className="text-lg font-medium text-td-ink dark:text-white">
             {activePickup.points || 0}
           </p>
           {/* Points sparkle animation */}
@@ -558,7 +558,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
       </div>
 
       {/* Map with collector's location and route */}
-      <div className="h-64 w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-0 relative z-0">
+      <div className="h-64 w-full rounded-lg overflow-hidden border border-td-border dark:border-gray-700 mb-0 relative z-0">
         <PickupMap 
           userLocation={activePickup.location} 
           collectorLocation={collectorLocation}
@@ -574,7 +574,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
         </button>
       </div>
       {/* Smart Action Buttons - Based on available actions */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-700">
+      <div className="p-4 bg-td-cream dark:bg-gray-700">
         <div className="flex flex-wrap gap-2 justify-end">
           {availableActions.includes('track') && (
             <button
@@ -589,7 +589,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
           {availableActions.includes('contact') && activePickup.collector?.phone && (
             <button
               onClick={() => handleAction('contact')}
-              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center"
+              className="px-4 py-2 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-colors flex items-center"
             >
               <FaPhone className="mr-2" />
               Call Collector
@@ -609,7 +609,7 @@ const ActivePickupCard = ({ activePickup, onCancel, onRefresh }) => {
         
         {/* Status description */}
         <div className="mt-3 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-td-sage dark:text-gray-400">
             {statusConfig.description}
           </p>
         </div>

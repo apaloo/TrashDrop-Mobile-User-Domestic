@@ -598,7 +598,7 @@ const CameraModal = ({
                   e.stopPropagation();
                   handleClose(e);
                 }}
-                className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg"
+                className="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg"
               >
                 Close
               </button>
@@ -623,7 +623,7 @@ const CameraModal = ({
             className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg disabled:opacity-50 border-4 border-white"
             aria-label="Capture photo"
           >
-            <div className="w-16 h-16 bg-blue-600 rounded-full"></div>
+            <div className="w-16 h-16 bg-green-600 rounded-full"></div>
           </button>
           
           {/* Empty space for symmetry (right) */}

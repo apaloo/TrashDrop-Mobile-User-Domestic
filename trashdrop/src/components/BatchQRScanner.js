@@ -236,7 +236,7 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
       {/* Loading Indicator */}
       {loading && (
         <div className="flex justify-center my-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-td-forest"></div>
           <span className="ml-3 text-sm text-blue-300">{loadingMessage || 'Loading...'}</span>
         </div>
       )}
@@ -279,7 +279,7 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
             <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
               {/* Camera Icon */}
               <svg
-                className="w-16 h-16 text-gray-600 mb-4"
+                className="w-16 h-16 text-td-sage mb-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -297,7 +297,7 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
                   d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              <span className="text-gray-700 text-lg font-medium">Camera Ready</span>
+              <span className="text-td-ink text-lg font-medium">Camera Ready</span>
               
               {/* Corner Markers for inactive state */}
               <div className="absolute inset-0 pointer-events-none">
@@ -339,7 +339,7 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
             <button
               onClick={startScanning}
               disabled={loading}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+              className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
             >
               {loading ? 'Loading...' : 'Start Scanning'}
             </button>
