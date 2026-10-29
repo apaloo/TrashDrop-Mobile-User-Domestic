@@ -196,14 +196,14 @@ const Register = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50" style={{ backgroundColor: '#f9fafb', minHeight: '100vh' }}>
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg" style={{ backgroundColor: '#ffffff' }}>
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border" style={{ backgroundColor: '#ffffff' }}>
         <div className="text-center">
           <div className="flex justify-center mb-4">
             <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
           </div>
-          <h1 className="text-3xl font-bold text-primary dark:text-primary-light">Create Account</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">Join TrashDrop to make a difference</p>
+          <h1 className="text-3xl font-bold text-td-ink dark:text-white">Create Account</h1>
+          <p className="mt-2 text-td-sage dark:text-gray-300">Join TrashDrop to make a difference</p>
         </div>
 
         {error && (
@@ -222,7 +222,7 @@ const Register = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="fullName" className="block text-sm font-medium text-td-ink dark:text-gray-300">
                 Full Name
               </label>
               <input
@@ -234,7 +234,7 @@ const Register = () => {
                 value={formData.fullName}
                 onChange={handleChange}
                 className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white ${
-                  fieldErrors.fullName ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-700'
+                  fieldErrors.fullName ? 'border-red-300 dark:border-red-600' : 'border-td-border-strong dark:border-gray-700'
                 }`}
                 placeholder="John Doe"
               />
@@ -244,7 +244,7 @@ const Register = () => {
             </div>
             
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="email" className="block text-sm font-medium text-td-ink dark:text-gray-300">
                 Email Address
               </label>
               <input
@@ -256,7 +256,7 @@ const Register = () => {
                 value={formData.email}
                 onChange={handleChange}
                 className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white ${
-                  fieldErrors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-700'
+                  fieldErrors.email ? 'border-red-300 dark:border-red-600' : 'border-td-border-strong dark:border-gray-700'
                 }`}
                 placeholder="your.email@example.com"
               />
@@ -266,7 +266,7 @@ const Register = () => {
             </div>
             
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="password" className="block text-sm font-medium text-td-ink dark:text-gray-300">
                 Password
               </label>
               <div className="relative">
@@ -279,7 +279,7 @@ const Register = () => {
                   value={formData.password}
                   onChange={handleChange}
                   className={`mt-1 block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white ${
-                    fieldErrors.password ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-700'
+                    fieldErrors.password ? 'border-red-300 dark:border-red-600' : 'border-td-border-strong dark:border-gray-700'
                   }`}
                   placeholder="••••••••"
                 />
@@ -287,14 +287,15 @@ const Register = () => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  tabIndex="-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                 >
                   {showPassword ? (
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 text-td-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 text-td-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
@@ -307,7 +308,7 @@ const Register = () => {
               {formData.password && !fieldErrors.password && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Password strength:</span>
+                    <span className="text-xs text-td-sage dark:text-gray-400">Password strength:</span>
                     <span className={`text-xs font-medium ${
                       passwordStrength <= 1 ? 'text-red-500' :
                       passwordStrength === 2 ? 'text-yellow-500' :
@@ -329,13 +330,13 @@ const Register = () => {
                   </div>
                 </div>
               )}
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-xs text-td-sage dark:text-gray-400">
                 Use 8+ characters with a mix of letters, numbers & symbols
               </p>
             </div>
             
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-td-ink dark:text-gray-300">
                 Confirm Password
               </label>
               <div className="relative">
@@ -348,7 +349,7 @@ const Register = () => {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   className={`mt-1 block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white ${
-                    fieldErrors.confirmPassword ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-700'
+                    fieldErrors.confirmPassword ? 'border-red-300 dark:border-red-600' : 'border-td-border-strong dark:border-gray-700'
                   }`}
                   placeholder="••••••••"
                 />
@@ -356,14 +357,15 @@ const Register = () => {
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  tabIndex="-1"
+                  aria-label={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}
+                  aria-pressed={showConfirmPassword}
                 >
                   {showConfirmPassword ? (
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 text-td-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 text-td-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
@@ -383,11 +385,11 @@ const Register = () => {
                 checked={formData.agreeTerms}
                 onChange={handleChange}
                 className={`h-4 w-4 text-primary focus:ring-primary border rounded ${
-                  fieldErrors.agreeTerms ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-700'
+                  fieldErrors.agreeTerms ? 'border-red-300 dark:border-red-600' : 'border-td-border-strong dark:border-gray-700'
                 }`}
                 required
               />
-              <label htmlFor="agreeTerms" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+              <label htmlFor="agreeTerms" className="ml-2 block text-sm text-td-ink dark:text-gray-300">
                 I agree to the{' '}
                 <Link to="/terms" className="text-primary hover:underline dark:text-primary-light">
                   Terms of Service
@@ -418,7 +420,7 @@ const Register = () => {
         <SocialLogin isSubmitting={isSubmitting} onError={setError} />
         
         <div className="text-center mt-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-td-sage dark:text-gray-400">
             Already have an account?{' '}
             <Link to="/login" className="font-medium text-primary hover:text-primary-dark dark:text-primary-light dark:hover:text-primary">
               Sign in

@@ -112,6 +112,7 @@ const ToastNotification = ({
           className="toast-progress" 
           style={{ width: `${progress}%` }}
           role="progressbar"
+          aria-label="Time until this message closes"
           aria-valuemin="0"
           aria-valuemax="100"
           aria-valuenow={Math.round(progress)}
