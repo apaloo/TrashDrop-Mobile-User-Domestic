@@ -97,20 +97,26 @@ code {
     monospace;
 }
 
-/* Enhanced form element readability - enforced black text for all inputs regardless of theme */
+/* Form fields: ink text on light screens */
 select, input, textarea, option {
-  color: #000000 !important;
+  color: #0a0f0a !important;
   font-weight: 500 !important;
 }
 
-/* Ensuring dark theme doesn't override text color but keeps other styling */
-.dark select, .dark input, .dark textarea, .dark option,
-html.app-loaded[data-theme='dark'] select, 
-html.app-loaded[data-theme='dark'] input, 
-html.app-loaded[data-theme='dark'] textarea, 
-html.app-loaded[data-theme='dark'] option {
-  color: #000000 !important; /* Enforcing black text regardless of theme */
+/* Dark mode: every field is a dark field with light text. Text was forced
+   black in dark mode too, which was unreadable on the fields that already
+   had a dark background (1.1:1); now all fields match. */
+.dark select, .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .dark textarea,
+html.app-loaded[data-theme='dark'] select,
+html.app-loaded[data-theme='dark'] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.app-loaded[data-theme='dark'] textarea {
+  background-color: #1f2937 !important;
+  border-color: #6b7280 !important;
+  color: #f3f4f6 !important;
   font-weight: 500 !important;
+}
+.dark option, html.app-loaded[data-theme='dark'] option {
+  color: #f3f4f6 !important;
 }
 
 /* People can zoom the app (the viewport no longer blocks it). Phones zoom
