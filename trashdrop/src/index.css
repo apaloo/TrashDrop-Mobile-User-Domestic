@@ -113,6 +113,15 @@ html.app-loaded[data-theme='dark'] option {
   font-weight: 500 !important;
 }
 
+/* People can zoom the app (the viewport no longer blocks it). Phones zoom
+   in on a field whose text is under 16px when it is tapped, so fields are
+   16px on phones. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 select::placeholder, input::placeholder, textarea::placeholder {
   color: #555555 !important;
   font-weight: 500 !important;
