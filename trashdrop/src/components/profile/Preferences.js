@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useTheme } from '../../context/ThemeContext.js';
 import supabase from '../../utils/supabaseClient.js';
+import Switch from './Switch.js';
 
 /**
  * Preferences tab component for the Profile page
@@ -9,7 +10,7 @@ import supabase from '../../utils/supabaseClient.js';
  */
 const Preferences = () => {
   const { user } = useAuth();
-  const { theme: globalTheme } = useTheme();
+  const { setThemeMode } = useTheme();
   
   // State for user preferences
   const [preferences, setPreferences] = useState({
@@ -83,6 +84,22 @@ const Preferences = () => {
     });
   };
 
+  // Dark mode applies at once and is saved straight away (no Save or reload)
+  const handleDarkModeChange = async (on) => {
+    setPreferences(prev => ({ ...prev, darkMode: on }));
+    setThemeMode(on ? 'dark' : 'light');
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ dark_mode: on, updated_at: new Date().toISOString() })
+      .eq('id', user.id);
+    if (error) {
+      console.error('[Preferences] Error saving dark mode:', error);
+      setSaveMessage({ type: 'error', text: 'Dark mode is on for now, but could not be saved. Please try again.' });
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
+  };
+
   // Handle language selection change
   const handleLanguageChange = (e) => {
     setPreferences({
@@ -144,17 +161,10 @@ const Preferences = () => {
       }
       
       console.log('[Preferences] Preferences saved successfully');
-      setSaveMessage({ type: 'success', text: 'Preferences saved successfully! Reloading...' });
-      
-      // Dispatch custom event to notify ThemeContext of theme change
-      window.dispatchEvent(new CustomEvent('theme-changed', { 
-        detail: { darkMode: preferences.darkMode } 
-      }));
-      
-      // Reload page after short delay to apply theme globally
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      setSaveMessage({ type: 'success', text: 'Preferences saved.' });
+      setTimeout(() => setSaveMessage(null), 3000);
+      // The theme is applied as soon as the switch changes, so no reload
+      setThemeMode(preferences.darkMode ? 'dark' : 'light');
       
     } catch (error) {
       console.error('[Preferences] Error in handleSubmit:', error);
@@ -204,29 +214,8 @@ const Preferences = () => {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-gray-100">Theme</h2>
           <div className="flex items-center">
-            <div className="relative inline-block w-12 mr-2 align-middle select-none">
-              <input 
-                type="checkbox" 
-                id="dark-mode" 
-                checked={preferences.darkMode}
-                onChange={() => handleToggleChange('darkMode')}
-                className="absolute block w-6 h-6 bg-white border-4 rounded-full appearance-none cursor-pointer"
-                style={{
-                  top: '0.25rem',
-                  left: preferences.darkMode ? '6px' : '0px',
-                  transition: 'left 0.2s ease-in-out',
-                  backgroundColor: preferences.darkMode ? '#4299e1' : '#fff',
-                  borderColor: preferences.darkMode ? '#4299e1' : '#d1d5db'
-                }}
-              />
-              <label 
-                htmlFor="dark-mode" 
-                className={`block overflow-hidden h-6 rounded-full cursor-pointer ${
-                  preferences.darkMode ? 'bg-blue-300' : 'bg-gray-300'
-                }`}
-              ></label>
-            </div>
-            <label htmlFor="dark-mode" className="cursor-pointer text-td-ink dark:text-gray-100">
+            <Switch id="dark-mode" checked={preferences.darkMode} onChange={handleDarkModeChange} labelledBy="dark-mode-label" />
+            <label htmlFor="dark-mode" id="dark-mode-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
               Dark Mode
             </label>
           </div>
@@ -240,6 +229,7 @@ const Preferences = () => {
             <select
               id="language"
               name="language"
+              aria-label="Language"
               value={preferences.language}
               onChange={handleLanguageChange}
               className="w-full md:w-72 px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
@@ -260,87 +250,24 @@ const Preferences = () => {
           <div className="space-y-4">
             {/* High Contrast */}
             <div className="flex items-center">
-              <div className="relative inline-block w-12 mr-2 align-middle select-none">
-                <input 
-                  type="checkbox" 
-                  id="high-contrast" 
-                  checked={preferences.highContrast}
-                  onChange={() => handleToggleChange('highContrast')}
-                  className="absolute block w-6 h-6 bg-white border-4 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    top: '0.25rem',
-                    left: preferences.highContrast ? '6px' : '0px',
-                    transition: 'left 0.2s ease-in-out',
-                    backgroundColor: preferences.highContrast ? '#4299e1' : '#fff',
-                    borderColor: preferences.highContrast ? '#4299e1' : '#d1d5db'
-                  }}
-                />
-                <label 
-                  htmlFor="high-contrast" 
-                  className={`block overflow-hidden h-6 rounded-full cursor-pointer ${
-                    preferences.highContrast ? 'bg-blue-300' : 'bg-gray-300'
-                  }`}
-                ></label>
-              </div>
-              <label htmlFor="high-contrast" className="cursor-pointer text-td-ink dark:text-gray-100">
+              <Switch id="high-contrast" checked={preferences.highContrast} onChange={() => handleToggleChange('highContrast')} labelledBy="high-contrast-label" />
+              <label htmlFor="high-contrast" id="high-contrast-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
                 High Contrast
               </label>
             </div>
 
             {/* Larger Text */}
             <div className="flex items-center">
-              <div className="relative inline-block w-12 mr-2 align-middle select-none">
-                <input 
-                  type="checkbox" 
-                  id="larger-text" 
-                  checked={preferences.largerText}
-                  onChange={() => handleToggleChange('largerText')}
-                  className="absolute block w-6 h-6 bg-white border-4 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    top: '0.25rem',
-                    left: preferences.largerText ? '6px' : '0px',
-                    transition: 'left 0.2s ease-in-out',
-                    backgroundColor: preferences.largerText ? '#4299e1' : '#fff',
-                    borderColor: preferences.largerText ? '#4299e1' : '#d1d5db'
-                  }}
-                />
-                <label 
-                  htmlFor="larger-text" 
-                  className={`block overflow-hidden h-6 rounded-full cursor-pointer ${
-                    preferences.largerText ? 'bg-blue-300' : 'bg-gray-300'
-                  }`}
-                ></label>
-              </div>
-              <label htmlFor="larger-text" className="cursor-pointer text-td-ink dark:text-gray-100">
+              <Switch id="larger-text" checked={preferences.largerText} onChange={() => handleToggleChange('largerText')} labelledBy="larger-text-label" />
+              <label htmlFor="larger-text" id="larger-text-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
                 Larger Text
               </label>
             </div>
 
             {/* Reduce Motion */}
             <div className="flex items-center">
-              <div className="relative inline-block w-12 mr-2 align-middle select-none">
-                <input 
-                  type="checkbox" 
-                  id="reduce-motion" 
-                  checked={preferences.reduceMotion}
-                  onChange={() => handleToggleChange('reduceMotion')}
-                  className="absolute block w-6 h-6 bg-white border-4 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    top: '0.25rem',
-                    left: preferences.reduceMotion ? '6px' : '0px',
-                    transition: 'left 0.2s ease-in-out',
-                    backgroundColor: preferences.reduceMotion ? '#4299e1' : '#fff',
-                    borderColor: preferences.reduceMotion ? '#4299e1' : '#d1d5db'
-                  }}
-                />
-                <label 
-                  htmlFor="reduce-motion" 
-                  className={`block overflow-hidden h-6 rounded-full cursor-pointer ${
-                    preferences.reduceMotion ? 'bg-blue-300' : 'bg-gray-300'
-                  }`}
-                ></label>
-              </div>
-              <label htmlFor="reduce-motion" className="cursor-pointer text-td-ink dark:text-gray-100">
+              <Switch id="reduce-motion" checked={preferences.reduceMotion} onChange={() => handleToggleChange('reduceMotion')} labelledBy="reduce-motion-label" />
+              <label htmlFor="reduce-motion" id="reduce-motion-label" className="ml-3 cursor-pointer text-td-ink dark:text-gray-100">
                 Reduce Motion
               </label>
             </div>

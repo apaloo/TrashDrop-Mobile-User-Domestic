@@ -108,8 +108,14 @@ export const ThemeProvider = ({ children }) => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   };
 
+  // Set the theme from a setting (Profile > Preferences): applies at once
+  const setThemeMode = (mode) => {
+    setTheme(mode === 'dark' ? 'dark' : 'light');
+    setIsInitialized(true);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setThemeMode }}>
       {children}
     </ThemeContext.Provider>
   );

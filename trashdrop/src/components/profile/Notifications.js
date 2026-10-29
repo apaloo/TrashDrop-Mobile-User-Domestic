@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import supabase from '../../utils/supabaseClient.js';
+import Switch from './Switch.js';
 
 /**
  * Notifications tab component for the Profile page
@@ -180,38 +181,15 @@ const Notifications = () => {
     }
   };
 
-  // Toggle switch component
-  const ToggleSwitch = ({ checked, onChange }) => (
-    <div className="relative inline-block w-12 mr-2 align-middle select-none">
-      <input 
-        type="checkbox" 
-        checked={checked}
-        onChange={onChange}
-        className="absolute block w-6 h-6 bg-white border-4 rounded-full appearance-none cursor-pointer"
-        style={{
-          top: '0.25rem',
-          left: checked ? '6px' : '0px',
-          transition: 'left 0.2s ease-in-out',
-          backgroundColor: checked ? '#4299e1' : '#fff',
-          borderColor: checked ? '#4299e1' : '#d1d5db'
-        }}
-      />
-      <label 
-        className={`block overflow-hidden h-6 rounded-full cursor-pointer ${
-          checked ? 'bg-blue-300' : 'bg-gray-300'
-        }`}
-      ></label>
-    </div>
-  );
-
   // Checkbox component
-  const Checkbox = ({ id, checked, onChange, label }) => (
+  const Checkbox = ({ id, checked, onChange, label, disabled = false }) => (
     <div className="flex items-center mb-3">
       <input
         id={id}
         type="checkbox"
         checked={checked}
         onChange={onChange}
+        disabled={disabled}
         className="w-4 h-4 text-td-forest bg-gray-100 border-td-border-strong rounded focus:ring-green-600"
       />
       <label htmlFor={id} className="ml-2 text-sm font-medium text-td-ink dark:text-gray-300">
@@ -248,9 +226,10 @@ const Notifications = () => {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100">Push Notifications</h2>
-            <ToggleSwitch 
-              checked={notificationSettings.pushEnabled} 
-              onChange={() => handleMasterToggle('push')} 
+            <Switch
+              checked={notificationSettings.pushEnabled}
+              onChange={() => handleMasterToggle('push')}
+              label="Push notifications"
             />
           </div>
           
@@ -293,9 +272,10 @@ const Notifications = () => {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100">Email Notifications</h2>
-            <ToggleSwitch 
-              checked={notificationSettings.emailEnabled} 
-              onChange={() => handleMasterToggle('email')} 
+            <Switch
+              checked={notificationSettings.emailEnabled}
+              onChange={() => handleMasterToggle('email')}
+              label="Email notifications"
             />
           </div>
           
