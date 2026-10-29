@@ -55,7 +55,9 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           }}
         >
           {/* One-time Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.frequency === 'one-time'}
             onClick={() => updateFormData({ frequency: 'one-time' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'one-time'
@@ -64,18 +66,20 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">1️⃣</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">1️⃣</span>
               <span className={`text-xs font-medium ${
                 formData.frequency === 'one-time' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 One-time
               </span>
-            </div>
-          </div>
+            </span>
+          </button>
 
           {/* Weekly Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.frequency === 'weekly'}
             onClick={() => updateFormData({ frequency: 'weekly' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'weekly'
@@ -84,18 +88,20 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">📅</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">📅</span>
               <span className={`text-xs font-medium ${
                 formData.frequency === 'weekly' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Weekly
               </span>
-            </div>
-          </div>
+            </span>
+          </button>
 
           {/* Bi-weekly Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.frequency === 'biweekly'}
             onClick={() => updateFormData({ frequency: 'biweekly' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'biweekly'
@@ -104,18 +110,20 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">📆</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">📆</span>
               <span className={`text-xs font-medium ${
                 formData.frequency === 'biweekly' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Bi-weekly
               </span>
-            </div>
-          </div>
+            </span>
+          </button>
 
           {/* Monthly Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.frequency === 'monthly'}
             onClick={() => updateFormData({ frequency: 'monthly' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.frequency === 'monthly'
@@ -124,15 +132,15 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🗓️</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">🗓️</span>
               <span className={`text-xs font-medium ${
                 formData.frequency === 'monthly' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Monthly
               </span>
-            </div>
-          </div>
+            </span>
+          </button>
         </div>
         
         <p className="text-sm text-td-sage mt-2">
@@ -181,7 +189,9 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
           }}
         >
           {/* Morning Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.preferredTime === 'morning'}
             onClick={() => updateFormData({ preferredTime: 'morning' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.preferredTime === 'morning'
@@ -190,19 +200,21 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🌅</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">🌅</span>
               <span className={`text-xs font-medium ${
                 formData.preferredTime === 'morning' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Morning
               </span>
               <span className="text-[10px] text-td-sage">8am - 12pm</span>
-            </div>
-          </div>
+            </span>
+          </button>
 
           {/* Afternoon Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.preferredTime === 'afternoon'}
             onClick={() => updateFormData({ preferredTime: 'afternoon' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.preferredTime === 'afternoon'
@@ -211,19 +223,21 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">☀️</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">☀️</span>
               <span className={`text-xs font-medium ${
                 formData.preferredTime === 'afternoon' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Afternoon
               </span>
               <span className="text-[10px] text-td-sage">12pm - 4pm</span>
-            </div>
-          </div>
+            </span>
+          </button>
 
           {/* Evening Card */}
-          <div
+          <button
+            type="button"
+            aria-pressed={formData.preferredTime === 'evening'}
             onClick={() => updateFormData({ preferredTime: 'evening' })}
             className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
               formData.preferredTime === 'evening'
@@ -232,16 +246,16 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             }`}
             style={{ scrollSnapAlign: 'start' }}
           >
-            <div className="flex flex-col items-center text-center">
-              <div className="text-3xl mb-2">🌆</div>
+            <span className="flex flex-col items-center text-center">
+              <span className="block text-3xl mb-2">🌆</span>
               <span className={`text-xs font-medium ${
                 formData.preferredTime === 'evening' ? 'text-green-700' : 'text-td-ink'
               }`}>
                 Evening
               </span>
               <span className="text-[10px] text-td-sage">4pm - 8pm</span>
-            </div>
-          </div>
+            </span>
+          </button>
         </div>
       </div>
       
