@@ -184,9 +184,9 @@ const AnimatedCollectorMarker = ({ position, prevPosition }) => {
     >
       <Popup>
         <div className="text-center">
-          <strong className="text-blue-600">Collector En Route</strong>
-          <p className="text-xs text-gray-600 mt-1">Moving to your location</p>
-          <div className="mt-2 px-2 py-1 bg-blue-50 rounded text-xs text-blue-700 font-medium">
+          <strong className="text-td-forest">Collector En Route</strong>
+          <p className="text-xs text-td-sage mt-1">Moving to your location</p>
+          <div className="mt-2 px-2 py-1 bg-td-tonal rounded text-xs text-td-forest font-medium">
             🚚 Live tracking active
           </div>
         </div>
@@ -320,11 +320,11 @@ const UberStyleTrackingMap = ({
     return (
       <div className="relative w-full h-full bg-gray-100 flex items-center justify-center">
         <div className="text-center p-8">
-          <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="mx-auto h-16 w-16 text-td-sage mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
           </svg>
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Location Required</h3>
-          <p className="text-sm text-gray-500">Waiting for pickup location data...</p>
+          <h3 className="text-lg font-semibold text-td-ink mb-2">Location Required</h3>
+          <p className="text-sm text-td-sage">Waiting for pickup location data...</p>
         </div>
       </div>
     );
@@ -397,8 +397,8 @@ const UberStyleTrackingMap = ({
             >
               <Popup>
                 <div className="text-center">
-                  <strong className="text-blue-600">Your Location</strong>
-                  <p className="text-xs text-gray-600 mt-1">Pickup point</p>
+                  <strong className="text-td-forest">Your Location</strong>
+                  <p className="text-xs text-td-sage mt-1">Pickup point</p>
                 </div>
               </Popup>
             </Marker>
@@ -455,7 +455,7 @@ const UberStyleTrackingMap = ({
             <div className="flex items-center space-x-3">
               {/* Collector Avatar */}
               <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -464,7 +464,7 @@ const UberStyleTrackingMap = ({
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
+                <p className="text-sm font-semibold text-td-ink truncate">
                   {statusText}
                 </p>
                 {isLocationStale && !isCollected && (
@@ -476,14 +476,14 @@ const UberStyleTrackingMap = ({
                   {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) ? (
                     isActuallyArrived ? (
                       <div className="flex items-center">
-                        <svg className="w-4 h-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-4 h-4 text-green-700 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
                         <span className="text-sm font-bold text-green-600">Arrived</span>
                       </div>
                     ) : (
                     <div className="flex items-center">
-                      <svg className="w-4 h-4 text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-td-sage mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span className="text-sm font-bold text-green-600">{eta} min</span>
@@ -491,18 +491,18 @@ const UberStyleTrackingMap = ({
                   )
                 ) : (
                   <div className="flex items-center">
-                    <svg className="w-4 h-4 text-gray-400 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-td-sage mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span className="text-xs text-gray-400">Calculating...</span>
+                    <span className="text-xs text-td-sage">Calculating...</span>
                   </div>
                 )}
                 {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                   <div className="flex items-center">
-                    <svg className="w-4 h-4 text-gray-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-td-sage mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     </svg>
-                    <span className="text-sm text-gray-600">{formatDistance(distance)}</span>
+                    <span className="text-sm text-td-sage">{formatDistance(distance)}</span>
                   </div>
                 )}
               </div>
@@ -511,8 +511,8 @@ const UberStyleTrackingMap = ({
             {/* Pulse indicator */}
             <div className="flex-shrink-0">
               <div className="relative">
-                <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-2.5 h-2.5 bg-green-500 rounded-full animate-ping opacity-75"></div>
+                <div className="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-2.5 h-2.5 bg-green-600 rounded-full animate-ping opacity-75"></div>
               </div>
             </div>
           </div>
@@ -537,9 +537,9 @@ const UberStyleTrackingMap = ({
             onClick={() => setIsCardExpanded(!isCardExpanded)}
           >
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-bold text-gray-900">Active Pickup</h3>
+              <h3 className="text-lg font-bold text-td-ink">Active Pickup</h3>
               <svg 
-                className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${isCardExpanded ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-td-sage transition-transform duration-300 ${isCardExpanded ? 'rotate-180' : ''}`}
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -555,18 +555,18 @@ const UberStyleTrackingMap = ({
                   {activePickup.collector.first_name?.[0]}{activePickup.collector.last_name?.[0]}
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-gray-900 text-sm">
+                  <p className="font-semibold text-td-ink text-sm">
                     {activePickup.collector.first_name} {activePickup.collector.last_name}
                   </p>
                   <div className="flex items-center space-x-1">
                     <span className="text-yellow-500 text-xs">⭐</span>
-                    <span className="text-sm text-gray-600">{activePickup.collector.rating || '5.0'}</span>
+                    <span className="text-sm text-td-sage">{activePickup.collector.rating || '5.0'}</span>
                   </div>
                 </div>
                 {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">Distance</p>
-                    <p className="text-sm font-bold text-blue-600">{formatDistance(distance)}</p>
+                    <p className="text-xs text-td-sage">Distance</p>
+                    <p className="text-sm font-bold text-td-forest">{formatDistance(distance)}</p>
                   </div>
                 )}
               </div>
@@ -593,22 +593,22 @@ const UberStyleTrackingMap = ({
                         </div>
                       )}
                       <div>
-                        <p className="font-bold text-gray-900">
+                        <p className="font-bold text-td-ink">
                           {activePickup.collector.first_name} {activePickup.collector.last_name}
                         </p>
                         <div className="flex items-center space-x-1 mt-1">
                           <span className="text-yellow-500">⭐</span>
-                          <span className="font-semibold text-gray-700">{activePickup.collector.rating || '5.0'}</span>
+                          <span className="font-semibold text-td-ink">{activePickup.collector.rating || '5.0'}</span>
                         </div>
                         {activePickup.collector.vehicle_plate && (
-                          <p className="text-xs text-gray-600 mt-1">
+                          <p className="text-xs text-td-sage mt-1">
                             Vehicle: <span className="font-medium">{activePickup.collector.vehicle_plate}</span>
                           </p>
                         )}
                       </div>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${(() => {
-                      if (displayStatus === 'accepted' || displayStatus === 'active') return 'bg-blue-100 text-blue-700';
+                      if (displayStatus === 'accepted' || displayStatus === 'active') return 'bg-blue-100 text-blue-700'; // status colour: assigned
                       if (displayStatus === 'in_transit' || displayStatus === 'en_route') return 'bg-purple-100 text-purple-700';
                       if (displayStatus === 'arrived') return 'bg-green-100 text-green-700';
                       if (displayStatus === 'picked_up' || displayStatus === 'collecting') return 'bg-orange-100 text-orange-700';
@@ -624,7 +624,7 @@ const UberStyleTrackingMap = ({
               {/* Distance & ETA Info Box */}
               {((typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0) || 
                 (typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0)) && (
-                <div className="bg-blue-600 text-white rounded-lg p-2.5">
+                <div className="bg-green-600 text-white rounded-lg p-2.5">
                   <div className="grid grid-cols-2 gap-3">
                     {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
                       <div>
@@ -643,8 +643,8 @@ const UberStyleTrackingMap = ({
               )}
 
               {/* Progress Tracker */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-500 mb-3">PROGRESS</p>
+              <div className="bg-td-cream rounded-xl p-4">
+                <p className="text-xs font-semibold text-td-sage mb-3">PROGRESS</p>
                 <div className="relative">
                   {/* Progress Line */}
                   <div className="absolute top-4 left-4 right-4 h-0.5 bg-gray-300"></div>
@@ -687,7 +687,7 @@ const UberStyleTrackingMap = ({
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
                             isCompleted ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg' :
                             isCurrent ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg animate-pulse' :
-                            'bg-gray-300 text-gray-500'
+                            'bg-gray-300 text-td-sage'
                           }`}>
                             {isCompleted ? (
                               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -698,7 +698,7 @@ const UberStyleTrackingMap = ({
                             )}
                           </div>
                           <p className={`text-[10px] font-medium text-center max-w-[60px] ${
-                            isCurrent ? 'text-blue-600' : 'text-gray-500'
+                            isCurrent ? 'text-td-forest' : 'text-td-sage'
                           }`}>
                             {(() => {
                               // Custom label mapping
@@ -721,20 +721,20 @@ const UberStyleTrackingMap = ({
 
               {/* Pickup Details */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Waste Type</p>
-                  <p className="text-sm font-semibold text-gray-900 capitalize">{activePickup.waste_type || 'General'}</p>
+                <div className="bg-td-cream rounded-lg p-3">
+                  <p className="text-xs text-td-sage mb-1">Waste Type</p>
+                  <p className="text-sm font-semibold text-td-ink capitalize">{activePickup.waste_type || 'General'}</p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Bags</p>
-                  <p className="text-sm font-semibold text-gray-900">{Math.round(Number(activePickup.estimated_volume)) || activePickup.bag_count || 0}</p>
+                <div className="bg-td-cream rounded-lg p-3">
+                  <p className="text-xs text-td-sage mb-1">Bags</p>
+                  <p className="text-sm font-semibold text-td-ink">{Math.round(Number(activePickup.estimated_volume)) || activePickup.bag_count || 0}</p>
                 </div>
               </div>
 
               {activePickup.special_instructions && (
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-600 font-medium mb-1">Special Instructions</p>
-                  <p className="text-sm text-gray-700">{activePickup.special_instructions}</p>
+                <div className="p-3 bg-td-tonal rounded-lg">
+                  <p className="text-xs text-td-forest font-medium mb-1">Special Instructions</p>
+                  <p className="text-sm text-td-ink">{activePickup.special_instructions}</p>
                 </div>
               )}
 
@@ -748,7 +748,7 @@ const UberStyleTrackingMap = ({
                         window.location.href = `tel:${activePickup.collector.phone}`;
                       }
                     }}
-                    className="flex flex-col items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded-xl p-3 transition-colors shadow-md"
+                    className="flex flex-col items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-xl p-3 transition-colors shadow-md"
                   >
                     <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -824,14 +824,14 @@ const UberStyleTrackingMap = ({
       {/* No Active Pickup Message */}
       {!activePickup && !loading && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 z-[1000] max-w-md">
-          <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="mx-auto h-16 w-16 text-td-sage mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">
+          <h3 className="text-xl font-bold text-td-ink mb-2">
             {isCollector ? 'No Assigned Pickups' : 'No Active Pickup'}
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-td-sage mb-6">
             {isCollector 
               ? 'You currently have no pickup requests assigned to you.'
               : 'You don\'t have any active pickup requests. Schedule one to track collectors in your area.'
@@ -840,7 +840,7 @@ const UberStyleTrackingMap = ({
           {!isCollector && onSchedulePickup && (
             <button
               onClick={onSchedulePickup}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-lg"
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-lg"
             >
               Schedule a Pickup
             </button>

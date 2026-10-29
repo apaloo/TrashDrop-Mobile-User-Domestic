@@ -101,7 +101,7 @@ const CollectionQRCode = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <LoadingSpinner />
-        <p className="mt-4 text-gray-600">Preparing your collection QR code...</p>
+        <p className="mt-4 text-td-sage">Preparing your collection QR code...</p>
       </div>
     );
   }
@@ -115,7 +115,7 @@ const CollectionQRCode = () => {
         </div>
         <button
           onClick={() => window.location.reload()}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
         >
           Try Again
         </button>
@@ -124,11 +124,11 @@ const CollectionQRCode = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-td-cream py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-6">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Collection Request</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-td-ink mb-2">Collection Request</h2>
+          <p className="text-td-sage">
             {status === 'waiting' && 'Show this QR code to the collector to start the collection process.'}
             {status === 'scanned' && 'QR code scanned! Preparing collection form...'}
             {status === 'processing' && 'Redirecting to collection form...'}
@@ -136,7 +136,7 @@ const CollectionQRCode = () => {
         </div>
         
         <div className="flex justify-center mb-8">
-          <div className="p-4 bg-white rounded-lg border-2 border-blue-200">
+          <div className="p-4 bg-white rounded-lg border-2 border-td-border">
             <QRCodeSVG 
               value={qrData} 
               size={256} 
@@ -144,14 +144,14 @@ const CollectionQRCode = () => {
               includeMargin={true}
               className="mx-auto"
             />
-            <p className="text-center mt-2 text-sm text-gray-500">Collection ID: {collectionId}</p>
+            <p className="text-center mt-2 text-sm text-td-sage">Collection ID: {collectionId}</p>
           </div>
         </div>
         
         {collectorInfo && (
-          <div className="bg-blue-50 p-4 rounded-lg mb-6">
-            <h3 className="font-medium text-blue-800 mb-2">Collector Information:</h3>
-            <p className="text-blue-700">
+          <div className="bg-td-tonal p-4 rounded-lg mb-6">
+            <h3 className="font-medium text-td-forest mb-2">Collector Information:</h3>
+            <p className="text-td-forest">
               {collectorInfo.full_name && `${collectorInfo.full_name} • `}
               {collectorInfo.phone_number || 'Collector'}
             </p>

@@ -37,7 +37,7 @@ const QRScanner = () => {
     <div className="min-h-screen bg-white dark:bg-gray-900 pt-2" style={{ minHeight: '100vh', paddingTop: '75px' }}>
       {/* Fixed Header (positioned below navbar) */}
       <div className="bg-white dark:bg-gray-800 px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md">
-        <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
+        <h1 className="text-2xl font-bold text-center text-td-ink dark:text-gray-100">
           Scan QR Code
         </h1>
       </div>
@@ -61,26 +61,26 @@ const QRScanner = () => {
 
       {/* How to Use Section */}
       <div className="px-6 py-4">
-        <h2 className="text-lg font-semibold mb-4 text-gray-900">How to Use</h2>
-        <div className="space-y-3 text-gray-700">
+        <h2 className="text-lg font-semibold mb-4 text-td-ink dark:text-gray-100">How to Use</h2>
+        <div className="space-y-3 text-td-ink dark:text-gray-200">
           <div className="flex items-start">
-            <span className="text-gray-900 font-medium mr-3">1.</span>
+            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">1.</span>
             <span>Find the TrashDrop Batch QR code wrapped on the bundle of bags</span>
           </div>
           <div className="flex items-start">
-            <span className="text-gray-900 font-medium mr-3">2.</span>
+            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">2.</span>
             <span>Click "Start Scanning" and aim your camera at the QR code</span>
           </div>
           <div className="flex items-start">
-            <span className="text-gray-900 font-medium mr-3">3.</span>
+            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">3.</span>
             <span>Hold steady until the code is recognised and validated</span>
           </div>
           <div className="flex items-start">
-            <span className="text-gray-900 font-medium mr-3">4.</span>
+            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">4.</span>
             <span>Earn points for each sorting and recycling trash</span>
           </div>
           <div className="flex items-start">
-            <span className="text-gray-900 font-medium mr-3">5.</span>
+            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">5.</span>
             <span>Properly tie the flaps when the trash bag is full and ready for pickup</span>
           </div>
         </div>
