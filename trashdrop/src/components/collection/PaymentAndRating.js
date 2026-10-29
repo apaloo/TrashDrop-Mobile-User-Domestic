@@ -129,19 +129,19 @@ export const PaymentAndRating = ({
   // Render payment step
   const renderPaymentStep = () => (
     <div className="space-y-6">
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Summary</h3>
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-td-border">
+        <h3 className="text-lg font-medium text-td-ink mb-4">Payment Summary</h3>
         
         <div className="space-y-3">
           <div className="flex justify-between">
-            <span className="text-gray-600">Service Fee</span>
+            <span className="text-td-sage">Service Fee</span>
             <span className="font-medium">${paymentDetails.amount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Service Fee</span>
-            <span className="text-gray-500">${paymentDetails.fee.toFixed(2)}</span>
+            <span className="text-td-sage">Service Fee</span>
+            <span className="text-td-sage">${paymentDetails.fee.toFixed(2)}</span>
           </div>
-          <div className="border-t border-gray-200 my-2"></div>
+          <div className="border-t border-td-border my-2"></div>
           <div className="flex justify-between font-medium text-lg">
             <span>Total</span>
             <span>${paymentDetails.total.toFixed(2)}</span>
@@ -149,7 +149,7 @@ export const PaymentAndRating = ({
         </div>
         
         <div className="mt-6">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h4>
+          <h4 className="text-sm font-medium text-td-ink mb-3">Payment Method</h4>
           
           <div className="space-y-3">
             <button
@@ -157,15 +157,15 @@ export const PaymentAndRating = ({
               onClick={() => setPaymentMethod('wallet')}
               className={`w-full p-4 rounded-lg border-2 ${paymentMethod === 'wallet' 
                 ? 'border-primary bg-primary/5' 
-                : 'border-gray-200 hover:border-gray-300'} transition-colors text-left`}
+                : 'border-td-border hover:border-gray-300'} transition-colors text-left`}
             >
               <div className="flex items-center">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${paymentMethod === 'wallet' ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${paymentMethod === 'wallet' ? 'border-primary bg-primary' : 'border-td-border-strong'}`}>
                   {paymentMethod === 'wallet' && <div className="w-2 h-2 bg-white rounded-full"></div>}
                 </div>
                 <div>
                   <p className="font-medium">TrashDrop Wallet</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-td-sage">
                     Balance: ${walletBalance.toFixed(2)}
                     {insufficientFunds && paymentMethod === 'wallet' && (
                       <span className="text-red-500 ml-2">Insufficient funds</span>
@@ -180,15 +180,15 @@ export const PaymentAndRating = ({
               onClick={() => setPaymentMethod('cash')}
               className={`w-full p-4 rounded-lg border-2 ${paymentMethod === 'cash' 
                 ? 'border-primary bg-primary/5' 
-                : 'border-gray-200 hover:border-gray-300'} transition-colors text-left`}
+                : 'border-td-border hover:border-gray-300'} transition-colors text-left`}
             >
               <div className="flex items-center">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${paymentMethod === 'cash' ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${paymentMethod === 'cash' ? 'border-primary bg-primary' : 'border-td-border-strong'}`}>
                   {paymentMethod === 'cash' && <div className="w-2 h-2 bg-white rounded-full"></div>}
                 </div>
                 <div>
                   <p className="font-medium">Pay with Cash</p>
-                  <p className="text-sm text-gray-500">Pay the collector directly</p>
+                  <p className="text-sm text-td-sage">Pay the collector directly</p>
                 </div>
               </div>
             </button>
@@ -213,7 +213,7 @@ export const PaymentAndRating = ({
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center"
+          className="flex-1 bg-gray-100 text-td-ink py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center"
           disabled={loading}
         >
           <FaArrowLeft className="mr-2" />
@@ -246,15 +246,15 @@ export const PaymentAndRating = ({
     <div className="space-y-6">
       <div className="text-center">
         <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-          <FaCheckCircle className="text-green-500 text-3xl" />
+          <FaCheckCircle className="text-green-700 text-3xl" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Payment Successful!</h3>
-        <p className="text-gray-600 mb-6">
+        <h3 className="text-lg font-medium text-td-ink mb-2">Payment Successful!</h3>
+        <p className="text-td-sage mb-6">
           Thank you for your payment. How was your experience with {collector.name || 'the collector'}?
         </p>
       </div>
       
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-td-border">
         <div className="flex justify-center mb-6">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
@@ -272,7 +272,7 @@ export const PaymentAndRating = ({
         </div>
         
         <div className="mt-4">
-          <label htmlFor="review" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="review" className="block text-sm font-medium text-td-ink mb-1">
             Add a review (optional)
           </label>
           <textarea
@@ -280,7 +280,7 @@ export const PaymentAndRating = ({
             rows="3"
             value={review}
             onChange={(e) => setReview(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 border border-td-border-strong rounded-lg focus:ring-primary focus:border-primary"
             placeholder="Share your experience..."
           ></textarea>
         </div>
@@ -303,7 +303,7 @@ export const PaymentAndRating = ({
         <button
           type="button"
           onClick={() => setStep('payment')}
-          className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+          className="flex-1 bg-gray-100 text-td-ink py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
           disabled={loading}
         >
           Back

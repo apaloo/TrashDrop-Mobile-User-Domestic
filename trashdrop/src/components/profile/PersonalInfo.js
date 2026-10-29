@@ -288,8 +288,8 @@ const PersonalInfo = () => {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading profile...</span>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-td-forest"></div>
+          <span className="ml-3 text-td-sage dark:text-gray-300">Loading profile...</span>
         </div>
       </div>
     );
@@ -302,7 +302,7 @@ const PersonalInfo = () => {
         <div className={`mb-4 p-3 rounded-md ${
           saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
-          'bg-blue-100 text-blue-700'
+          'bg-td-tonal text-td-forest'
         }`}>
           {saveMessage.text}
         </div>
@@ -321,12 +321,12 @@ const PersonalInfo = () => {
                   decoding="async"
                 />
               ) : (
-                <span className="text-gray-400 text-4xl">👤</span>
+                <span className="text-td-sage dark:text-gray-300 text-4xl">👤</span>
               )}
             </div>
             <label 
               htmlFor="profile-upload" 
-              className="absolute bottom-0 right-0 bg-blue-500 text-white p-2 rounded-full cursor-pointer"
+              className="absolute bottom-0 right-0 bg-green-600 text-white p-2 rounded-full cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -342,7 +342,7 @@ const PersonalInfo = () => {
             />
           </div>
           <h3 className="text-lg font-medium mt-4">{user?.email ? user.email.split('@')[0] : 'User Name'}</h3>
-          <p className="text-sm text-gray-500">Member since: {userData.memberSince}</p>
+          <p className="text-sm text-td-sage dark:text-gray-300">Member since: {userData.memberSince}</p>
         </div>
 
         {/* Personal Information Form */}
@@ -351,7 +351,7 @@ const PersonalInfo = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* First Name */}
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="firstName" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                   First Name
                 </label>
                 <input
@@ -360,13 +360,13 @@ const PersonalInfo = () => {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
                 />
               </div>
 
               {/* Last Name */}
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="lastName" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                   Last Name
                 </label>
                 <input
@@ -375,13 +375,13 @@ const PersonalInfo = () => {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
                 />
               </div>
 
               {/* Email Address */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                   Email Address
                 </label>
                 <input
@@ -390,14 +390,14 @@ const PersonalInfo = () => {
                   name="email"
                   value={formData.email}
                   readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                  className="w-full px-3 py-2 border border-td-border-strong rounded-md bg-gray-100"
                 />
-                <p className="text-xs text-gray-500 mt-1">Email address cannot be changed</p>
+                <p className="text-xs text-td-sage dark:text-gray-300 mt-1">Email address cannot be changed</p>
               </div>
 
               {/* Phone Number */}
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="phone" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                   Phone Number
                 </label>
                 <input
@@ -406,14 +406,14 @@ const PersonalInfo = () => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
                 />
               </div>
             </div>
 
             {/* Address */}
             <div className="mt-4">
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="address" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
                 Address
               </label>
               <input
@@ -422,7 +422,7 @@ const PersonalInfo = () => {
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
               />
             </div>
 

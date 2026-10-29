@@ -212,9 +212,9 @@ const Notifications = () => {
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+        className="w-4 h-4 text-td-forest bg-gray-100 border-td-border-strong rounded focus:ring-green-600"
       />
-      <label htmlFor={id} className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+      <label htmlFor={id} className="ml-2 text-sm font-medium text-td-ink dark:text-gray-300">
         {label}
       </label>
     </div>
@@ -224,8 +224,8 @@ const Notifications = () => {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading notification settings...</span>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-td-forest"></div>
+          <span className="ml-3 text-td-sage dark:text-gray-300">Loading notification settings...</span>
         </div>
       </div>
     );
@@ -238,7 +238,7 @@ const Notifications = () => {
         <div className={`mb-4 p-3 rounded-md ${
           saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
-          'bg-blue-100 text-blue-700'
+          'bg-td-tonal text-td-forest'
         }`}>
           {saveMessage.text}
         </div>
@@ -247,7 +247,7 @@ const Notifications = () => {
         {/* Push Notifications Section */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Push Notifications</h2>
+            <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100">Push Notifications</h2>
             <ToggleSwitch 
               checked={notificationSettings.pushEnabled} 
               onChange={() => handleMasterToggle('push')} 
@@ -292,7 +292,7 @@ const Notifications = () => {
         {/* Email Notifications Section */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Email Notifications</h2>
+            <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100">Email Notifications</h2>
             <ToggleSwitch 
               checked={notificationSettings.emailEnabled} 
               onChange={() => handleMasterToggle('email')} 
