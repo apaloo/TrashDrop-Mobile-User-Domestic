@@ -240,13 +240,14 @@ export const userService = {
       try {
         const result = await supabase
           .from('rewards_redemption')
-          .select('points_spent', { count: 'exact' })
+          .select('points_spent, status', { count: 'exact' })
           .eq('user_id', userId);
         
         if (result.data && Array.isArray(result.data)) {
-          totalPointsSpent = result.data.reduce((sum, redemption) => {
-            return sum + (redemption.points_spent || 0);
-          }, 0);
+          // A rejected redemption gives its points back
+          totalPointsSpent = result.data
+            .filter(redemption => redemption.status !== 'rejected')
+            .reduce((sum, redemption) => sum + (redemption.points_spent || 0), 0);
           console.log(`[UserService] Calculated total points spent on rewards: ${totalPointsSpent}`);
         }
       } catch (error) {
