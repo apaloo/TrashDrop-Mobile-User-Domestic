@@ -39,6 +39,7 @@ import AuthErrorBoundary from './components/AuthErrorBoundary.js';
 import AuthFallback from './components/AuthFallback.js';
 import PwaInitializer from './components/PwaInitializer.js';
 import PwaRecovery from './components/PwaRecovery.js';
+import UpdateBanner from './components/UpdateBanner.js';
 import ForceInstallPrompt from './components/ForceInstallPrompt.js';
 
 // Styling
@@ -278,6 +279,7 @@ const App = () => {
             <ForceInstallPrompt />
             <PwaInitializer />
             <PwaRecovery />
+            <UpdateBanner />
             <AuthErrorBoundary>
               <AppPerformanceOptimizer />
               <Suspense 

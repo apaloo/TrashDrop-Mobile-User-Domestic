@@ -7,6 +7,8 @@
 // existing tabs open on the page have been closed, since previously cached
 // resources are updated in the background.
 
+import { watchForUpdates } from './utils/appUpdate';
+
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
     // [::1] is the IPv6 localhost address.
@@ -53,6 +55,7 @@ function registerValidSW(swUrl, config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      if (config && config.onUpdate) watchForUpdates(registration, config.onUpdate);
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker == null) {
