@@ -380,7 +380,7 @@ const Rewards = () => {
         </div>
         
         <p className="mt-2 text-td-sage dark:text-gray-300">
-          Earn points by requesting pickups, reporting illegal dumping, and scanning QR codes.
+          Earn points by requesting pickups, scanning QR codes, and reporting illegal dumping (once your report is verified).
         </p>
       </div>
       

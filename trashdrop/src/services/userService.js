@@ -4,6 +4,7 @@
  */
 
 import supabase from '../utils/supabaseClient.js';
+import { reportPoints } from '../utils/reportPoints.js';
 
 export const userService = {
   /**
@@ -129,21 +130,15 @@ export const userService = {
       try {
         const result = await supabase
           .from('illegal_dumping_mobile')
-          .select('id, severity', { count: 'exact' })
+          .select('id, severity, status, created_at', { count: 'exact' })
           .eq('reported_by', userId);
         reportCount = result.count;
         reportError = result.error;
         
         // Calculate points from dumping reports based on severity
         if (result.data && Array.isArray(result.data)) {
-          totalPointsFromReports = result.data.reduce((sum, report) => {
-            // Award points based on severity: high=20, medium=15, low=10
-            const severity = report.severity || 'medium';
-            let points = 15; // default for medium
-            if (severity === 'high') points = 20;
-            else if (severity === 'low') points = 10;
-            return sum + points;
-          }, 0);
+          // high=20, medium=15, low=10, once the report is verified (utils/reportPoints)
+          totalPointsFromReports = result.data.reduce((sum, report) => sum + reportPoints(report), 0);
           console.log(`[UserService] Calculated total points from dumping reports: ${totalPointsFromReports}`);
         }
       } catch (error) {
