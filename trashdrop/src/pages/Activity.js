@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
+import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
 
 /**
  * Activity page to display user's complete activity history
@@ -382,7 +383,9 @@ const Activity = () => {
             type: 'dumping_report',
             status: activity.status || 'submitted',
             date: new Date(activity.created_at).toLocaleDateString(),
-            points: 10,
+            // Earned once the team verifies the report (utils/reportPoints)
+            points: reportPoints(activity),
+            pointsPending: reportPointsPending(activity),
             related_id: activity.id,
             description: `Reported ${activity.waste_type || 'illegal dumping'} (${activity.severity || 'medium'} severity)`,
             address: asText(activity.location) || 'Unknown location',
@@ -671,6 +674,9 @@ const Activity = () => {
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 ml-2">
                     Pending Sync
                   </span>
+                )}
+                {activity.pointsPending && (
+                  <div className="mt-2 text-sm text-td-sage dark:text-gray-300">Points when verified</div>
                 )}
                 {activity.points !== 0 && (
                   <div className="mt-2">
