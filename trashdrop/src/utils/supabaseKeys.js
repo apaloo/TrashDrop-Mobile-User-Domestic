@@ -23,4 +23,31 @@ export const supabaseBrowserKeyProblem = (key) => {
   return 'is not an anon (eyJ...) or publishable (sb_publishable_...) key';
 };
 
-export default { supabaseBrowserKeyProblem };
+// The production project (public: it is in every API address)
+export const PRODUCTION_PROJECT_REF = 'tfdedlqdsajjdjkerkli';
+
+/**
+ * Where the signed-in session is kept in the browser.
+ *
+ * supabase-js names it after the first part of the API address:
+ * https://<ref>.supabase.co gives "sb-<ref>-auth-token". On a custom domain
+ * (https://auth.trashdrops.com, so Google sign-in shows TrashDrop's address
+ * instead of Supabase's) that would become "sb-auth-auth-token" and sign
+ * everyone out once. Keep the project's own name instead: from the
+ * *.supabase.co address, else REACT_APP_SUPABASE_PROJECT_REF, else production.
+ *
+ * @param {string} url - REACT_APP_SUPABASE_URL
+ * @param {string} [projectRef] - REACT_APP_SUPABASE_PROJECT_REF
+ */
+export const authStorageKey = (url, projectRef) => {
+  let ref = null;
+  try {
+    const host = new URL(url).hostname;
+    if (host.endsWith('.supabase.co')) ref = host.split('.')[0];
+  } catch {
+    // not a URL: fall through
+  }
+  return `sb-${ref || projectRef || PRODUCTION_PROJECT_REF}-auth-token`;
+};
+
+export default { supabaseBrowserKeyProblem, authStorageKey };

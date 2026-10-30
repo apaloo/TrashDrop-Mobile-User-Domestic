@@ -992,9 +992,11 @@ export const AuthProvider = ({ children }) => {
         provider: 'google',
         options: {
           redirectTo: `${getSiteUrl()}/dashboard`,
+          // Let people pick their Google account, without asking them to
+          // approve TrashDrop again every time (the app never uses Google's
+          // offline access)
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account',
           }
         }
       });

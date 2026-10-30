@@ -18,3 +18,15 @@ describe('supabaseBrowserKeyProblem', () => {
     expect(supabaseBrowserKeyProblem('not-a-key')).toMatch(/not an anon/);
   });
 });
+
+describe('authStorageKey', () => {
+  const { authStorageKey } = require('../supabaseKeys');
+  it('keeps the project name on the *.supabase.co address', () => {
+    expect(authStorageKey('https://tfdedlqdsajjdjkerkli.supabase.co')).toBe('sb-tfdedlqdsajjdjkerkli-auth-token');
+    expect(authStorageKey('https://abcdefghijklmnopqrst.supabase.co', 'other')).toBe('sb-abcdefghijklmnopqrst-auth-token');
+  });
+  it('keeps the same name on a custom domain, so no one is signed out', () => {
+    expect(authStorageKey('https://auth.trashdrops.com')).toBe('sb-tfdedlqdsajjdjkerkli-auth-token');
+    expect(authStorageKey('https://auth.trashdrops.com', 'abcdefghijklmnopqrst')).toBe('sb-abcdefghijklmnopqrst-auth-token');
+  });
+});
