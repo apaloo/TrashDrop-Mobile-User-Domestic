@@ -3,6 +3,8 @@
  * This file handles service worker registration specifically for mobile devices
  */
 
+import { watchForUpdates } from './utils/appUpdate';
+
 // Check if the device is mobile
 const isMobileDevice = () => {
   const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -33,6 +35,7 @@ export function register(config) {
           .register(swUrl)
           .then(registration => {
             console.log('[MobileSW] Service worker registered successfully');
+            if (config && config.onUpdate) watchForUpdates(registration, config.onUpdate);
             
             // Check for updates
             registration.onupdatefound = () => {

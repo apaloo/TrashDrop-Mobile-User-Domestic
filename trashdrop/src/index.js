@@ -11,6 +11,7 @@ import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import * as mobileServiceWorker from "./mobileServiceWorker";
 import { initGlobalErrorHandlers } from "./utils/errorBoundary";
 import { isMobileDevice } from "./utils/mobileAuth";
+import { notifyUpdateReady } from "./utils/appUpdate";
 
 // Initialize global error handlers early
 initGlobalErrorHandlers();
@@ -42,9 +43,8 @@ logAppDebug("React initialization starting");
 if (isMobileDevice()) {
   console.log("[PWA] Mobile device detected, using mobile-specific service worker");
   mobileServiceWorker.register({
-    onUpdate: registration => {
-      console.log("[PWA] New content is available, please refresh");
-    },
+    // A new version has downloaded: UpdateBanner offers to switch to it
+    onUpdate: notifyUpdateReady,
     onSuccess: registration => {
       console.log("[PWA] Content is cached for offline use");
     }
@@ -52,9 +52,8 @@ if (isMobileDevice()) {
 } else {
   console.log("[PWA] Desktop device detected, using standard service worker");
   serviceWorkerRegistration.register({
-    onUpdate: registration => {
-      console.log("[PWA] New content is available, please refresh");
-    },
+    // A new version has downloaded: UpdateBanner offers to switch to it
+    onUpdate: notifyUpdateReady,
     onSuccess: registration => {
       console.log("[PWA] Content is cached for offline use");
     }
