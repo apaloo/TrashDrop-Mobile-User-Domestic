@@ -5,6 +5,17 @@ import supabase from '../utils/supabaseClient.js';
 import { Link } from 'react-router-dom';
 import { subscribeToRewardsUpdates, handleRewardsUpdate } from '../utils/realtime.js';
 import { userService } from '../services/userService.js';
+import RedeemDialog from '../components/rewards/RedeemDialog.js';
+import { formatGhanaPhone } from '../utils/ghanaPhone.js';
+
+// Airtime and data rewards: sent by TrashDrop staff to a phone number
+const isMobileReward = (reward) => ['airtime', 'data'].includes(reward?.category);
+
+const STATUS_LABELS = {
+  pending: { text: 'Pending', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+  sent: { text: 'Sent', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  rejected: { text: 'Rejected · points returned', className: 'bg-gray-200 text-td-ink dark:bg-gray-600 dark:text-gray-100' },
+};
 
 /**
  * Rewards page component for viewing and redeeming rewards
@@ -18,6 +29,8 @@ const Rewards = () => {
   const [isRedemptionsLoading, setIsRedemptionsLoading] = useState(true);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
+  const [confirmReward, setConfirmReward] = useState(null);
+  const [profilePhone, setProfilePhone] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const mountedRef = useRef(true);
   const isLoadingRef = useRef(false);
@@ -37,6 +50,8 @@ const Rewards = () => {
           created_at,
           points_spent,
           status,
+          phone_number,
+          network,
           rewards (
             id,
             name,
@@ -62,6 +77,8 @@ const Rewards = () => {
           rewardImage: redemption.rewards?.image_url || '',
           pointsSpent: redemption.points_spent,
           status: redemption.status,
+          phone: redemption.phone_number,
+          network: redemption.network,
           redeemedAt: new Date(redemption.created_at).toLocaleDateString(),
           timestamp: redemption.created_at
         }));
@@ -125,7 +142,8 @@ const Rewards = () => {
               .from('rewards')
               .select('*')
               .eq('active', true)
-              .order('points_cost', { ascending: true });
+              .order('points_cost', { ascending: true })
+              .order('name', { ascending: true });
             
             if (!error && rewardsData) {
               const formattedRewards = rewardsData.map(reward => ({
@@ -133,7 +151,7 @@ const Rewards = () => {
                 name: reward.name,
                 description: reward.description,
                 pointsCost: reward.points_cost,
-                image: reward.image_url || `https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop`,
+                image: reward.image_url || '',
                 expiresAt: reward.expires_at,
                 partnerId: reward.partner_id,
                 category: reward.category
@@ -203,7 +221,8 @@ const Rewards = () => {
           .from('rewards')
           .select('*')
           .eq('active', true)
-          .order('points_cost', { ascending: true });
+          .order('points_cost', { ascending: true })
+          .order('name', { ascending: true });
         
         if (rewardsError) {
           console.warn('Error fetching rewards:', rewardsError);
@@ -215,7 +234,7 @@ const Rewards = () => {
             name: reward.name,
             description: reward.description,
             pointsCost: reward.points_cost,
-            image: reward.image_url || `https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop`,
+            image: reward.image_url || '',
             expiresAt: reward.expires_at,
             partnerId: reward.partner_id,
             category: reward.category
@@ -243,7 +262,21 @@ const Rewards = () => {
     fetchRewardsData();
   }, [user]);
 
-  const handleRedeemReward = async (reward) => {
+  // Airtime and data: ask which number and network first (prefilled from the profile)
+  const openRedeemDialog = async (reward) => {
+    setErrorMessage('');
+    setRedeemSuccess(null);
+    setConfirmReward(reward);
+    if (profilePhone || !user) return;
+    try {
+      const { data } = await supabase.from('profiles').select('phone').eq('id', user.id).maybeSingle();
+      setProfilePhone(data?.phone || user.phone || '');
+    } catch {
+      setProfilePhone(user.phone || '');
+    }
+  };
+
+  const handleRedeemReward = async (reward, delivery = null) => {
     if (!user) {
       setErrorMessage('You must be logged in to redeem rewards');
       setTimeout(() => setErrorMessage(''), 3000);
@@ -272,7 +305,9 @@ const Rewards = () => {
             user_id: user.id,
             reward_id: reward.id,
             points_spent: reward.pointsCost,
-            status: 'pending'
+            status: 'pending',
+            // Where staff send airtime or data
+            ...(delivery ? { phone_number: delivery.phone, network: delivery.network } : {})
           }
         ])
         .select();
@@ -302,7 +337,11 @@ const Rewards = () => {
       fetchRecentRedemptions();
       
       // Show success message
-      setRedeemSuccess({
+      setConfirmReward(null);
+      setRedeemSuccess(delivery ? {
+        id: reward.id,
+        message: `Request received. We'll send ${reward.name} to ${formatGhanaPhone(delivery.phone)} (${delivery.network}).`,
+      } : {
         id: reward.id,
         message: `Successfully redeemed ${reward.name}!`,
         code: redemptionCode,
@@ -369,8 +408,8 @@ const Rewards = () => {
               }`}
             >
               {/* Out of reach: only the picture fades, so the text stays readable */}
-              <div className={`h-40 bg-gray-200 dark:bg-gray-600 overflow-hidden ${userPoints >= reward.pointsCost ? '' : 'opacity-60'}`}>
-                {reward.image && (
+              <div className={`h-40 bg-gray-200 dark:bg-gray-600 overflow-hidden ${userPoints >= reward.pointsCost || !reward.image ? '' : 'opacity-60'}`}>
+                {reward.image ? (
                   <img 
                     src={reward.image} 
                     alt={reward.name} 
@@ -380,6 +419,16 @@ const Rewards = () => {
                       e.target.src = 'https://via.placeholder.com/300x200?text=Reward';
                     }}
                   />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-td-tonal dark:bg-gray-600 text-td-forest dark:text-green-200" aria-hidden="true">
+                    {/* Out of reach: only the icon fades; the label stays readable */}
+                    {reward.category === 'data' ? (
+                      <svg className={`w-12 h-12 ${userPoints >= reward.pointsCost ? '' : 'opacity-50'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                    ) : (
+                      <svg className={`w-12 h-12 ${userPoints >= reward.pointsCost ? '' : 'opacity-50'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    )}
+                    <span className="mt-2 text-sm font-semibold uppercase tracking-wide">{reward.category === 'data' ? 'Data bundle' : 'Airtime'}</span>
+                  </div>
                 )}
               </div>
               
@@ -387,7 +436,7 @@ const Rewards = () => {
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-medium text-td-ink dark:text-white">{reward.name}</h3>
                   <span className="bg-primary/10 dark:bg-primary-dark/20 text-primary dark:text-primary-light text-sm px-2 py-1 rounded-full">
-                    {reward.pointsCost} Points
+                    {reward.pointsCost.toLocaleString()} Points
                   </span>
                 </div>
                 
@@ -405,11 +454,11 @@ const Rewards = () => {
                 {redeemSuccess && redeemSuccess.id === reward.id ? (
                   <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 p-3 rounded-md text-sm">
                     <p>{redeemSuccess.message}</p>
-                    <p className="font-mono font-bold mt-1">{redeemSuccess.code}</p>
+                    {redeemSuccess.code && <p className="font-mono font-bold mt-1">{redeemSuccess.code}</p>}
                   </div>
                 ) : (
                   <button
-                    onClick={() => handleRedeemReward(reward)}
+                    onClick={() => (isMobileReward(reward) ? openRedeemDialog(reward) : handleRedeemReward(reward))}
                     disabled={isRedeeming || userPoints < reward.pointsCost}
                     className={`w-full px-4 py-2 text-sm font-medium rounded-md ${
                       userPoints >= reward.pointsCost 
@@ -422,7 +471,7 @@ const Rewards = () => {
                     ) : userPoints >= reward.pointsCost ? (
                       'Redeem Reward'
                     ) : (
-                      `Need ${reward.pointsCost - userPoints} more points`
+                      `Need ${(reward.pointsCost - userPoints).toLocaleString()} more points`
                     )}
                   </button>
                 )}
@@ -459,7 +508,11 @@ const Rewards = () => {
                 )}
                 <div className="flex-1">
                   <h3 className="font-semibold text-td-ink dark:text-white">{redemption.rewardName}</h3>
-                  <p className="text-sm text-td-sage dark:text-gray-300">{redemption.rewardDescription}</p>
+                  {redemption.phone ? (
+                    <p className="text-sm text-td-sage dark:text-gray-300">To {formatGhanaPhone(redemption.phone)}{redemption.network ? ` · ${redemption.network}` : ''}</p>
+                  ) : (
+                    <p className="text-sm text-td-sage dark:text-gray-300">{redemption.rewardDescription}</p>
+                  )}
                   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2">
                     <span className="text-sm text-td-sage dark:text-gray-300">
                       Redeemed on {redemption.redeemedAt}
@@ -468,12 +521,8 @@ const Rewards = () => {
                       <span className="text-sm font-medium text-red-700 dark:text-red-300">
                         -{redemption.pointsSpent} points
                       </span>
-                      <span className={`ml-2 px-2 py-1 text-xs rounded-full capitalize ${
-                        redemption.status === 'pending' 
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        {redemption.status}
+                      <span className={`ml-2 px-2 py-1 text-xs rounded-full ${(STATUS_LABELS[redemption.status] || STATUS_LABELS.pending).className}`}>
+                        {(STATUS_LABELS[redemption.status] || { text: redemption.status }).text}
                       </span>
                     </div>
                   </div>
@@ -503,6 +552,17 @@ const Rewards = () => {
         </svg>
       </Link>
       </div>
+
+      {confirmReward && (
+        <RedeemDialog
+          reward={confirmReward}
+          defaultPhone={profilePhone}
+          busy={isRedeeming}
+          serverError={errorMessage}
+          onCancel={() => setConfirmReward(null)}
+          onConfirm={(delivery) => handleRedeemReward(confirmReward, delivery)}
+        />
+      )}
     </div>
   );
 };
