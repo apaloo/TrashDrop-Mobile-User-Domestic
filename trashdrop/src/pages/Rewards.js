@@ -13,117 +13,14 @@ const Rewards = () => {
   const { user } = useAuth();
   const [userPoints, setUserPoints] = useState(0);
   const [rewards, setRewards] = useState([]);
-  const [pointsHistory, setPointsHistory] = useState([]);
   const [recentRedemptions, setRecentRedemptions] = useState([]);
-  const [showAllHistory, setShowAllHistory] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isRedemptionsLoading, setIsRedemptionsLoading] = useState(true);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const mountedRef = useRef(true);
   const isLoadingRef = useRef(false);
-
-  const fetchPointsHistory = async (limit = 10) => {
-    if (!user) return;
-    
-    setIsHistoryLoading(true);
-    try {
-      console.log('[Rewards] Fetching points history from source tables');
-      
-      // Fetch from actual source tables (same as userService architecture)
-      const [pickupResult, dumpingResult, scanResult] = await Promise.allSettled([
-        // Pickup requests with points_earned
-        supabase
-          .from('pickup_requests')
-          .select('id, created_at, waste_type, bag_count, status, points_earned')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false }),
-        
-        // Dumping reports with severity for points calculation
-        supabase
-          .from('illegal_dumping_mobile')
-          .select('id, created_at, waste_type, severity')
-          .eq('reported_by', user.id)
-          .order('created_at', { ascending: false }),
-        
-        // QR scans from user_activity
-        supabase
-          .from('user_activity')
-          .select('id, created_at, activity_type, points_impact')
-          .eq('user_id', user.id)
-          .eq('activity_type', 'qr_scan')
-          .order('created_at', { ascending: false })
-      ]);
-      
-      let allActivities = [];
-      
-      // Process pickup requests
-      if (pickupResult.status === 'fulfilled' && pickupResult.value?.data) {
-        const pickups = pickupResult.value.data.map(pickup => ({
-          id: pickup.id,
-          activity: 'Pickup Request',
-          date: new Date(pickup.created_at).toLocaleDateString(),
-          points: pickup.points_earned || 10,
-          details: `${pickup.waste_type || 'Waste'} - ${pickup.bag_count || 1} bag(s)`,
-          timestamp: pickup.created_at,
-          type: 'pickup_request'
-        }));
-        allActivities = [...allActivities, ...pickups];
-      }
-      
-      // Process dumping reports
-      if (dumpingResult.status === 'fulfilled' && dumpingResult.value?.data) {
-        const reports = dumpingResult.value.data.map(report => {
-          // Calculate points based on severity (same as userService)
-          const severity = report.severity || 'medium';
-          let points = 15; // default for medium
-          if (severity === 'high') points = 20;
-          else if (severity === 'low') points = 10;
-          
-          return {
-            id: report.id,
-            activity: 'Dumping Report',
-            date: new Date(report.created_at).toLocaleDateString(),
-            points: points,
-            details: `${report.waste_type || 'Illegal dumping'} (${severity} severity)`,
-            timestamp: report.created_at,
-            type: 'dumping_report'
-          };
-        });
-        allActivities = [...allActivities, ...reports];
-      }
-      
-      // Process QR scans
-      if (scanResult.status === 'fulfilled' && scanResult.value?.data) {
-        const scans = scanResult.value.data.map(scan => ({
-          id: scan.id,
-          activity: 'QR Code Scan',
-          date: new Date(scan.created_at).toLocaleDateString(),
-          points: scan.points_impact || 5,
-          details: 'QR code scanned for points',
-          timestamp: scan.created_at,
-          type: 'qr_scan'
-        }));
-        allActivities = [...allActivities, ...scans];
-      }
-      
-      // Sort all activities by timestamp (newest first) and limit
-      const sortedActivities = allActivities
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, limit);
-      
-      console.log(`[Rewards] Found ${sortedActivities.length} point-earning activities`);
-      setPointsHistory(sortedActivities);
-      
-    } catch (error) {
-      console.error('Error fetching points history:', error);
-      setPointsHistory([]);
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  };
 
   const fetchRecentRedemptions = async (limit = 5) => {
     if (!user) return;
@@ -179,18 +76,6 @@ const Rewards = () => {
       setRecentRedemptions([]);
     } finally {
       setIsRedemptionsLoading(false);
-    }
-  };
-
-  // Helper function to assign points based on activity type
-  const getPointsForActivity = (activityType) => {
-    switch (activityType) {
-      case 'pickup_request': return 10;
-      case 'dumping_report': return 15; // Default medium severity
-      case 'qr_scan': return 5;
-      case 'reward_redemption': return 0; // No points gained for redemption
-      case 'batch_scan': return 8;
-      default: return 5;
     }
   };
 
@@ -276,18 +161,14 @@ const Rewards = () => {
         };
         refreshUserPoints();
       }
-      
-      // For user_activity updates, refresh points history
-      if (tableType === 'user_activity' && payload.eventType === 'INSERT') {
-        fetchPointsHistory(showAllHistory ? 50 : 3);
-      }
+
     });
 
     return () => {
       console.log('[Rewards] Cleaning up real-time rewards subscription');
       subscription.unsubscribe();
     };
-  }, [user?.id, showAllHistory]);
+  }, [user?.id]);
   
   useEffect(() => {
     // Fetch user points and available rewards from Supabase
@@ -347,9 +228,6 @@ const Rewards = () => {
           console.log('[Rewards] No rewards found in database');
           setRewards([]);
         }
-        
-        // Fetch initial points history (limited to 10 entries)
-        await fetchPointsHistory();
         
         // Fetch recent redemptions
         await fetchRecentRedemptions();
@@ -419,8 +297,9 @@ const Rewards = () => {
         }
       ]);
       
-      // Update local state
+      // Update local state and show it under My Redemptions
       setUserPoints(prev => prev - reward.pointsCost);
+      fetchRecentRedemptions();
       
       // Show success message
       setRedeemSuccess({
@@ -486,10 +365,11 @@ const Rewards = () => {
               className={`bg-td-cream dark:bg-gray-700 rounded-lg overflow-hidden shadow-sm border border-td-border dark:border-gray-600 transition-all ${
                 userPoints >= reward.pointsCost 
                   ? 'hover:shadow-md hover:-translate-y-1' 
-                  : 'opacity-70'
+                  : ''
               }`}
             >
-              <div className="h-40 bg-gray-200 dark:bg-gray-600 overflow-hidden">
+              {/* Out of reach: only the picture fades, so the text stays readable */}
+              <div className={`h-40 bg-gray-200 dark:bg-gray-600 overflow-hidden ${userPoints >= reward.pointsCost ? '' : 'opacity-60'}`}>
                 {reward.image && (
                   <img 
                     src={reward.image} 
@@ -515,9 +395,12 @@ const Rewards = () => {
                   {reward.description}
                 </p>
                 
-                <div className="text-xs text-td-sage dark:text-gray-400 mb-4">
-                  Expires: {new Date(reward.expiresAt).toLocaleDateString()}
-                </div>
+                {/* Only rewards with an end date say when they expire */}
+                {reward.expiresAt && !Number.isNaN(new Date(reward.expiresAt).getTime()) && (
+                  <div className="text-xs text-td-sage dark:text-gray-300 mb-4">
+                    Expires: {new Date(reward.expiresAt).toLocaleDateString()}
+                  </div>
+                )}
                 
                 {redeemSuccess && redeemSuccess.id === reward.id ? (
                   <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 p-3 rounded-md text-sm">
@@ -531,7 +414,7 @@ const Rewards = () => {
                     className={`w-full px-4 py-2 text-sm font-medium rounded-md ${
                       userPoints >= reward.pointsCost 
                         ? 'bg-primary hover:bg-primary-dark text-white' 
-                        : 'bg-gray-300 dark:bg-gray-600 text-td-sage dark:text-gray-400 cursor-not-allowed'
+                        : 'bg-gray-300 dark:bg-gray-600 text-td-sage dark:text-gray-300 cursor-not-allowed'
                     }`}
                   >
                     {isRedeeming ? (
@@ -550,14 +433,14 @@ const Rewards = () => {
         
         {rewards.length === 0 && !isLoading && (
           <div className="text-center py-12">
-            <p className="text-td-sage dark:text-gray-400">No rewards available at this time.</p>
+            <p className="text-td-sage dark:text-gray-300">No rewards available at this time.</p>
           </div>
         )}
       </div>
       
       {/* Recent Redemptions */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold text-td-ink dark:text-white mb-4">Recent Redemptions</h2>
+        <h2 className="text-xl font-bold text-td-ink dark:text-white mb-4">My Redemptions</h2>
         
         {isRedemptionsLoading ? (
           <div className="py-8 text-center">
@@ -577,15 +460,15 @@ const Rewards = () => {
                 <div className="flex-1">
                   <h3 className="font-semibold text-td-ink dark:text-white">{redemption.rewardName}</h3>
                   <p className="text-sm text-td-sage dark:text-gray-300">{redemption.rewardDescription}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm text-td-sage dark:text-gray-400">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2">
+                    <span className="text-sm text-td-sage dark:text-gray-300">
                       Redeemed on {redemption.redeemedAt}
                     </span>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                    <div className="flex items-center whitespace-nowrap">
+                      <span className="text-sm font-medium text-red-700 dark:text-red-300">
                         -{redemption.pointsSpent} points
                       </span>
-                      <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                      <span className={`ml-2 px-2 py-1 text-xs rounded-full capitalize ${
                         redemption.status === 'pending' 
                           ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                           : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
@@ -600,82 +483,25 @@ const Rewards = () => {
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-td-sage dark:text-gray-400">You haven't redeemed any rewards yet.</p>
-            <p className="text-td-sage dark:text-gray-400 mt-1">Redeem a reward to see it here.</p>
+            <p className="text-td-sage dark:text-gray-300">You haven't redeemed any rewards yet.</p>
+            <p className="text-td-sage dark:text-gray-300 mt-1">Redeem a reward to see it here.</p>
           </div>
         )}
       </div>
       
-      {/* Points history */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-td-ink dark:text-white">Points History</h2>
-          <button 
-            className="text-sm text-primary dark:text-primary-light hover:underline focus:outline-none"
-            onClick={() => {
-              if (showAllHistory) {
-                // If already showing all, revert to just 10
-                fetchPointsHistory(10);
-              } else {
-                // Show all history (limit set to 100, can be adjusted)
-                fetchPointsHistory(100);
-              }
-              setShowAllHistory(!showAllHistory);
-            }}
-          >
-            {showAllHistory ? "Show Less" : "View All"}
-          </button>
-        </div>
-        
-        <div className="overflow-x-auto">
-          {isHistoryLoading ? (
-            <div className="py-8 text-center">
-              <LoadingSpinner size="md" />
-            </div>
-          ) : pointsHistory.length > 0 ? (
-            <table className="min-w-full divide-y divide-td-border dark:divide-gray-700">
-              <thead className="bg-td-cream dark:bg-gray-700">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-td-sage dark:text-gray-300 uppercase tracking-wider">
-                    Activity
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-td-sage dark:text-gray-300 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-td-sage dark:text-gray-300 uppercase tracking-wider">
-                    Points
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-td-border dark:divide-gray-700">
-                {pointsHistory.map(item => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 text-sm text-td-ink dark:text-white">
-                      <div className="font-medium">{item.activity}</div>
-                      {item.details && (
-                        <div className="text-xs text-td-sage dark:text-gray-400 mt-1">
-                          {item.details}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-td-sage dark:text-gray-300">
-                      {item.date}
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${item.points >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {item.points > 0 ? `+${item.points}` : item.points}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-td-sage dark:text-gray-400">No points history found.</p>
-              <p className="text-td-sage dark:text-gray-400 mt-1">Earn points by requesting pickups, reporting illegal dumping, and scanning QR codes.</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Where the points came from: listed once, in Activity */}
+      <Link
+        to="/activity"
+        className="flex items-center justify-between bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-td-ink dark:text-white hover:bg-td-cream dark:hover:bg-gray-700"
+      >
+        <span>
+          <span className="block font-semibold">How you earned your points</span>
+          <span className="block text-sm text-td-sage dark:text-gray-300 mt-1">Every pickup, report, scan and redemption is in Activity</span>
+        </span>
+        <svg className="w-5 h-5 flex-shrink-0 ml-3 text-td-forest dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
       </div>
     </div>
   );
