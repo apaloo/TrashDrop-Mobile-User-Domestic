@@ -1,12 +1,58 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
-import LoadingSpinner from './LoadingSpinner.js';
+import { GOOGLE_CLIENT_ID, loadGoogleIdentity, makeNonce } from '../utils/googleIdentity.js';
 
 /**
  * Social login buttons component - Google only (Apple hidden for now)
  */
 const SocialLogin = ({ isSubmitting = false, onError = null }) => {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInWithGoogleIdToken } = useAuth();
+  const navigate = useNavigate();
+  const googleButtonRef = useRef(null);
+  // Google's own button when a Google client ID is set (utils/googleIdentity.js);
+  // the redirect button otherwise, or if Google's script can't load
+  const [useGoogleButton, setUseGoogleButton] = useState(Boolean(GOOGLE_CLIENT_ID));
+  // Latest handlers, so Google is set up once per page (a new set-up would
+  // also mean a new one-time nonce)
+  const handlers = useRef({});
+  handlers.current = { navigate, onError, signInWithGoogleIdToken };
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [gsi, nonce] = await Promise.all([loadGoogleIdentity(), makeNonce()]);
+        if (cancelled || !googleButtonRef.current) return;
+        gsi.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          nonce: nonce.hashed,
+          ux_mode: 'popup',
+          use_fedcm_for_button: true,
+          callback: async ({ credential }) => {
+            const { navigate: go, onError: fail, signInWithGoogleIdToken: signIn } = handlers.current;
+            const result = await signIn(credential, nonce.raw);
+            if (result?.success) go('/dashboard');
+            else if (fail) fail(result?.error?.message || 'Failed to sign in with Google');
+          },
+        });
+        gsi.renderButton(googleButtonRef.current, {
+          type: 'standard',
+          theme: document.documentElement.classList.contains('dark') ? 'filled_black' : 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+          logo_alignment: 'center',
+          width: Math.min(400, googleButtonRef.current.offsetWidth || 320),
+        });
+      } catch (error) {
+        console.warn('[SocialLogin] Google button unavailable, using the redirect:', error);
+        if (!cancelled) setUseGoogleButton(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -35,6 +81,11 @@ const SocialLogin = ({ isSubmitting = false, onError = null }) => {
         </div>
       </div>
 
+      {useGoogleButton ? (
+        <div className="mt-6 flex justify-center" aria-busy={isSubmitting}>
+          <div ref={googleButtonRef} className="w-full max-w-[400px] flex justify-center min-h-[44px]" data-testid="google-button" />
+        </div>
+      ) : (
       <div className="mt-6">
         <button
           type="button"
@@ -63,6 +114,7 @@ const SocialLogin = ({ isSubmitting = false, onError = null }) => {
           Continue with Google
         </button>
       </div>
+      )}
     </div>
   );
 };

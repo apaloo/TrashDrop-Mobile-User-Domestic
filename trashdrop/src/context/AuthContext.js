@@ -992,9 +992,11 @@ export const AuthProvider = ({ children }) => {
         provider: 'google',
         options: {
           redirectTo: `${getSiteUrl()}/dashboard`,
+          // Let people pick their Google account, without asking them to
+          // approve TrashDrop again every time (the app never uses Google's
+          // offline access)
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account',
           }
         }
       });
@@ -1009,6 +1011,24 @@ export const AuthProvider = ({ children }) => {
       
     } catch (error) {
       console.error('[Auth] Unexpected error during Google OAuth:', error);
+      return handleAuthError(error, 'google_sign_in');
+    }
+  }, [handleAuthError, updateAuthState]);
+
+  // Google's own button (utils/googleIdentity.js): Google's ID token goes to
+  // Supabase directly, so the Google screen shows TrashDrop, not Supabase
+  const signInWithGoogleIdToken = useCallback(async (token, nonce) => {
+    console.log('[Auth] Signing in with a Google ID token');
+    updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_google' });
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token, nonce });
+      if (error) {
+        console.error('[Auth] Google ID token sign-in error:', error);
+        return handleAuthError(error, 'google_sign_in');
+      }
+      return { success: true, data };
+    } catch (error) {
+      console.error('[Auth] Unexpected error during Google ID token sign-in:', error);
       return handleAuthError(error, 'google_sign_in');
     }
   }, [handleAuthError, updateAuthState]);
@@ -1394,6 +1414,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     resendConfirmationEmail,
     signInWithGoogle,
+    signInWithGoogleIdToken,
     signInWithApple,
     checkSession,
     resetAuthState,
