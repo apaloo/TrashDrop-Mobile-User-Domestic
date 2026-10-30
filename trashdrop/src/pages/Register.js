@@ -391,13 +391,14 @@ const Register = () => {
               />
               <label htmlFor="agreeTerms" className="ml-2 block text-sm text-td-ink dark:text-gray-300">
                 I agree to the{' '}
-                <Link to="/terms" className="text-primary hover:underline dark:text-primary-light">
+                {/* The pages live on trashdrops.com; a new tab keeps this form as it is */}
+                <a href="https://trashdrops.com/terms/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline dark:text-primary-light">
                   Terms of Service
-                </Link>{' '}
+                </a>{' '}
                 and{' '}
-                <Link to="/privacy" className="text-primary hover:underline dark:text-primary-light">
+                <a href="https://trashdrops.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline dark:text-primary-light">
                   Privacy Policy
-                </Link>
+                </a>
               </label>
             </div>
             {fieldErrors.agreeTerms && (
