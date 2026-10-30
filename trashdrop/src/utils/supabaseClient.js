@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import appConfig from './app-config.js';
-import { supabaseBrowserKeyProblem, authStorageKey } from './supabaseKeys.js';
+import { supabaseBrowserKeyProblem } from './supabaseKeys.js';
 import { getSiteUrl } from './siteUrl.js';
 
 // Import environment variables directly to avoid circular dependency or initialization timing issues
@@ -309,8 +309,6 @@ const initSupabase = () => {
   const clientOptions = {
     auth: {
       storage: window.localStorage,
-      // Same session name on a custom domain, so no one is signed out (supabaseKeys.js)
-      storageKey: authStorageKey(supabaseUrl, process.env.REACT_APP_SUPABASE_PROJECT_REF),
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true

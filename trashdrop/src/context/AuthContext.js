@@ -1015,6 +1015,24 @@ export const AuthProvider = ({ children }) => {
     }
   }, [handleAuthError, updateAuthState]);
 
+  // Google's own button (utils/googleIdentity.js): Google's ID token goes to
+  // Supabase directly, so the Google screen shows TrashDrop, not Supabase
+  const signInWithGoogleIdToken = useCallback(async (token, nonce) => {
+    console.log('[Auth] Signing in with a Google ID token');
+    updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_google' });
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token, nonce });
+      if (error) {
+        console.error('[Auth] Google ID token sign-in error:', error);
+        return handleAuthError(error, 'google_sign_in');
+      }
+      return { success: true, data };
+    } catch (error) {
+      console.error('[Auth] Unexpected error during Google ID token sign-in:', error);
+      return handleAuthError(error, 'google_sign_in');
+    }
+  }, [handleAuthError, updateAuthState]);
+
   const signInWithApple = useCallback(async () => {
     console.log('[Auth] Initiating Apple OAuth sign in');
     updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_apple' });
@@ -1396,6 +1414,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     resendConfirmationEmail,
     signInWithGoogle,
+    signInWithGoogleIdToken,
     signInWithApple,
     checkSession,
     resetAuthState,
