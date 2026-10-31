@@ -779,9 +779,9 @@ const PickupRequest = () => {
                   {touched.savedLocationId && errors.savedLocationId && (
                     <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.savedLocationId}</div>
                   )}
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-td-sage dark:text-gray-300">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-sm text-td-sage dark:text-gray-300">
                     <span>Select from your saved locations or</span>
-                    <Link to="/profile?tab=locations" className={`${tonalButton} h-9`}>
+                    <Link to="/profile?tab=locations" className={`${tonalButton} h-9 ml-auto`}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                       Add new locations
                     </Link>
