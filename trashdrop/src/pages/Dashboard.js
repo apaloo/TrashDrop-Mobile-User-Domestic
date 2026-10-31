@@ -1249,20 +1249,13 @@ const Dashboard = () => {
 
         <section aria-labelledby="impact-heading">
           <h2 id="impact-heading" className="text-[17px] font-bold text-td-ink dark:text-gray-100 mb-2.5">Your impact</h2>
-          {/* Batches and bags share the first tile, side by side, so it is a little wider */}
-          <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-2.5">
+          {/* The bags tile is never narrower than its one-line label ("bags · 12 batches"), so the label never wraps */}
+          <div className="grid grid-cols-[minmax(max-content,1.5fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
             <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
-              {/* The grid sits inside: .dashboard-card is styled display:block elsewhere */}
-              <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.batches || 0}</p>
-                <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{(stats.batches || 0) === 1 ? 'batch' : 'batches'}</p>
-              </div>
-              <div>
-                <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
-                <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{(stats.totalBags || 0) === 1 ? 'bag' : 'bags'}</p>
-              </div>
-              </div>
+              <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
+              <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">
+                {(stats.totalBags || 0) === 1 ? 'bag' : 'bags'} · {stats.batches || 0} {(stats.batches || 0) === 1 ? 'batch' : 'batches'}
+              </p>
             </div>
             <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
               <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.pickups || 0}</p>
