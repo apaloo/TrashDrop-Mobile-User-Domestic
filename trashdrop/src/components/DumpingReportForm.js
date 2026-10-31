@@ -20,6 +20,7 @@ const WASTE_OPTIONS = [
   ['electronic', '📱', 'Electronic'],
   ['organic', '🥬', 'Organic'],
   ['recyclables', '♻️', 'Recyclables'],
+  ['plastic', '🥤', 'Plastic'],
   ['hazardous', '☣️', 'Hazardous'],
 ];
 const SIZE_OPTIONS = [
@@ -84,6 +85,7 @@ const WASTE_TYPE_LABELS = {
   electronic: 'Electronic waste',
   organic: 'Organic waste',
   recyclables: 'Recyclables',
+  plastic: 'Plastic waste',
   hazardous: 'Hazardous waste'
 };
 

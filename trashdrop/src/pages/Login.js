@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import SocialLogin from '../components/SocialLogin.js';
+import { rememberedSignIn } from '../utils/rememberMe.js';
 
 /**
  * Login page component
@@ -11,8 +12,10 @@ const Login = () => {
   const navigate = useNavigate();
   const { signIn, isLoading, resendConfirmationEmail } = useAuth();
   
+  // Ticked by default; the email from the last "Remember me" sign-in is filled in
+  const [remembered] = useState(rememberedSignIn);
   const [formData, setFormData] = useState({
-    email: '',
+    email: remembered.email,
     password: '',
   });
   const [error, setError] = useState('');
@@ -20,7 +23,7 @@ const Login = () => {
   const [showResendButton, setShowResendButton] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(remembered.remember);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
