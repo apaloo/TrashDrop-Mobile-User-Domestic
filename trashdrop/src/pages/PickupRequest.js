@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
@@ -9,7 +9,7 @@ import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import OptionTile from '../components/ui/OptionTile.js';
 import PageHeader from '../components/ui/PageHeader.js';
-import { card, errorNote, infoNote, primaryButton, secondaryButton, sectionTitle, warningNote } from '../components/ui/styles.js';
+import { card, errorNote, infoNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from '../components/ui/styles.js';
 import appConfig from '../utils/app-config.js';
 import GeolocationService from '../utils/geolocationService.js';
 import { subscribeToStatsUpdates } from '../utils/realtime.js';
@@ -779,8 +779,12 @@ const PickupRequest = () => {
                   {touched.savedLocationId && errors.savedLocationId && (
                     <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.savedLocationId}</div>
                   )}
-                  <div className="mt-1.5 text-sm text-td-sage dark:text-gray-300">
-                    You can select from your saved locations or <a href="/profile?tab=locations" className="font-semibold text-td-forest dark:text-green-300 underline underline-offset-2">add new locations</a>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-sm text-td-sage dark:text-gray-300">
+                    <span>Select from your saved locations or</span>
+                    <Link to="/profile?tab=locations" className={`${tonalButton} h-9 ml-auto`}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                      Add new locations
+                    </Link>
                   </div>
                 </div>
 

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import appConfig from './app-config.js';
 import { supabaseBrowserKeyProblem } from './supabaseKeys.js';
 import { getSiteUrl } from './siteUrl.js';
+import { endSessionIfNotRemembered } from './rememberMe.js';
 
 // Import environment variables directly to avoid circular dependency or initialization timing issues
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
@@ -345,6 +346,9 @@ const initSupabase = () => {
       originalConsoleError.apply(console, args);
     };
   }
+
+  // Signed in without "Remember me" and the app was closed since: start signed out
+  if (endSessionIfNotRemembered()) console.log('[Supabase] Session not remembered: signed out');
 
   const client = createClient(supabaseUrl, supabaseAnonKey, clientOptions);
 

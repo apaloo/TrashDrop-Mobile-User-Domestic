@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { applyRememberMe } from '../utils/rememberMe.js';
 import supabase, { isTokenValid } from '../utils/supabaseClient.js';
 import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
 import { getSiteUrl } from '../utils/siteUrl.js';
@@ -690,6 +691,8 @@ export const AuthProvider = ({ children }) => {
         key: appConfig?.supabase?.anonKey ? 'Set' : 'Not set'
       });
       
+      // Before Supabase stores the session: keep it after the app closes, or not
+      applyRememberMe(rememberMe, email);
       console.log('[Auth DEBUG] Calling signInWithPassword with:', { email, rememberMe });
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -988,6 +991,7 @@ export const AuthProvider = ({ children }) => {
     updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_google' });
     
     try {
+      applyRememberMe(true);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -1021,6 +1025,7 @@ export const AuthProvider = ({ children }) => {
     console.log('[Auth] Signing in with a Google ID token');
     updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_google' });
     try {
+      applyRememberMe(true);
       const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token, nonce });
       if (error) {
         console.error('[Auth] Google ID token sign-in error:', error);
@@ -1038,6 +1043,7 @@ export const AuthProvider = ({ children }) => {
     updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_in_apple' });
     
     try {
+      applyRememberMe(true);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
