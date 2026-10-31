@@ -3,6 +3,31 @@ import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
+import { Link } from 'react-router-dom';
+import PageHeader from '../components/ui/PageHeader.js';
+import { card, errorNote, secondaryButton, tonalButton } from '../components/ui/styles.js';
+
+// Title, icon and tint for each kind of activity (reports orange, as on the dashboard)
+const GREEN = 'bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300';
+const BIN = 'M4 7h16M6 7l1 13h10l1-13M10 11v5M14 11v5M9 7V4h6v3';
+const ACTIVITY_KINDS = {
+  pickup_request: { title: 'Waste Pickup', tint: GREEN, d: 'M3 7h11v9H3zM14 10h4l3 3v3h-7M7 18a2 2 0 100 .01M17 18a2 2 0 100 .01' },
+  dumping_report: { title: 'Dumping Report', tint: 'bg-orange-100 text-td-orange-text dark:bg-orange-900/40 dark:text-orange-300', d: 'M12 3l9 16H3zM12 10v4M12 17v.01' },
+  qr_scan: { title: 'QR Code Scan', tint: GREEN, d: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3' },
+  digital_bin: { title: 'Request Bin Pickup', tint: GREEN, d: BIN },
+  reward_redemption: { title: 'Reward Redemption', tint: GREEN, d: 'M12 3a6 6 0 100 12 6 6 0 000-12zM9 14l-2 7 5-3 5 3-2-7' },
+  other: { title: 'Reward Redemption', tint: GREEN, d: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 3' },
+};
+
+// Status chips: done in green, under way in amber, stopped in grey
+const DONE = 'bg-td-tonal text-td-forest-dk dark:bg-green-900/50 dark:text-green-200';
+const WAITING = 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200';
+const STOPPED = 'bg-gray-200 text-td-ink dark:bg-gray-600 dark:text-gray-100';
+const STATUS_TINTS = {
+  completed: DONE, disposed: DONE, verified: DONE, collected: DONE, sent: DONE,
+  pending: WAITING, scheduled: WAITING, accepted: WAITING, in_progress: WAITING, en_route: WAITING, pending_verification: WAITING,
+  cancelled: STOPPED, canceled: STOPPED, rejected: STOPPED,
+};
 
 /**
  * Activity page to display user's complete activity history
@@ -581,251 +606,178 @@ const Activity = () => {
     setHasMoreData(true);
   };
 
-  // Activity card component
-  const ActivityCard = ({ activity }) => {
-    const getActivityIcon = () => {
-      switch (activity.type) {
-        case 'pickup_request':
-          return (
-            <div className="p-2 rounded-full bg-td-tonal dark:bg-blue-900/30">
-              <svg className="w-5 h-5 text-td-forest" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            </div>
-          );
-        case 'dumping_report':
-          return (
-            <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-          );
-        case 'qr_scan':
-          return (
-            <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30">
-              <svg className="w-5 h-5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-            </div>
-          );
-        case 'reward_redemption':
-          return (
-            <div className="p-2 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-              <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          );
-        case 'digital_bin':
-          return (
-            <div className="p-2 rounded-full bg-td-tonal dark:bg-blue-900/30">
-              <svg className="w-5 h-5 text-td-forest" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            </div>
-          );
-        default:
-          return (
-            <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
-              <svg className="w-5 h-5 text-td-sage" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          );
-      }
-    };
-    
-    return (
-      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 mb-4 border border-td-border dark:border-gray-700">
-        <div className="flex items-start">
-          {getActivityIcon()}
-          <div className="ml-4 flex-1">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-              <div>
-                <h3 className="text-lg font-medium text-td-ink dark:text-white capitalize">
-                  {activity.type === 'pickup_request' ? 'Waste Pickup' : 
-                   activity.type === 'dumping_report' ? 'Dumping Report' : 
-                   activity.type === 'qr_scan' ? 'QR Code Scan' : 
-                   activity.type === 'digital_bin' ? 'Request Bin Pickup' : 'Reward Redemption'}
-                </h3>
-                <p className="text-sm text-td-sage dark:text-gray-400 mb-1">
-                  {activity.date} • {activity.description}
-                </p>
-                {activity.address && (
-                  <p className="text-sm text-td-sage dark:text-gray-400 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {activity.address}
-                  </p>
-                )}
-              </div>
-              <div className="mt-2 sm:mt-0">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                  ${activity.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 
-                    activity.status === 'scheduled' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' : 
-                    activity.status === 'canceled' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' : 
-                    'bg-gray-100 dark:bg-gray-700 text-td-ink dark:text-gray-300'}`}>
-                  {activity.status.charAt(0).toUpperCase() + activity.status.slice(1)}
-                </span>
-                {activity.isLocal && activity.sync_status === 'pending_sync' && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 ml-2">
-                    Pending Sync
-                  </span>
-                )}
-                {activity.pointsPending && (
-                  <div className="mt-2 text-sm text-td-sage dark:text-gray-300">Points when verified</div>
-                )}
-                {activity.points !== 0 && (
-                  <div className="mt-2">
-                    <span className={`font-medium ${activity.points > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {activity.points > 0 ? '+' : ''}{activity.points} points
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  // Loading indicator for infinite scroll
-  const InfiniteScrollLoader = () => {
-    if (!hasMoreData) {
-      return (
-        <div className="text-center py-8 text-td-sage dark:text-gray-400">
-          <p>No more activities to load</p>
-        </div>
-      );
-    }
-    
-    if (isLoadingMore) {
-      return (
-        <div className="flex justify-center items-center py-8">
-          <LoadingSpinner />
-          <span className="ml-2 text-td-sage dark:text-gray-400">Loading more activities...</span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="text-center py-4 text-td-sage dark:text-gray-400">
-        <p>Scroll down to load more activities</p>
-      </div>
-    );
-  };
+  // Activity row component, in the dashboard's Recent Activity style
+  const ActivityCard = ({ activity, first }) => {
+    const kind = ACTIVITY_KINDS[activity.type] || ACTIVITY_KINDS.other;
+    const points = Number(activity.points) || 0;
+    const status = String(activity.status || '');
 
-  return (
-    <div className="flex flex-col min-h-screen bg-td-cream dark:bg-gray-900">
-      {/* Fixed Header - positioned below navbar */}
-      <div className="sticky top-0 bg-td-cream dark:bg-gray-900 z-10 border-b border-td-border dark:border-gray-700" style={{top: '70px'}}>
-        <div className="container mx-auto px-4 pt-2 pb-3">
-          <h1 className="text-2xl font-bold text-td-ink dark:text-gray-100">Activity History</h1>
-        </div>
-        
-        {/* Filter tabs - Sticky below header */}
-        <div className="container mx-auto px-4 pb-3">
-          <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-td-border dark:border-gray-700">
-            <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'all' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              onClick={() => handleFilterChange('all')}
-            >
-              All
-            </button>
-            <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'pickup_request' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              onClick={() => handleFilterChange('pickup_request')}
-            >
-              Pickups
-            </button>
-            <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'dumping_report' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              onClick={() => handleFilterChange('dumping_report')}
-            >
-              Reports
-            </button>
-            <button 
-              className={`px-3 py-3 flex-1 text-center text-sm font-medium ${filter === 'qr_scan' ? 'bg-primary text-white' : 'text-td-ink dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              onClick={() => handleFilterChange('qr_scan')}
-            >
-              Scans
-            </button>
-            <button 
-              onClick={handleRefresh}
-              className="px-3 py-3 text-td-forest dark:text-blue-400 hover:bg-green-100 dark:hover:bg-gray-700 flex items-center justify-center flex-shrink-0"
-              aria-label="Refresh activity data"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-            </button>
+    return (
+      <li className={`flex items-start gap-3 py-3.5 ${first ? '' : 'border-t border-td-border dark:border-gray-700'}`}>
+        <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${kind.tint}`} aria-hidden="true">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d={kind.d} />
+          </svg>
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-[15px] font-semibold text-td-ink dark:text-gray-100 leading-snug">{kind.title}</h3>
+            {activity.pointsPending ? (
+              <span className="flex-shrink-0 max-w-[6rem] text-right text-[13px] text-td-sage dark:text-gray-300">Points when verified</span>
+            ) : points !== 0 && (
+              <span className={`flex-shrink-0 text-[15px] font-bold ${points > 0 ? 'text-td-forest dark:text-green-300' : 'text-td-ink dark:text-gray-100'}`}>
+                {points > 0 ? '+' : '−'}{Math.abs(points).toLocaleString()}
+                <span className="sr-only"> points</span>
+              </span>
+            )}
           </div>
-        </div>
-      </div>
-      
-      {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="container mx-auto px-4 py-4">
-          {/* Loading state */}
-          {isLoading && (
-            <div className="flex justify-center items-center py-12">
-              <LoadingSpinner />
-            </div>
+          <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">
+            {activity.date} • {activity.description}
+          </p>
+          {activity.address && (
+            <p className="text-[13px] text-td-sage dark:text-gray-300 flex items-center mt-0.5">
+              <svg className="w-3.5 h-3.5 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="truncate">{activity.address}</span>
+            </p>
           )}
-          
-          {/* Error state */}
-          {error && !isLoading && (
-            <div className="bg-red-50 dark:bg-red-900/40 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg shadow-sm relative mb-4" role="alert">
-              <strong className="font-bold">Error: </strong>
-              <span className="block sm:inline">{error}</span>
-              <button 
-                onClick={handleRefresh}
-                className="mt-2 bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded"
-              >
-                Try Again
-              </button>
-            </div>
-          )}
-          
-          {/* Activity list */}
-          {!isLoading && !error && (
-            <div className="space-y-4">
-              {activities.length > 0 ? (
-                <>
-                  {activities.map(activity => (
-                    <ActivityCard key={`${activity.id}-${activity.created_at}`} activity={activity} />
-                  ))}
-                  
-                  {/* Infinite scroll loading indicator */}
-                  <div ref={loadingRef}>
-                    <InfiniteScrollLoader />
-                  </div>
-                </>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center border border-td-border dark:border-gray-700">
-                  <div className="text-td-sage dark:text-gray-400 mb-4">
-                    <svg className="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                    </svg>
-                    <h3 className="text-xl font-medium mb-1">No activity yet</h3>
-                    <p>Your activity history will appear here as you use the app.</p>
-                  </div>
-                  <div className="flex flex-col space-y-2">
-                    <p className="text-sm text-td-sage dark:text-gray-400">Try these activities to get started:</p>
-                    <a href="/pickup-request" className="text-td-forest hover:underline">Request a trash pickup</a>
-                    <a href="/dumping-report" className="text-td-forest hover:underline">Report illegal dumping</a>
-                    <a href="/scan" className="text-td-forest hover:underline">Scan a QR code at a public bin</a>
-                  </div>
-                </div>
+          {(status || (activity.isLocal && activity.sync_status === 'pending_sync')) && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {status && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_TINTS[status] || 'bg-td-cream text-td-ink dark:bg-gray-700 dark:text-gray-200'}`}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </span>
+              )}
+              {activity.isLocal && activity.sync_status === 'pending_sync' && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">
+                  Pending Sync
+                </span>
               )}
             </div>
           )}
         </div>
+      </li>
+    );
+  };
+
+  // Loading indicator for infinite scroll
+  const InfiniteScrollLoader = () => {
+    if (!hasMoreData) {
+      return (
+        <p className="text-center py-4 text-[13px] text-td-sage dark:text-gray-300 border-t border-td-border dark:border-gray-700">
+          No more activities to load
+        </p>
+      );
+    }
+
+    if (isLoadingMore) {
+      return (
+        <div className="flex justify-center items-center py-4 border-t border-td-border dark:border-gray-700">
+          <LoadingSpinner />
+          <span className="ml-2 text-[13px] text-td-sage dark:text-gray-300">Loading more activities...</span>
+        </div>
+      );
+    }
+
+    return (
+      <p className="text-center py-4 text-[13px] text-td-sage dark:text-gray-300 border-t border-td-border dark:border-gray-700">
+        Scroll down to load more activities
+      </p>
+    );
+  };
+
+  const FILTERS = [
+    ['all', 'All'],
+    ['pickup_request', 'Pickups'],
+    ['dumping_report', 'Reports'],
+    ['qr_scan', 'Scans'],
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto px-2 pb-24">
+      <PageHeader title="Activity History" subtitle="Every pickup, report, scan and redemption, newest first." />
+
+      {/* Filters - stay in view while scrolling */}
+      <div className="sticky top-16 md:top-14 z-10 -mx-2 px-2 py-3 bg-white dark:bg-gray-900">
+        <div className="flex items-center gap-2" role="group" aria-label="Show">
+          <div className="flex-1 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {FILTERS.map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => handleFilterChange(value)}
+                aria-pressed={filter === value}
+                className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+                  filter === value
+                    ? 'bg-td-forest text-white'
+                    : 'bg-td-tonal text-td-forest-dk hover:bg-[#d5eadb] dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 border border-td-border dark:border-gray-600 text-td-forest dark:text-green-300 hover:bg-td-cream dark:hover:bg-gray-800"
+            aria-label="Refresh activity data"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-12">
+          <LoadingSpinner />
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && !isLoading && (
+        <div className={`${errorNote} px-4 py-3`} role="alert">
+          <p className="text-[15px]"><strong className="font-bold">Error: </strong>{error}</p>
+          <button onClick={handleRefresh} className={`${secondaryButton} h-10 mt-3 bg-white dark:bg-transparent`}>
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {/* Activity list */}
+      {!isLoading && !error && (
+        activities.length > 0 ? (
+          <section aria-label="Activities" className={`${card} px-4 pt-0.5`}>
+            <ul>
+              {activities.map((activity, i) => (
+                <ActivityCard key={`${activity.id}-${activity.created_at}`} activity={activity} first={i === 0} />
+              ))}
+            </ul>
+
+            {/* Infinite scroll loading indicator */}
+            <div ref={loadingRef}>
+              <InfiniteScrollLoader />
+            </div>
+          </section>
+        ) : (
+          <section className={`${card} px-5 py-8 text-center`}>
+            <span className="inline-flex w-14 h-14 rounded-2xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 items-center justify-center mb-3" aria-hidden="true">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+            </span>
+            <h2 className="text-[17px] font-bold text-td-ink dark:text-gray-100">No activity yet</h2>
+            <p className="text-[15px] text-td-sage dark:text-gray-300 mt-1">Your activity history will appear here as you use the app.</p>
+            <p className="text-sm text-td-sage dark:text-gray-300 mt-5 mb-2">Try these activities to get started:</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link to="/pickup-request" className={tonalButton}>Request a trash pickup</Link>
+              <Link to="/report" className={tonalButton}>Report illegal dumping</Link>
+              <Link to="/qr-scanner" className={tonalButton}>Scan a bag QR code</Link>
+            </div>
+          </section>
+        )
+      )}
     </div>
   );
 };
