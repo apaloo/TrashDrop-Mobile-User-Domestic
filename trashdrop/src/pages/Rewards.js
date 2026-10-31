@@ -7,13 +7,16 @@ import { subscribeToRewardsUpdates, handleRewardsUpdate } from '../utils/realtim
 import { userService } from '../services/userService.js';
 import RedeemDialog from '../components/rewards/RedeemDialog.js';
 import { formatGhanaPhone } from '../utils/ghanaPhone.js';
+import { nextReward, pointsLevel, pointsToCedis } from '../utils/rewardsMath.js';
+import PageHeader from '../components/ui/PageHeader.js';
+import { card, errorNote, infoNote, primaryButton, sectionTitle } from '../components/ui/styles.js';
 
 // Airtime and data rewards: sent by TrashDrop staff to a phone number
 const isMobileReward = (reward) => ['airtime', 'data'].includes(reward?.category);
 
 const STATUS_LABELS = {
-  pending: { text: 'Pending', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-  sent: { text: 'Sent', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  pending: { text: 'Pending', className: 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200' },
+  sent: { text: 'Sent', className: 'bg-td-tonal text-td-forest-dk dark:bg-green-900/50 dark:text-green-200' },
   rejected: { text: 'Rejected · points returned', className: 'bg-gray-200 text-td-ink dark:bg-gray-600 dark:text-gray-100' },
 };
 
@@ -362,196 +365,189 @@ const Rewards = () => {
     );
   }
 
+  const next = nextReward(userPoints);
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Fixed Points summary header */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6" style={{top: '65px'}}>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-td-ink dark:text-white">My Rewards</h1>
-          
-          <div className="bg-primary/10 dark:bg-primary-dark/20 px-4 py-2 rounded-full">
-            <span className="text-primary dark:text-primary-light font-semibold flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-              </svg>
-              {userPoints} Points
-            </span>
-          </div>
+    <div className="max-w-3xl mx-auto px-2 pb-24 space-y-5">
+      <PageHeader
+        title="My Rewards"
+        subtitle="Earn points by requesting pickups, scanning QR codes, and reporting illegal dumping (once your report is verified)."
+      />
+
+      {/* Balance, in the dashboard's Rewards card style */}
+      <section aria-label="Your points" className="relative overflow-hidden rounded-3xl bg-td-forest text-white px-5 py-5">
+        <span className="absolute -top-16 -right-16 w-56 h-56 rounded-full border-[28px] border-white/10" aria-hidden="true" />
+        <div className="relative flex items-start justify-between gap-3">
+          <p className="text-[13px] font-bold uppercase tracking-wide text-white/90">Your balance</p>
+          <span className="rounded-full bg-td-lime px-3 py-1 text-[13px] font-bold text-td-ink">Level {pointsLevel(userPoints)}</span>
         </div>
-        
-        <p className="mt-2 text-td-sage dark:text-gray-300">
-          Earn points by requesting pickups, scanning QR codes, and reporting illegal dumping (once your report is verified).
+        <p className="relative mt-2 flex items-baseline gap-2">
+          <span className="text-[44px] leading-none font-bold">{userPoints.toLocaleString()}</span>
+          <span className="text-lg font-semibold">Points</span>
         </p>
-      </div>
-      
-      {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto space-y-6 pb-6">
-        {/* Error message */}
-        {errorMessage && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
-            <p>{errorMessage}</p>
-          </div>
-        )}
-        
-        {/* Rewards list */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold text-td-ink dark:text-white mb-4">Available Rewards</h2>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rewards.map((reward) => (
-            <div 
-              key={reward.id} 
-              className={`bg-td-cream dark:bg-gray-700 rounded-lg overflow-hidden shadow-sm border border-td-border dark:border-gray-600 transition-all ${
-                userPoints >= reward.pointsCost 
-                  ? 'hover:shadow-md hover:-translate-y-1' 
-                  : ''
-              }`}
-            >
-              {/* Out of reach: only the picture fades, so the text stays readable */}
-              <div className={`h-40 bg-gray-200 dark:bg-gray-600 overflow-hidden ${userPoints >= reward.pointsCost || !reward.image ? '' : 'opacity-60'}`}>
-                {reward.image ? (
-                  <img 
-                    src={reward.image} 
-                    alt={reward.name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = 'https://via.placeholder.com/300x200?text=Reward';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-td-tonal dark:bg-gray-600 text-td-forest dark:text-green-200" aria-hidden="true">
-                    {/* Out of reach: only the icon fades; the label stays readable */}
-                    {reward.category === 'data' ? (
-                      <svg className={`w-12 h-12 ${userPoints >= reward.pointsCost ? '' : 'opacity-50'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
-                    ) : (
-                      <svg className={`w-12 h-12 ${userPoints >= reward.pointsCost ? '' : 'opacity-50'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                    )}
-                    <span className="mt-2 text-sm font-semibold uppercase tracking-wide">{reward.category === 'data' ? 'Data bundle' : 'Airtime'}</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-medium text-td-ink dark:text-white">{reward.name}</h3>
-                  <span className="bg-primary/10 dark:bg-primary-dark/20 text-primary dark:text-primary-light text-sm px-2 py-1 rounded-full">
-                    {reward.pointsCost.toLocaleString()} Points
-                  </span>
-                </div>
-                
-                <p className="text-sm text-td-sage dark:text-gray-300 mb-4">
-                  {reward.description}
-                </p>
-                
-                {/* Only rewards with an end date say when they expire */}
-                {reward.expiresAt && !Number.isNaN(new Date(reward.expiresAt).getTime()) && (
-                  <div className="text-xs text-td-sage dark:text-gray-300 mb-4">
-                    Expires: {new Date(reward.expiresAt).toLocaleDateString()}
-                  </div>
-                )}
-                
-                {redeemSuccess && redeemSuccess.id === reward.id ? (
-                  <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 p-3 rounded-md text-sm">
-                    <p>{redeemSuccess.message}</p>
-                    {redeemSuccess.code && <p className="font-mono font-bold mt-1">{redeemSuccess.code}</p>}
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => (isMobileReward(reward) ? openRedeemDialog(reward) : handleRedeemReward(reward))}
-                    disabled={isRedeeming || userPoints < reward.pointsCost}
-                    className={`w-full px-4 py-2 text-sm font-medium rounded-md ${
-                      userPoints >= reward.pointsCost 
-                        ? 'bg-primary hover:bg-primary-dark text-white' 
-                        : 'bg-gray-300 dark:bg-gray-600 text-td-sage dark:text-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    {isRedeeming ? (
-                      <LoadingSpinner size="sm" color="white" />
-                    ) : userPoints >= reward.pointsCost ? (
-                      'Redeem Reward'
-                    ) : (
-                      `Need ${(reward.pointsCost - userPoints).toLocaleString()} more points`
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+        <p className="relative mt-1 text-[15px] text-white/90">Worth GH₵{pointsToCedis(userPoints)} in airtime or data</p>
+        <div
+          className="relative mt-4 h-2 rounded-full bg-white/20 overflow-hidden"
+          role="progressbar"
+          aria-label={next.top ? 'Enough points for the biggest reward' : `Progress to GH₵${next.cedis} airtime`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(next.progress * 100)}
+        >
+          <span className="block h-full rounded-full bg-td-lime" style={{ width: `${Math.round(next.progress * 100)}%` }} />
         </div>
-        
+        <p className="relative mt-2 text-[13px] text-white/90">
+          {next.top
+            ? `You can redeem any reward, up to GH₵${next.cedis}`
+            : `${next.remaining.toLocaleString()} more points to GH₵${next.cedis} airtime`}
+        </p>
+      </section>
+
+      {/* Error message */}
+      {errorMessage && (
+        <div className={`${errorNote} px-4 py-3`} role="alert">
+          <p className="text-[15px]">{errorMessage}</p>
+        </div>
+      )}
+
+      {/* Rewards list */}
+      <section aria-labelledby="available-rewards" className={`${card} px-4 pt-3.5 pb-2`}>
+        <h2 id="available-rewards" className={sectionTitle}>Available Rewards</h2>
+
+        <ul className="mt-1">
+          {rewards.map((reward, i) => {
+            const affordable = userPoints >= reward.pointsCost;
+            return (
+              <li key={reward.id} className={`py-3.5 ${i === 0 ? '' : 'border-t border-td-border dark:border-gray-700'}`}>
+                <div className="flex items-start gap-3">
+                  {reward.image ? (
+                    <img
+                      src={reward.image}
+                      alt=""
+                      className={`w-11 h-11 rounded-xl object-cover flex-shrink-0 ${affordable ? '' : 'opacity-60'}`}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/300x200?text=Reward';
+                      }}
+                    />
+                  ) : (
+                    <span className="w-11 h-11 rounded-xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      {reward.category === 'data' ? (
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                      ) : (
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                      )}
+                    </span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-[15px] font-bold text-td-ink dark:text-gray-100 leading-snug">{reward.name}</h3>
+                      <span className="flex-shrink-0 text-[15px] font-bold text-td-forest dark:text-green-300">
+                        {reward.pointsCost.toLocaleString()}<span className="text-xs font-semibold"> pts</span>
+                      </span>
+                    </div>
+                    <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{reward.description}</p>
+                    {/* Only rewards with an end date say when they expire */}
+                    {reward.expiresAt && !Number.isNaN(new Date(reward.expiresAt).getTime()) && (
+                      <p className="text-xs text-td-sage dark:text-gray-300 mt-1">
+                        Expires: {new Date(reward.expiresAt).toLocaleDateString()}
+                      </p>
+                    )}
+
+                    {redeemSuccess && redeemSuccess.id === reward.id ? (
+                      <div className={`${infoNote} mt-2.5 px-3 py-2.5 text-sm`} role="status">
+                        <p>{redeemSuccess.message}</p>
+                        {redeemSuccess.code && <p className="font-mono font-bold mt-1">{redeemSuccess.code}</p>}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => (isMobileReward(reward) ? openRedeemDialog(reward) : handleRedeemReward(reward))}
+                        disabled={isRedeeming || !affordable}
+                        className={`mt-2.5 ${affordable ? `${primaryButton} h-10 px-5 text-[15px]` : 'inline-flex items-center h-10 px-4 rounded-full bg-td-cream dark:bg-gray-700 text-td-sage dark:text-gray-300 text-sm font-semibold cursor-not-allowed'}`}
+                      >
+                        {isRedeeming ? (
+                          <LoadingSpinner size="sm" color="white" />
+                        ) : affordable ? (
+                          'Redeem Reward'
+                        ) : (
+                          `Need ${(reward.pointsCost - userPoints).toLocaleString()} more points`
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
         {rewards.length === 0 && !isLoading && (
-          <div className="text-center py-12">
-            <p className="text-td-sage dark:text-gray-300">No rewards available at this time.</p>
-          </div>
+          <p className="text-center py-10 text-td-sage dark:text-gray-300">No rewards available at this time.</p>
         )}
-      </div>
-      
+      </section>
+
       {/* Recent Redemptions */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold text-td-ink dark:text-white mb-4">My Redemptions</h2>
-        
+      <section aria-labelledby="my-redemptions" className={`${card} px-4 pt-3.5 pb-2`}>
+        <h2 id="my-redemptions" className={sectionTitle}>My Redemptions</h2>
+
         {isRedemptionsLoading ? (
           <div className="py-8 text-center">
             <LoadingSpinner size="md" />
           </div>
         ) : recentRedemptions.length > 0 ? (
-          <div className="space-y-4">
-            {recentRedemptions.map(redemption => (
-              <div key={redemption.id} className="flex items-center p-4 bg-td-cream dark:bg-gray-700 rounded-lg">
-                {redemption.rewardImage && (
-                  <img 
-                    src={redemption.rewardImage} 
-                    alt={redemption.rewardName}
-                    className="w-16 h-16 object-cover rounded-lg mr-4"
-                  />
+          <ul className="mt-1">
+            {recentRedemptions.map((redemption, i) => (
+              <li key={redemption.id} className={`flex items-start gap-3 py-3 ${i === 0 ? '' : 'border-t border-td-border dark:border-gray-700'}`}>
+                {redemption.rewardImage ? (
+                  <img src={redemption.rewardImage} alt="" className="w-10 h-10 object-cover rounded-xl flex-shrink-0" />
+                ) : (
+                  <span className="w-10 h-10 rounded-xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="9" r="6" /><path d="M9 14l-2 7 5-3 5 3-2-7" /></svg>
+                  </span>
                 )}
-                <div className="flex-1">
-                  <h3 className="font-semibold text-td-ink dark:text-white">{redemption.rewardName}</h3>
-                  {redemption.phone ? (
-                    <p className="text-sm text-td-sage dark:text-gray-300">To {formatGhanaPhone(redemption.phone)}{redemption.network ? ` · ${redemption.network}` : ''}</p>
-                  ) : (
-                    <p className="text-sm text-td-sage dark:text-gray-300">{redemption.rewardDescription}</p>
-                  )}
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2">
-                    <span className="text-sm text-td-sage dark:text-gray-300">
-                      Redeemed on {redemption.redeemedAt}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-[15px] font-semibold text-td-ink dark:text-gray-100 leading-snug">{redemption.rewardName}</h3>
+                    <span className="flex-shrink-0 text-[15px] font-bold text-td-ink dark:text-gray-100">
+                      −{Number(redemption.pointsSpent).toLocaleString()}<span className="sr-only"> points</span>
                     </span>
-                    <div className="flex items-center whitespace-nowrap">
-                      <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                        -{redemption.pointsSpent} points
-                      </span>
-                      <span className={`ml-2 px-2 py-1 text-xs rounded-full ${(STATUS_LABELS[redemption.status] || STATUS_LABELS.pending).className}`}>
-                        {(STATUS_LABELS[redemption.status] || { text: redemption.status }).text}
-                      </span>
-                    </div>
+                  </div>
+                  {redemption.phone ? (
+                    <p className="text-[13px] text-td-sage dark:text-gray-300">To {formatGhanaPhone(redemption.phone)}{redemption.network ? ` · ${redemption.network}` : ''}</p>
+                  ) : (
+                    <p className="text-[13px] text-td-sage dark:text-gray-300">{redemption.rewardDescription}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                    <span className="text-[13px] text-td-sage dark:text-gray-300">Redeemed on {redemption.redeemedAt}</span>
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${(STATUS_LABELS[redemption.status] || STATUS_LABELS.pending).className}`}>
+                      {(STATUS_LABELS[redemption.status] || { text: redemption.status }).text}
+                    </span>
                   </div>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
           <div className="text-center py-8">
             <p className="text-td-sage dark:text-gray-300">You haven't redeemed any rewards yet.</p>
             <p className="text-td-sage dark:text-gray-300 mt-1">Redeem a reward to see it here.</p>
           </div>
         )}
-      </div>
-      
+      </section>
+
       {/* Where the points came from: listed once, in Activity */}
       <Link
         to="/activity"
-        className="flex items-center justify-between bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-td-ink dark:text-white hover:bg-td-cream dark:hover:bg-gray-700"
+        className={`${card} flex items-center justify-between px-4 py-4 text-td-ink dark:text-gray-100 hover:bg-td-cream dark:hover:bg-gray-700`}
       >
         <span>
-          <span className="block font-semibold">How you earned your points</span>
-          <span className="block text-sm text-td-sage dark:text-gray-300 mt-1">Every pickup, report, scan and redemption is in Activity</span>
+          <span className="block text-[15px] font-bold">How you earned your points</span>
+          <span className="block text-[13px] text-td-sage dark:text-gray-300 mt-0.5">Every pickup, report, scan and redemption is in Activity</span>
         </span>
         <svg className="w-5 h-5 flex-shrink-0 ml-3 text-td-forest dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </Link>
-      </div>
 
       {confirmReward && (
         <RedeemDialog
