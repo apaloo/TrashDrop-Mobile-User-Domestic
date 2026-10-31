@@ -6,6 +6,7 @@
 
 import supabase from '../utils/supabaseClient.js';
 import { deduplicatedRequests } from '../utils/requestDeduplication.js';
+import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
 
 export const userServiceOptimized = {
   /**
@@ -185,6 +186,23 @@ export const userServiceOptimized = {
         points: activity.points_earned || 0,
         _source: activity.source_type
       }));
+
+      // The view gives every report its severity's points; a report earns them
+      // once verified (utils/reportPoints), so look up the reports' status
+      const reportIds = activities.filter(a => a.type === 'dumping_report').map(a => a.id);
+      if (reportIds.length > 0) {
+        const { data: reports } = await supabase
+          .from('illegal_dumping_mobile')
+          .select('id, status, severity, created_at')
+          .in('id', reportIds);
+        const byId = new Map((reports || []).map(r => [String(r.id), r]));
+        activities.forEach(a => {
+          const report = byId.get(String(a.id));
+          if (a.type !== 'dumping_report' || !report) return;
+          a.points = reportPoints(report);
+          a.pointsPending = reportPointsPending(report);
+        });
+      }
 
       console.log(`[UserServiceOptimized] ✅ Loaded ${activities.length} activities with 1 query instead of 4`);
       return { data: activities, error: null };

@@ -20,6 +20,7 @@ import DataFreshnessIndicator from '../components/DataFreshnessIndicator.js';
 import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
 import CoverageArrivalBanner from '../components/CoverageArrivalBanner.js';
 import RewardsCard from '../components/dashboard/RewardsCard.js';
+import ActivityRow from '../components/dashboard/ActivityRow.js';
 import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
 
 // For development: expose cleanup function
@@ -72,7 +73,7 @@ const ActivityListSkeleton = () => (
     {[1, 2, 3].map(i => (
       <div
         key={i}
-        className="bg-td-cream dark:bg-gray-700 border border-td-border dark:border-gray-600 rounded-lg p-4 mb-3"
+        className="py-2.5 border-t border-td-border dark:border-gray-700 first:border-t-0"
         aria-hidden="true"
       >
         <ActivityItemSkeleton />
@@ -1143,7 +1144,7 @@ const Dashboard = () => {
   // Memoize non-critical UI elements to avoid unnecessary re-renders
   const ActivitySection = useMemo(() => {
     return (
-      <div className="space-y-3">
+      <div>
           {!activitiesLoaded && (!Array.isArray(recentActivities) || recentActivities.length === 0) ? (
             <ActivityListSkeleton />
           ) : !recentActivities || !Array.isArray(recentActivities) || recentActivities.length === 0 ? (
@@ -1153,64 +1154,13 @@ const Dashboard = () => {
           ) : (
             (() => {
               console.log(`[Dashboard] 🎨 RENDERING ${recentActivities.length} activities from all sources`);
-              return Array.isArray(recentActivities) && recentActivities.map((activity, index) => (
-              <div 
-                key={activity.id || `activity-${index}`}
-                className="bg-td-cream dark:bg-gray-700 border border-td-border dark:border-gray-600 rounded-lg p-4 mb-3 flex items-center"
-                loading={index > 2 ? "lazy" : "eager"}
-              >
-                <div className="flex-shrink-0 mr-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center text-white">
-                    {(activity.type === 'pickup' || activity.type === 'pickup_request') && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" />
-                      </svg>
-                    )}
-                    {(activity.type === 'report' || activity.type === 'dumping_report') && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    )}
-                    {activity.type === 'digital_bin' && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm1 3v8a2 2 0 002 2h8a2 2 0 002-2V7H4zm3 2a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {(activity.type === 'batch' || activity.type === 'qr_scan') && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                      </svg>
-                    )}
-                    {activity.type === 'reward_redemption' && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                    {!['pickup', 'pickup_request', 'report', 'dumping_report', 'digital_bin', 'batch', 'qr_scan', 'reward_redemption'].includes(activity.type) && (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-grow">
-                  <p className="text-sm font-medium text-td-ink dark:text-gray-100">{activity.description || activity.message}</p>
-                  <p className="text-xs text-td-sage dark:text-gray-400">
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </p>
-                </div>
-                {activity.pointsPending && (
-                  <div className="flex-shrink-0 ml-2 max-w-[6rem] text-right text-xs text-td-sage dark:text-gray-300">
-                    Points when verified
-                  </div>
-                )}
-                {activity.points > 0 && (
-                  <div className="flex-shrink-0 ml-2 bg-green-900 bg-opacity-50 px-2 py-1 rounded text-green-300 text-xs font-semibold">
-                    +{activity.points} pts
-                  </div>
-                )}
-              </div>
-            ));
+              return Array.isArray(recentActivities) && (
+                <ul>
+                  {recentActivities.map((activity, index) => (
+                    <ActivityRow key={activity.id || `activity-${index}`} activity={activity} first={index === 0} />
+                  ))}
+                </ul>
+              );
             })()
           )}
       </div>
@@ -1450,9 +1400,9 @@ const Dashboard = () => {
 
         {/* Recent Activity - shown when activity tab selected or no active pickup */}
         {dashboardTab === 'activity' && (
-        <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Recent Activity</h3>
+        <section aria-labelledby="recent-activity-heading" className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-4 pt-1.5 pb-2">
+          <div className="flex items-center justify-between min-h-[3rem]">
+            <h2 id="recent-activity-heading" className="text-td-ink dark:text-gray-100 text-[17px] font-bold">Recent Activity</h2>
             <div className="flex items-center gap-3">
               {isRefreshingActivities && (
                 <div className="flex items-center text-td-sage text-sm">
@@ -1469,7 +1419,7 @@ const Dashboard = () => {
             </div>
           </div>
           {ActivitySection}
-        </div>
+        </section>
         )}
 
         {/* Active Pickup Card - shown when pickup tab selected */}
