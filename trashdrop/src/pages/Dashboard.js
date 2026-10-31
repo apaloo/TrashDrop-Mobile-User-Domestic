@@ -21,6 +21,7 @@ import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
 import CoverageArrivalBanner from '../components/CoverageArrivalBanner.js';
 import RewardsCard from '../components/dashboard/RewardsCard.js';
 import ActivityRow from '../components/dashboard/ActivityRow.js';
+import LivePickupCard from '../components/dashboard/LivePickupCard.js';
 import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
 
 // For development: expose cleanup function
@@ -116,7 +117,6 @@ const Dashboard = () => {
   // Latest active pickups for realtime callbacks, which outlive a render
   const activePickupsRef = useRef(activePickups);
   activePickupsRef.current = activePickups;
-  const [dashboardTab, setDashboardTab] = useState('activity'); // 'activity' | 'pickup'
   const [isLoading, setIsLoading] = useState(false); // Start with false to improve LCP
   const [isRefreshingActivities, setIsRefreshingActivities] = useState(false); // Track activity refresh state
   const [activitiesLoaded, setActivitiesLoaded] = useState(false); // First activity fetch has settled (success or failure)
@@ -1167,16 +1167,6 @@ const Dashboard = () => {
     );
   }, [recentActivities, isRefreshingActivities, activitiesLoaded]); // Re-render when activities change, refresh state changes, or the first fetch settles
 
-  // Auto-switch tab based on active pickup state
-  useEffect(() => {
-    const collectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
-    if (collectorAssigned) {
-      setDashboardTab('pickup');
-    } else {
-      setDashboardTab('activity');
-    }
-  }, [activePickups]);
-
   // Calculate hasCollectorAssigned for rendering
   const hasCollectorAssigned = activePickups?.length > 0 && activePickups[0]?.status !== 'pending';
 
@@ -1240,7 +1230,11 @@ const Dashboard = () => {
           offsets): the Rewards card, the bin pickup button, then the totals.
           The top padding leaves room for the floating "Live" indicator. */}
       <div className="max-w-3xl mx-auto px-2 pt-[3.25rem] space-y-4">
-        <RewardsCard userId={user?.id} fallbackPoints={stats.points} />
+        {/* Once a collector has the pickup, it leads the page and the rewards shrink to one row */}
+        {hasCollectorAssigned && (
+          <LivePickupCard pickup={activePickups[0]} unreadNotifications={unreadNotifications} />
+        )}
+        <RewardsCard userId={user?.id} fallbackPoints={stats.points} compact={hasCollectorAssigned} />
 
         <button
           type="button"
@@ -1255,12 +1249,20 @@ const Dashboard = () => {
 
         <section aria-labelledby="impact-heading">
           <h2 id="impact-heading" className="text-[17px] font-bold text-td-ink dark:text-gray-100 mb-2.5">Your impact</h2>
-          <div className="grid grid-cols-3 gap-2.5">
+          {/* Batches and bags share the first tile, side by side, so it is a little wider */}
+          <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-2.5">
             <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
-              <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
-              <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">
-                bags · {stats.batches || 0} {(stats.batches || 0) === 1 ? 'batch' : 'batches'}
-              </p>
+              {/* The grid sits inside: .dashboard-card is styled display:block elsewhere */}
+              <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.batches || 0}</p>
+                <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{(stats.batches || 0) === 1 ? 'batch' : 'batches'}</p>
+              </div>
+              <div>
+                <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
+                <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{(stats.totalBags || 0) === 1 ? 'bag' : 'bags'}</p>
+              </div>
+              </div>
             </div>
             <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
               <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.pickups || 0}</p>
@@ -1330,38 +1332,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Segmented Control - Only visible when active pickup with collector */}
-      {hasCollectorAssigned && (
-        <div className="max-w-3xl mx-auto px-2 pt-6">
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1 flex">
-            <button
-              onClick={() => setDashboardTab('activity')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all duration-200 ${
-                dashboardTab === 'activity'
-                  ? 'bg-white dark:bg-gray-700 text-td-ink dark:text-gray-100 shadow-sm'
-                  : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
-              }`}
-            >
-              Recent Activity
-            </button>
-            <button
-              onClick={() => setDashboardTab('pickup')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
-                dashboardTab === 'pickup'
-                  ? 'bg-white dark:bg-gray-700 text-td-ink dark:text-gray-100 shadow-sm'
-                  : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
-              }`}
-            >
-              Active Pickup
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Scrollable Content - Tab-based: Recent Activity or Active Pickup */}
       <div className="max-w-3xl mx-auto px-2 pt-6 pb-24 space-y-6">
         {/* Initial load gave up after retries - plain language plus a way out,
@@ -1398,8 +1368,7 @@ const Dashboard = () => {
         {/* "We've arrived" for places the user waitlisted from the location step */}
         <CoverageArrivalBanner />
 
-        {/* Recent Activity - shown when activity tab selected or no active pickup */}
-        {dashboardTab === 'activity' && (
+        {/* Recent Activity */}
         <section aria-labelledby="recent-activity-heading" className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-4 pt-1.5 pb-2">
           <div className="flex items-center justify-between min-h-[3rem]">
             <h2 id="recent-activity-heading" className="text-td-ink dark:text-gray-100 text-[17px] font-bold">Recent Activity</h2>
@@ -1420,150 +1389,7 @@ const Dashboard = () => {
           </div>
           {ActivitySection}
         </section>
-        )}
 
-        {/* Active Pickup Card - shown when pickup tab selected */}
-        {dashboardTab === 'pickup' && activePickups && activePickups.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-lg overflow-hidden mt-6">
-            {/* Card Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-td-cream dark:bg-gray-700/60">
-              <h3 className="text-td-ink dark:text-gray-100 text-base font-bold">
-                {activePickups[0].is_digital_bin ? 'Active Digital Bin' : 'Active Pickup'}
-              </h3>
-              <span 
-                className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
-                style={{ 
-                  backgroundColor: statusService.getStatusConfig(activePickups[0].status).color + '20', 
-                  color: statusService.getStatusConfig(activePickups[0].status).color 
-                }}
-              >
-                {statusService.getStatusIcon(activePickups[0].status)}
-                {statusService.getStatusDisplay(activePickups[0].status)}
-              </span>
-            </div>
-
-            {/* Card Body */}
-            <div className="px-5 py-4 space-y-3">
-              {/* Row 1: Collector + Bags/Points */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-td-tonal dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-td-forest dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-td-sage dark:text-gray-400">Collector</p>
-                    <p className="text-sm font-semibold text-td-ink dark:text-gray-100 truncate">
-                      {activePickups[0].collector_name || (activePickups[0].collector ? `${activePickups[0].collector.first_name || ''} ${activePickups[0].collector.last_name || ''}`.trim() : null) || 'Waiting...'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                  <div className="text-center px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                    <p className="text-base font-bold text-td-ink dark:text-gray-100">{activePickups[0].estimated_volume || activePickups[0].bag_count || activePickups[0].number_of_bags || 0}</p>
-                    <p className="text-[10px] text-td-sage dark:text-gray-400 uppercase tracking-wide">Bags</p>
-                  </div>
-                  <div className="text-center px-3 py-1 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                    <p className="text-base font-bold text-green-600 dark:text-green-400">+{activePickups[0].points_earned || activePickups[0].points || 0}</p>
-                    <p className="text-[10px] text-green-600 dark:text-green-400 uppercase tracking-wide">Pts</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2: Location */}
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-td-sage dark:text-gray-400">Pickup Location</p>
-                  <p className="text-sm font-medium text-td-ink dark:text-gray-100 line-clamp-2">
-                    {activePickups[0].location?.address || activePickups[0].location?.location_name || activePickups[0].address || 'N/A'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Digital bin frequency badge */}
-              {activePickups[0].is_digital_bin && activePickups[0].frequency && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs bg-td-tonal dark:bg-blue-900 text-td-forest dark:text-blue-300 px-2.5 py-1 rounded-full font-medium">
-                    {activePickups[0].frequency}
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="px-5 pb-4">
-              {/* Action Buttons - Using unified status service */}
-              {(() => {
-                const availableActions = statusService.getAvailableActions(activePickups[0].status);
-                const isTrackingAvailable = statusService.isTrackingAvailable(activePickups[0].status);
-                
-                if (isTrackingAvailable) {
-                  return (
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Track Collector Button */}
-                      <Link 
-                        to={`/collector-tracking?pickupId=${activePickups[0].id}`}
-                        className="flex items-center justify-center bg-green-600 hover:bg-green-700 rounded-lg p-3 transition-colors cursor-pointer shadow-md"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span className="text-white font-medium text-sm">Track Collector</span>
-                        </div>
-                      </Link>
-
-                      {/* Alerts/Notifications Button */}
-                      <Link 
-                        to="/notifications" 
-                        className="flex items-center justify-center bg-td-tonal dark:bg-blue-900/30 hover:bg-green-100 dark:hover:bg-blue-900/50 border border-td-border dark:border-blue-700 rounded-lg p-3 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center space-x-2 relative">
-                          <svg className="w-5 h-5 text-td-forest dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                          </svg>
-                          <span className="text-td-forest dark:text-blue-300 font-medium text-sm">Alerts</span>
-                          {unreadNotifications > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                              {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="flex justify-center">
-                      <Link 
-                        to="/notifications" 
-                        className="flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 rounded-lg p-3 transition-colors cursor-pointer w-full"
-                      >
-                        <div className="flex items-center space-x-2 relative">
-                          <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                          </svg>
-                          <span className="text-purple-700 dark:text-purple-300 font-medium">Waiting for Collector... Check Alerts</span>
-                          {unreadNotifications > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                              {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-          </div>
-        )}
       </div>
       
       {/* Navigation Choice Modal */}

@@ -12,7 +12,7 @@ import { pointsToCedis, pointsLevel, nextReward } from '../../utils/rewardsMath.
  * less redemptions), so the two pages always agree. Until it loads, the
  * dashboard's own total is shown (fallbackPoints).
  */
-const RewardsCard = ({ userId, fallbackPoints = 0 }) => {
+const RewardsCard = ({ userId, fallbackPoints = 0, compact = false }) => {
   const [points, setPoints] = useState(null);
 
   useEffect(() => {
@@ -26,6 +26,26 @@ const RewardsCard = ({ userId, fallbackPoints = 0 }) => {
 
   const balance = Math.max(0, points ?? fallbackPoints ?? 0);
   const next = nextReward(balance);
+
+  // During a pickup the pickup card leads, so the rewards shrink to one row
+  if (compact) {
+    return (
+      <Link
+        to="/rewards"
+        aria-label={`Rewards: ${balance.toLocaleString()} points, level ${pointsLevel(balance)}. Redeem`}
+        className="flex items-center gap-3.5 rounded-2xl bg-td-forest-dk text-white px-4 py-3.5 hover:brightness-110"
+      >
+        <span className="w-11 h-11 rounded-xl bg-td-lime flex items-center justify-center flex-shrink-0" aria-hidden="true">
+          <svg className="w-5 h-5 text-td-ink" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6" /><path d="M9 14l-2 7 5-3 5 3-2-7" /></svg>
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-xl font-bold">{balance.toLocaleString()} points</span>
+          <span className="block text-[13px] text-td-tonal">Level {pointsLevel(balance)} · GH₵{pointsToCedis(balance)} to redeem</span>
+        </span>
+        <svg className="w-5 h-5 text-td-lime flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </Link>
+    );
+  }
 
   return (
     <section
