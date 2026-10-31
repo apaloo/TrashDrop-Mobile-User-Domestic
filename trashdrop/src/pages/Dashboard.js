@@ -19,6 +19,8 @@ import seamlessDashboardService from '../services/seamlessDashboardService.js';
 import DataFreshnessIndicator from '../components/DataFreshnessIndicator.js';
 import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
 import CoverageArrivalBanner from '../components/CoverageArrivalBanner.js';
+import RewardsCard from '../components/dashboard/RewardsCard.js';
+import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
 
 // For development: expose cleanup function
 if (process.env.NODE_ENV === 'development') {
@@ -296,11 +298,8 @@ const Dashboard = () => {
       // Process dumping reports
       if (dumpingResult.status === 'fulfilled' && dumpingResult.value?.data) {
         const reports = dumpingResult.value.data.map(report => {
-          // Calculate points based on severity: high=20, medium=15, low=10
+          // high=20, medium=15, low=10, once the report is verified (utils/reportPoints)
           const severity = report.severity || 'medium';
-          let points = 15; // default for medium
-          if (severity === 'high') points = 20;
-          else if (severity === 'low') points = 10;
           
           return {
             id: report.id,
@@ -308,7 +307,8 @@ const Dashboard = () => {
             description: `Reported ${report.waste_type || 'illegal dumping'} (${severity} severity)`,
             timestamp: report.created_at,
             related_id: report.id,
-            points: points,
+            points: reportPoints(report),
+            pointsPending: reportPointsPending(report),
             _source: 'illegal_dumping_mobile'
           };
         });
@@ -1199,6 +1199,11 @@ const Dashboard = () => {
                     {new Date(activity.timestamp).toLocaleString()}
                   </p>
                 </div>
+                {activity.pointsPending && (
+                  <div className="flex-shrink-0 ml-2 max-w-[6rem] text-right text-xs text-td-sage dark:text-gray-300">
+                    Points when verified
+                  </div>
+                )}
                 {activity.points > 0 && (
                   <div className="flex-shrink-0 ml-2 bg-green-900 bg-opacity-50 px-2 py-1 rounded text-green-300 text-xs font-semibold">
                     +{activity.points} pts
@@ -1281,158 +1286,47 @@ const Dashboard = () => {
       )}
       
       <DashboardOptimizer />
-      {/* Positions are in rem (16px each), so they grow with Profile > Preferences > Larger Text */}
-      {/* Sticky Stats Cards - Horizontal scroll only */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 pt-4 pb-2" style={{position: "fixed", top: "4.0625rem", width: "100%"}}>
-        {/* Scrolls sideways on phones; focusable so it scrolls from the keyboard too */}
-        <div className="overflow-x-auto scrollbar-hide px-4" tabIndex={0} role="region" aria-label="Your totals">
-          <div className="flex space-x-4 pb-2" style={{ width: 'fit-content' }}>
-              
-              {/* Batches & Bags Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[17.5rem] h-32 relative overflow-hidden" fetchpriority="high">
-                {/* Decorative Background Icon */}
-                <div className="absolute top-2 left-2 opacity-10">
-                  <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12,2A3,3 0 0,1 15,5V6H20A1,1 0 0,1 21,7V19A3,3 0 0,1 18,22H6A3,3 0 0,1 3,19V7A1,1 0 0,1 4,6H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V6H13V5A1,1 0 0,0 12,4M5,8V19A1,1 0 0,0 6,20H18A1,1 0 0,0 19,19V8H5Z" />
-                  </svg>
-                </div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12,2A3,3 0 0,1 15,5V6H20A1,1 0 0,1 21,7V19A3,3 0 0,1 18,22H6A3,3 0 0,1 3,19V7A1,1 0 0,1 4,6H9V5A3,3 0 0,1 12,2M12,4A1,1 0 0,0 11,5V6H13V5A1,1 0 0,0 12,4M5,8V19A1,1 0 0,0 6,20H18A1,1 0 0,0 19,19V8H5Z" />
-                      </svg>
-                      <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Batches & Bags</h3>
-                    </div>
-                    <div className="bg-td-tonal text-td-forest dark:bg-green-900/30 dark:text-green-300 px-3 py-1 rounded-full text-sm font-bold">
-                      Lv {Math.floor((stats.points || 0) / 100) + 1}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-around">
-                    <div className="text-center">
-                      <p className="text-td-sage dark:text-gray-400 text-xs mb-1">Batches</p>
-                      <p className={`text-td-ink dark:text-gray-100 text-3xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
-                        {stats.batches || 0}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-td-sage dark:text-gray-400 text-xs mb-1">Bags</p>
-                      <p className={`text-td-ink dark:text-gray-100 text-3xl font-bold ${bagsPulse ? 'animate-pulse' : ''}`}>
-                        {stats.totalBags || 0}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full bg-td-tonal dark:bg-gray-700 rounded-full h-2 mb-2">
-                    <div 
-                      className="bg-td-forest h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${Math.min(((stats.points || 0) % 100) / 100 * 100, 100)}%` }}
-                    ></div>
-                  </div>
-                  
-                  <p className="text-td-sage dark:text-gray-400 text-sm text-center">
-                    {100 - ((stats.points || 0) % 100)} more to level up
-                  </p>
-                </div>
-              </div>
-              
-              {/* Pickups Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[17.5rem] h-32 relative overflow-hidden" fetchpriority="high">
-                {/* Decorative Background Icon */}
-                <div className="absolute top-2 left-2 opacity-10">
-                  <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
-                  </svg>
-                </div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A1,1 0 0,0 4,8V19A3,3 0 0,0 7,22H17A3,3 0 0,0 20,19V8A1,1 0 0,0 19,7M18,19A1,1 0 0,1 17,20H7A1,1 0 0,1 6,19V9H8V10A1,1 0 0,0 9,11H15A1,1 0 0,0 16,10V9H18V19Z" />
-                      </svg>
-                      <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Pickups</h3>
-                    </div>
-                    <div className="bg-td-tonal text-td-forest dark:bg-green-900/30 dark:text-green-300 px-3 py-1 rounded-full text-sm font-bold">
-                      Lv {Math.floor((stats.pickups || 0) / 5) + 1}
-                    </div>
-                  </div>
-                  
-                  <div className="text-center mb-4">
-                    <p className={`text-td-ink dark:text-gray-100 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
-                      {stats.pickups || 0}
-                    </p>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full bg-td-tonal dark:bg-gray-700 rounded-full h-2 mb-2">
-                    <div 
-                      className="bg-td-forest h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${Math.min(((stats.pickups || 0) % 5) / 5 * 100, 100)}%` }}
-                    ></div>
-                  </div>
-                  
-                  <p className="text-td-sage dark:text-gray-400 text-sm text-center">
-                    {5 - ((stats.pickups || 0) % 5)} more to level up
-                  </p>
-                </div>
-              </div>
+      {/* Top of the dashboard, in the page flow (it used to be pinned at fixed
+          offsets): the Rewards card, the bin pickup button, then the totals.
+          The top padding leaves room for the floating "Live" indicator. */}
+      <div className="max-w-3xl mx-auto px-2 pt-[3.25rem] space-y-4">
+        <RewardsCard userId={user?.id} fallbackPoints={stats.points} />
 
-              {/* Reports Card */}
-              <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl shadow-sm p-6 min-w-[17.5rem] h-32 relative overflow-hidden" fetchpriority="high">
-                {/* Decorative Background Icon */}
-                <div className="absolute top-2 left-2 opacity-10">
-                  <svg className="w-16 h-16 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                  </svg>
-                </div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-6 h-6 text-td-forest dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                      </svg>
-                      <h3 className="text-td-ink dark:text-gray-100 text-lg font-bold">Reports</h3>
-                    </div>
-                    <div className="bg-td-tonal text-td-forest dark:bg-green-900/30 dark:text-green-300 px-3 py-1 rounded-full text-sm font-bold">
-                      Lv {Math.floor((stats.reports || 0) / 3) + 1}
-                    </div>
-                  </div>
-                  
-                  <div className="text-center mb-4">
-                    <p className={`text-td-ink dark:text-gray-100 text-4xl font-bold ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>
-                      {stats.reports || 0}
-                    </p>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full bg-td-tonal dark:bg-gray-700 rounded-full h-2 mb-2">
-                    <div 
-                      className="bg-td-orange h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${Math.min(((stats.reports || 0) % 3) / 3 * 100, 100)}%` }}
-                    ></div>
-                  </div>
-                  
-                  <p className="text-td-sage dark:text-gray-400 text-sm text-center">
-                    {3 - ((stats.reports || 0) % 3)} more to level up
-                  </p>
-                </div>
-              </div>
-              
+        <button
+          type="button"
+          onClick={() => navigate('/digital-bin')}
+          className="w-full min-h-[3.5rem] bg-green-600 hover:bg-green-700 text-white text-[17px] font-bold py-4 px-6 rounded-2xl shadow-sm transition-colors duration-200 flex items-center justify-center gap-2.5"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span>Request Bin Pickup (No Bag)</span>
+        </button>
+
+        <section aria-labelledby="impact-heading">
+          <h2 id="impact-heading" className="text-[17px] font-bold text-td-ink dark:text-gray-100 mb-2.5">Your impact</h2>
+          <div className="grid grid-cols-3 gap-2.5">
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
+              <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
+              <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">
+                bags · {stats.batches || 0} {(stats.batches || 0) === 1 ? 'batch' : 'batches'}
+              </p>
+            </div>
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
+              <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.pickups || 0}</p>
+              <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{(stats.pickups || 0) === 1 ? 'pickup' : 'pickups'}</p>
+            </div>
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3.5 py-3">
+              <p className={`text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.reports || 0}</p>
+              <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{(stats.reports || 0) === 1 ? 'report' : 'reports'}</p>
             </div>
           </div>
-        </div>
+        </section>
+      </div>
 
       {/* Onboarding Progress Banner - Show when user needs guidance */}
       {!showOnboarding && nextAction && userOnboardingState?.state !== 'READY_FOR_PICKUP' && (
-        <div className="mx-4 mt-4 mb-2 bg-td-tonal dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl p-4">
+        <div className="mx-2 sm:mx-auto sm:max-w-3xl mt-4 mb-2 bg-td-tonal dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-td-ink dark:text-gray-100 mb-1">
@@ -1486,36 +1380,9 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Sticky Action Buttons - Sticks below stats cards */}
-      <div className="sticky top-[9.5rem] z-10 bg-white dark:bg-gray-900 px-4 pb-4" style={{position: "fixed", top: "14.375rem", width: "96%"}}>
-        <div className="grid gap-4">
-            {/* Digital Bin Button */}
-            <button 
-              onClick={() => navigate('/digital-bin')}
-              className="w-full bg-green-600 dark:bg-green-600 border-2 border-transparent hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center space-x-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span>Request Bin Pickup (No Bag)</span>
-            </button>
-            
-            {/* View Rewards Button */}
-            <button 
-              onClick={() => navigate('/rewards')}
-              className="w-full bg-white dark:bg-gray-800 border-2 border-td-orange hover:bg-orange-50 dark:hover:bg-gray-700 text-td-orange-text dark:text-td-orange font-semibold py-4 px-6 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center space-x-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-              <span>View Rewards</span>
-            </button>
-          </div>
-        </div>
-
       {/* Segmented Control - Only visible when active pickup with collector */}
       {hasCollectorAssigned && (
-        <div className="px-4 pb-3" style={{position: "fixed", top: "calc(23.75rem + var(--td-larger-text-space, 0px))", width: "96%", zIndex: 10, backgroundColor: "inherit"}}>
+        <div className="max-w-3xl mx-auto px-2 pt-6">
           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1 flex">
             <button
               onClick={() => setDashboardTab('activity')}
@@ -1546,7 +1413,7 @@ const Dashboard = () => {
       )}
 
       {/* Scrollable Content - Tab-based: Recent Activity or Active Pickup */}
-      <div className="px-4 pb-4 space-y-6" style={{marginTop: hasCollectorAssigned ? "calc(23.4375rem + var(--td-larger-text-space, 0px))" : "calc(20.3125rem + var(--td-larger-text-space, 0px))" }}>
+      <div className="max-w-3xl mx-auto px-2 pt-6 pb-24 space-y-6">
         {/* Initial load gave up after retries - plain language plus a way out,
             never a raw error dump */}
         {loadFailed && (
