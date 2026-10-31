@@ -227,7 +227,7 @@ const NavBar = () => {
                   <button
                     onClick={handleSignOut}
                     disabled={isSigningOut}
-                    className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center min-h-[44px]"
+                    className="w-full text-left px-4 py-3 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center min-h-[44px]"
                   >
                     {isSigningOut ? (
                       <>

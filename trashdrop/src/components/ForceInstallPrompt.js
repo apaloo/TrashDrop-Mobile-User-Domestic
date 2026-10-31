@@ -116,9 +116,7 @@ const ForceInstallPrompt = () => {
         {/* Header with app icon */}
         <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 text-center">
           <div className="w-20 h-20 bg-white rounded-2xl shadow-lg mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-12 h-12 text-green-500" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z"/>
-            </svg>
+            <img src="/logo.svg" alt="TrashDrop logo" className="w-14 h-14 object-contain" />
           </div>
           <h2 className="text-2xl font-bold text-white">Install TrashDrop</h2>
           <p className="text-green-100 mt-1">Get the best experience</p>
