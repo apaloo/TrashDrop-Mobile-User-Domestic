@@ -7,10 +7,26 @@ import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
+import OptionTile from '../components/ui/OptionTile.js';
+import PageHeader from '../components/ui/PageHeader.js';
+import { card, errorNote, infoNote, primaryButton, secondaryButton, sectionTitle, warningNote } from '../components/ui/styles.js';
 import appConfig from '../utils/app-config.js';
 import GeolocationService from '../utils/geolocationService.js';
 import { subscribeToStatsUpdates } from '../utils/realtime.js';
 import { userServiceOptimized } from '../services/userServiceOptimized.js';
+
+// Choices on the form
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Low', icon: '🐢', description: 'Flexible timing' },
+  { value: 'normal', label: 'Normal', icon: '📦', description: 'Standard pickup' },
+  { value: 'urgent', label: 'Urgent', icon: '⚡', description: 'Priority service' },
+];
+const WASTE_OPTIONS = [
+  { value: 'general', label: 'General', icon: '🗑️', description: 'Mixed waste' },
+  { value: 'recycling', label: 'Recycling', icon: '♻️', description: 'Paper, cans' },
+  { value: 'plastic', label: 'Plastic', icon: '🥤', description: 'Bottles, bags' },
+  { value: 'organic', label: 'Organic', icon: '🍂', description: 'Food, garden' },
+];
 
 // Component to handle map view updates when position changes
 const MapViewController = ({ position }) => {
@@ -609,396 +625,312 @@ const PickupRequest = () => {
   // If submission was successful, show success message
   if (success) {
     return (
-      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900 mb-4">
-            <svg className="w-8 h-8 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-td-ink dark:text-white mb-2">Pickup Request Submitted!</h2>
-          <p className="text-td-sage dark:text-gray-300 mb-4">
+      <div className="max-w-3xl mx-auto px-2 pt-6 pb-24">
+        <section className={`${card} px-5 py-6 text-center`} role="status">
+          <span className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 mb-4" aria-hidden="true">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          </span>
+          <h1 className="text-[24px] leading-tight font-bold text-td-ink dark:text-gray-100 mb-2">Pickup Request Submitted!</h1>
+          <p className="text-[15px] text-td-sage dark:text-gray-300 mb-5">
             Your request has been received. We'll notify you when the pickup is scheduled.
           </p>
-          <div className="bg-td-cream dark:bg-gray-700 p-4 rounded-md mb-6">
-            <p className="text-sm text-td-sage dark:text-gray-400">
-              Location: {formData.savedLocationId ? savedLocations.find(loc => loc.id === formData.savedLocationId)?.name : 'Custom Location'}
-              <br />
-              Number of Bags: {formData.numberOfBags}
-              <br />
-              Priority: {formData.priority}
-              <br />
-              Waste Type: {formData.wasteType === 'general' ? 'General Waste' : 
-                        formData.wasteType === 'recycling' ? 'Recycling' : 
-                        formData.wasteType === 'plastic' ? 'Plastic' : 'Organic Waste'}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors"
-          >
+          <dl className="bg-td-cream dark:bg-gray-700/60 rounded-2xl px-4 py-3 mb-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-left text-[15px]">
+            <dt className="text-td-sage dark:text-gray-300">Location</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold">{formData.savedLocationId ? savedLocations.find(loc => loc.id === formData.savedLocationId)?.name : 'Custom Location'}</dd>
+            <dt className="text-td-sage dark:text-gray-300">Number of Bags</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold">{formData.numberOfBags}</dd>
+            <dt className="text-td-sage dark:text-gray-300">Priority</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold capitalize">{formData.priority}</dd>
+            <dt className="text-td-sage dark:text-gray-300">Waste Type</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold">
+              {formData.wasteType === 'general' ? 'General Waste' :
+                formData.wasteType === 'recycling' ? 'Recycling' :
+                formData.wasteType === 'plastic' ? 'Plastic' : 'Organic Waste'}
+            </dd>
+          </dl>
+          <button onClick={() => navigate('/dashboard')} className={`${primaryButton} w-full`}>
             Return to Dashboard
           </button>
-        </div>
+        </section>
       </div>
     );
   }
 
+  const fieldClass = 'mt-1.5 block w-full h-12 px-3.5 text-[15px] bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-td-ink dark:text-gray-100 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30 disabled:bg-td-cream disabled:text-td-sage dark:disabled:bg-gray-800';
+
   return (
-    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-20 md:mb-0 pt-2" style={{marginTop: '80px'}}> {/* Reduced padding-top to 0.5rem */}
-      {/* Fixed Header (positioned below navbar) */}
-      <div className="p-4 bg-white dark:bg-gray-800 fixed top-16 left-0 right-0 z-40 shadow-md max-w-2xl mx-auto rounded-t-lg">
-        <h1 className="text-2xl font-bold text-td-ink dark:text-white text-center">
-          Request Pickup
-        </h1>
-      </div>
-      
-      <div className="p-6 pt-0"> {/* Adjusted padding-top to 0 since we have the fixed header now */}
-        
-        {/* Display bag availability information */}
-        <div className="mb-4">
-          <p className="text-sm text-td-sage dark:text-gray-300">
-            You have <span className="font-bold">{availableBags}</span> bag(s) available for pickup.
-          </p>
-          {requestedBags > 0 && (
-            <p className="text-xs text-td-sage dark:text-gray-400 mt-1">
-              ({userStats.totalBags} total bags - {requestedBags} already requested = {availableBags} available)
-            </p>
-          )}
-        </div>
-        
-        {insufficientBags && (
-          <div className="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-md text-yellow-700 dark:text-yellow-200 mb-4">
-            <p>You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.</p>
-            <div className="mt-3 flex space-x-4">
-              <button 
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                onClick={() => setShowPurchaseModal(true)}
-              >
-                Purchase Bags
-              </button>
-              <button 
-                className="bg-white dark:bg-gray-800 text-td-forest dark:text-green-300 border border-td-forest dark:border-green-300 px-4 py-2 rounded-md hover:bg-td-tonal dark:hover:bg-gray-700 transition-colors"
-                onClick={() => navigate('/digital-bin')}
-              >
-                Request Bin Pickup
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {/* Success path returns earlier above. Always show helper box. */}
-        <div>
-          <div className="bg-td-tonal border border-td-border rounded-lg p-4 mb-6">
-            <div className="flex items-center text-td-forest">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+    <div className="max-w-3xl mx-auto px-2 pb-24">
+      <PageHeader
+        title="Request Pickup"
+        subtitle="A collector picks up your full TrashDrop bags from your door."
+      />
+
+      <div className="space-y-5 mt-4">
+        {/* Bags available for pickup */}
+        <section className={`${card} px-4 py-4`} aria-label="Bags available">
+          <div className="flex items-center gap-3">
+            <span className="w-11 h-11 rounded-xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M6 7h12l-1 13H7L6 7z" /><path d="M9 7V5a3 3 0 016 0v2" />
               </svg>
-              <span className="font-medium">Important:</span>
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] text-td-ink dark:text-gray-100">
+                You have <span className="font-bold">{availableBags}</span> bag(s) available for pickup.
+              </p>
+              {requestedBags > 0 && (
+                <p className="text-xs text-td-sage dark:text-gray-300 mt-0.5">
+                  ({userStats.totalBags} total bags - {requestedBags} already requested = {availableBags} available)
+                </p>
+              )}
             </div>
-            <p className="ml-7 text-td-forest">Select your pickup location by clicking on the map or choosing from your saved locations.</p>
           </div>
-        </div>
-        
+
+          {insufficientBags && (
+            <div className={`${warningNote} px-4 py-3 mt-4`}>
+              <p className="text-sm">You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.</p>
+              <div className="mt-3 grid grid-cols-1 min-[480px]:grid-cols-2 gap-2.5">
+                <button className={`${primaryButton} h-11 px-4 text-[15px] whitespace-nowrap`} onClick={() => setShowPurchaseModal(true)}>
+                  Purchase Bags
+                </button>
+                <button className={`${secondaryButton} h-11 px-4 whitespace-nowrap bg-white dark:bg-gray-800`} onClick={() => navigate('/digital-bin')}>
+                  Request Bin Pickup
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
         {error && (
-          <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded relative mb-4" role="alert">
-            <span className="block sm:inline">{error}</span>
+          <div className={`${errorNote} px-4 py-3`} role="alert">
+            <span className="block text-[15px]">{error}</span>
           </div>
         )}
-        
+
         <Formik
           initialValues={formData}
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
         >
           {({ values, setFieldValue, isValid, dirty, errors, touched }) => (
-            <Form className="space-y-6">
+            <Form className="space-y-5">
               {/* Pickup Location Section */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-                <div className="p-4">
-                  <h2 className="text-xl font-medium text-td-ink dark:text-white mb-4">Pickup Location</h2>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="savedLocationId" className="block text-sm font-medium text-td-ink dark:text-gray-300">
-                      Select from Saved Locations <span className="text-red-600">*</span>
-                    </label>
-                    <Field
-                      as="select"
-                      id="savedLocationId"
-                      name="savedLocationId"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-td-border-strong dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
-                      onChange={(e) => {
-                        const selectedId = e.target.value;
-                        setFieldValue('savedLocationId', selectedId);
-                        
-                        // Find the selected location to get its coordinates
-                        const selectedLocation = savedLocations.find(loc => loc.id === selectedId);
-                        
-                        if (selectedLocation && selectedLocation.latitude && selectedLocation.longitude) {
-                          console.log('[PickupRequest] Dropdown selected location:', selectedLocation);
-                          
-                          // CRITICAL: Update Formik's location values (these are used in form submission)
-                          setFieldValue('location', {
+              <section className={`${card} px-4 py-4`} aria-labelledby="pickup-location-heading">
+                <h2 id="pickup-location-heading" className={sectionTitle}>Pickup Location</h2>
+                <p className="text-sm text-td-sage dark:text-gray-300 mt-1 mb-3">
+                  Select your pickup location by clicking on the map or choosing from your saved locations.
+                </p>
+
+                <div className="mb-3">
+                  <label htmlFor="savedLocationId" className="block text-sm font-semibold text-td-ink dark:text-gray-200">
+                    Select from Saved Locations <span className="text-td-error" aria-hidden="true">*</span>
+                  </label>
+                  <Field
+                    as="select"
+                    id="savedLocationId"
+                    name="savedLocationId"
+                    className={fieldClass}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      setFieldValue('savedLocationId', selectedId);
+
+                      // Find the selected location to get its coordinates
+                      const selectedLocation = savedLocations.find(loc => loc.id === selectedId);
+
+                      if (selectedLocation && selectedLocation.latitude && selectedLocation.longitude) {
+                        console.log('[PickupRequest] Dropdown selected location:', selectedLocation);
+
+                        // CRITICAL: Update Formik's location values (these are used in form submission)
+                        setFieldValue('location', {
+                          lat: selectedLocation.latitude,
+                          lng: selectedLocation.longitude
+                        });
+
+                        // Update formData state to trigger map position update
+                        setFormData(prev => ({
+                          ...prev,
+                          savedLocationId: selectedId,
+                          location: {
                             lat: selectedLocation.latitude,
                             lng: selectedLocation.longitude
-                          });
-                          
-                          // Update formData state to trigger map position update
-                          setFormData(prev => ({
-                            ...prev,
-                            savedLocationId: selectedId,
-                            location: {
-                              lat: selectedLocation.latitude,
-                              lng: selectedLocation.longitude
-                            }
-                          }));
-                          
-                          console.log('[PickupRequest] ✅ Updated form location to:', {
-                            lat: selectedLocation.latitude,
-                            lng: selectedLocation.longitude
-                          });
-                        } else {
-                          console.error('[PickupRequest] ❌ Selected location has no coordinates:', selectedLocation);
-                          
-                          // Update formData state anyway (will trigger map update useEffect)
-                          setFormData(prev => ({
-                            ...prev,
-                            savedLocationId: selectedId
-                          }));
-                        }
-                      }}
-                    >
-                      <option value="" className="text-td-ink dark:text-white font-medium">Choose a saved location</option>
-                      {savedLocations.map(location => (
-                        <option key={location.id} value={location.id}>{location.name} - {location.address}</option>
-                      ))}
-                    </Field>
-                    {touched.savedLocationId && errors.savedLocationId && (
-                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.savedLocationId}</div>
-                    )}
-                    <div className="mt-1 text-sm text-td-sage dark:text-gray-400">
-                      You can select from your saved locations or <a href="/profile?tab=locations" className="text-td-forest hover:underline">add new locations</a>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="h-72 rounded-lg overflow-hidden border border-td-border-strong dark:border-gray-700">
-                      <MapContainer 
-                        center={position} 
-                        zoom={13} 
-                        style={{ height: '100%', width: '100%' }}
-                      >
-                        <TileLayer
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        />
-                        <MapViewController position={position} />
-                        <LocationMarker position={position} setPosition={handlePositionChange} />
-                      </MapContainer>
-                    </div>
+                          }
+                        }));
+
+                        console.log('[PickupRequest] ✅ Updated form location to:', {
+                          lat: selectedLocation.latitude,
+                          lng: selectedLocation.longitude
+                        });
+                      } else {
+                        console.error('[PickupRequest] ❌ Selected location has no coordinates:', selectedLocation);
+
+                        // Update formData state anyway (will trigger map update useEffect)
+                        setFormData(prev => ({
+                          ...prev,
+                          savedLocationId: selectedId
+                        }));
+                      }
+                    }}
+                  >
+                    <option value="">Choose a saved location</option>
+                    {savedLocations.map(location => (
+                      <option key={location.id} value={location.id}>{location.name} - {location.address}</option>
+                    ))}
+                  </Field>
+                  {touched.savedLocationId && errors.savedLocationId && (
+                    <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.savedLocationId}</div>
+                  )}
+                  <div className="mt-1.5 text-sm text-td-sage dark:text-gray-300">
+                    You can select from your saved locations or <a href="/profile?tab=locations" className="font-semibold text-td-forest dark:text-green-300 underline underline-offset-2">add new locations</a>
                   </div>
                 </div>
-              </div>
-              
-              {/* Pickup Details Section */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-                <div className="p-4">
-                  <h2 className="text-xl font-medium text-td-ink dark:text-white mb-4">Pickup Details</h2>
-                  
-                  {/* Number of Bags - Dynamic based on available bags */}
-                  <div className="mb-4">
-                    <label htmlFor="numberOfBags" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-2">
-                      Number of Bags <span className="text-red-600">*</span>
-                      {availableBags > 0 && (
-                        <span className="ml-2 text-xs text-td-sage dark:text-gray-400">
-                          (You have {availableBags} bag{availableBags !== 1 ? 's' : ''} available)
-                        </span>
-                      )}
-                    </label>
-                    <Field
-                      as="select"
-                      id="numberOfBags"
-                      name="numberOfBags"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-td-border-strong dark:border-gray-700 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white rounded-md"
-                      disabled={availableBags <= 0}
-                    >
-                      {/* Dynamically generate options based on available bags, up to 10 maximum */}
-                      {[...Array(Math.min(availableBags, 10))].map((_, index) => {
-                        const bagNumber = index + 1;
-                        return (
-                          <option key={bagNumber} value={String(bagNumber)}>
-                            {bagNumber} Bag{bagNumber !== 1 ? 's' : ''}
-                          </option>
-                        );
-                      })}
-                      {availableBags <= 0 && (
-                        <option value="1">No bags available</option>
-                      )}
-                    </Field>
-                    {touched.numberOfBags && errors.numberOfBags && (
-                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.numberOfBags}</div>
-                    )}
-                    {availableBags <= 0 && (
-                      <>
-                        <div className="mt-1 text-sm text-amber-700 dark:text-yellow-400">
-                          You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.
-                        </div>
-                        <div className="mt-2 flex justify-center space-x-4">
-                          <button 
-                            className="bg-green-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-green-700 transition-colors"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setShowPurchaseModal(true);
-                            }}
-                          >
-                            Purchase Bags
-                          </button>
-                          <button 
-                            className="bg-white dark:bg-gray-800 text-td-forest dark:text-green-300 border border-td-forest dark:border-green-300 px-3 py-1.5 rounded-md text-sm hover:bg-td-tonal dark:hover:bg-gray-700 transition-colors"
-                            onClick={() => navigate('/digital-bin')}
-                          >
-                            Request Bin Pickup
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Priority - Horizontal Scrollable Cards */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-2">
-                      Priority <span className="text-red-600">*</span>
-                    </label>
-                    <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                      {[
-                        { value: 'low', label: 'Low', icon: '🐢', description: 'Flexible timing' },
-                        { value: 'normal', label: 'Normal', icon: '📦', description: 'Standard pickup' },
-                        { value: 'urgent', label: 'Urgent', icon: '⚡', description: 'Priority service' }
-                      ].map((option) => (
-                        <button
-                          type="button"
-                          key={option.value}
-                          onClick={() => setFieldValue('priority', option.value)}
-                          aria-pressed={values.priority === option.value}
-                          className={`flex-shrink-0 w-28 p-3 rounded-lg cursor-pointer transition-all duration-200 snap-start ${
-                            values.priority === option.value
-                              ? 'bg-primary/10 border-2 border-primary shadow-md'
-                              : 'bg-td-cream dark:bg-gray-700 border-2 border-td-border dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                          }`}
-                        >
-                          <span className="block text-center">
-                            <span className="block text-2xl" aria-hidden="true">{option.icon}</span>
-                            <span className={`block text-sm font-semibold mt-1 ${
-                              values.priority === option.value 
-                                ? 'text-primary dark:text-green-300' 
-                                : 'text-td-ink dark:text-gray-300'
-                            }`}>
-                              {option.label}
-                            </span>
-                            <span className="block text-xs text-td-sage dark:text-gray-300 mt-0.5">{option.description}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    {touched.priority && errors.priority && (
-                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</div>
-                    )}
-                  </div>
-                  
-                  {/* Waste Type - Horizontal Scrollable Cards */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-2">
-                      Waste Type <span className="text-red-600">*</span>
-                    </label>
-                    
-                    <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                      {[
-                        { value: 'general', label: 'General', icon: '🗑️', description: 'Mixed waste' },
-                        { value: 'recycling', label: 'Recycling', icon: '♻️', description: 'Paper, cans' },
-                        { value: 'plastic', label: 'Plastic', icon: '🥤', description: 'Bottles, bags' },
-                        { value: 'organic', label: 'Organic', icon: '🍂', description: 'Food, garden' }
-                      ].map((option) => (
-                        <button
-                          type="button"
-                          key={option.value}
-                          onClick={() => setFieldValue('wasteType', option.value)}
-                          aria-pressed={values.wasteType === option.value}
-                          className={`flex-shrink-0 w-24 p-3 rounded-lg cursor-pointer transition-all duration-200 snap-start ${
-                            values.wasteType === option.value
-                              ? 'bg-primary/10 border-2 border-primary shadow-md'
-                              : 'bg-td-cream dark:bg-gray-700 border-2 border-td-border dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                          }`}
-                        >
-                          <span className="block text-center">
-                            <span className="block text-2xl" aria-hidden="true">{option.icon}</span>
-                            <span className={`block text-sm font-semibold mt-1 ${
-                              values.wasteType === option.value 
-                                ? 'text-primary dark:text-green-300' 
-                                : 'text-td-ink dark:text-gray-300'
-                            }`}>
-                              {option.label}
-                            </span>
-                            <span className="block text-xs text-td-sage dark:text-gray-300 mt-0.5">{option.description}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    
-                    {touched.wasteType && errors.wasteType && (
-                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.wasteType}</div>
-                    )}
-                    
-                    <div className="mt-2 flex items-start text-sm text-td-sage dark:text-gray-400">
-                      <svg className="flex-shrink-0 h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-                      </svg>
-                      <p>Earn reward points by properly segregating recycling and plastic waste!</p>
-                    </div>
-                  </div>
-                  
-                  {/* Additional Notes */}
-                  <div>
-                    <label htmlFor="notes" className="block text-sm font-medium text-td-ink dark:text-gray-300">
-                      Additional Notes (Optional)
-                    </label>
-                    <Field
-                      as="textarea"
-                      id="notes"
-                      name="notes"
-                      rows={3}
-                      className="mt-1 block w-full px-3 py-2 border border-td-border-strong dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
-                      placeholder="Any other information for the collector"
+
+                <div className="h-64 rounded-2xl overflow-hidden border border-td-border dark:border-gray-700">
+                  <MapContainer
+                    center={position}
+                    zoom={13}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     />
-                    {touched.notes && errors.notes && (
-                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.notes}</div>
+                    <MapViewController position={position} />
+                    <LocationMarker position={position} setPosition={handlePositionChange} />
+                  </MapContainer>
+                </div>
+              </section>
+
+              {/* Pickup Details Section */}
+              <section className={`${card} px-4 py-4 space-y-5`} aria-labelledby="pickup-details-heading">
+                <h2 id="pickup-details-heading" className={sectionTitle}>Pickup Details</h2>
+
+                {/* Number of Bags - Dynamic based on available bags */}
+                <div>
+                  <label htmlFor="numberOfBags" className="block text-sm font-semibold text-td-ink dark:text-gray-200">
+                    Number of Bags <span className="text-td-error" aria-hidden="true">*</span>
+                    {availableBags > 0 && (
+                      <span className="ml-2 text-xs font-normal text-td-sage dark:text-gray-300">
+                        (You have {availableBags} bag{availableBags !== 1 ? 's' : ''} available)
+                      </span>
                     )}
+                  </label>
+                  <Field
+                    as="select"
+                    id="numberOfBags"
+                    name="numberOfBags"
+                    className={fieldClass}
+                    disabled={availableBags <= 0}
+                  >
+                    {/* Dynamically generate options based on available bags, up to 10 maximum */}
+                    {[...Array(Math.min(availableBags, 10))].map((_, index) => {
+                      const bagNumber = index + 1;
+                      return (
+                        <option key={bagNumber} value={String(bagNumber)}>
+                          {bagNumber} Bag{bagNumber !== 1 ? 's' : ''}
+                        </option>
+                      );
+                    })}
+                    {availableBags <= 0 && (
+                      <option value="1">No bags available</option>
+                    )}
+                  </Field>
+                  {touched.numberOfBags && errors.numberOfBags && (
+                    <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.numberOfBags}</div>
+                  )}
+                </div>
+
+                {/* Priority */}
+                <div role="group" aria-labelledby="pickup-priority-label">
+                  <p id="pickup-priority-label" className="text-sm font-semibold text-td-ink dark:text-gray-200 mb-2">
+                    Priority <span className="text-td-error" aria-hidden="true">*</span>
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <OptionTile
+                        key={option.value}
+                        selected={values.priority === option.value}
+                        onClick={() => setFieldValue('priority', option.value)}
+                        icon={option.icon}
+                        label={option.label}
+                        hint={option.description}
+                      />
+                    ))}
+                  </div>
+                  {touched.priority && errors.priority && (
+                    <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.priority}</div>
+                  )}
+                </div>
+
+                {/* Waste Type */}
+                <div role="group" aria-labelledby="pickup-waste-label">
+                  <p id="pickup-waste-label" className="text-sm font-semibold text-td-ink dark:text-gray-200 mb-2">
+                    Waste Type <span className="text-td-error" aria-hidden="true">*</span>
+                  </p>
+                  <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2">
+                    {WASTE_OPTIONS.map((option) => (
+                      <OptionTile
+                        key={option.value}
+                        selected={values.wasteType === option.value}
+                        onClick={() => setFieldValue('wasteType', option.value)}
+                        icon={option.icon}
+                        label={option.label}
+                        hint={option.description}
+                      />
+                    ))}
+                  </div>
+                  {touched.wasteType && errors.wasteType && (
+                    <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.wasteType}</div>
+                  )}
+                  <div className={`${infoNote} mt-3 px-3.5 py-2.5 flex items-start gap-2 text-sm`}>
+                    <svg className="flex-shrink-0 h-5 w-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+                    </svg>
+                    <p>Earn reward points by properly segregating recycling and plastic waste!</p>
                   </div>
                 </div>
-              </div>
-              
-              {/* Pricing & Rewards Section */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-                <div className="p-4">
-                  <h2 className="text-xl font-medium text-td-ink dark:text-white mb-4">Pricing & Rewards</h2>
-                  <p className="text-td-sage dark:text-gray-400 mb-4">No standard pickup fee</p>
+
+                {/* Additional Notes */}
+                <div>
+                  <label htmlFor="notes" className="block text-sm font-semibold text-td-ink dark:text-gray-200">
+                    Additional Notes (Optional)
+                  </label>
+                  <Field
+                    as="textarea"
+                    id="notes"
+                    name="notes"
+                    rows={3}
+                    className="mt-1.5 block w-full px-3.5 py-2.5 text-[15px] bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-td-ink dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30"
+                    placeholder="Any other information for the collector"
+                  />
+                  {touched.notes && errors.notes && (
+                    <div className="mt-1 text-sm text-td-error dark:text-red-300">{errors.notes}</div>
+                  )}
                 </div>
-              </div>
+              </section>
+
+              {/* Pricing & Rewards Section */}
+              <section className={`${card} px-4 py-4`} aria-labelledby="pickup-pricing-heading">
+                <h2 id="pickup-pricing-heading" className={sectionTitle}>Pricing & Rewards</h2>
+                <p className="text-[15px] text-td-sage dark:text-gray-300 mt-1">No standard pickup fee</p>
+              </section>
+
               {userStats.totalBags <= 0 && (
-                <div className="text-sm text-yellow-700 bg-yellow-100 border border-yellow-300 rounded-md p-3 mb-3" role="alert">
+                <div className={`${warningNote} px-4 py-3 text-sm`} role="alert">
                   No bags available. Scan a batch to enable pickup.
                 </div>
               )}
+
               {/* Submit button */}
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-green-600 text-white font-medium text-lg rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 transition-colors"
+                className={`${primaryButton} w-full h-[52px]`}
                 disabled={submitDisabled}
               >
                 {isSubmitting ? (
-                  <div className="flex items-center justify-center">
+                  <span className="flex items-center justify-center">
                     <LoadingSpinner size="sm" />
                     <span className="ml-2">Processing...</span>
-                  </div>
+                  </span>
                 ) : (
                   'Request Pickup'
                 )}
@@ -1019,7 +951,7 @@ const PickupRequest = () => {
           
           {/* Modal content */}
           <div 
-            className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
@@ -1035,8 +967,8 @@ const PickupRequest = () => {
 
             {/* Header */}
             <div className="px-6 pt-6 pb-3 text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-td-tonal dark:bg-blue-900 mb-3">
-                <svg className="w-7 h-7 text-td-forest dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-td-tonal dark:bg-green-900/40 mb-3">
+                <svg className="w-7 h-7 text-td-forest dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
               </div>
@@ -1067,7 +999,7 @@ const PickupRequest = () => {
                   href="https://trashdrops.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center text-sm font-medium text-td-forest dark:text-blue-400 hover:underline"
+                  className="inline-flex items-center text-sm font-semibold text-td-forest dark:text-green-300 hover:underline"
                 >
                   View pricing on trashdrops.com
                   <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1077,9 +1009,9 @@ const PickupRequest = () => {
               </div>
 
               {/* How to get bags now */}
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-4">
-                <h4 className="text-sm font-semibold text-green-700 dark:text-green-300 mb-2">How to get bags now</h4>
-                <ul className="text-xs text-green-600 dark:text-green-400 space-y-1.5">
+              <div className={`${infoNote} p-4 mb-4`}>
+                <h4 className="text-sm font-bold mb-2">How to get bags now</h4>
+                <ul className="text-sm space-y-1.5">
                   <li className="flex items-start">
                     <span className="font-bold mr-1.5 mt-px">1.</span>
                     <span>Purchase a batch from an authorized TrashDrop vendor</span>
@@ -1099,7 +1031,7 @@ const PickupRequest = () => {
             {/* Actions */}
             <div className="px-6 pb-6 flex flex-col gap-2">
               <button
-                className="w-full py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors"
+                className={`${primaryButton} w-full`}
                 onClick={() => {
                   setShowPurchaseModal(false);
                   navigate('/qr-scanner');
@@ -1108,7 +1040,7 @@ const PickupRequest = () => {
                 Scan a Batch QR Code
               </button>
               <button
-                className="w-full py-2.5 text-td-sage dark:text-gray-300 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className={`${secondaryButton} w-full`}
                 onClick={() => setShowPurchaseModal(false)}
               >
                 Close
