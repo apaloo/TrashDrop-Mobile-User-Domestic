@@ -6,6 +6,7 @@ import { notificationService } from '../services/notificationService.js';
 import supabase from '../utils/supabaseClient.js';
 import offlineStorageAPI from '../utils/offlineStorage.js';
 import realTableInspector from '../utils/realTableInspector.js';
+import { card, dangerButton, errorNote, primaryButton, secondaryButton } from './ui/styles.js';
  
 
 const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
@@ -216,178 +217,122 @@ const BatchQRScanner = ({ onScanComplete, autoStart = false }) => {
     cancelRef.current.canceled = true;
   };
 
+  const corners = (tone) => (
+    <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+      <span className={`absolute top-8 left-8 w-8 h-8 border-t-4 border-l-4 rounded-tl-xl ${tone}`} />
+      <span className={`absolute top-8 right-8 w-8 h-8 border-t-4 border-r-4 rounded-tr-xl ${tone}`} />
+      <span className={`absolute bottom-8 left-8 w-8 h-8 border-b-4 border-l-4 rounded-bl-xl ${tone}`} />
+      <span className={`absolute bottom-8 right-8 w-8 h-8 border-b-4 border-r-4 rounded-br-xl ${tone}`} />
+    </div>
+  );
+
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full space-y-4">
       {/* Error Alert */}
       {error && (
-        <div className="mb-4 p-4 bg-red-900 border border-red-700 rounded-lg">
-          <div className="flex justify-between items-center">
-            <span className="text-red-200">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-300 hover:text-red-100 font-bold text-xl leading-none"
-            >
-              ×
-            </button>
-          </div>
+        <div role="alert" className={`${errorNote} px-4 py-3 flex items-start justify-between gap-3`}>
+          <span className="text-[15px]">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            className="-mr-1 -mt-0.5 w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xl leading-none hover:bg-red-100 dark:hover:bg-red-900/40"
+          >
+            ×
+          </button>
         </div>
       )}
 
       {/* Loading Indicator */}
       {loading && (
-        <div className="flex justify-center my-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-td-forest"></div>
-          <span className="ml-3 text-sm text-blue-300">{loadingMessage || 'Loading...'}</span>
+        <div className="flex items-center justify-center gap-3" role="status">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-td-forest dark:border-green-300"></div>
+          <span className="text-sm text-td-sage dark:text-gray-300">{loadingMessage || 'Loading...'}</span>
         </div>
       )}
 
-      {/* Camera Interface */}
-      <div className="relative">
-        {/* Camera Viewfinder */}
-        <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
-          {scanning ? (
-            <div className="relative w-full h-full">
-              <QRReader
-                onScan={handleScan}
-                onError={handleError}
-              />
-              {/* Camera Overlay with Corner Markers */}
-              <div className="absolute inset-0 pointer-events-none">
-                {/* Top Left Corner */}
-                <div className="absolute top-12 left-12 w-6 h-6">
-                  <div className="absolute top-0 left-0 w-6 h-1 bg-white"></div>
-                  <div className="absolute top-0 left-0 w-1 h-6 bg-white"></div>
-                </div>
-                {/* Top Right Corner */}
-                <div className="absolute top-12 right-12 w-6 h-6">
-                  <div className="absolute top-0 right-0 w-6 h-1 bg-white"></div>
-                  <div className="absolute top-0 right-0 w-1 h-6 bg-white"></div>
-                </div>
-                {/* Bottom Left Corner */}
-                <div className="absolute bottom-12 left-12 w-6 h-6">
-                  <div className="absolute bottom-0 left-0 w-6 h-1 bg-white"></div>
-                  <div className="absolute bottom-0 left-0 w-1 h-6 bg-white"></div>
-                </div>
-                {/* Bottom Right Corner */}
-                <div className="absolute bottom-12 right-12 w-6 h-6">
-                  <div className="absolute bottom-0 right-0 w-6 h-1 bg-white"></div>
-                  <div className="absolute bottom-0 right-0 w-1 h-6 bg-white"></div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
-              {/* Camera Icon */}
-              <svg
-                className="w-16 h-16 text-td-sage mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
+      {/* Camera Viewfinder */}
+      <div className="relative rounded-3xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
+        {scanning ? (
+          <div className="relative w-full h-full bg-black">
+            <QRReader
+              onScan={handleScan}
+              onError={handleError}
+            />
+            {corners('border-td-lime')}
+          </div>
+        ) : (
+          <div className="relative w-full h-full flex flex-col items-center justify-center bg-td-forest text-white">
+            <span className="absolute -top-16 -right-16 w-56 h-56 rounded-full border-[28px] border-white/10" aria-hidden="true" />
+            <span className="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center mb-3" aria-hidden="true">
+              <svg className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+                <path d="M7 7h4v4H7zM13 13h4v4h-4zM13 7h4M7 13v4" />
               </svg>
-              <span className="text-td-ink text-lg font-medium">Camera Ready</span>
-              
-              {/* Corner Markers for inactive state */}
-              <div className="absolute inset-0 pointer-events-none">
-                {/* Top Left Corner */}
-                <div className="absolute top-12 left-12 w-6 h-6">
-                  <div className="absolute top-0 left-0 w-6 h-1 bg-white opacity-60"></div>
-                  <div className="absolute top-0 left-0 w-1 h-6 bg-white opacity-60"></div>
-                </div>
-                {/* Top Right Corner */}
-                <div className="absolute top-12 right-12 w-6 h-6">
-                  <div className="absolute top-0 right-0 w-6 h-1 bg-white opacity-60"></div>
-                  <div className="absolute top-0 right-0 w-1 h-6 bg-white opacity-60"></div>
-                </div>
-                {/* Bottom Left Corner */}
-                <div className="absolute bottom-12 left-12 w-6 h-6">
-                  <div className="absolute bottom-0 left-0 w-6 h-1 bg-white opacity-60"></div>
-                  <div className="absolute bottom-0 left-0 w-1 h-6 bg-white opacity-60"></div>
-                </div>
-                {/* Bottom Right Corner */}
-                <div className="absolute bottom-12 right-12 w-6 h-6">
-                  <div className="absolute bottom-0 right-0 w-6 h-1 bg-white opacity-60"></div>
-                  <div className="absolute bottom-0 right-0 w-1 h-6 bg-white opacity-60"></div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Start/Stop Scanning Button */}
-        <div className="mt-6">
-          {scanning ? (
-            <button
-              onClick={stopScanning}
-              className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              Stop Scanning
-            </button>
-          ) : (
-            <button
-              onClick={startScanning}
-              disabled={loading}
-              className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
-            >
-              {loading ? 'Loading...' : 'Start Scanning'}
-            </button>
-          )}
-        </div>
+            </span>
+            <span className="text-lg font-bold">Camera Ready</span>
+            <span className="mt-0.5 text-sm text-white/80">Tap Start Scanning below</span>
+            {corners('border-td-lime/70')}
+          </div>
+        )}
       </div>
 
-      {/* Manual Input Fallback removed as requested */}
+      {/* Start/Stop Scanning Button */}
+      {scanning ? (
+        <button onClick={stopScanning} className={`${dangerButton} w-full`}>
+          Stop Scanning
+        </button>
+      ) : (
+        <button onClick={startScanning} disabled={loading} className={`${primaryButton} w-full`}>
+          {loading ? 'Loading...' : 'Start Scanning'}
+        </button>
+      )}
 
       {/* Scan Result */}
       {scanResult && (
-        <div style={{ 
-          marginTop: '20px', 
-          padding: '15px', 
-          backgroundColor: '#e8f5e8', 
-          borderRadius: '8px',
-          border: '1px solid #4caf50',
-          color: 'black'
-        }}>
-          <h3>{scanResult.alreadyActivated ? '⚠️ Batch Already Scanned' : '✅ Batch Scanned Successfully!'}</h3>
-          <p><strong>Batch ID:</strong> {scanResult.batch_qr_code || scanResult.batch_id}</p>
-          <p><strong>Total Bags:</strong> {scanResult.bag_count || 0}</p>
-          <p><strong>Status:</strong> {scanResult.status}</p>
-          <p><strong>Created:</strong> {scanResult.created_at ? new Date(scanResult.created_at).toLocaleDateString() : 'Unknown'}</p>
-          {scanResult.alreadyActivated && <p style={{ color: '#856404', marginTop: '8px' }}>This batch was previously scanned and activated.</p>}
-        </div>
-      )}
-      
-      {/* Clear Results Only - No Cache Controls */}
-      {scanResult && (
-        <div style={{ marginTop: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
-          <button 
+        <section
+          aria-label={scanResult.alreadyActivated ? 'Batch already scanned' : 'Batch scanned'}
+          className={`${card} px-4 py-4`}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${scanResult.alreadyActivated
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300'}`}
+              aria-hidden="true"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                {scanResult.alreadyActivated
+                  ? <><path d="M12 8v5" /><path d="M12 16.5v.01" /><circle cx="12" cy="12" r="9" /></>
+                  : <path d="M5 12.5l4.5 4.5L19 7.5" />}
+              </svg>
+            </span>
+            <h3 className="text-[17px] font-bold text-td-ink dark:text-gray-100">
+              {scanResult.alreadyActivated ? 'Batch Already Scanned' : 'Batch Scanned Successfully!'}
+            </h3>
+          </div>
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[15px]">
+            <dt className="text-td-sage dark:text-gray-300">Batch ID</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold break-all">{scanResult.batch_qr_code || scanResult.batch_id}</dd>
+            <dt className="text-td-sage dark:text-gray-300">Total bags</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold">{scanResult.bag_count || 0}</dd>
+            <dt className="text-td-sage dark:text-gray-300">Status</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold capitalize">{scanResult.status}</dd>
+            <dt className="text-td-sage dark:text-gray-300">Created</dt>
+            <dd className="text-td-ink dark:text-gray-100 font-semibold">{scanResult.created_at ? new Date(scanResult.created_at).toLocaleDateString() : 'Unknown'}</dd>
+          </dl>
+          {scanResult.alreadyActivated && (
+            <p className="mt-3 text-sm text-amber-900 dark:text-amber-200">This batch was previously scanned and activated.</p>
+          )}
+          <button
             onClick={() => {
               setError(null);
               setScanResult(null);
             }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#2196f3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            className={`${secondaryButton} w-full mt-4`}
           >
             Clear Results
           </button>
-        </div>
+        </section>
       )}
     </div>
   );
