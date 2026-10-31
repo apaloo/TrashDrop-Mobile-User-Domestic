@@ -200,7 +200,7 @@ const Notifications = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl p-5">
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-td-forest"></div>
           <span className="ml-3 text-td-sage dark:text-gray-300">Loading notification settings...</span>
@@ -210,10 +210,10 @@ const Notifications = () => {
   }
   
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+    <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl p-5">
       {/* Save status message */}
       {saveMessage && (
-        <div className={`mb-4 p-3 rounded-md ${
+        <div className={`mb-4 px-4 py-3 rounded-2xl ${
           saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
           'bg-td-tonal text-td-forest'
@@ -311,7 +311,7 @@ const Notifications = () => {
           <button
             type="submit"
             disabled={isSaving}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full text-[15px] transition-colors bg-td-forest hover:bg-td-forest-dk text-white font-bold disabled:bg-gray-300 disabled:text-gray-600 dark:disabled:bg-gray-700 dark:disabled:text-gray-300 disabled:cursor-not-allowed"
           >
             {isSaving ? (
               <>

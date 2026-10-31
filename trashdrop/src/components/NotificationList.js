@@ -1,29 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  IconButton,
-  Typography,
-  Box,
-  Paper,
-  Switch,
-  FormGroup,
-  FormControlLabel,
-  Divider,
-  Badge,
-  CircularProgress,
-  Alert
-} from '@mui/material';
-import {
-  NotificationsOutlined,
-  CheckCircleOutline,
-  ErrorOutline,
-  InfoOutlined,
-  DeleteOutline,
-  Settings as SettingsIcon
-} from '@mui/icons-material';
+import Switch from './profile/Switch.js';
+import { card, errorNote, sectionTitle } from './ui/styles.js';
 import { useAuth } from '../context/AuthContext.js';
 import { notificationService, normalizeNotification } from '../services/notificationService.js';
 import supabase from '../utils/supabaseClient.js';
@@ -196,138 +173,145 @@ const NotificationList = () => {
   };
 
   const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'pickup_status':
-        return <CheckCircleOutline color="primary" />;
-      case 'error':
-        return <ErrorOutline color="error" />;
-      default:
-        return <InfoOutlined color="info" />;
-    }
+    const kind = type === 'pickup_status' ? 'done' : type === 'error' ? 'error' : 'info';
+    const tint = {
+      done: 'bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300',
+      error: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+      info: 'bg-td-cream text-td-ink dark:bg-gray-700 dark:text-gray-200',
+    }[kind];
+    return (
+      <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tint}`} aria-hidden="true">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+          {kind === 'done' && <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l3 3 5-6" /></>}
+          {kind === 'error' && <><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5M12 16v.01" /></>}
+          {kind === 'info' && <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8v.01" /></>}
+        </svg>
+      </span>
+    );
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" p={3}>
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center p-6" role="status" aria-label="Loading notifications">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-td-forest dark:border-green-300" />
+      </div>
     );
   }
 
+  const PREFERENCE_LABELS = [
+    ['pickup_status', 'Pickup Status Updates'],
+    ['system', 'System Notifications'],
+    ['promo', 'Promotional Messages'],
+  ];
+
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', p: 2 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h6">
-          Notifications
-        </Typography>
-        <Box>
-          <IconButton onClick={() => setShowPreferences(!showPreferences)} aria-label="Notification settings">
-            <Badge color="primary" variant="dot" invisible={!showPreferences}>
-              <SettingsIcon />
-            </Badge>
-          </IconButton>
-          <IconButton onClick={handleDeleteOld} aria-label="Delete old notifications">
-            <DeleteOutline />
-          </IconButton>
-        </Box>
-      </Box>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="sr-only">Notifications</h2>
+        <p className="text-[15px] text-td-sage dark:text-gray-300">
+          {notifications.length > 0
+            ? `${notifications.filter(n => n.status === 'unread').length} unread`
+            : 'Nothing new'}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowPreferences(!showPreferences)}
+            aria-label="Notification settings"
+            aria-expanded={showPreferences}
+            className={`w-10 h-10 rounded-full flex items-center justify-center border transition-colors ${showPreferences
+              ? 'bg-td-forest border-td-forest text-white'
+              : 'border-td-border dark:border-gray-600 text-td-ink dark:text-gray-100 hover:bg-td-cream dark:hover:bg-gray-800'}`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001 2.5 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.5 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.5-1.1z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+          <button
+            onClick={handleDeleteOld}
+            aria-label="Delete old notifications"
+            className="w-10 h-10 rounded-full flex items-center justify-center border border-td-border dark:border-gray-600 text-td-ink dark:text-gray-100 hover:bg-td-cream dark:hover:bg-gray-800"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M6 7l1 13h10l1-13M10 11v5M14 11v5M9 7V4h6v3" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <div role="alert" className={`${errorNote} px-4 py-3 flex items-start justify-between gap-3`}>
+          <span className="text-[15px]">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            className="-mr-1 -mt-0.5 w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xl leading-none hover:bg-red-100 dark:hover:bg-red-900/40"
+          >
+            ×
+          </button>
+        </div>
       )}
 
       {showPreferences && (
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            Notification Preferences
-          </Typography>
-          <FormGroup>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={preferences.pickup_status}
-                  onChange={() => handlePreferenceChange('pickup_status')}
-                />
-              }
-              label="Pickup Status Updates"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={preferences.system}
-                  onChange={() => handlePreferenceChange('system')}
-                />
-              }
-              label="System Notifications"
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={preferences.promo}
-                  onChange={() => handlePreferenceChange('promo')}
-                />
-              }
-              label="Promotional Messages"
-            />
-          </FormGroup>
-        </Paper>
+        <section aria-labelledby="notification-preferences" className={`${card} px-4 py-3`}>
+          <h3 id="notification-preferences" className={`${sectionTitle} mb-1`}>Notification Preferences</h3>
+          <ul>
+            {PREFERENCE_LABELS.map(([key, label], i) => (
+              <li key={key} className={`flex items-center justify-between gap-3 py-3 ${i === 0 ? '' : 'border-t border-td-border dark:border-gray-700'}`}>
+                <span id={`pref-${key}`} className="text-[15px] text-td-ink dark:text-gray-100">{label}</span>
+                <Switch checked={!!preferences[key]} onChange={() => handlePreferenceChange(key)} labelledBy={`pref-${key}`} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
-      <Paper>
+      <section aria-label="Your notifications" className={`${card} px-4`}>
         {notifications.length > 0 ? (
-          <List>
-            {notifications.map((notification, index) => (
-              <React.Fragment key={notification.id}>
-                {index > 0 && <Divider />}
-                <ListItem
-                  sx={{
-                    bgcolor: notification.status === 'unread' ? 'action.hover' : 'inherit',
-                    transition: 'background-color 0.2s'
-                  }}
-                  secondaryAction={
-                    notification.status === 'unread' && (
-                      <IconButton
-                        edge="end"
-                        aria-label="Mark as read"
-                        onClick={() => handleMarkAsRead(notification.id)}
-                      >
-                        <CheckCircleOutline />
-                      </IconButton>
-                    )
-                  }
-                >
-                  <ListItemIcon>
-                    {getNotificationIcon(notification.type)}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={notification.title}
-                    secondary={
-                      <>
-                        <Typography variant="body2" component="span" display="block">
-                          {notification.message}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(notification.created_at).toLocaleString()}
-                        </Typography>
-                      </>
-                    }
-                  />
-                </ListItem>
-              </React.Fragment>
-            ))}
-          </List>
+          <ul>
+            {notifications.map((notification, index) => {
+              const unread = notification.status === 'unread';
+              return (
+                <li key={notification.id} className={`flex items-start gap-3 py-3.5 ${index > 0 ? 'border-t border-td-border dark:border-gray-700' : ''}`}>
+                  {getNotificationIcon(notification.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[15px] leading-snug text-td-ink dark:text-gray-100 ${unread ? 'font-bold' : 'font-semibold'}`}>
+                      {unread && <span className="inline-block w-2 h-2 rounded-full bg-td-forest dark:bg-green-300 mr-2 align-middle" aria-hidden="true" />}
+                      {notification.title}
+                      {unread && <span className="sr-only"> (unread)</span>}
+                    </p>
+                    <p className="text-sm text-td-ink/80 dark:text-gray-200 mt-0.5">{notification.message}</p>
+                    <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{new Date(notification.created_at).toLocaleString()}</p>
+                  </div>
+                  {unread && (
+                    <button
+                      onClick={() => handleMarkAsRead(notification.id)}
+                      aria-label="Mark as read"
+                      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-td-forest dark:text-green-300 hover:bg-td-tonal dark:hover:bg-green-900/40"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" />
+                      </svg>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         ) : (
-          <Box p={3} textAlign="center">
-            <NotificationsOutlined sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-            <Typography color="text.secondary">
+          <div className="py-8 text-center">
+            <span className="inline-flex w-14 h-14 rounded-2xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 items-center justify-center mb-3" aria-hidden="true">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3A6 6 0 006 11v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </span>
+            <p className="text-[15px] text-td-sage dark:text-gray-300">
               No notifications to display
-            </Typography>
-          </Box>
+            </p>
+          </div>
         )}
-      </Paper>
-    </Box>
+      </section>
+    </div>
   );
 };
 

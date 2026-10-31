@@ -4,6 +4,7 @@ import PersonalInfo from '../components/profile/PersonalInfo.js';
 import Locations from '../components/profile/Locations.js';
 import Preferences from '../components/profile/Preferences.js';
 import Security from '../components/profile/Security.js';
+import PageHeader from '../components/ui/PageHeader.js';
 
 /**
  * Profile page component that displays user profile information and settings
@@ -55,35 +56,35 @@ const Profile = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-20">
-      <h1 className="text-2xl font-bold p-4 mb-4 text-td-ink dark:text-white">Profile & Settings</h1>
+    <div className="max-w-3xl mx-auto px-2 pb-24">
+      <PageHeader title="Profile & Settings" subtitle="Your details, saved places and how the app works for you." />
 
       {/* Tab navigation */}
-      <div className="border-b border-td-border dark:border-gray-700 mb-6">
-        <div className="flex overflow-x-auto">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={(e) => {
-                setActiveTab(tab.id);
-                // The row scrolls sideways on phones: bring the chosen tab fully into view
-                e.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-              }}
-              // The row scrolls sideways, which clips anything outside it: keep the focus ring inside the tab
-              className={`px-4 py-2 whitespace-nowrap focus-visible:outline-offset-[-3px] ${
-                activeTab === tab.id 
-                  ? 'text-td-forest dark:text-green-300 border-b-2 border-td-forest dark:border-green-300 font-medium' 
-                  : 'text-td-sage dark:text-gray-400 hover:text-td-ink dark:hover:text-gray-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex gap-2 overflow-x-auto py-4 -mx-2 px-2" role="tablist" aria-label="Profile sections" style={{ scrollbarWidth: 'none' }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={(e) => {
+              setActiveTab(tab.id);
+              // The row scrolls sideways on phones: bring the chosen tab fully into view
+              e.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+            }}
+            // The row scrolls sideways, which clips anything outside it: keep the focus ring inside the tab
+            className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-offset-[-3px] ${
+              activeTab === tab.id
+                ? 'bg-td-forest text-white'
+                : 'bg-td-tonal text-td-forest-dk hover:bg-[#d5eadb] dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Tab content */}
-      <div className="p-4">
+      <div role="tabpanel">
         {renderTabContent()}
       </div>
     </div>
