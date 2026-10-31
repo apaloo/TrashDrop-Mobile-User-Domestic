@@ -130,7 +130,7 @@ const Preferences = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl p-5">
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-td-forest"></div>
           <span className="ml-3 text-td-sage dark:text-gray-300">Loading preferences...</span>
@@ -140,9 +140,9 @@ const Preferences = () => {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+    <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl p-5">
       {saveMessage && (
-        <div role="alert" className={`mb-4 p-3 rounded-md ${
+        <div role="alert" className={`mb-4 px-4 py-3 rounded-2xl ${
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
         }`}>
           {saveMessage.text}

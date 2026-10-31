@@ -248,10 +248,10 @@ const Security = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+    <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl p-5">
       {/* Save status message */}
       {saveMessage && (
-        <div className={`mb-4 p-3 rounded-md ${
+        <div className={`mb-4 px-4 py-3 rounded-2xl ${
           saveMessage.type === 'success' ? 'bg-green-100 text-green-700' :
           saveMessage.type === 'error' ? 'bg-red-100 text-red-700' :
           'bg-td-tonal text-td-forest'
@@ -275,7 +275,7 @@ const Security = () => {
               name="currentPassword"
               value={passwordForm.currentPassword}
               onChange={handlePasswordChange}
-              className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
+              className="w-full h-12 px-3.5 text-[15px] bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-td-ink dark:text-gray-100 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30"
             />
           </div>
           
@@ -290,7 +290,7 @@ const Security = () => {
               name="newPassword"
               value={passwordForm.newPassword}
               onChange={handlePasswordChange}
-              className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
+              className="w-full h-12 px-3.5 text-[15px] bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-td-ink dark:text-gray-100 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30"
             />
           </div>
           
@@ -314,7 +314,7 @@ const Security = () => {
               name="confirmPassword"
               value={passwordForm.confirmPassword}
               onChange={handlePasswordChange}
-              className="w-full px-3 py-2 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
+              className="w-full h-12 px-3.5 text-[15px] bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-td-ink dark:text-gray-100 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30"
             />
           </div>
           
@@ -323,7 +323,7 @@ const Security = () => {
             <button
               type="submit"
               disabled={isUpdating}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full text-[15px] transition-colors bg-td-forest hover:bg-td-forest-dk text-white font-bold disabled:bg-gray-300 disabled:text-gray-600 dark:disabled:bg-gray-700 dark:disabled:text-gray-300 disabled:cursor-not-allowed"
             >
               {isUpdating ? (
                 <>
@@ -356,7 +356,7 @@ const Security = () => {
         {/* Current Device */}
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2 text-td-ink dark:text-gray-100">Current Device</h3>
-          <div className="bg-td-cream dark:bg-gray-700 p-4 rounded-lg">
+          <div className="bg-td-cream dark:bg-gray-700 p-4 rounded-2xl">
             <p className="text-td-ink dark:text-gray-200">{deviceInfo.device} • {deviceInfo.status}</p>
           </div>
         </div>
@@ -366,7 +366,7 @@ const Security = () => {
           <button
             onClick={handleLogoutAllDevices}
             disabled={isLoggingOut}
-            className="px-4 py-2 border border-red-700 text-red-700 dark:border-red-400 dark:text-red-400 rounded-md hover:bg-red-50 flex items-center disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 disabled:border-gray-300"
+            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full text-[15px] transition-colors border-[1.5px] border-red-700 text-red-700 dark:border-red-400 dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isLoggingOut ? (
               <>
