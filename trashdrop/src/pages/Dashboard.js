@@ -1354,7 +1354,7 @@ const Dashboard = () => {
                 type="button"
                 onClick={handleRetryInitialLoad}
                 disabled={isRetryingLoad}
-                className="mt-3 inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                className="mt-3 inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               >
                 {isRetryingLoad ? 'Retrying...' : 'Try again'}
               </button>
@@ -1378,9 +1378,10 @@ const Dashboard = () => {
               )}
               <Link
                 to="/activity"
-                className="text-sm text-td-forest dark:text-green-300 hover:text-td-forest-dk underline underline-offset-2"
+                aria-label="See all activity"
+                className="inline-flex h-9 items-center rounded-full bg-td-tonal px-4 text-sm font-semibold text-td-forest-dk hover:bg-[#d5eadb] dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
               >
-                View all activity →
+                See All
               </Link>
             </div>
           </div>
