@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BatchQRScanner from '../components/BatchQRScanner.js';
+import PageHeader from '../components/ui/PageHeader.js';
+import { card, primaryButton, sectionTitle } from '../components/ui/styles.js';
+
+const STEPS = [
+  'Find the TrashDrop batch QR code wrapped on the bundle of bags',
+  'Tap "Start Scanning" and aim your camera at the QR code',
+  'Hold steady until the code is recognised and validated',
+  'Earn points for each sorting and recycling trash',
+  'Properly tie the flaps when the trash bag is full and ready for pickup',
+];
 
 /**
  * QR Scanner page for scanning batch QR codes
@@ -34,57 +44,34 @@ const QRScanner = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 pt-2" style={{ minHeight: '100vh', paddingTop: '75px' }}>
-      {/* Fixed Header (positioned below navbar) */}
-      <div className="bg-white dark:bg-gray-800 px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md">
-        <h1 className="text-2xl font-bold text-center text-td-ink dark:text-gray-100">
-          Scan QR Code
-        </h1>
-      </div>
+    <div className="max-w-3xl mx-auto px-2 pb-24 space-y-5">
+      <PageHeader
+        title="Scan QR Code"
+        subtitle="Scan the QR code on your bundle of bags to add them to your account."
+      />
 
-      {/* Scanner Section */}
-      <div className="px-6 py-4">
-        <BatchQRScanner onScanComplete={handleScanComplete} autoStart={autoStart} />
-      </div>
+      <BatchQRScanner onScanComplete={handleScanComplete} autoStart={autoStart} />
 
       {/* Continue Setup button — visible after scan when coming from onboarding */}
       {isOnboarding && scannedBatch && (
-        <div className="px-6 pb-4">
-          <button
-            onClick={handleContinueOnboarding}
-            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors text-lg"
-          >
-            Continue Setup
-          </button>
-        </div>
+        <button onClick={handleContinueOnboarding} className={`${primaryButton} w-full`}>
+          Continue Setup
+        </button>
       )}
 
-      {/* How to Use Section */}
-      <div className="px-6 py-4">
-        <h2 className="text-lg font-semibold mb-4 text-td-ink dark:text-gray-100">How to Use</h2>
-        <div className="space-y-3 text-td-ink dark:text-gray-200">
-          <div className="flex items-start">
-            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">1.</span>
-            <span>Find the TrashDrop Batch QR code wrapped on the bundle of bags</span>
-          </div>
-          <div className="flex items-start">
-            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">2.</span>
-            <span>Click "Start Scanning" and aim your camera at the QR code</span>
-          </div>
-          <div className="flex items-start">
-            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">3.</span>
-            <span>Hold steady until the code is recognised and validated</span>
-          </div>
-          <div className="flex items-start">
-            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">4.</span>
-            <span>Earn points for each sorting and recycling trash</span>
-          </div>
-          <div className="flex items-start">
-            <span className="text-td-ink dark:text-gray-100 font-medium mr-3">5.</span>
-            <span>Properly tie the flaps when the trash bag is full and ready for pickup</span>
-          </div>
-        </div>
-      </div>
+      <section aria-labelledby="how-to-scan" className={`${card} px-4 py-4`}>
+        <h2 id="how-to-scan" className={sectionTitle}>How to use</h2>
+        <ol className="mt-3 space-y-3">
+          {STEPS.map((step, i) => (
+            <li key={step} className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-td-tonal text-td-forest-dk dark:bg-green-900/40 dark:text-green-300 text-sm font-bold flex items-center justify-center" aria-hidden="true">
+                {i + 1}
+              </span>
+              <span className="pt-0.5 text-[15px] leading-snug text-td-ink dark:text-gray-200">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
     </div>
   );
 };
