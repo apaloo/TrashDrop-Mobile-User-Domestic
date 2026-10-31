@@ -1249,25 +1249,25 @@ const Dashboard = () => {
 
         <section aria-labelledby="impact-heading">
           <h2 id="impact-heading" className="text-[17px] font-bold text-td-ink dark:text-gray-100 mb-2.5">Your impact</h2>
-          {/* Bags and batches share one tile, each number over its own one-word label ("Bag", "Batch"); no tile is narrower than its numbers and labels, so nothing wraps, overlaps or is cut off */}
-          <div className="grid grid-cols-[minmax(max-content,2fr)_minmax(max-content,1fr)_minmax(max-content,1fr)] gap-2 min-[360px]:gap-2.5">
-            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3 py-3">
-              <div className="flex gap-x-3 min-[360px]:gap-x-5">
-                <div className="min-w-0">
+          {/* Three tiles of equal width and height. Bags and batches share the first, Batch at the right edge on phones and a fixed gap after Bag on wider screens; if both numbers are ever too wide for a narrow tile, Batch moves under Bag rather than overlapping */}
+          <div className="grid grid-cols-3 gap-2 min-[360px]:gap-2.5">
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-2.5 min-[360px]:px-3 py-3 min-w-0">
+              <div className="flex flex-wrap justify-between gap-x-2 sm:justify-start sm:gap-x-12">
+                <div>
                   <p className={`text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
                   <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">Bag</p>
                 </div>
-                <div className="min-w-0">
+                <div>
                   <p className="text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100">{stats.batches || 0}</p>
                   <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">Batch</p>
                 </div>
               </div>
             </div>
-            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3 py-3">
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-2.5 min-[360px]:px-3 py-3 min-w-0">
               <p className={`text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.pickups || 0}</p>
               <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">{(stats.pickups || 0) === 1 ? 'Pickup' : 'Pickups'}</p>
             </div>
-            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-3 py-3">
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-2.5 min-[360px]:px-3 py-3 min-w-0">
               <p className={`text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100 ${updateType === 'optimistic' ? 'animate-pulse' : ''}`}>{stats.reports || 0}</p>
               <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">{(stats.reports || 0) === 1 ? 'Report' : 'Reports'}</p>
             </div>
