@@ -9,6 +9,7 @@ import userServiceOptimized from './userServiceOptimized.js';
 import requestDeduplicator from '../utils/requestDeduplication.js';
 import supabase from '../utils/supabaseClient.js';
 import { pickupService } from './pickupService.js';
+import { reportPoints } from '../utils/reportPoints.js';
 
 class SeamlessDashboardService {
   constructor() {
@@ -137,9 +138,12 @@ class SeamlessDashboardService {
             
           case 'dumping_report':
             updatedStats.reports = (updatedStats.reports || 0) + 1;
-            const severity = actionData.severity || 'medium';
-            const points = severity === 'high' ? 20 : severity === 'low' ? 10 : 15;
-            updatedStats.points = (updatedStats.points || 0) + points;
+            // A new report earns its points once verified (utils/reportPoints)
+            updatedStats.points = (updatedStats.points || 0) + reportPoints({
+              severity: actionData.severity,
+              status: actionData.status || 'pending',
+              created_at: actionData.created_at || new Date().toISOString(),
+            });
             break;
             
           case 'digital_bin':
