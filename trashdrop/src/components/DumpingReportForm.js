@@ -8,6 +8,55 @@ import { toastService } from '../services/toastService.js';
 import { useCallback } from 'react'; // Add useCallback for toast functions
 import { notificationService } from '../services/notificationService.js';
 import CameraModal from './CameraModal.js';
+import PageHeader from './ui/PageHeader.js';
+import { card, errorNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from './ui/styles.js';
+
+// Choices on the form: [value, icon, label(, hint)]
+const WASTE_OPTIONS = [
+  ['mixed', '🗑️', 'Mixed'],
+  ['construction', '🧱', 'Construction'],
+  ['household', '🏠', 'Household'],
+  ['electronic', '📱', 'Electronic'],
+  ['organic', '🥬', 'Organic'],
+  ['recyclables', '♻️', 'Recyclables'],
+  ['hazardous', '☣️', 'Hazardous'],
+];
+const SIZE_OPTIONS = [
+  ['small', '🛍️', 'Small', 'Few bags'],
+  ['medium', '🚗', 'Medium', 'Car load'],
+  ['large', '🚚', 'Large', 'Truck load'],
+  ['massive', '🚛', 'Massive', 'Multiple trucks'],
+];
+// [label, icon, hint, tone]
+const SEVERITY_OPTIONS = [
+  ['Low', '🟢', 'Minor issue', 'green'],
+  ['Medium', '🟡', 'Needs attention', 'amber'],
+  ['High', '🔴', 'Urgent', 'red'],
+];
+
+const SELECTED_TONES = {
+  green: 'border-td-forest bg-td-tonal dark:border-green-400 dark:bg-green-900/40',
+  amber: 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-900/30',
+  red: 'border-red-600 bg-red-50 dark:border-red-400 dark:bg-red-900/30',
+};
+
+/** One choice tile: icon, label, optional hint; selected tiles get a coloured border and tint */
+const OptionTile = ({ selected, onClick, icon, label, hint, tone = 'green' }) => (
+  <button
+    type="button"
+    aria-pressed={selected}
+    onClick={onClick}
+    className={`min-w-0 rounded-2xl border-2 px-1.5 py-2.5 flex flex-col items-center text-center transition-colors ${
+      selected
+        ? SELECTED_TONES[tone]
+        : 'border-td-border bg-white hover:border-td-border-strong dark:border-gray-600 dark:bg-gray-800 dark:hover:border-gray-400'
+    }`}
+  >
+    <span className="text-2xl leading-none mb-1.5" aria-hidden="true">{icon}</span>
+    <span className={`text-[13px] leading-tight text-td-ink dark:text-gray-100 ${selected ? 'font-bold' : 'font-semibold'}`}>{label}</span>
+    {hint && <span className="text-xs leading-tight text-td-sage dark:text-gray-300 mt-0.5">{hint}</span>}
+  </button>
+);
 
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -580,616 +629,223 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     }
   };
 
+  const spinner = (cls) => (
+    <svg className={`animate-spin ${cls}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  );
+
   return (
-    <div className="min-h-screen pt-2 bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
-      {/* Fixed Header (positioned below navbar) */}
-      <div className="px-4 py-4 fixed top-16 left-0 right-0 z-40 shadow-md bg-white dark:bg-gray-800">
-        <h1 className="text-2xl font-bold text-td-ink dark:text-gray-100 text-center">
-          Report Illegal Dumping
-        </h1>
-      </div>
-      
-      <div className="px-4 py-2" style={{marginTop: '65px'}}>
+    <div className="max-w-3xl mx-auto px-2 pb-24 space-y-5">
+      <PageHeader
+        title="Report Illegal Dumping"
+        subtitle="Help keep our community clean. Your report goes to the local authorities for cleanup."
+      />
 
-        {/* Submission confirmation */}
-        {submissionSuccess && (
-          <div
-            className="bg-green-50 dark:bg-green-900 dark:bg-opacity-20 border border-green-300 dark:border-green-800 rounded-lg p-4 mb-6"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="flex items-start">
-              <div className="bg-green-600 rounded-full p-2 mr-3 mt-1 flex-shrink-0">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-green-900 dark:text-green-200">
-                  Report submitted - reference {submissionSuccess.reference}
-                </p>
-                <p className="text-sm text-green-800 dark:text-green-300 mt-1">
-                  {submissionSuccess.wasteType}, {submissionSuccess.volume}, {submissionSuccess.severity} severity,
-                  {' '}{submissionSuccess.photoCount} photo{submissionSuccess.photoCount === 1 ? '' : 's'}
-                  {submissionSuccess.hazardous ? ' · flagged hazardous' : ''}
-                  {submissionSuccess.coordinates
-                    ? ` at ${submissionSuccess.coordinates.latitude.toFixed(5)}, ${submissionSuccess.coordinates.longitude.toFixed(5)}`
-                    : ''}.
-                </p>
-                <p className="text-sm text-green-800 dark:text-green-300 mt-1">
-                  Local authorities have been notified. You can follow it up under Activity.
-                </p>
-                <div className="flex flex-wrap gap-3 mt-3">
-                  {onDone && (
-                    <button
-                      type="button"
-                      onClick={() => onDone(submissionSuccess)}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Back to Dashboard
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSubmissionSuccess(null)}
-                    className="px-4 py-2 border border-green-600 text-green-800 dark:text-green-300 rounded-lg text-sm font-medium hover:bg-green-100 dark:hover:bg-green-900 dark:hover:bg-opacity-40 transition-colors"
-                  >
-                    Report another site
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Info Box */}
-        <div className="bg-td-tonal dark:bg-blue-900 dark:bg-opacity-20 border border-td-border dark:border-blue-800 rounded-lg p-4 mb-6 flex items-start">
-          <div className="bg-green-600 rounded-full p-2 mr-3 mt-1 flex-shrink-0">
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="text-td-ink dark:text-gray-300">
-            <p className="text-sm">
-              Help keep our community clean by reporting illegal waste dumps. Your report will be sent to local authorities for cleanup. Photos can only be taken with your device's camera.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} autoComplete="off" noValidate>
-          {/* Type of Waste - Horizontal Scrollable Cards */}
-          <div className="mb-6">
-            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
-              Type of Waste <span className="text-red-500">*</span>
-            </label>
-            
-            {/* Horizontal scrollable container */}
-            <div 
-              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-              style={{
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-            >
-              {/* Mixed Waste Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'mixed'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'mixed' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'mixed'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🗑️</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'mixed' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Mixed
-                  </span>
-                </span>
-              </button>
-
-              {/* Construction Debris Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'construction'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'construction' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'construction'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🧱</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'construction' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Construction
-                  </span>
-                </span>
-              </button>
-
-              {/* Household Waste Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'household'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'household' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'household'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🏠</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'household' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Household
-                  </span>
-                </span>
-              </button>
-
-              {/* Electronic Waste Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'electronic'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'electronic' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'electronic'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">📱</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'electronic' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Electronic
-                  </span>
-                </span>
-              </button>
-
-              {/* Organic Waste Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'organic'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'organic' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'organic'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🥬</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'organic' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Organic
-                  </span>
-                </span>
-              </button>
-
-              {/* Recyclables Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'recyclables'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'recyclables' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'recyclables'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">♻️</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'recyclables' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Recyclables
-                  </span>
-                </span>
-              </button>
-
-              {/* Hazardous Materials Card */}
-              <button
-                type="button"
-                aria-pressed={formData.waste_type === 'hazardous'}
-                onClick={() => setFormData(prev => ({ ...prev, waste_type: 'hazardous' }))}
-                className={`flex-shrink-0 w-24 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.waste_type === 'hazardous'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">☣️</span>
-                  <span className={`text-xs font-medium ${
-                    formData.waste_type === 'hazardous' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Hazardous
-                  </span>
-                </span>
-              </button>
-            </div>
-            
-            <p className="text-sm text-td-sage dark:text-gray-300 mt-2">
-              Swipe to see more options
-            </p>
-          </div>
-
-          {/* Size of dumping - Horizontal Scrollable Cards */}
-          <div className="mb-6">
-            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
-              Size of the illegal dumping <span className="text-red-500">*</span>
-            </label>
-            
-            {/* Horizontal scrollable container */}
-            <div 
-              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-              style={{
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-            >
-              {/* Small Size Card */}
-              <button
-                type="button"
-                aria-pressed={formData.estimated_volume === 'small'}
-                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'small' }))}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.estimated_volume === 'small'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🛍️</span>
-                  <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'small' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Small
-                  </span>
-                  <span className={`text-xs ${
-                    formData.estimated_volume === 'small' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Few bags
-                  </span>
-                </span>
-              </button>
-
-              {/* Medium Size Card */}
-              <button
-                type="button"
-                aria-pressed={formData.estimated_volume === 'medium'}
-                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'medium' }))}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.estimated_volume === 'medium'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🚗</span>
-                  <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'medium' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Medium
-                  </span>
-                  <span className={`text-xs ${
-                    formData.estimated_volume === 'medium' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Car load
-                  </span>
-                </span>
-              </button>
-
-              {/* Large Size Card */}
-              <button
-                type="button"
-                aria-pressed={formData.estimated_volume === 'large'}
-                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'large' }))}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.estimated_volume === 'large'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🚚</span>
-                  <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'large' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Large
-                  </span>
-                  <span className={`text-xs ${
-                    formData.estimated_volume === 'large' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Truck load
-                  </span>
-                </span>
-              </button>
-
-              {/* Massive Size Card */}
-              <button
-                type="button"
-                aria-pressed={formData.estimated_volume === 'massive'}
-                onClick={() => setFormData(prev => ({ ...prev, estimated_volume: 'massive' }))}
-                className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.estimated_volume === 'massive'
-                    ? 'bg-td-tonal dark:bg-blue-900 border-2 border-td-forest shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <span className="flex flex-col items-center text-center">
-                  <span className="block text-2xl mb-1">🚛</span>
-                  <span className={`text-sm font-medium ${
-                    formData.estimated_volume === 'massive' ? 'text-td-forest dark:text-blue-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Massive
-                  </span>
-                  <span className={`text-xs ${
-                    formData.estimated_volume === 'massive' ? 'text-td-forest dark:text-blue-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Multiple trucks
-                  </span>
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Severity - three cards sharing the row */}
-          <div className="mb-6">
-            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
-              Severity <span className="text-red-500">*</span>
-            </label>
-            
-            {/* Equal-width cards */}
-            <div 
-              className="flex gap-3 pb-2"
-              style={{
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-            >
-              {/* Low Severity Card */}
-              <div
-                onClick={() => handleSeverityClick('Low')}
-                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.severity === 'low'
-                    ? 'bg-green-50 dark:bg-green-900 border-2 border-green-500 shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🟢</div>
-                  <span className={`text-sm font-medium ${
-                    formData.severity === 'low' ? 'text-green-700 dark:text-green-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Low
-                  </span>
-                  <span className={`text-xs ${
-                    formData.severity === 'low' ? 'text-green-600 dark:text-green-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Minor issue
-                  </span>
-                </div>
-              </div>
-
-              {/* Medium Severity Card */}
-              <div
-                onClick={() => handleSeverityClick('Medium')}
-                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.severity === 'medium'
-                    ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-500 shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🟡</div>
-                  <span className={`text-sm font-medium ${
-                    formData.severity === 'medium' ? 'text-yellow-700 dark:text-yellow-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    Medium
-                  </span>
-                  <span className={`text-xs ${
-                    formData.severity === 'medium' ? 'text-amber-700 dark:text-yellow-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Needs attention
-                  </span>
-                </div>
-              </div>
-
-              {/* High Severity Card */}
-              <div
-                onClick={() => handleSeverityClick('High')}
-                className={`flex-1 min-w-0 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                  formData.severity === 'high'
-                    ? 'bg-red-50 dark:bg-red-900 border-2 border-red-500 shadow-md'
-                    : 'bg-td-cream dark:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                }`}
-                style={{ scrollSnapAlign: 'start' }}
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className="text-2xl mb-1">🔴</div>
-                  <span className={`text-sm font-medium ${
-                    formData.severity === 'high' ? 'text-red-700 dark:text-red-300' : 'text-td-ink dark:text-gray-300'
-                  }`}>
-                    High
-                  </span>
-                  <span className={`text-xs ${
-                    formData.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-td-sage dark:text-gray-300'
-                  }`}>
-                    Urgent
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Location */}
-          <div className="mb-6">
-            <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
-              Location <span className="text-red-500">*</span>
-            </label>
-            <div>
-              <p className="text-sm text-td-sage dark:text-gray-300 mb-2">
-                Please click on the map to select a location or use the button below to detect your current location.
+      {/* Submission confirmation */}
+      {submissionSuccess && (
+        <section className={`${card} px-4 py-4`} role="status" aria-live="polite">
+          <div className="flex items-start gap-3">
+            <span className="w-10 h-10 rounded-xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[17px] font-bold text-td-ink dark:text-gray-100">
+                Report submitted - reference {submissionSuccess.reference}
               </p>
-            
-            {/* Map */}
-            <div className="mb-6">
-              <div className="h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative">
-                <MapContainer 
-                  center={mapPosition} 
-                  zoom={13} 
-                  style={{ height: '100%', width: '100%', display: showCamera ? 'none' : 'block' }}
-                  attributionControl={false}
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  />
-                  <MapViewController position={mapPosition} />
-                  <LocationMarker position={mapPosition} setPosition={setMapPosition} onMapClick={handleMapClick} disabled={showCamera} />
-                  {mapPosition && <Marker position={mapPosition} />}
-                </MapContainer>
-
-              </div>
-            </div>
-            
-            {/* Location coordinates */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-td-sage dark:text-gray-300" role="status" aria-live="polite">
-                {isLocating && !formData?.coordinates ? (
-                  <div className="animate-pulse">
-                    <div className="flex items-center">
-                      <svg className="animate-spin mr-2 h-4 w-4 text-td-forest" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Detecting your location...
-                    </div>
-                  </div>
-                ) : formData?.coordinates ? (
-                  <>
-                    <div>Lat: {formData.coordinates.latitude?.toFixed(6)}</div>
-                    <div>Lng: {formData.coordinates.longitude?.toFixed(6)}</div>
-                    {gpsAccuracy !== null && (
-                      <div className={gpsAccuracy <= 10 ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}>
-                        GPS ±{gpsAccuracy} m{gpsWatching ? ' · improving until you submit' : ''}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-amber-700 dark:text-amber-400">
-                    No location set yet - tap the map or use the button.
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => handleUseMyLocation(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                Use My Location
-              </button>
+              <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
+                {submissionSuccess.wasteType}, {submissionSuccess.volume}, {submissionSuccess.severity} severity,
+                {' '}{submissionSuccess.photoCount} photo{submissionSuccess.photoCount === 1 ? '' : 's'}
+                {submissionSuccess.hazardous ? ' · flagged hazardous' : ''}
+                {submissionSuccess.coordinates
+                  ? ` at ${submissionSuccess.coordinates.latitude.toFixed(5)}, ${submissionSuccess.coordinates.longitude.toFixed(5)}`
+                  : ''}.
+              </p>
+              <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
+                Local authorities have been notified. You can follow it up under Activity.
+              </p>
             </div>
           </div>
-        </div>
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2.5 mt-4">
+            {onDone && (
+              <button type="button" onClick={() => onDone(submissionSuccess)} className={primaryButton}>
+                Back to Dashboard
+              </button>
+            )}
+            <button type="button" onClick={() => setSubmissionSuccess(null)} className={secondaryButton}>
+              Report another site
+            </button>
+          </div>
+        </section>
+      )}
+
+      <form onSubmit={handleSubmit} autoComplete="off" noValidate className="space-y-5">
+        {/* What was dumped: type, size and severity */}
+        <section className={`${card} px-4 py-4 space-y-5`}>
+          <div role="group" aria-labelledby="report-waste-type">
+            <p id="report-waste-type" className={`${sectionTitle} mb-2.5`}>
+              Type of Waste <span className="text-td-error" aria-hidden="true">*</span>
+            </p>
+            <div className="grid grid-cols-3 min-[480px]:grid-cols-4 gap-2">
+              {WASTE_OPTIONS.map(([value, icon, label]) => (
+                <OptionTile
+                  key={value}
+                  selected={formData.waste_type === value}
+                  onClick={() => setFormData(prev => ({ ...prev, waste_type: value }))}
+                  icon={icon}
+                  label={label}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div role="group" aria-labelledby="report-size">
+            <p id="report-size" className={`${sectionTitle} mb-2.5`}>
+              Size of the illegal dumping <span className="text-td-error" aria-hidden="true">*</span>
+            </p>
+            <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2">
+              {SIZE_OPTIONS.map(([value, icon, label, hint]) => (
+                <OptionTile
+                  key={value}
+                  selected={formData.estimated_volume === value}
+                  onClick={() => setFormData(prev => ({ ...prev, estimated_volume: value }))}
+                  icon={icon}
+                  label={label}
+                  hint={hint}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div role="group" aria-labelledby="report-severity">
+            <p id="report-severity" className={`${sectionTitle} mb-2.5`}>
+              Severity <span className="text-td-error" aria-hidden="true">*</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {SEVERITY_OPTIONS.map(([label, icon, hint, tone]) => (
+                <OptionTile
+                  key={label}
+                  selected={formData.severity === label.toLowerCase()}
+                  onClick={() => handleSeverityClick(label)}
+                  icon={icon}
+                  label={label}
+                  hint={hint}
+                  tone={tone}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Location */}
+        <section className={`${card} px-4 py-4`} aria-labelledby="report-location">
+          <p id="report-location" className={sectionTitle}>
+            Location <span className="text-td-error" aria-hidden="true">*</span>
+          </p>
+          <p className="text-sm text-td-sage dark:text-gray-300 mt-1 mb-3">
+            Please click on the map to select a location or use the button below to detect your current location.
+          </p>
+          <div className="h-44 bg-gray-100 dark:bg-gray-700 rounded-2xl overflow-hidden relative">
+            <MapContainer
+              center={mapPosition}
+              zoom={13}
+              style={{ height: '100%', width: '100%', display: showCamera ? 'none' : 'block' }}
+              attributionControl={false}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <MapViewController position={mapPosition} />
+              <LocationMarker position={mapPosition} setPosition={setMapPosition} onMapClick={handleMapClick} disabled={showCamera} />
+              {mapPosition && <Marker position={mapPosition} />}
+            </MapContainer>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 mt-3">
+            <div className="text-sm text-td-sage dark:text-gray-300 min-w-0" role="status" aria-live="polite">
+              {isLocating && !formData?.coordinates ? (
+                <div className="flex items-center animate-pulse">
+                  {spinner('mr-2 h-4 w-4 text-td-forest')}
+                  Detecting your location...
+                </div>
+              ) : formData?.coordinates ? (
+                <>
+                  <div>Lat: {formData.coordinates.latitude?.toFixed(6)}</div>
+                  <div>Lng: {formData.coordinates.longitude?.toFixed(6)}</div>
+                  {gpsAccuracy !== null && (
+                    <div className={gpsAccuracy <= 10 ? 'text-td-forest dark:text-green-300' : 'text-amber-800 dark:text-amber-300'}>
+                      GPS ±{gpsAccuracy} m{gpsWatching ? ' · improving until you submit' : ''}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-amber-800 dark:text-amber-300">
+                  No location set yet - tap the map or use the button.
+                </div>
+              )}
+            </div>
+            <button type="button" onClick={() => handleUseMyLocation(true)} className={`${tonalButton} flex-shrink-0 h-10`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
+              Use My Location
+            </button>
+          </div>
+        </section>
 
         {/* Take Photos */}
-        <div className="mb-6">
-          <label className="block text-td-ink dark:text-gray-300 text-sm font-medium mb-2">
-            Take Photos <span className="text-red-500">*</span>
-          </label>
-          
-          {/* Photo Grid */}
+        <section className={`${card} px-4 py-4`} aria-labelledby="report-photos">
+          <p id="report-photos" className={sectionTitle}>
+            Take Photos <span className="text-td-error" aria-hidden="true">*</span>
+          </p>
+          <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
+            Add at least 1 photo (up to 6) to document the illegal dumping
+          </p>
+
           {capturedPhotos.length > 0 && (
-            <div className="mb-4">
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {capturedPhotos.map((photo) => (
+            <>
+              <p className="text-sm font-semibold text-td-forest dark:text-green-300 mt-3">
+                ✓ {capturedPhotos.length} photo(s) captured
+              </p>
+              <div className="grid grid-cols-2 min-[480px]:grid-cols-3 gap-2 mt-2">
+                {capturedPhotos.map((photo, i) => (
                   <div key={photo.id} className="relative">
-                    <img 
-                      src={photo.url} 
-                      alt="Captured evidence" 
-                      className="w-full h-32 object-cover rounded-lg"
+                    <img
+                      src={photo.url}
+                      alt={`Illegal dumping, shot ${i + 1}`}
+                      className="w-full h-32 object-cover rounded-xl"
                     />
                     <button
                       type="button"
                       onClick={() => removePhoto(photo.id)}
-                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
+                      aria-label={`Remove photo ${i + 1}`}
+                      className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full w-7 h-7 flex items-center justify-center text-base leading-none"
                     >
                       ×
                     </button>
                   </div>
                 ))}
               </div>
-            </div>
+            </>
           )}
-          
-          <div className="border-2 border-dashed border-gray-500 dark:border-gray-600 rounded-lg p-5">
-            <div className="text-center">
-              {capturedPhotos.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-sm text-green-400 mb-2">
-                    ✓ {capturedPhotos.length} photo(s) captured
-                  </p>
-                </div>
-              )}
-              
-              <div className="mb-2">
-                <svg className="w-10 h-10 mx-auto text-td-sage" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                </svg>
-              </div>
-              
-              <button
-                type="button"
-                onClick={handleTakePhoto}
-                className="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg mb-3 transition-colors"
-              >
-                Take Photo with Camera
-              </button>
-              
-              <p className="text-sm text-td-sage dark:text-gray-300">
-                Add at least 1 photo (up to 6) to document the illegal dumping
-              </p>
-              <p className="text-xs text-td-forest dark:text-green-300 mt-2">
-                Note: Photos can only be taken with your device's camera
-              </p>
-            </div>
-          </div>
-        </div>
+
+          <button type="button" onClick={handleTakePhoto} className={`${primaryButton} w-full mt-4`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+            Take Photo with Camera
+          </button>
+          <p className="text-xs text-td-sage dark:text-gray-300 mt-2 text-center">
+            Note: Photos can only be taken with your device's camera
+          </p>
+        </section>
 
         {/* Camera Modal */}
         {showCamera && (
-          <CameraModal 
+          <CameraModal
             onClose={handleCloseCamera}
             onCapture={handleCapturePhoto}
             maxPhotos={6}
@@ -1197,96 +853,86 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
           />
         )}
 
-          {/* More details (optional): description and contact consent */}
-          <div role="group" aria-labelledby="report-more-details" className="mb-6 border border-td-border dark:border-gray-700 rounded-lg p-4">
-            <p id="report-more-details" className="text-td-ink dark:text-gray-300 text-sm font-medium mb-2">More details (optional)</p>
-            <label htmlFor="report-description" className="block text-td-sage dark:text-gray-300 text-xs mb-1">
-              Description (optional)
-            </label>
-            <textarea
-              id="report-description"
-              name="description"
-              value={formData.description}
+        {/* More details (optional): description and contact consent */}
+        <div role="group" aria-labelledby="report-more-details" className={`${card} px-4 py-4`}>
+          <p id="report-more-details" className={`${sectionTitle} mb-2`}>More details (optional)</p>
+          <label htmlFor="report-description" className="block text-td-sage dark:text-gray-300 text-sm mb-1">
+            Description (optional)
+          </label>
+          <textarea
+            id="report-description"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows={2}
+            placeholder="Describe the dumped waste and any relevant details..."
+            className="w-full px-3.5 py-2.5 mb-3 bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-[15px] text-td-ink dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30 resize-none"
+          />
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="contact_consent"
+              checked={formData.contact_consent}
               onChange={handleChange}
-              rows={2}
-              placeholder="Describe the dumped waste and any relevant details..."
-              className="w-full px-3 py-2 mb-3 bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-600 rounded-lg text-td-ink dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 resize-none"
+              className="w-5 h-5 text-td-forest bg-white dark:bg-gray-700 border-td-border-strong dark:border-gray-500 rounded focus:ring-td-forest mt-0.5"
             />
-            <label className="flex items-start">
-              <input
-                type="checkbox"
-                name="contact_consent"
-                checked={formData.contact_consent}
-                onChange={handleChange}
-                className="w-4 h-4 text-td-forest bg-white dark:bg-gray-700 border-td-border-strong dark:border-gray-600 rounded focus:ring-green-600 mt-0.5 mr-3"
-              />
-              <span className="text-td-ink dark:text-gray-300 text-sm">
-                I'm willing to be contacted for more information about this report
-              </span>
-            </label>
-          </div>
+            <span className="text-td-ink dark:text-gray-200 text-[15px]">
+              I'm willing to be contacted for more information about this report
+            </span>
+          </label>
+        </div>
 
-          {/* Disclaimer */}
-          <div className="mb-6 text-td-sage dark:text-gray-300 text-sm">
-            <p className="mb-2">
-              By submitting this report, you confirm that the information provided is accurate to the best of your knowledge.
+        {/* Disclaimer */}
+        <div className="px-1 text-td-sage dark:text-gray-300 text-sm space-y-2">
+          <p>
+            By submitting this report, you confirm that the information provided is accurate to the best of your knowledge.
+          </p>
+          <p>
+            <strong className="text-td-ink dark:text-gray-100">Note:</strong> Photos can only be taken with your device's camera and cannot be selected from your gallery.
+          </p>
+        </div>
+
+        {/* Reasons the Submit button is disabled */}
+        {missingRequirements.length > 0 && (
+          <div id="report-missing-requirements" className={`${warningNote} px-4 py-3`} role="status">
+            <p className="text-sm font-semibold">
+              Add the following before you can submit:
             </p>
-            <p>
-              <strong>Note:</strong> Photos can only be taken with your device's camera and cannot be selected from your gallery.
-            </p>
-          </div>
-
-          {/* Reasons the Submit button is disabled */}
-          {missingRequirements.length > 0 && (
-            <div
-              id="report-missing-requirements"
-              className="mb-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900 dark:bg-opacity-20 border border-amber-300 dark:border-amber-800"
-              role="status"
-            >
-              <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                Add the following before you can submit:
-              </p>
-              <ul className="mt-2 list-disc list-inside space-y-1">
-                {missingRequirements.map(requirement => (
-                  <li key={requirement} className="text-sm text-amber-800 dark:text-amber-300">{requirement}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            aria-describedby={missingRequirements.length > 0 ? 'report-missing-requirements' : undefined}
-            title={missingRequirements.length > 0 ? `Still needed: ${missingRequirements.join('; ')}` : undefined}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-lg transition-colors"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Submitting...
-              </div>
-            ) : (
-              'Submit Report'
-            )}
-          </button>
-        </form>
-        
-        {error && (
-          <div className="mt-4 bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded-lg">
-            <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              {error}
-            </div>
+            <ul className="mt-2 list-disc list-inside space-y-1">
+              {missingRequirements.map(requirement => (
+                <li key={requirement} className="text-sm">{requirement}</li>
+              ))}
+            </ul>
           </div>
         )}
-      </div>
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          aria-describedby={missingRequirements.length > 0 ? 'report-missing-requirements' : undefined}
+          title={missingRequirements.length > 0 ? `Still needed: ${missingRequirements.join('; ')}` : undefined}
+          className={`${primaryButton} w-full h-[52px]`}
+        >
+          {loading ? (
+            <span className="flex items-center justify-center">
+              {spinner('-ml-1 mr-3 h-5 w-5 text-white')}
+              Submitting...
+            </span>
+          ) : (
+            'Submit Report'
+          )}
+        </button>
+      </form>
+
+      {error && (
+        <div role="alert" className={`${errorNote} px-4 py-3 flex items-center gap-2`}>
+          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {error}
+        </div>
+      )}
     </div>
   );
 };
