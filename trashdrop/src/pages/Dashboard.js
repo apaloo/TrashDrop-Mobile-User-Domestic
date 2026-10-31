@@ -1249,18 +1249,12 @@ const Dashboard = () => {
 
         <section aria-labelledby="impact-heading">
           <h2 id="impact-heading" className="text-[17px] font-bold text-td-ink dark:text-gray-100 mb-2.5">Your impact</h2>
-          {/* Three tiles of equal width and height, numbers and labels centred. Bags and batches share the first, side by side; if both numbers are ever too wide for a narrow tile, Batch moves under Bag rather than overlapping. (DashboardOptimizer sets display:block on .dashboard-card, so the flex layout sits on an inner wrapper.) */}
+          {/* Three tiles of equal width and height (QR Bags, Pickups, Reports), each number and label centred. DashboardOptimizer sets display:block on .dashboard-card, so the centring sits on an inner wrapper. */}
           <div className="grid grid-cols-3 gap-2 min-[360px]:gap-2.5">
-            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-2.5 min-[360px]:px-3 py-3 min-w-0">
-              <div className="h-full flex flex-wrap justify-around content-center gap-x-2">
-                <div className="text-center">
-                  <p className={`text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
-                  <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">Bag</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100">{stats.batches || 0}</p>
-                  <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">Batch</p>
-                </div>
+            <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-2.5 min-[360px]:px-3 py-3 min-w-0 text-center">
+              <div className="h-full flex flex-col justify-center">
+                <p className={`text-xl min-[360px]:text-2xl font-bold text-td-ink dark:text-gray-100 ${bagsPulse ? 'animate-pulse' : ''}`}>{stats.totalBags || 0}</p>
+                <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5 whitespace-nowrap">{(stats.totalBags || 0) === 1 ? 'QR Bag' : 'QR Bags'}</p>
               </div>
             </div>
             <div className="dashboard-card bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl px-2.5 min-[360px]:px-3 py-3 min-w-0 text-center">
