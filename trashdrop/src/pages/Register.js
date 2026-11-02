@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import SocialLogin from '../components/SocialLogin.js';
-import toastService from '../services/toastService.js';
+import CheckEmailModal from '../components/CheckEmailModal.js';
 
 /**
  * Register page component for new user registration
@@ -12,7 +12,7 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const Register = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, resendConfirmationEmail } = useAuth();
   const isMountedRef = useRef(true);
   
   const [formData, setFormData] = useState({
@@ -31,7 +31,8 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  // Address waiting for the user to open the confirmation link
+  const [pendingEmail, setPendingEmail] = useState('');
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -130,7 +131,6 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccessMessage('');
     
     // Form validation
     if (!validateForm()) return;
@@ -142,21 +142,16 @@ const Register = () => {
         full_name: formData.fullName,
       };
       
-      const { success, error, data } = await signUp(formData.email, formData.password, userData);
+      const { success, error, session } = await signUp(formData.email, formData.password, userData);
       
       if (success) {
-        toastService.success(
-          '🎉 Welcome to TrashDrop! Your account has been created successfully.',
-          { duration: 6000 }
-        );
-        setSuccessMessage(
-          '🎉 Account created! Check your email to verify your account.'
-        );
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            navigate('/login');
-          }
-        }, 5000);
+        if (session) {
+          // Email confirmation is off: already signed in
+          navigate('/dashboard');
+        } else {
+          // Stays up until the user moves on - they must open the email first
+          setPendingEmail(formData.email.trim());
+        }
       } else {
         // Enhanced error message handling for registration
         const getRegistrationErrorMessage = (error) => {
@@ -209,13 +204,6 @@ const Register = () => {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-            <div className="font-semibold mb-2">✅ Registration Successful!</div>
-            <div className="text-sm whitespace-pre-line">{successMessage.replace('Registration successful! ', '')}</div>
           </div>
         )}
 
@@ -420,6 +408,14 @@ const Register = () => {
         {/* Social Login */}
         <SocialLogin isSubmitting={isSubmitting} onError={setError} />
         
+        {pendingEmail && (
+          <CheckEmailModal
+            email={pendingEmail}
+            onResend={() => resendConfirmationEmail(pendingEmail)}
+            onContinue={() => navigate('/login', { state: { email: pendingEmail, awaitingConfirmation: true } })}
+          />
+        )}
+
         <div className="text-center mt-4">
           <p className="text-sm text-td-sage dark:text-gray-400">
             Already have an account?{' '}

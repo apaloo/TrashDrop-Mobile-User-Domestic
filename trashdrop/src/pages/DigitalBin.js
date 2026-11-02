@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
-import { FaQrcode, FaPlus, FaSpinner, FaSync, FaTimes, FaPlusCircle, FaCheckCircle } from 'react-icons/fa';
+import { FaSpinner, FaSync, FaTimes, FaPlus } from 'react-icons/fa';
 import toastService from '../services/toastService.js';
 import debug from '../utils/debug.js';
 // QR storage removed - using server-first approach
@@ -15,6 +15,8 @@ import WasteDetailsStep from '../components/digitalBin/WasteDetailsStep.js';
 import AdditionalInfoStep from '../components/digitalBin/AdditionalInfoStep.js';
 import ReviewStep from '../components/digitalBin/ReviewStep.js';
 import ScheduledQRTab from '../components/digitalBin/ScheduledQRTab.js';
+import PageHeader from '../components/ui/PageHeader.js';
+import { card, infoNote, primaryButton } from '../components/ui/styles.js';
 import { getBinSizeLabelShort } from '../utils/costCalculator.js';
 import { prepareDigitalBinData, transformBin } from '../services/digitalBinService.js';
 import { uploadPhotos } from '../services/photoUploadService.js';
@@ -1057,198 +1059,182 @@ function DigitalBin() {
     );
   }
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 z-[100] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 shadow-2xl rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden relative flex flex-col">
-        {/* Close button */}
-        <button
-          onClick={() => {
-            if (viewMode === 'create') {
-              setViewMode('list');
-              setCurrentStep(1);
-            } else {
-              navigate('/dashboard');
-            }
-          }}
-          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
-          aria-label={viewMode === 'create' ? 'Back to list' : 'Close modal'}
-        >
-          <FaTimes className="text-td-sage dark:text-gray-300 text-xl" />
-        </button>
-        
-        {/* Header */}
-        <div className="border-b border-td-border dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-4 flex-shrink-0 pr-16">
-          <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100 flex items-center gap-2">
-            {viewMode === 'list' ? (
-              <>
-                <FaQrcode className="text-primary" />
-                My Digital Bins
-              </>
-            ) : (
-              <>
-                <FaPlus className="text-primary" />
-                Create Digital Bin
-              </>
-            )}
-          </h2>
-        </div>
-        
-        {/* Main content - scrollable area with smooth transition */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 sm:p-6">
-            {viewMode === 'list' ? (
-              /* List View */
-              <div className="animate-fadeIn">
-                {submissionSuccess && (
-                  <div
-                    className="mb-4 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <div className="flex items-start gap-3">
-                      <FaCheckCircle className="text-green-600 dark:text-green-400 text-xl flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-green-900 dark:text-green-200">
-                          Request submitted
-                        </p>
-                        <p className="text-sm text-green-800 dark:text-green-300 mt-1">
-                          {submissionSuccess.binCount} {getBinSizeLabelShort(submissionSuccess.binSize)} bin
-                          {submissionSuccess.binCount > 1 ? 's' : ''} for {submissionSuccess.wasteType}
-                          {submissionSuccess.startDate ? `, starting ${submissionSuccess.startDate}` : ''}
-                          {submissionSuccess.preferredTime ? ` (${submissionSuccess.preferredTime})` : ''}
-                          {submissionSuccess.isUrgent ? ' · marked urgent' : ''}.
-                        </p>
-                        <p className="text-sm text-green-800 dark:text-green-300 mt-1">
-                          Your QR code is ready below - print or show it to the collector on pickup day.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSubmissionSuccess(null)}
-                        className="text-green-700 dark:text-green-300 hover:text-green-900 dark:hover:text-green-100 p-1"
-                        aria-label="Dismiss confirmation"
-                      >
-                        <FaTimes />
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <ScheduledQRTab 
-                  scheduledPickups={scheduledPickups} 
-                  onRefresh={handleRefresh}
-                  isLoading={isLoading}
-                  newlyCreatedBinId={newlyCreatedBinId}
-                  onNewBinExpanded={() => setTimeout(() => setNewlyCreatedBinId(null), 3000)}
-                />
-              </div>
-            ) : (
-              /* Create View */
-              <div className="animate-fadeIn">
-                {/* Step indicators */}
-                <div className="mb-6 flex items-center justify-between overflow-x-auto pb-2">
-                  {[1, 2, 3, 4, 5].map(step => (
-                    <div 
-                      key={step}
-                      className={`flex flex-col items-center flex-shrink-0 ${currentStep === step ? 'opacity-100' : 'opacity-60'}`}
-                      style={{ minWidth: '60px' }}
-                    >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1
-                        ${currentStep >= step ? 'bg-primary text-white' : 'bg-gray-200 text-td-sage dark:bg-gray-700 dark:text-gray-300'}`}>
-                        {step}
-                      </div>
-                      <span className="text-xs text-center hidden sm:block dark:text-gray-300">{getStepTitle(step)}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* GPS Accuracy Indicator - shows during pages 1-4 when we have coordinates */}
-                <div className={`mb-4 px-3 py-2 bg-td-tonal dark:bg-blue-900/20 rounded-lg flex items-center justify-between text-sm ${currentStep < 5 && formData.latitude && formData.longitude ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${isRefining ? 'bg-yellow-500 animate-pulse' : 'bg-green-600'}`}></span>
-                    <span className="text-td-forest dark:text-blue-300">
-                      GPS Accuracy: {formData.gps_accuracy ? `${formData.gps_accuracy.toFixed(1)}m` : 'Measuring...'}
-                    </span>
-                  </div>
-                  <span className={`text-xs ${isRefining ? 'text-td-forest dark:text-blue-400' : refinementCount > 0 ? 'text-green-600 dark:text-green-400' : 'hidden'}`}>
-                    {isRefining ? 'Refining...' : refinementCount > 0 ? `✓ Improved ${refinementCount}x` : ''}
-                  </span>
-                </div>
-                
-                {/* Form steps */}
-                <div className="bg-white dark:bg-gray-800">
-                  {currentStep === 1 && (
-                    <LocationStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      nextStep={nextStep}
-                    />
-                  )}
-                  
-                  {currentStep === 2 && (
-                    <ScheduleDetailsStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      nextStep={nextStep}
-                      prevStep={prevStep}
-                    />
-                  )}
-                  
-                  {currentStep === 3 && (
-                    <WasteDetailsStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      nextStep={nextStep}
-                      prevStep={prevStep}
-                      promoState={promoState}
-                    />
-                  )}
-                  
-                  {currentStep === 4 && (
-                    <AdditionalInfoStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      nextStep={nextStep}
-                      prevStep={prevStep}
-                    />
-                  )}
-                  {currentStep === 5 && (
-                    <ReviewStep 
-                      formData={formData}
-                      prevStep={prevStep}
-                      handleSubmit={handleSubmit}
-                      promoState={promoState}
-                    />
-                  )}
-                </div>
-                
-                {/* Link to one-time pickup */}
-                {currentStep === 5 && (
-                  <div className="text-center mt-6">
-                    <a href="/pickup-request" className="text-primary hover:underline text-sm dark:text-primary-light">
-                      Need a one-time pickup? Request here
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+  const showGps = currentStep < 5 && formData.latitude && formData.longitude;
 
-        {/* Floating Action Button - only visible in list view */}
-        {viewMode === 'list' && (
+  return (
+    <div className="max-w-3xl mx-auto px-2 pb-24">
+      {viewMode === 'list' ? (
+        /* List View */
+        <div className="animate-fadeIn space-y-4">
+          <PageHeader
+            title="My Digital Bins"
+            subtitle="Scheduled bin pickups and their QR codes. Show the code to the collector on pickup day."
+          />
+
           <button
+            type="button"
             onClick={() => {
               setSubmissionSuccess(null);
               setViewMode('create');
             }}
-            className="absolute bottom-6 right-6 bg-primary hover:bg-primary-dark text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 flex items-center gap-2 z-10"
-            aria-label="Create new digital bin"
+            className={`${primaryButton} w-full`}
           >
-            <FaPlusCircle className="text-2xl" />
-            <span className="hidden sm:inline font-medium">New Digital Bin</span>
+            <FaPlus aria-hidden="true" />
+            New Digital Bin
           </button>
-        )}
-      </div>
+
+          {submissionSuccess && (
+            <section className={`${card} px-4 py-4`} role="status" aria-live="polite">
+              <div className="flex items-start gap-3">
+                <span className="w-10 h-10 rounded-xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[17px] font-bold text-td-ink dark:text-gray-100">
+                    Request submitted
+                  </p>
+                  <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
+                    {submissionSuccess.binCount} {getBinSizeLabelShort(submissionSuccess.binSize)} bin
+                    {submissionSuccess.binCount > 1 ? 's' : ''} for {submissionSuccess.wasteType}
+                    {submissionSuccess.startDate ? `, starting ${submissionSuccess.startDate}` : ''}
+                    {submissionSuccess.preferredTime ? ` (${submissionSuccess.preferredTime})` : ''}
+                    {submissionSuccess.isUrgent ? ' · marked urgent' : ''}.
+                  </p>
+                  <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
+                    Your QR code is ready below - print or show it to the collector on pickup day.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubmissionSuccess(null)}
+                  className="w-9 h-9 -mt-1 -mr-1 rounded-full flex items-center justify-center text-td-sage dark:text-gray-300 hover:bg-td-cream dark:hover:bg-gray-700 flex-shrink-0"
+                  aria-label="Dismiss confirmation"
+                >
+                  <FaTimes aria-hidden="true" />
+                </button>
+              </div>
+            </section>
+          )}
+
+          <ScheduledQRTab 
+            scheduledPickups={scheduledPickups} 
+            onRefresh={handleRefresh}
+            isLoading={isLoading}
+            newlyCreatedBinId={newlyCreatedBinId}
+            onNewBinExpanded={() => setTimeout(() => setNewlyCreatedBinId(null), 3000)}
+          />
+        </div>
+      ) : (
+        /* Create View */
+        <div className="animate-fadeIn space-y-4">
+          <PageHeader
+            title="Create Digital Bin"
+            subtitle="Schedule pickups for your bin and get a QR code for the collector."
+          />
+
+          {/* Progress through the five steps */}
+          <div>
+            <div className="flex items-baseline justify-between mb-2">
+              <p className="text-sm font-semibold text-td-ink dark:text-gray-100">
+                Step {currentStep} of 5 <span className="text-td-sage dark:text-gray-300 font-normal">· {getStepTitle(currentStep)}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('list');
+                  setCurrentStep(1);
+                }}
+                className="text-sm font-semibold text-td-forest dark:text-green-300 hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5" role="progressbar" aria-label="Digital bin form progress" aria-valuemin={1} aria-valuemax={5} aria-valuenow={currentStep}>
+              {[1, 2, 3, 4, 5].map(step => (
+                <span
+                  key={step}
+                  className={`h-1.5 rounded-full ${currentStep >= step ? 'bg-td-forest dark:bg-green-400' : 'bg-td-border dark:bg-gray-700'}`}
+                ></span>
+              ))}
+            </div>
+          </div>
+          
+          {/* GPS Accuracy Indicator - shows during pages 1-4 when we have coordinates */}
+          {showGps && (
+            <div className={`${infoNote} px-3.5 py-2 flex items-center justify-between text-sm`}>
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full ${isRefining ? 'bg-amber-500 animate-pulse' : 'bg-td-forest dark:bg-green-400'}`} aria-hidden="true"></span>
+                <span>
+                  GPS Accuracy: {formData.gps_accuracy ? `${formData.gps_accuracy.toFixed(1)}m` : 'Measuring...'}
+                </span>
+              </div>
+              {(isRefining || refinementCount > 0) && (
+                <span className="text-xs font-semibold">
+                  {isRefining ? 'Refining...' : `✓ Improved ${refinementCount}x`}
+                </span>
+              )}
+            </div>
+          )}
+          
+          {/* Form steps */}
+          <div>
+            {currentStep === 1 && (
+              <LocationStep 
+                formData={formData}
+                updateFormData={updateFormData}
+                nextStep={nextStep}
+              />
+            )}
+            
+            {currentStep === 2 && (
+              <ScheduleDetailsStep 
+                formData={formData}
+                updateFormData={updateFormData}
+                nextStep={nextStep}
+                prevStep={prevStep}
+              />
+            )}
+            
+            {currentStep === 3 && (
+              <WasteDetailsStep 
+                formData={formData}
+                updateFormData={updateFormData}
+                nextStep={nextStep}
+                prevStep={prevStep}
+                promoState={promoState}
+              />
+            )}
+            
+            {currentStep === 4 && (
+              <AdditionalInfoStep 
+                formData={formData}
+                updateFormData={updateFormData}
+                nextStep={nextStep}
+                prevStep={prevStep}
+              />
+            )}
+            {currentStep === 5 && (
+              <div className={`${card} px-4 py-4`}>
+                <ReviewStep 
+                  formData={formData}
+                  prevStep={prevStep}
+                  handleSubmit={handleSubmit}
+                  promoState={promoState}
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Link to one-time pickup */}
+          {currentStep === 5 && (
+            <div className="text-center">
+              <a href="/pickup-request" className="text-sm font-semibold text-td-forest dark:text-green-300 hover:underline">
+                Need a one-time pickup? Request here
+              </a>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

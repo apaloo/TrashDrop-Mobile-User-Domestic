@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { FaCamera, FaTrash, FaCheckCircle } from 'react-icons/fa';
+import { FaCamera, FaTrash } from 'react-icons/fa';
 import CameraModal from '../CameraModal';
 import { toastService } from '../../services/toastService';
+import StepNav from './StepNav.js';
+import { card, fieldHint, infoNote, inputField, sectionTitle } from '../ui/styles.js';
 
 // The camera screen must stop at the same number the labels below promise
 const MAX_BIN_PHOTOS = 3;
@@ -70,16 +72,12 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-4 text-td-ink">Waste Bin Photos</h2>
-      
+    <div className="space-y-4">
       {/* Photo Capture Section */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-td-ink mb-1">
-          Photos of waste Bin (Required)
-        </label>
-        <p className="text-sm text-td-sage mb-3">
-          Take photos of your filled up waste bin for service. This helps our collectors locate and service your bin efficiently.
+      <section className={`${card} px-4 py-4`}>
+        <h2 className={sectionTitle}>Waste Bin Photos</h2>
+        <p className={`${fieldHint} mt-1 mb-3`}>
+          Required. Take photos of your filled up waste bin for service. This helps our collectors locate and service your bin efficiently.
         </p>
 
         {/* Camera Button */}
@@ -87,15 +85,21 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           type="button"
           onClick={() => setShowCamera(true)}
           disabled={photos.length >= MAX_BIN_PHOTOS}
-          className={`w-full h-32 border-2 border-dashed border-td-border-strong rounded-lg flex flex-col items-center justify-center
-            ${photos.length >= MAX_BIN_PHOTOS ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-td-cream cursor-pointer'}
-            transition-colors`}
+          className={`w-full h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-colors ${
+            photos.length >= MAX_BIN_PHOTOS
+              ? 'border-td-border bg-td-cream dark:border-gray-600 dark:bg-gray-900/40 cursor-not-allowed'
+              : 'border-td-border-strong dark:border-gray-500 hover:bg-td-cream dark:hover:bg-gray-700'
+          }`}
         >
-          <FaCamera className={`text-2xl mb-2 ${photos.length >= MAX_BIN_PHOTOS ? 'text-td-sage' : 'text-primary'}`} />
-          <span className="text-sm font-medium text-td-ink">
+          <span className={`w-11 h-11 rounded-xl flex items-center justify-center mb-2 ${
+            photos.length >= MAX_BIN_PHOTOS ? 'bg-gray-100 text-td-sage dark:bg-gray-700 dark:text-gray-400' : 'bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300'
+          }`} aria-hidden="true">
+            <FaCamera className="text-lg" />
+          </span>
+          <span className="text-[15px] font-semibold text-td-ink dark:text-gray-100">
             {photos.length === 0 ? 'Take Photos' : 'Add More Photos'}
           </span>
-          <span className="text-xs text-td-sage mt-1">
+          <span className="text-xs text-td-sage dark:text-gray-300 mt-0.5">
             {photos.length}/{MAX_BIN_PHOTOS} photos taken
           </span>
         </button>
@@ -113,40 +117,38 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         {/* Photo Previews */}
         {photos.length > 0 && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-td-ink mb-2">
+            <h3 className="text-sm font-semibold text-td-ink dark:text-gray-100 mb-2">
               Your Photos ({photos.length}/{MAX_BIN_PHOTOS})
-            </h4>
-            <div className="grid grid-cols-3 gap-2">
+            </h3>
+            <div className="grid grid-cols-3 gap-2.5">
               {photos.map((photo, index) => (
-                <div key={index} className="relative group">
-                  <div className="w-full aspect-square bg-gray-100 rounded-lg border border-td-border overflow-hidden">
+                <div key={index} className="relative">
+                  <div className="w-full aspect-square bg-td-cream dark:bg-gray-900 rounded-xl border border-td-border dark:border-gray-700 overflow-hidden">
                     <img 
                       src={photo} 
                       alt={`Waste Bin ${index + 1}`}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                   <button
+                    type="button"
                     onClick={() => removePhoto(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                    aria-label="Remove photo"
+                    className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-700 hover:bg-red-800 text-white flex items-center justify-center shadow"
+                    aria-label={`Remove photo ${index + 1}`}
                   >
-                    <FaTrash className="text-xs" />
+                    <FaTrash className="text-xs" aria-hidden="true" />
                   </button>
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-colors">
-                    <FaCheckCircle className="text-white opacity-0 group-hover:opacity-100" />
-                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {/* Additional Notes */}
-      <div className="mb-5">
-        <label htmlFor="notes" className="block text-sm font-medium text-td-ink mb-1">
-          Additional Notes (Optional)
+      <section className={`${card} px-4 py-4`}>
+        <label htmlFor="notes" className={`${sectionTitle} block mb-1.5`}>
+          Additional Notes <span className="font-normal text-[15px] text-td-sage dark:text-gray-300">(Optional)</span>
         </label>
         <textarea
           id="notes"
@@ -154,46 +156,29 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
           onChange={handleNotesChange}
           placeholder="Any special instructions for servicing your waste bin?"
           rows={3}
-          className="w-full p-3 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-td-ink font-medium"
-          style={{color: '#333'}}
+          className={`${inputField} resize-none`}
         />
-        <p className="text-sm text-td-sage mt-1">
+        <p className={`${fieldHint} mt-1.5`}>
           Add any special instructions or notes for the service provider
         </p>
-      </div>
+      </section>
       
       {/* Service Information */}
-      <div className="mb-5 bg-td-cream p-4 rounded-md">
-        <h3 className="text-lg font-semibold mb-3 text-td-ink">Service Details</h3>
-        <p className="text-sm text-td-ink font-medium mb-2">
-          Service fee will be calculated based on waste type, size, and number of bins
-        </p>
-        <p className="text-sm text-td-ink font-medium">
+      <div className={`${infoNote} px-4 py-3.5 text-sm`}>
+        <p className="font-semibold text-[15px] mb-1">Service Details</p>
+        <p>Service fee will be calculated based on waste type, size, and number of bins</p>
+        <p className="mt-1">
           Based on your selected frequency: {FREQUENCY_LABELS[formData.frequency] || formData.frequency}
         </p>
       </div>
       
-      <div className="flex justify-between mt-6">
-        <button
-          type="button"
-          onClick={prevStep}
-          className="px-6 py-2 border border-td-border-strong text-td-ink rounded-md hover:bg-td-cream transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={photos.length === 0}
-          className={`px-6 py-2 rounded-md transition-colors ${
-            photos.length === 0
-              ? 'bg-gray-300 text-td-sage cursor-not-allowed'
-              : 'bg-primary hover:bg-primary-dark text-white'
-          }`}
-        >
-          Continue
-        </button>
-      </div>
+      <StepNav
+        onBack={prevStep}
+        onNext={handleNext}
+        disabled={photos.length === 0}
+        missingText="Take at least one photo to continue."
+        missingId="photos-step-missing"
+      />
     </div>
   );
 };

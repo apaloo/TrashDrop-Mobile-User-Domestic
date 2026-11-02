@@ -96,6 +96,73 @@ const VOLUME_LABELS = {
   massive: 'Massive'
 };
 
+// Seconds the confirmation stays up before returning to the dashboard
+export const CONFIRMATION_SECONDS = 10;
+
+/** "Report submitted" popup; returns to the dashboard after CONFIRMATION_SECONDS unless a button is pressed */
+export const SubmissionModal = ({ summary, onDone, onReportAnother }) => {
+  const [secondsLeft, setSecondsLeft] = useState(CONFIRMATION_SECONDS);
+  const closeRef = useRef(onDone || onReportAnother);
+  closeRef.current = onDone ? () => onDone(summary) : onReportAnother;
+
+  useEffect(() => {
+    const tick = setInterval(() => setSecondsLeft(s => Math.max(s - 1, 0)), 1000);
+    const close = setTimeout(() => closeRef.current(), CONFIRMATION_SECONDS * 1000);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(close);
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[99999] overflow-y-auto">
+      <div className="fixed inset-0 bg-black/50" aria-hidden="true"></div>
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-submitted-title"
+          aria-describedby="report-submitted-text"
+          className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-sm w-full px-6 pt-7 pb-6 text-center"
+        >
+          <div className="mx-auto flex items-center justify-center h-14 w-14 rounded-2xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 mb-4" aria-hidden="true">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          </div>
+          <h2 id="report-submitted-title" className="text-[20px] font-bold text-td-ink dark:text-gray-100">
+            Report submitted - reference {summary.reference}
+          </h2>
+          <div id="report-submitted-text">
+            <p className="text-sm text-td-sage dark:text-gray-300 mt-2">
+              {summary.wasteType}, {summary.volume}, {summary.severity} severity,
+              {' '}{summary.photoCount} photo{summary.photoCount === 1 ? '' : 's'}
+              {summary.hazardous ? ' · flagged hazardous' : ''}
+              {summary.coordinates
+                ? ` at ${summary.coordinates.latitude.toFixed(5)}, ${summary.coordinates.longitude.toFixed(5)}`
+                : ''}.
+            </p>
+            <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
+              Local authorities have been notified. You can follow it up under Activity.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2.5 mt-5">
+            {onDone && (
+              <button type="button" autoFocus onClick={() => onDone(summary)} className={primaryButton}>
+                Back to Dashboard
+              </button>
+            )}
+            <button type="button" autoFocus={!onDone} onClick={onReportAnother} className={secondaryButton}>
+              Report another site
+            </button>
+          </div>
+          <p className="text-xs text-td-sage dark:text-gray-400 mt-3" aria-live="off">
+            {onDone ? 'Returning to Dashboard' : 'Closing'} in {secondsLeft}s
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DumpingReportForm = ({ onSuccess, onDone }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -131,10 +198,6 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   // Memoized toast notification functions to prevent render-time calls
   const showErrorToast = useCallback((message) => {
     setTimeout(() => toastService.error(message), 0);
-  }, []);
-  
-  const showSuccessToast = useCallback((message) => {
-    setTimeout(() => toastService.success(message), 0);
   }, []);
   
   const showWarningToast = useCallback((message) => {
@@ -588,14 +651,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       // Locate afresh for a next report
       handleUseMyLocation(false);
 
-      // Confirm on screen - a toast alone disappears before it is read
+      // Confirm in a popup - a toast alone disappears before it is read
       setSubmissionSuccess(confirmation);
-      showSuccessToast('Report submitted successfully');
-      try {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch (scrollError) {
-        // Non-fatal - some environments do not implement smooth scrolling
-      }
 
       // Call success callback
       if (onSuccess) {
@@ -623,41 +680,13 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         subtitle="Help keep our community clean. Your report goes to the local authorities for cleanup."
       />
 
-      {/* Submission confirmation */}
+      {/* Submission confirmation: a popup that returns to the dashboard on its own */}
       {submissionSuccess && (
-        <section className={`${card} px-4 py-4`} role="status" aria-live="polite">
-          <div className="flex items-start gap-3">
-            <span className="w-10 h-10 rounded-xl bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[17px] font-bold text-td-ink dark:text-gray-100">
-                Report submitted - reference {submissionSuccess.reference}
-              </p>
-              <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
-                {submissionSuccess.wasteType}, {submissionSuccess.volume}, {submissionSuccess.severity} severity,
-                {' '}{submissionSuccess.photoCount} photo{submissionSuccess.photoCount === 1 ? '' : 's'}
-                {submissionSuccess.hazardous ? ' · flagged hazardous' : ''}
-                {submissionSuccess.coordinates
-                  ? ` at ${submissionSuccess.coordinates.latitude.toFixed(5)}, ${submissionSuccess.coordinates.longitude.toFixed(5)}`
-                  : ''}.
-              </p>
-              <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
-                Local authorities have been notified. You can follow it up under Activity.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2.5 mt-4">
-            {onDone && (
-              <button type="button" onClick={() => onDone(submissionSuccess)} className={primaryButton}>
-                Back to Dashboard
-              </button>
-            )}
-            <button type="button" onClick={() => setSubmissionSuccess(null)} className={secondaryButton}>
-              Report another site
-            </button>
-          </div>
-        </section>
+        <SubmissionModal
+          summary={submissionSuccess}
+          onDone={onDone}
+          onReportAnother={() => setSubmissionSuccess(null)}
+        />
       )}
 
       <form onSubmit={handleSubmit} autoComplete="off" noValidate className="space-y-5">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import SocialLogin from '../components/SocialLogin.js';
@@ -10,17 +10,20 @@ import { rememberedSignIn } from '../utils/rememberMe.js';
  */
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, isLoading, resendConfirmationEmail } = useAuth();
+  // Arriving from sign-up: the new account's email still needs confirming
+  const fromSignUp = location.state?.awaitingConfirmation ? location.state.email : '';
   
   // Ticked by default; the email from the last "Remember me" sign-in is filled in
   const [remembered] = useState(rememberedSignIn);
   const [formData, setFormData] = useState({
-    email: remembered.email,
+    email: fromSignUp || remembered.email,
     password: '',
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showResendButton, setShowResendButton] = useState(false);
+  const [showResendButton, setShowResendButton] = useState(Boolean(fromSignUp));
   const [resendMessage, setResendMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(remembered.remember);
@@ -61,14 +64,19 @@ const Login = () => {
       } else {
         console.error('[Login] Sign in failed:', result?.error);
         // Enhanced error message handling
+        const isUnconfirmed = (error) => {
+          const errorMessage = error?.originalMessage || error?.message || '';
+          return error?.code === 'email_not_confirmed' ||
+            errorMessage.includes('email_not_confirmed') || errorMessage.includes('Email not confirmed');
+        };
         const getErrorMessage = (error) => {
           const errorMessage = error?.originalMessage || error?.message || '';
           
+          if (isUnconfirmed(error)) {
+            return `Your email address isn't confirmed yet. Open the link we sent to ${formData.email} to finish signing up, then sign in.`;
+          }
           if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('invalid')) {
             return 'Incorrect email or password. Please check your credentials and try again.';
-          }
-          if (errorMessage.includes('email_not_confirmed') || errorMessage.includes('Email not confirmed')) {
-            return 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
           }
           if (errorMessage.includes('User not found')) {
             return 'No account found with this email address. Would you like to create an account?';
@@ -86,8 +94,7 @@ const Login = () => {
         setError(getErrorMessage(result?.error));
         
         // Show resend button if email is not confirmed
-        const errorMessage = result?.error?.originalMessage || result?.error?.message || '';
-        if (errorMessage.includes('email_not_confirmed') || errorMessage.includes('Email not confirmed')) {
+        if (isUnconfirmed(result?.error)) {
           setShowResendButton(true);
         }
       }
@@ -138,10 +145,16 @@ const Login = () => {
           </div>
         )}
 
+        {fromSignUp && !error && (
+          <div className="bg-td-tonal px-4 py-3 rounded-2xl text-sm text-td-forest-dk" role="status">
+            Confirm your email first: open the link we sent to <span className="font-semibold break-all">{fromSignUp}</span>, then sign in here.
+          </div>
+        )}
+
         {showResendButton && (
-          <div className="bg-td-tonal border border-blue-400 px-4 py-3 rounded">
-            <p className="text-sm text-td-forest mb-2">
-              Haven't received the verification email?
+          <div className="bg-td-tonal border border-td-border px-4 py-3 rounded-2xl">
+            <p className="text-sm text-td-forest-dk mb-2">
+              Haven't received the confirmation email? Check your spam folder, or get a new link.
             </p>
             <button
               type="button"
