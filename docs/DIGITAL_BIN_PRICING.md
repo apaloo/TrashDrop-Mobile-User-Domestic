@@ -73,6 +73,10 @@ cancelled when its status is cancelled, or it is inactive and not completed
 | Health check (read-only) | household app | `trashdrop/supabase/diagnostics/digital_bin_pricing_check.sql` |
 | Price shown before booking | household app | `trashdrop/src/services/digitalBinService.js`, `trashdrop/src/components/digitalBin/ReviewStep.js`, `trashdrop/src/utils/costCalculator.js`, `trashdrop/src/services/gpsPricingService.js` |
 | WhatsApp quote | household app | `trashdrop/netlify/functions/utils/pricing.js` |
+
+Approved 2026-11-02: the Review & Submit step (`ReviewStep.js`) was restyled in
+the app's dashboard look. Only its layout and colours changed; the prices it
+shows, how they are fetched, the promotional rules and submission are as before.
 | Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js`, `src/services/earningsService.js` (Earnings page), `supabase/migrations/20261109_promo_cash_subsidy_withdrawable.sql` (cash-outs) |
 | Admin checks | admin site | `src/utils/pickupRequestUtils.js` (`feeBreakdown`), `supabase/migrations/20261107_fee_mismatch_pricing.sql` (alert rule 9) |
 

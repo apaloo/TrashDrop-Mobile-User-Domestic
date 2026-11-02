@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getCostBreakdownWithGPS, formatCurrency, getBinSizeLabelShort } from '../../utils/costCalculator';
 import { getPromotionalFee } from '../../services/promotionalService.js';
+import { card, infoNote, primaryButton, secondaryButton, sectionTitle, warningNote } from '../ui/styles.js';
+
+// Look only: a summary row and the cost line items
+const label = 'text-sm text-td-sage dark:text-gray-300';
+const value = 'text-[15px] font-semibold text-td-ink dark:text-gray-100';
+const lineLabel = 'text-sm text-td-ink dark:text-gray-200';
+const lineAmount = 'text-sm font-semibold text-td-ink dark:text-gray-100 tabular-nums';
 
 const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,147 +159,148 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
   };
   
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Review & Submit</h2>
-      
-      <div className="bg-gray-50 p-4 rounded-md mb-6">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900">Digital Bin Location</h3>
-        <p className="text-gray-900 font-medium">
+    <div className="space-y-4">
+      <section className={`${card} px-4 py-4`}>
+        <h2 className={sectionTitle}>Review & Submit</h2>
+        <p className={`${label} mt-1`}>Check the details below, then request your pickup.</p>
+      </section>
+
+      <section className={`${card} px-4 py-4`}>
+        <h3 className={`${sectionTitle} mb-2`}>Digital Bin Location</h3>
+        <p className={value}>
           {formData.address || 'Custom location'}
         </p>
-        <div className="text-sm text-gray-700 font-medium mt-1">
+        <div className={`${label} mt-1`}>
           Coordinates: {formData.latitude?.toFixed(6)}, {formData.longitude?.toFixed(6)}
         </div>
-      </div>
+      </section>
       
-      <div className="bg-gray-50 p-4 rounded-md mb-6">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900">Service Schedule</h3>
-        <div className="grid grid-cols-2 gap-2">
+      <section className={`${card} px-4 py-4`}>
+        <h3 className={`${sectionTitle} mb-3`}>Service Schedule</h3>
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <span className="text-sm text-gray-700 font-medium">Frequency:</span>
-            <p className="text-gray-900 font-medium">{formatFrequency(formData.frequency)}</p>
+            <span className={label}>Frequency:</span>
+            <p className={value}>{formatFrequency(formData.frequency)}</p>
           </div>
           <div>
-            <span className="text-sm text-gray-700 font-medium">Start Date:</span>
-            <p className="text-gray-900 font-medium">{formData.startDate}</p>
+            <span className={label}>Start Date:</span>
+            <p className={value}>{formData.startDate}</p>
           </div>
           {!formData.is_urgent && (
             <div>
-              <span className="text-sm text-gray-700 font-medium">Preferred Time:</span>
-              <p className="text-gray-900 font-medium">{formatPreferredTime(formData.preferredTime)}</p>
+              <span className={label}>Preferred Time:</span>
+              <p className={value}>{formatPreferredTime(formData.preferredTime)}</p>
             </div>
           )}
         </div>
-      </div>
+      </section>
       
-      <div className="bg-gray-50 p-4 rounded-md mb-6">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900">Waste Details</h3>
-        <div className="grid grid-cols-2 gap-2">
+      <section className={`${card} px-4 py-4`}>
+        <h3 className={`${sectionTitle} mb-3`}>Waste Details</h3>
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <span className="text-sm text-gray-700 font-medium">Number of Bins:</span>
-            <p className="text-gray-900 font-medium">{formData.numberOfBags} Bin{formData.numberOfBags > 1 ? 's' : ''}</p>
+            <span className={label}>Number of Bins:</span>
+            <p className={value}>{formData.numberOfBags} Bin{formData.numberOfBags > 1 ? 's' : ''}</p>
           </div>
           <div>
-            <span className="text-sm text-gray-700 font-medium">Bin Size:</span>
-            <p className="text-gray-900 font-medium">{getBinSizeLabelShort(formData.bin_size_liters)}</p>
+            <span className={label}>Bin Size:</span>
+            <p className={value}>{getBinSizeLabelShort(formData.bin_size_liters)}</p>
           </div>
           <div>
-            <span className="text-sm text-gray-700 font-medium">Waste Type:</span>
-            <p className="text-gray-900 font-medium">{formatWasteType(formData.wasteType)}</p>
+            <span className={label}>Waste Type:</span>
+            <p className={value}>{formatWasteType(formData.wasteType)}</p>
           </div>
           {formData.is_urgent && (
-            <div className="col-span-2 mt-2">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+            <div className="col-span-2 mt-1">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-50 text-amber-900 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800">
                 ⚡ Urgent Priority
               </span>
             </div>
           )}
         </div>
-      </div>
+      </section>
       
       {formData.notes && (
-        <div className="bg-gray-50 p-4 rounded-md mb-6">
-          <h3 className="text-lg font-semibold mb-3 text-gray-900">Additional Notes</h3>
-          <p className="text-gray-900 font-medium whitespace-pre-wrap">{formData.notes}</p>
-        </div>
+        <section className={`${card} px-4 py-4`}>
+          <h3 className={`${sectionTitle} mb-2`}>Additional Notes</h3>
+          <p className="text-[15px] text-td-ink dark:text-gray-100 whitespace-pre-wrap">{formData.notes}</p>
+        </section>
       )}
       
       {formData.photos && formData.photos.length > 0 && (
-        <div className="bg-gray-50 p-4 rounded-md mb-6">
-          <h3 className="text-lg font-semibold mb-3 text-gray-900">Digital Bin Area Photos</h3>
-          <div className="grid grid-cols-3 gap-2">
+        <section className={`${card} px-4 py-4`}>
+          <h3 className={`${sectionTitle} mb-3`}>Digital Bin Area Photos</h3>
+          <div className="grid grid-cols-3 gap-2.5">
             {formData.photos.map((photo, index) => (
               <div key={index} className="relative aspect-square">
                 <img 
                   src={photo} 
                   alt={`Digital Bin Area ${index + 1}`}
-                  className="w-full h-full object-cover rounded-lg border border-gray-200"
+                  className="w-full h-full object-cover rounded-xl border border-td-border dark:border-gray-700"
                 />
               </div>
             ))}
           </div>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className={`${label} mt-2`}>
             {formData.photos.length} photo{formData.photos.length > 1 ? 's' : ''} attached
           </p>
-        </div>
+        </section>
       )}
-      
 
-
-      <div className="bg-blue-50 p-4 rounded-md mb-6 border border-blue-200">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900">
+      <section className={`${card} px-4 py-4`}>
+        <h3 className={`${sectionTitle} mb-3`}>
           {isPromotional && promoFee?.clientFee != null ? 'Promotional Price' : 'Estimated Cost'}
         </h3>
         
         {pricingError && !isLoadingPrice ? (
-          <div className="bg-amber-50 border border-amber-300 rounded-md p-3 mb-3" role="alert">
-            <p className="text-sm font-medium text-amber-900">{pricingError.message}</p>
+          <div className={`${warningNote} px-3.5 py-3 mb-3`} role="alert">
+            <p className="text-sm font-semibold">{pricingError.message}</p>
             {pricingError.reason === 'not_covered' && (
-              <p className="mt-1 text-sm text-amber-800">Go back to Step 1 to check your bin's location.</p>
+              <p className="mt-1 text-sm">Go back to Step 1 to check your bin's location.</p>
             )}
             {pricingError.reason === 'size_unpriced' && (
-              <p className="mt-1 text-sm text-amber-800">Go back to Step 3 to choose a different bin size.</p>
+              <p className="mt-1 text-sm">Go back to Step 3 to choose a different bin size.</p>
             )}
             {pricingError.reason === 'lookup_failed' && (
               <button
                 type="button"
                 onClick={() => setPricingAttempt(attempt => attempt + 1)}
-                className="mt-2 text-sm font-medium text-amber-900 underline"
+                className="mt-2 text-sm font-semibold underline"
               >
                 Try again
               </button>
             )}
           </div>
         ) : isLoadingPrice || (!costBreakdown && !isPromotional) ? (
-          <div className="bg-white p-3 rounded-md mb-3 flex items-center justify-center py-8">
-            <span className="inline-block animate-spin mr-2 text-2xl">⟳</span>
-            <span className="text-gray-600">Calculating price...</span>
+          <div className="rounded-xl bg-td-cream dark:bg-gray-900/40 mb-3 flex items-center justify-center py-8">
+            <span className="inline-block animate-spin mr-2 text-2xl text-td-forest dark:text-green-300" aria-hidden="true">⟳</span>
+            <span className={label}>Calculating price...</span>
           </div>
         ) : isPromotional && promoFee?.clientFee != null ? (
           /* ---- Promotional flat-fee display ---- */
           <>
-            <div className="bg-purple-50 border border-purple-200 rounded-md p-2 mb-3 text-sm">
-              <span className="text-purple-800 font-medium">🎁 Promotional pricing applied (request {promoState.usedCount + 1} of {promoState.maxRequests})</span>
+            <div className={`${infoNote} px-3 py-2 mb-3 text-sm font-semibold`}>
+              <span>🎁 Promotional pricing applied (request {promoState.usedCount + 1} of {promoState.maxRequests})</span>
             </div>
-            <div className="bg-white p-3 rounded-md mb-3 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-700 font-medium">
+            <div className="rounded-xl bg-td-cream dark:bg-gray-900/40 px-3.5 py-3 mb-3 space-y-2">
+              <div className="flex justify-between items-center gap-3">
+                <span className={lineLabel}>
                   {getBinSizeLabelShort(formData.bin_size_liters)} — Promotional Rate × {bagCount}
                 </span>
-                <span className="text-sm text-purple-700 font-semibold">
+                <span className={lineAmount}>
                   {formatCurrency(promoTotal)}
                 </span>
               </div>
               {costBreakdown && (
-                <div className="flex justify-between items-center text-xs text-gray-400">
+                <div className={`flex justify-between items-center ${label}`}>
                   <span>Standard price</span>
-                  <span className="line-through">{formatCurrency(costBreakdown.total)}</span>
+                  <span className="line-through tabular-nums">{formatCurrency(costBreakdown.total)}</span>
                 </div>
               )}
             </div>
-            <div className="flex justify-between items-center pt-3 border-t-2 border-purple-300">
-              <span className="text-lg font-semibold text-gray-900">TOTAL</span>
-              <span className="text-3xl font-bold text-purple-700">
+            <div className="flex justify-between items-baseline pt-3 border-t border-td-border dark:border-gray-700">
+              <span className="text-[15px] font-bold text-td-ink dark:text-gray-100">TOTAL</span>
+              <span className="text-[28px] leading-none font-bold text-td-forest dark:text-green-300 tabular-nums">
                 {formatCurrency(promoTotal)}
               </span>
             </div>
@@ -301,40 +309,40 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
           /* ---- Standard SOP pricing display ---- */
           <>
             {promoState?.isEligible && formData.is_urgent && (
-              <div className="bg-purple-50 border border-purple-200 rounded-md p-2 mb-3 text-sm text-purple-800">
+              <div className={`${infoNote} px-3 py-2 mb-3 text-sm`}>
                 🎁 Promotional pricing doesn't apply to urgent pickups. Untick urgent to use one of your promotional pickups.
               </div>
             )}
             {!costBreakdown && (
-              <div className="text-center py-4 text-gray-500 text-sm">Calculating price...</div>
+              <div className={`text-center py-4 ${label}`}>Calculating price...</div>
             )}
             {/* GPS Pricing indicator */}
             {costBreakdown?.pricing_source === 'gps' && costBreakdown?.pricing_zone && (
-              <div className="bg-green-100 border border-green-300 rounded-md p-2 mb-3 text-sm">
-                <span className="text-green-800 font-medium">📍 Location-based pricing for {costBreakdown.pricing_zone.suburb || costBreakdown.pricing_zone.community}</span>
+              <div className={`${infoNote} px-3 py-2 mb-3 text-sm font-semibold`}>
+                <span>📍 Location-based pricing for {costBreakdown.pricing_zone.suburb || costBreakdown.pricing_zone.community}</span>
               </div>
             )}
             
             {costBreakdown && (
               <>
                 {/* Line items breakdown */}
-                <div className="bg-white p-3 rounded-md mb-3 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700 font-medium">
+                <div className="rounded-xl bg-td-cream dark:bg-gray-900/40 px-3.5 py-3 mb-3 space-y-2">
+                  <div className="flex justify-between items-center gap-3">
+                    <span className={lineLabel}>
                       Base ({getBinSizeLabelShort(formData.bin_size_liters)} × {formData.numberOfBags})
                     </span>
-                    <span className="text-sm text-gray-900 font-semibold">
+                    <span className={lineAmount}>
                       {formatCurrency(costBreakdown.base)}
                     </span>
                   </div>
                   
                   {/* Conditional: Show urgent charge only if applicable */}
                   {costBreakdown.display?.urgent_charge && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700 font-medium">
+                    <div className="flex justify-between items-center gap-3">
+                      <span className={lineLabel}>
                         Urgent surcharge (30%)
                       </span>
-                      <span className="text-sm text-yellow-700 font-semibold">
+                      <span className={lineAmount}>
                         {formatCurrency(costBreakdown.urgent_charge)}
                       </span>
                     </div>
@@ -342,11 +350,11 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
                   
                   {/* Conditional: Show distance charge only if applicable */}
                   {costBreakdown.display?.distance_charge && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700 font-medium">
+                    <div className="flex justify-between items-center gap-3">
+                      <span className={lineLabel}>
                         Distance ({costBreakdown.billable_km.toFixed(1)} km)
                       </span>
-                      <span className="text-sm text-gray-900 font-semibold">
+                      <span className={lineAmount}>
                         {formatCurrency(costBreakdown.distance_charge)}
                       </span>
                     </div>
@@ -354,11 +362,11 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
                   
                   {/* Conditional: Show on-site charges only if applicable */}
                   {costBreakdown.display?.on_site_charges && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700 font-medium">
+                    <div className="flex justify-between items-center gap-3">
+                      <span className={lineLabel}>
                         On-site charges
                       </span>
-                      <span className="text-sm text-gray-900 font-semibold">
+                      <span className={lineAmount}>
                         {formatCurrency(costBreakdown.on_site_charges)}
                       </span>
                     </div>
@@ -366,31 +374,31 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
                   
                   {/* Conditional: Show discount only if applicable */}
                   {costBreakdown.display?.discount && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700 font-medium">
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-sm text-td-forest dark:text-green-300">
                         Discount
                       </span>
-                      <span className="text-sm text-green-700 font-semibold">
+                      <span className="text-sm font-semibold text-td-forest dark:text-green-300 tabular-nums">
                         -{formatCurrency(costBreakdown.discount_applied)}
                       </span>
                     </div>
                   )}
                   
                   {/* Always show request fee */}
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                    <span className="text-sm text-gray-700 font-medium">
+                  <div className="flex justify-between items-center gap-3 pt-2 border-t border-td-border dark:border-gray-700">
+                    <span className={lineLabel}>
                       Request fee
                     </span>
-                    <span className="text-sm text-gray-900 font-semibold">
+                    <span className={lineAmount}>
                       {formatCurrency(costBreakdown.request_fee)}
                     </span>
                   </div>
                 </div>
                 
                 {/* Total */}
-                <div className="flex justify-between items-center pt-3 border-t-2 border-blue-300">
-                  <span className="text-lg font-semibold text-gray-900">TOTAL</span>
-                  <span className="text-3xl font-bold text-primary">
+                <div className="flex justify-between items-baseline pt-3 border-t border-td-border dark:border-gray-700">
+                  <span className="text-[15px] font-bold text-td-ink dark:text-gray-100">TOTAL</span>
+                  <span className="text-[28px] leading-none font-bold text-td-forest dark:text-green-300 tabular-nums">
                     {formatCurrency(costBreakdown.total)}
                   </span>
                 </div>
@@ -399,36 +407,36 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
           </>
         )}
         
-        <p className="text-xs text-gray-600 mt-3 italic">
+        <p className={`${label} text-xs mt-3`}>
           {isPromotional && promoFee?.clientFee != null
             ? '🎁 Promotional flat rate — no additional charges.'
             : '⚠️ Estimate only. Final price calculated at confirmation.'}
         </p>
-      </div>
+      </section>
       
       {missingRequirements.length > 0 && (
         <div
           id="review-missing-requirements"
-          className="mt-6 p-4 rounded-md bg-amber-50 border border-amber-300"
+          className={`${warningNote} px-4 py-3.5`}
           role="status"
         >
-          <p className="text-sm font-semibold text-amber-900">
+          <p className="text-sm font-semibold">
             Add the following before you can submit:
           </p>
           <ul className="mt-2 list-disc list-inside space-y-1">
             {missingRequirements.map(requirement => (
-              <li key={requirement} className="text-sm text-amber-800">{requirement}</li>
+              <li key={requirement} className="text-sm">{requirement}</li>
             ))}
           </ul>
         </div>
       )}
 
-      <div className="flex justify-between mt-6">
+      <div className="grid grid-cols-2 gap-2.5 pt-1">
         <button
           type="button"
           onClick={prevStep}
           disabled={isSubmitting}
-          className="px-6 py-2 border border-gray-300 text-gray-900 font-medium rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={secondaryButton}
         >
           Back
         </button>
@@ -438,11 +446,11 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
           disabled={!canSubmit}
           aria-describedby={missingRequirements.length > 0 ? 'review-missing-requirements' : undefined}
           title={missingRequirements.length > 0 ? `Still needed: ${missingRequirements.join('; ')}` : undefined}
-          className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={primaryButton}
         >
           {isSubmitting ? (
             <>
-              <span className="inline-block animate-spin mr-2">⟳</span>
+              <span className="inline-block animate-spin" aria-hidden="true">⟳</span>
               Processing...
             </>
           ) : (

@@ -1214,14 +1214,12 @@ function DigitalBin() {
               />
             )}
             {currentStep === 5 && (
-              <div className={`${card} px-4 py-4`}>
-                <ReviewStep 
-                  formData={formData}
-                  prevStep={prevStep}
-                  handleSubmit={handleSubmit}
-                  promoState={promoState}
-                />
-              </div>
+              <ReviewStep 
+                formData={formData}
+                prevStep={prevStep}
+                handleSubmit={handleSubmit}
+                promoState={promoState}
+              />
             )}
           </div>
           
