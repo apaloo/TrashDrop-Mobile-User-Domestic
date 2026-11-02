@@ -700,7 +700,7 @@ const Activity = () => {
       <PageHeader title="Activity History" subtitle="Every pickup, report, scan and redemption, newest first." />
 
       {/* Filters - stay in view while scrolling */}
-      <div className="sticky top-16 md:top-14 z-10 -mx-2 px-2 py-3 bg-white dark:bg-gray-900">
+      <div className="sticky top-16 z-10 -mx-2 px-2 py-3 bg-white dark:bg-gray-900">
         <div className="flex items-center gap-2" role="group" aria-label="Show">
           <div className="flex-1 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
             {FILTERS.map(([value, label]) => (

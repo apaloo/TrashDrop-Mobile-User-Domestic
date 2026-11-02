@@ -186,32 +186,33 @@ const NavBar = () => {
   
   return (
     <>
-      <nav className="bg-white dark:bg-gray-800 h-16 py-1 md:h-auto md:py-2 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
-        <div className="container mx-auto h-full md:h-auto flex flex-wrap items-center justify-between">
+      <nav className="bg-white dark:bg-gray-800 h-16 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto h-full flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
-          <NavLink to="/" className="flex items-center space-x-3 text-td-forest dark:text-[#66BB6A] text-2xl font-bold">
+          <NavLink to="/" className="flex items-center gap-3 text-td-forest dark:text-[#66BB6A] text-2xl font-bold">
             {/* Phones: the logo alone, as tall as the profile circle (the name is part of it). The
-                logo files carry wide blank margins, so each is cropped to its artwork. */}
-            <div className="md:hidden relative h-10 w-[62px] overflow-hidden dark:hidden">
-              <img src="/logo.svg" alt="TrashDrop" className="absolute -top-[10px] -left-[10px] h-[61px] w-auto max-w-none" />
+                logo files carry wide blank margins, so each is cropped to its artwork, in rem so the
+                crop grows with Larger Text as the circle does. */}
+            <div className="xl:hidden relative h-10 w-[3.875rem] overflow-hidden dark:hidden">
+              <img src="/logo.svg" alt="TrashDrop" className="absolute -top-[0.625rem] -left-[0.625rem] h-[3.8125rem] w-auto max-w-none" />
             </div>
-            <div className="md:hidden relative h-10 w-[62px] overflow-hidden hidden dark:block">
-              <img src="/logo-02.svg" alt="TrashDrop" className="absolute -top-[34px] -left-[19px] h-[104px] w-[104px] max-w-none brightness-0 invert" />
+            <div className="xl:hidden relative h-10 w-[3.875rem] overflow-hidden hidden dark:block xl:dark:hidden">
+              <img src="/logo-02.svg" alt="TrashDrop" className="absolute -top-[2.125rem] -left-[1.1875rem] h-[6.5rem] w-[6.5rem] max-w-none brightness-0 invert" />
             </div>
             {/* Light mode logo */}
-            <div className="hidden md:flex w-12 h-12 bg-white rounded-lg items-center justify-center p-1 dark:hidden">
+            <div className="hidden xl:flex w-12 h-12 bg-white rounded-lg items-center justify-center p-1 dark:hidden">
               <img src="/logo.svg" alt="TrashDrop Logo" className="w-full h-full object-contain" />
             </div>
             {/* Dark mode logo */}
-            <div className="w-12 h-12 hidden md:dark:flex items-center justify-center">
+            <div className="w-12 h-12 hidden xl:dark:flex items-center justify-center">
               <img src="/logo-02.svg" alt="TrashDrop Logo" className="w-full h-full object-contain brightness-0 invert" />
             </div>
-            <span className="hidden md:inline">TrashDrop</span>
+            <span className="hidden xl:inline">TrashDrop</span>
           </NavLink>
 
           {/* Mobile User Profile */}
           {isAuthenticated && (
-            <div className="md:hidden relative" ref={dropdownRef}>
+            <div className="xl:hidden relative" ref={dropdownRef}>
               <button 
                 onClick={toggleProfileDropdown}
                 className="flex items-center space-x-2 p-2 text-td-forest focus:outline-none focus:ring-2 focus:ring-td-forest rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -260,13 +261,13 @@ const NavBar = () => {
           )}
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex md:items-center space-x-1">
+          <div className="hidden xl:flex xl:items-center space-x-1">
             {isAuthenticated ? (
               <>
                 <NavLink 
                   to="/dashboard" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -275,7 +276,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/qr-scanner" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -284,7 +285,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/pickup-request" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -293,7 +294,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/report" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -302,7 +303,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/rewards" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -311,7 +312,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/activity" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -321,7 +322,7 @@ const NavBar = () => {
                   to="/notifications" 
                   aria-label="Notifications"
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors relative
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors relative
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -339,7 +340,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/profile" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -373,7 +374,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/login" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -382,7 +383,7 @@ const NavBar = () => {
                 <NavLink 
                   to="/register" 
                   className={({ isActive }) => `
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
+                    px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors
                     ${isActive ? activeStyle : inactiveStyle}
                   `}
                 >
@@ -412,12 +413,12 @@ const NavBar = () => {
       </nav>
 
       {/* Add padding to compensate for fixed navbar */}
-      <div className="pt-16 md:pt-14"></div>
+      <div className="pt-16"></div>
       
       {/* Mobile Bottom Navigation */}
       {isAuthenticated && (
         <div className="mobile-bottom-nav-container">
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg z-50">
+          <nav className="xl:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg z-50">
             <div className="container mx-auto flex justify-between items-center px-2 py-2">
               <NavLink 
                 to="/dashboard" 

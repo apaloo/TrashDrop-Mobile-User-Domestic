@@ -28,7 +28,7 @@ export const ActivityItemSkeleton = () => (
 );
 
 export const DashboardSkeleton = () => (
-  <div className="space-y-6 pb-28 md:pb-6">
+  <div className="space-y-6 pb-28 xl:pb-6">
     {/* Stats Cards Skeleton */}
     <div className="bg-white dark:bg-gray-800 pt-2 px-6 pb-6 rounded-lg shadow-md mb-6">
       <div className="flex md:grid md:grid-cols-4 gap-4 mb-6 overflow-x-auto pb-4 snap-x snap-mandatory scroll-pl-6 touch-pan-x">

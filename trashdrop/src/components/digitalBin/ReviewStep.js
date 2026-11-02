@@ -431,7 +431,8 @@ const ReviewStep = ({ formData, prevStep, handleSubmit, promoState = {} }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5 pt-1">
+      {/* Back takes only its label's width so "Request Bin Pickup" fits on one line on phones */}
+      <div className="grid grid-cols-[auto_1fr] gap-2.5 pt-1">
         <button
           type="button"
           onClick={prevStep}
