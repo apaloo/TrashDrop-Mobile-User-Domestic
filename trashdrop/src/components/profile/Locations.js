@@ -831,20 +831,26 @@ const Locations = () => {
   return (
     <div className="bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-2xl p-5">
       {/* Header with Add Location button */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center space-x-4">
+      {/* On phones the row is too narrow for the full label and the status pill
+          (the Online Mode bar below says the same), so both give way there */}
+      <div className="flex justify-between items-center gap-3 mb-6">
+        <div className="flex items-center gap-4 min-w-0">
           <h2 className="text-xl font-semibold text-td-ink dark:text-gray-100">Saved Locations</h2>
-          <OnlineStatus />
+          <div className="hidden sm:block">
+            <OnlineStatus />
+          </div>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full text-[15px] transition-colors bg-td-forest hover:bg-td-forest-dk text-white font-bold"
+          className="shrink-0 inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full text-[15px] transition-colors bg-td-forest hover:bg-td-forest-dk text-white font-bold"
           disabled={isLoading}
+          aria-label="Add New Location"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add New Location
+          <span className="sm:hidden">Add</span>
+          <span className="hidden sm:inline">Add New Location</span>
         </button>
       </div>
       
