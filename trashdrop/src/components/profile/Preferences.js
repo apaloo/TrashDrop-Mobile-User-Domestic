@@ -82,15 +82,31 @@ const Preferences = () => {
     setTimeout(() => setSaveMessage(null), 5000);
   };
 
+  // Save settings on the user's profile row. Many accounts have no row yet (it
+  // is only created when Personal Info is saved), and an update that matches
+  // no row reports no error, so the setting was silently lost and came back
+  // off after a refresh. Create the row when the update finds none.
+  const saveProfileFields = async (fields) => {
+    const changes = { ...fields, updated_at: new Date().toISOString() };
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(changes)
+      .eq('id', user.id)
+      .select('id');
+    if (error) return error;
+    if (data?.length) return null;
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({ id: user.id, email: user.email, ...changes });
+    return insertError;
+  };
+
   // Dark mode: applies at once and is saved straight away
   const handleDarkModeChange = async (on) => {
     setPreferences(prev => ({ ...prev, darkMode: on }));
     setThemeMode(on ? 'dark' : 'light');
     if (!user?.id) return;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ dark_mode: on, updated_at: new Date().toISOString() })
-      .eq('id', user.id);
+    const error = await saveProfileFields({ dark_mode: on });
     if (error) {
       console.error('[Preferences] Error saving dark mode:', error);
       showSaveError();
@@ -111,16 +127,12 @@ const Preferences = () => {
         .eq('id', user.id)
         .maybeSingle();
       const current = currentProfile?.notification_preferences || {};
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          notification_preferences: {
-            ...current,
-            accessibility: { ...(current.accessibility || {}), [name]: on }
-          },
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+      const error = await saveProfileFields({
+        notification_preferences: {
+          ...current,
+          accessibility: { ...(current.accessibility || {}), [name]: on }
+        }
+      });
       if (error) throw error;
     } catch (error) {
       console.error('[Preferences] Error saving accessibility setting:', error);
