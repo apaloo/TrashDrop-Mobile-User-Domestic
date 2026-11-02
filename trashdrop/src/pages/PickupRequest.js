@@ -17,9 +17,9 @@ import { userServiceOptimized } from '../services/userServiceOptimized.js';
 
 // Choices on the form
 const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Low', icon: '🐢', description: 'Flexible timing' },
-  { value: 'normal', label: 'Normal', icon: '📦', description: 'Standard pickup' },
-  { value: 'urgent', label: 'Urgent', icon: '⚡', description: 'Priority service' },
+  { value: 'low', label: 'Low', icon: '🐢', description: 'Flexible' },
+  { value: 'normal', label: 'Normal', icon: '📦', description: 'Standard' },
+  { value: 'urgent', label: 'Urgent', icon: '⚡', description: 'Fastest' },
 ];
 const WASTE_OPTIONS = [
   { value: 'general', label: 'General', icon: '🗑️', description: 'Mixed waste' },

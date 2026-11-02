@@ -578,7 +578,7 @@ const ChooseServiceStep = ({ onServiceSelect, isLoading }) => (
       <button
         onClick={() => onServiceSelect('digital_bin')}
         disabled={isLoading}
-        className="w-full p-4 border border-td-border dark:border-gray-600 rounded-2xl hover:border-td-forest hover:bg-td-tonal dark:hover:bg-green-900/30 text-left disabled:opacity-50 antialiased min-h-[5rem]"
+        className="w-full p-4 whitespace-normal border border-td-border dark:border-gray-600 rounded-2xl hover:border-td-forest hover:bg-td-tonal dark:hover:bg-green-900/30 text-left disabled:opacity-50 antialiased min-h-[5rem]"
       >
         <div className="flex items-center h-full">
           <span className="text-2xl mr-3">🗑️</span>
@@ -592,7 +592,7 @@ const ChooseServiceStep = ({ onServiceSelect, isLoading }) => (
       <button
         onClick={() => onServiceSelect('report')}
         disabled={isLoading}
-        className="w-full p-4 border border-td-border dark:border-gray-600 rounded-2xl hover:border-td-orange hover:bg-orange-50 dark:hover:bg-orange-900/20 text-left disabled:opacity-50 antialiased min-h-[5rem]"
+        className="w-full p-4 whitespace-normal border border-td-border dark:border-gray-600 rounded-2xl hover:border-td-orange hover:bg-orange-50 dark:hover:bg-orange-900/20 text-left disabled:opacity-50 antialiased min-h-[5rem]"
       >
         <div className="flex items-center h-full">
           <span className="text-2xl mr-3">📸</span>
@@ -606,7 +606,7 @@ const ChooseServiceStep = ({ onServiceSelect, isLoading }) => (
       <button
         onClick={() => onServiceSelect('order_bag')}
         disabled={true} // This button is inactive as requested
-        className="w-full p-4 border border-td-border dark:border-gray-600 rounded-2xl text-left opacity-60 cursor-not-allowed antialiased min-h-[5rem]"
+        className="w-full p-4 whitespace-normal border border-td-border dark:border-gray-600 rounded-2xl text-left opacity-60 cursor-not-allowed antialiased min-h-[5rem]"
       >
         <div className="flex items-center h-full">
           <span className="text-2xl mr-3">🛍️</span>
