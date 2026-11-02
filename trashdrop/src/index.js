@@ -11,10 +11,15 @@ import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import * as mobileServiceWorker from "./mobileServiceWorker";
 import { initGlobalErrorHandlers } from "./utils/errorBoundary";
 import { isMobileDevice } from "./utils/mobileAuth";
-import { notifyUpdateReady } from "./utils/appUpdate";
+import { notifyUpdateReady, watchForMissingChunks } from "./utils/appUpdate";
 
 // Initialize global error handlers early
 initGlobalErrorHandlers();
+
+// A deploy can remove code files this version still asks for: reload onto the new one
+if (process.env.NODE_ENV === "production") {
+  watchForMissingChunks();
+}
 
 // Make performance tracker available for splash screen
 if (typeof window !== "undefined") {
