@@ -15,18 +15,50 @@ ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=$((fail+1)); }
 note() { printf '        %s\n' "$1"; }
 
+# Check a URL Meta calls. The main address passes outright; any other address
+# passes only if it answers like the function does ($4: the status an empty,
+# unsigned POST gets), since Meta does not follow redirects and the old
+# trashdrop-mobile.windsurf.build domain no longer exists.
+check_meta_url() {
+  local label=$1 actual=$2 expected=$3 want=$4 code
+  if [ -z "$actual" ]; then
+    bad "Meta has no $label set"
+  elif [ "$actual" = "$expected" ]; then
+    ok "$label is $actual"
+  else
+    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$actual" \
+           -H 'content-type: application/json' -d '{}' --max-time 25)
+    if [ "$code" = "$want" ]; then
+      ok "$label is $actual (reachable, but not $URL)"
+    else
+      bad "$label is $actual, which returned ${code/000/no answer} — Meta's calls are failing"
+      note "set it to $expected"
+    fi
+  fi
+}
+
 echo "WhatsApp booking layer — go-live check"
 echo "site: $URL"
 echo
 echo "1. Environment (values are never printed)"
 
 echo "context: $CONTEXT"
+# Only trashdrop/ is linked to the Netlify site (the repo root has an empty
+# link), so run the CLI from there wherever the script is started
+cd "$(dirname "$0")/.." || exit 1
 ENVJSON=$(netlify env:list --context "$CONTEXT" --json 2>/dev/null)
+# A CLI that is logged out or unlinked prints nothing; without this every
+# variable is reported missing and the real problem is hidden
+if ! printf '%s' "$ENVJSON" | python3 -c 'import json,sys;json.load(sys.stdin)' 2>/dev/null; then
+  bad "could not read Netlify env — run 'netlify status' in $(pwd) (logged in? linked?)"
+  ENVJSON='{}'
+fi
 have() { echo "$ENVJSON" | python3 -c "import json,sys;print('y' if '$1' in json.load(sys.stdin) else 'n')" 2>/dev/null; }
 getv() { echo "$ENVJSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$1',''))" 2>/dev/null; }
 
 for v in META_PHONE_NUMBER_ID META_ACCESS_TOKEN META_APP_SECRET \
          WHATSAPP_VERIFY_TOKEN WHATSAPP_NOTIFY_SECRET WHATSAPP_FLOW_ID SUPABASE_URL; do
+  [ "$ENVJSON" = '{}' ] && break
   [ "$(have $v)" = y ] && ok "$v set" || bad "$v missing"
 done
 
@@ -63,6 +95,8 @@ ROLE=$(python3 - <<PY
 import json,base64,os
 env=json.loads('''$ENVJSON''' or '{}')
 def role(k):
+    # Supabase's new secret keys are opaque, not JWTs; they are server-only too
+    if k.startswith('sb_secret_'): return 'service_role'
     try:
         p=k.split('.')[1]; p+='='*(-len(p)%4)
         return json.loads(base64.urlsafe_b64decode(p)).get('role')
@@ -73,13 +107,15 @@ for n in ('SUPABASE_SERVICE_ROLE','SUPABASE_SERVICE_ROLE_KEY'):
 else: print('')
 PY
 )
-[ -n "$ROLE" ] && ok "service_role key present (in $ROLE)" || bad "no variable holds a service_role key"
+if [ "$ENVJSON" != '{}' ]; then
+  [ -n "$ROLE" ] && ok "service_role key present (in $ROLE)" || bad "no variable holds a service_role key"
+fi
 
 # The superseded variable still holds the leaked token until it is revoked
 OLD=$(getv WHATSAPP_ACCESS_TOKEN)
 case "$OLD" in
   EAActvKX*) bad "WHATSAPP_ACCESS_TOKEN still holds the leaked token — revoke it in Meta and delete the variable";;
-  "")        ok "no stale WHATSAPP_ACCESS_TOKEN left behind";;
+  "")        [ "$ENVJSON" = '{}' ] || ok "no stale WHATSAPP_ACCESS_TOKEN left behind";;
   *)         : ;;
 esac
 
@@ -142,11 +178,28 @@ for d in json.load(sys.stdin).get("data",[]):
     a=d.get("whatsapp_business_api_data",{})
     print("        app: %s (%s)" % (a.get("name","?"), a.get("id","?")))
 ' 2>/dev/null
-    note "confirm in Meta: the app callback URL is $URL/.netlify/functions/whatsapp-webhook"
-    note "and that the 'messages' webhook field is Subscribed, not just configured"
+    note "confirm in Meta that the 'messages' webhook field is Subscribed, not just configured"
   else
     bad "no app is subscribed to WABA $WABA — inbound messages are delivered nowhere"
     note "WhatsApp Manager > the app > Configure Webhooks, then subscribe 'messages'"
+  fi
+fi
+
+# Where Meta actually sends this number's messages: a phone-number override
+# beats a WABA override, which beats the app's callback URL
+if [ -n "$TOKEN" ] && [ -n "$PHONE" ]; then
+  HOOK=$(curl -s -H "Authorization: Bearer $TOKEN" \
+         "https://graph.facebook.com/v21.0/${PHONE}?fields=webhook_configuration" --max-time 25)
+  CALLBACK=$(echo "$HOOK" | python3 -c '
+import json,sys
+c=json.load(sys.stdin).get("webhook_configuration") or {}
+print(c.get("phone_number") or c.get("whatsapp_business_account") or c.get("application") or "")
+' 2>/dev/null)
+  if echo "$HOOK" | grep -q '"error"'; then
+    bad "Graph rejected the webhook query — cannot tell where messages are sent"
+    note "$(echo "$HOOK" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("error",{}).get("message","?")[:90])' 2>/dev/null)"
+  else
+    check_meta_url "webhook callback URL" "$CALLBACK" "$URL/.netlify/functions/whatsapp-webhook" 401
   fi
 fi
 
@@ -157,7 +210,7 @@ FID=$(getv WHATSAPP_FLOW_ID); MODE=$(getv WHATSAPP_FLOW_MODE)
 
 if [ -n "$FID" ] && [ -n "$TOKEN" ]; then
   FLOW=$(curl -s -H "Authorization: Bearer $TOKEN" \
-         "https://graph.facebook.com/v21.0/${FID}?fields=name,status,validation_errors" --max-time 25)
+         "https://graph.facebook.com/v21.0/${FID}?fields=name,status,validation_errors,endpoint_uri" --max-time 25)
   STATUS=$(echo "$FLOW" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))' 2>/dev/null)
   EFFMODE=$(printf '%s' "${MODE:-published}" | tr '[:upper:]' '[:lower:]')
 
@@ -191,6 +244,12 @@ errs=json.load(sys.stdin).get("validation_errors") or []
 for e in errs:
     print("        validation: %s" % e.get("message","?"))
 ' 2>/dev/null
+
+  if [ -n "$STATUS" ]; then
+    ENDPOINT=$(echo "$FLOW" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("endpoint_uri") or "")' 2>/dev/null)
+    # 421 is the endpoint's answer to a request it cannot decrypt
+    check_meta_url "flow endpoint" "$ENDPOINT" "$URL/.netlify/functions/whatsapp-flow-endpoint" 421
+  fi
 fi
 
 echo
