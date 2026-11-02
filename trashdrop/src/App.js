@@ -51,6 +51,7 @@ import { enGB } from 'date-fns/locale';
 
 // Import network test utility for development
 import './utils/networkTest.js';
+import { markScreenChanged } from './utils/appUpdate.js';
 
 // Dynamic imports for lazy loading (moved after all imports)
 const importDebugConfig = () => import('./components/DebugConfig.js');
@@ -67,9 +68,14 @@ const theme = createTheme(themeOptions);
  * App content component with routing logic
  */
 const AppContent = () => {
-  const { isAuthenticated, isLoading, authState, user } = useAuth();
+  const { isAuthenticated, isLoading, lastAction, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // A new version may switch in quietly again: nothing is typed on this screen yet
+  useEffect(() => {
+    markScreenChanged();
+  }, [location.pathname]);
 
   // Check session on mount and when pathname changes
   useEffect(() => {
@@ -135,8 +141,10 @@ const AppContent = () => {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* The spinner is for the first session check only: swapping it in while
+            someone signs in would throw away the page and its error message */}
         <Route path="/login" element={
-          isLoading ? (
+          isLoading && lastAction !== 'signing_in' ? (
             <div className="flex justify-center items-center h-screen bg-white">
               <LoadingSpinner size="lg" />
             </div>

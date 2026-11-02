@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext.js';
 import toastService from '../../services/toastService.js';
 import GeolocationService from '../../utils/geolocationService.js';
 import { checkServiceCoverage, joinCoverageWaitlist } from '../../services/serviceCoverageService.js';
+import StepNav from './StepNav.js';
+import { card, errorNote, fieldHint, inputField, sectionTitle, tonalButton, warningNote } from '../ui/styles.js';
 
 // Fix for default marker icon in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -571,119 +573,124 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-4 text-td-ink dark:text-white">Digital Bin Location</h2>
-      
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={handleUseCurrentLocation}
-          disabled={loadingLocation || formData.useCurrentLocation}
-          className="w-full flex items-center justify-center px-4 py-3 bg-primary hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-md transition-colors font-medium"
-        >
-          {loadingLocation ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    <div className="space-y-4">
+      <section className={`${card} px-4 py-4 space-y-4`}>
+        <div>
+          <h2 className={sectionTitle}>Digital Bin Location</h2>
+          <p className={`${fieldHint} mt-1`}>Stand next to your bin and use your current location, then check the pin on the map.</p>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={loadingLocation || formData.useCurrentLocation}
+            className={`${tonalButton} w-full h-12 text-[15px]`}
+          >
+            {loadingLocation ? (
+              <>
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Getting location...
+              </>
+            ) : formData.useCurrentLocation ? (
+              <>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Location captured
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+                Get my current location <span className="text-td-error dark:text-red-300" aria-hidden="true">*</span>
+              </>
+            )}
+          </button>
+          {gpsHint && (
+            <p className="mt-2 text-sm text-amber-800 dark:text-amber-200 flex items-start">
+              <svg className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              Getting location...
-            </>
-          ) : formData.useCurrentLocation ? (
-            <>
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Location captured
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-              Get my current location <span className="text-red-500">*</span>
-            </>
+              {gpsHint}
+            </p>
           )}
-        </button>
-        {gpsHint && (
-          <p className="mt-2 text-sm text-amber-600 dark:text-amber-400 flex items-start">
-            <svg className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {gpsHint}
+        </div>
+
+        <div>
+          <label htmlFor="address" className="block text-[15px] font-semibold text-td-ink dark:text-gray-100 mb-1.5">
+            Address
+          </label>
+          <input
+            type="text"
+            id="address"
+            value={isGeocoding ? '' : addressInput}
+            readOnly
+            placeholder={isGeocoding ? 'Looking up address...' : 'Use current location to auto-fill'}
+            className={`${inputField} bg-td-cream dark:bg-gray-900/40 cursor-not-allowed`}
+          />
+          {addressError && (
+            <p className="text-sm text-td-error dark:text-red-300 mt-1.5">{addressError}</p>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[15px] font-semibold text-td-ink dark:text-gray-100 mb-1.5">
+            Confirm on Map
+          </p>
+          <div className="h-48 rounded-2xl overflow-hidden border border-td-border dark:border-gray-700">
+            <MapContainer 
+              center={position || [5.6037, -0.1870]} 
+              zoom={13} 
+              style={{ height: '100%', width: '100%' }}
+              whenCreated={(map) => {
+                map.on('click', (e) => {
+                  handlePositionChange([e.latlng.lat, e.latlng.lng]);
+                });
+              }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <MapUpdater position={position} isNewLocation={isNewLocation} />
+              <DraggableMarker position={position} setPosition={handlePositionChange} />
+            </MapContainer>
+          </div>
+        </div>
+
+        {coverage.status === 'checking' && (
+          <p className={fieldHint}>Checking service availability at this location...</p>
+        )}
+
+        {coverage.status === 'covered' && coverage.zone && (
+          <p className="text-sm font-semibold text-td-forest dark:text-green-300">
+            ✓ Service available in {coverage.zone.suburb}
           </p>
         )}
-      </div>
-      
-      <div className="mb-4">
-        <label htmlFor="address" className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
-          Address
-        </label>
-        <input
-          type="text"
-          id="address"
-          value={isGeocoding ? '' : addressInput}
-          readOnly
-          placeholder={isGeocoding ? 'Looking up address...' : 'Use current location to auto-fill'}
-          className="w-full p-3 border border-td-border-strong dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-td-ink dark:text-white font-medium placeholder-gray-400 dark:placeholder-gray-500 cursor-not-allowed"
-        />
-        {addressError && (
-          <p className="text-red-500 text-sm mt-1">{addressError}</p>
-        )}
-      </div>
-      
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-td-ink dark:text-gray-300 mb-1">
-          Confirm on Map
-        </label>
-        <div className="h-48 rounded-lg overflow-hidden border border-td-border-strong">
-          <MapContainer 
-            center={position || [5.6037, -0.1870]} 
-            zoom={13} 
-            style={{ height: '100%', width: '100%' }}
-            whenCreated={(map) => {
-              map.on('click', (e) => {
-                handlePositionChange([e.latlng.lat, e.latlng.lng]);
-              });
-            }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            />
-            <MapUpdater position={position} isNewLocation={isNewLocation} />
-            <DraggableMarker position={position} setPosition={handlePositionChange} />
-          </MapContainer>
-        </div>
-      </div>
-      
-      {coverage.status === 'checking' && (
-        <p className="mb-4 text-sm text-td-sage dark:text-gray-400">Checking service availability at this location...</p>
-      )}
-
-      {coverage.status === 'covered' && coverage.zone && (
-        <p className="mb-4 text-sm text-green-700 dark:text-green-400">
-          ✓ Service available in {coverage.zone.suburb}
-        </p>
-      )}
+      </section>
 
       {coverage.status === 'not_covered' && (
-        <div className="mb-4 p-3 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20">
-          <p className="font-medium text-amber-800 dark:text-amber-300">
+        <div className={`${warningNote} px-4 py-3.5`}>
+          <p className="font-semibold">
             We haven't started operating here yet
           </p>
-          <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+          <p className="mt-1 text-sm">
             TrashDrop doesn't have collectors at this location yet, so we can't take a pickup request here.
             {coverage.zone?.suburb && coverage.zone?.distance_km != null && (
               <> The nearest area we serve is {coverage.zone.suburb}, about {Math.round(coverage.zone.distance_km)} km away.</>
             )}
             {' '}We're expanding and hope to reach your area soon.
           </p>
-          <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
+          <p className="mt-2 text-sm">
             If the pin is in the wrong place, drag it to where your bin is.
           </p>
           {waitlistStatus === 'joined' ? (
-            <p className="mt-3 text-sm font-medium text-green-700 dark:text-green-400">
+            <p className="mt-3 text-sm font-semibold text-td-forest dark:text-green-300">
               ✓ You're on the list. We'll let you know here in the app when we start operating at this location.
             </p>
           ) : (
@@ -692,7 +699,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
                 type="button"
                 onClick={handleJoinWaitlist}
                 disabled={waitlistStatus === 'saving'}
-                className="mt-3 px-4 py-2 rounded-md text-sm font-medium bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white"
+                className="mt-3 inline-flex items-center justify-center h-10 px-4 rounded-full text-sm font-semibold bg-amber-700 hover:bg-amber-800 disabled:opacity-60 text-white"
               >
                 {waitlistStatus === 'saving' ? 'Saving...' : 'Notify me when you arrive'}
               </button>
@@ -707,14 +714,14 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       )}
 
       {coverage.status === 'unavailable' && (
-        <div className="mb-4 p-3 rounded-md border border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-300">
+        <div className={`${errorNote} px-4 py-3.5`}>
+          <p className="text-sm">
             We couldn't confirm service at this location right now.
           </p>
           <button
             type="button"
             onClick={() => setCoverageAttempt(attempt => attempt + 1)}
-            className="mt-2 text-sm font-medium text-red-700 dark:text-red-300 underline"
+            className="mt-2 text-sm font-semibold underline"
           >
             Try again
           </button>
@@ -729,16 +736,10 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         </>
       )}
       
-      <div className="flex justify-end mt-6 pb-4">
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={isGeocoding || ['checking', 'not_covered', 'unavailable'].includes(coverage.status)}
-          className="bg-primary hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-md transition-colors font-medium"
-        >
-          Continue
-        </button>
-      </div>
+      <StepNav
+        onNext={handleContinue}
+        disabled={isGeocoding || ['checking', 'not_covered', 'unavailable'].includes(coverage.status)}
+      />
     </div>
   );
 };

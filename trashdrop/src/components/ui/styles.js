@@ -34,3 +34,9 @@ export const errorNote = 'rounded-2xl border border-red-200 bg-red-50 text-red-8
 
 /** Needs the user's attention (missing fields, no bags) */
 export const warningNote = 'rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200';
+
+/** Text, date, select and textarea fields */
+export const inputField = 'w-full px-3.5 py-2.5 bg-white dark:bg-gray-700 border border-td-border-strong dark:border-gray-500 rounded-xl text-[15px] text-td-ink dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-td-forest focus:ring-2 focus:ring-td-forest/30';
+
+/** Hint under a field or section title */
+export const fieldHint = 'text-sm text-td-sage dark:text-gray-300';

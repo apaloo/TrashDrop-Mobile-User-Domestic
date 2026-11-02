@@ -1,5 +1,8 @@
 import React from 'react';
 import { BIN_SIZES, getBinSizeLabel } from '../../utils/costCalculator';
+import OptionTile from '../ui/OptionTile.js';
+import StepNav from './StepNav.js';
+import { card, fieldHint, infoNote, inputField, sectionTitle, warningNote } from '../ui/styles.js';
 
 // Waste types accepted by the digital_bins CHECK constraint
 const WASTE_TYPES = [
@@ -7,6 +10,8 @@ const WASTE_TYPES = [
   { value: 'recycling', label: 'Recycling', icon: '♻️' },
   { value: 'organic', label: 'Organic Waste', icon: '🥬' }
 ];
+
+const BIN_COUNTS = [1, 2, 3, 4, 5];
 
 const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoState = {} }) => {
   // What is still missing, so a disabled Continue button explains itself
@@ -22,197 +27,128 @@ const WasteDetailsStep = ({ formData, updateFormData, nextStep, prevStep, promoS
   const isValid = () => getMissingFields().length === 0;
   
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-4 text-td-ink">Digital Bin Details</h2>
-      
-      {/* Number of Bins - Horizontal Scrollable Cards */}
-      <div className="mb-5">
-        <label className="block text-sm font-medium text-td-ink mb-2">
-          Number of Digital Bins Needed
-        </label>
-        
-        {/* Horizontal scrollable container */}
-        <div 
-          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-          style={{
-            scrollSnapType: 'x mandatory',
-            WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none'
-          }}
-        >
-          {[1, 2, 3, 4, 5].map((num) => (
-            <button
-              type="button"
-              key={num}
-              aria-pressed={parseInt(formData.numberOfBags) === num}
-              onClick={() => updateFormData({ 
-                numberOfBags: String(num),
-                bag_count: num
-              })}
-              className={`flex-shrink-0 w-20 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                parseInt(formData.numberOfBags) === num
-                  ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                  : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
-              }`}
-              style={{ scrollSnapAlign: 'start' }}
-            >
-              <span className="flex flex-col items-center text-center">
-                <span className="block text-2xl font-bold mb-1" style={{
-                  color: parseInt(formData.numberOfBags) === num ? '#15803d' : '#374151'
-                }}>
-                  {num}
-                </span>
-                <span className={`text-xs font-medium ${
-                  parseInt(formData.numberOfBags) === num ? 'text-green-700' : 'text-td-ink'
-                }`}>
-                  {num === 1 ? 'Bin' : 'Bins'}
-                </span>
-              </span>
-            </button>
-          ))}
+    <div className="space-y-4">
+      <section className={`${card} px-4 py-4 space-y-5`}>
+        <h2 className={sectionTitle}>Digital Bin Details</h2>
+
+        <div role="group" aria-labelledby="bin-count">
+          <p id="bin-count" className="text-[15px] font-semibold text-td-ink dark:text-gray-100 mb-2.5">
+            Number of Digital Bins Needed
+          </p>
+          <div className="grid grid-cols-5 gap-2">
+            {BIN_COUNTS.map((num) => {
+              const selected = parseInt(formData.numberOfBags) === num;
+              return (
+                <button
+                  type="button"
+                  key={num}
+                  aria-pressed={selected}
+                  onClick={() => updateFormData({ 
+                    numberOfBags: String(num),
+                    bag_count: num
+                  })}
+                  className={`min-w-0 rounded-2xl border-2 py-2.5 flex flex-col items-center transition-colors ${
+                    selected
+                      ? 'border-td-forest bg-td-tonal dark:border-green-400 dark:bg-green-900/40'
+                      : 'border-td-border bg-white hover:border-td-border-strong dark:border-gray-600 dark:bg-gray-800 dark:hover:border-gray-400'
+                  }`}
+                >
+                  <span className={`text-[22px] leading-none font-bold ${selected ? 'text-td-forest-dk dark:text-green-300' : 'text-td-ink dark:text-gray-100'}`}>
+                    {num}
+                  </span>
+                  <span className="text-xs text-td-sage dark:text-gray-300 mt-1">{num === 1 ? 'Bin' : 'Bins'}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className={`${fieldHint} mt-2`}>
+            Select the number of digital bins you need for your waste collection
+          </p>
         </div>
-        
-        <p className="text-sm text-td-sage mt-2">
-          Select the number of digital bins you need for your waste collection
-        </p>
-      </div>
-      
-      {/* Bin Size - NEW (MANDATORY) */}
-      <div className="mb-5">
-        <label htmlFor="binSize" className="block text-sm font-medium text-td-ink mb-1">
-          Bin Size (Liters) <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="binSize"
-          value={formData.bin_size_liters}
-          onChange={(e) => updateFormData({ bin_size_liters: parseInt(e.target.value) })}
-          className="w-full p-3 border border-td-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-td-ink font-medium"
-          style={{color: '#333'}}
-          required
-        >
-          {BIN_SIZES.map(size => (
-            <option key={size} value={size}>
-              {getBinSizeLabel(size)}
-            </option>
-          ))}
-        </select>
-        <p className="text-sm text-td-sage mt-1">
-          Larger bins cost more but accommodate more waste. Collection cost is calculated based on bin size.
-        </p>
-      </div>
-      
-      {/* Waste Type - Horizontal Scrollable Cards */}
-      <div className="mb-5">
-        <label className="block text-sm font-medium text-td-ink mb-2">
-          Bin Type
-        </label>
-        
-        {/* Horizontal scrollable container */}
-        <div 
-          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-          style={{
-            scrollSnapType: 'x mandatory',
-            WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none'
-          }}
-        >
-          {WASTE_TYPES.map(({ value, label, icon }) => (
-            <button
-              type="button"
-              key={value}
-              aria-pressed={formData.wasteType === value}
-              onClick={() => updateFormData({ wasteType: value, waste_type: value })}
-              className={`flex-shrink-0 w-28 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                formData.wasteType === value
-                  ? 'bg-green-50 border-2 border-green-500 shadow-md'
-                  : 'bg-td-cream border-2 border-transparent hover:border-gray-200'
-              }`}
-              style={{ scrollSnapAlign: 'start' }}
-            >
-              <span className="flex flex-col items-center text-center">
-                <span className="block text-3xl mb-2">{icon}</span>
-                <span className={`text-xs font-medium ${
-                  formData.wasteType === value ? 'text-green-700' : 'text-td-ink'
-                }`}>
-                  {label}
-                </span>
-              </span>
-            </button>
-          ))}
+
+        <div>
+          <label htmlFor="binSize" className="block text-[15px] font-semibold text-td-ink dark:text-gray-100 mb-1.5">
+            Bin Size (Liters) <span className="text-td-error" aria-hidden="true">*</span>
+          </label>
+          <select
+            id="binSize"
+            value={formData.bin_size_liters}
+            onChange={(e) => updateFormData({ bin_size_liters: parseInt(e.target.value) })}
+            className={inputField}
+            required
+          >
+            {BIN_SIZES.map(size => (
+              <option key={size} value={size}>
+                {getBinSizeLabel(size)}
+              </option>
+            ))}
+          </select>
+          <p className={`${fieldHint} mt-1.5`}>
+            Larger bins cost more but accommodate more waste. Collection cost is calculated based on bin size.
+          </p>
         </div>
-        
-        <p className="text-sm text-td-sage mt-2">
-          Choose the type that matches your waste
-        </p>
-      </div>
+
+        <div role="group" aria-labelledby="bin-type">
+          <p id="bin-type" className="text-[15px] font-semibold text-td-ink dark:text-gray-100 mb-2.5">
+            Bin Type
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {WASTE_TYPES.map(({ value, label, icon }) => (
+              <OptionTile
+                key={value}
+                selected={formData.wasteType === value}
+                onClick={() => updateFormData({ wasteType: value, waste_type: value })}
+                icon={icon}
+                label={label}
+              />
+            ))}
+          </div>
+          <p className={`${fieldHint} mt-2`}>
+            Choose the type that matches your waste
+          </p>
+        </div>
+      </section>
       
       {/* Promotional pricing indicator */}
       {promoState?.isEligible && (
-        <div className="mb-5 bg-purple-50 p-3 rounded-md border border-purple-200">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🎁</span>
-            <div>
-              <span className="text-sm font-medium text-purple-900">Promotional pricing active</span>
-              <p className="text-xs text-purple-700 mt-0.5">
-                {promoState.maxRequests - promoState.usedCount} of {promoState.maxRequests} discounted pickups remaining
-              </p>
-              <p className="text-xs text-purple-700 mt-0.5">Promotional price per bin; not for urgent pickups.</p>
-            </div>
+        <div className={`${infoNote} px-4 py-3 flex items-start gap-3`}>
+          <span className="text-lg leading-none mt-0.5" aria-hidden="true">🎁</span>
+          <div className="text-sm">
+            <p className="font-semibold">Promotional pricing active</p>
+            <p className="mt-0.5">
+              {promoState.maxRequests - promoState.usedCount} of {promoState.maxRequests} discounted pickups remaining
+            </p>
+            <p className="mt-0.5">Promotional price per bin; not for urgent pickups.</p>
           </div>
         </div>
       )}
 
       {/* Urgent Priority - NEW (OPTIONAL) */}
-      <div className="mb-5 bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <div className="flex items-start">
-          <input
-            id="isUrgent"
-            type="checkbox"
-            checked={formData.is_urgent}
-            onChange={(e) => updateFormData({ is_urgent: e.target.checked })}
-            className="h-5 w-5 text-primary focus:ring-primary border-td-border-strong rounded mt-0.5"
-          />
-          <div className="ml-3 flex-1">
-            <label htmlFor="isUrgent" className="block text-sm font-medium text-td-ink">
-              ⚡ Mark as Urgent
-            </label>
-            <p className="text-sm text-td-sage mt-1">
-              Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+30%). It takes up to 2 hours for urgent pickup to be collected.
-            </p>
-          </div>
+      <div className={`${warningNote} px-4 py-3.5 flex items-start gap-3`}>
+        <input
+          id="isUrgent"
+          type="checkbox"
+          checked={formData.is_urgent}
+          onChange={(e) => updateFormData({ is_urgent: e.target.checked })}
+          className="h-5 w-5 mt-0.5 rounded border-td-border-strong text-td-forest focus:ring-td-forest flex-shrink-0"
+        />
+        <div className="flex-1">
+          <label htmlFor="isUrgent" className="block text-[15px] font-semibold">
+            ⚡ Mark as Urgent
+          </label>
+          <p className="text-sm mt-1">
+            Check this box to prioritize your request. Urgent pickups are processed first and may incur an additional fee (+30%). It takes up to 2 hours for urgent pickup to be collected.
+          </p>
         </div>
       </div>
-      
-      {!isValid() && (
-        <p id="waste-step-missing" className="mt-6 text-sm text-amber-700" role="status">
-          Select {getMissingFields().join(', ')} to continue.
-        </p>
-      )}
 
-      <div className="flex justify-between mt-6">
-        <button
-          type="button"
-          onClick={prevStep}
-          className="px-6 py-2 border border-td-border-strong text-td-ink rounded-md hover:bg-td-cream transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={nextStep}
-          disabled={!isValid()}
-          aria-describedby={isValid() ? undefined : 'waste-step-missing'}
-          className={`px-6 py-2 rounded-md transition-colors ${
-            isValid()
-              ? 'bg-primary hover:bg-primary-dark text-white'
-              : 'bg-gray-300 cursor-not-allowed text-td-sage'
-          }`}
-        >
-          Continue
-        </button>
-      </div>
+      <StepNav
+        onBack={prevStep}
+        onNext={nextStep}
+        disabled={!isValid()}
+        missing={getMissingFields()}
+        missingId="waste-step-missing"
+      />
     </div>
   );
 };

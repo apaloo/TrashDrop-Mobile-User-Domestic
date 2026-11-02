@@ -888,8 +888,22 @@ export const AuthProvider = ({ children }) => {
         return handleAuthError(error, 'sign_up');
       }
       
+      // With email confirmation on, an address that is already registered comes
+      // back as a user with no identities and no error
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        updateAuthState({ status: AUTH_STATES.UNAUTHENTICATED, error: null, lastAction: 'sign_up_existing' });
+        return { success: false, error: { message: 'User already registered', code: 'USER_EXISTS' } };
+      }
+
       console.log('[Auth] Sign up successful:', data.user?.email);
-      return { success: true, user: data.user, session: data.session };
+      // Leave the loading state: signed in straight away, or waiting for the
+      // user to open the link in the confirmation email
+      if (data.session) {
+        updateAuthState({ status: AUTH_STATES.AUTHENTICATED, user: data.user, session: data.session, error: null, lastAction: 'sign_up' });
+      } else {
+        updateAuthState({ status: AUTH_STATES.UNAUTHENTICATED, user: null, session: null, error: null, lastAction: 'sign_up_awaiting_confirmation' });
+      }
+      return { success: true, user: data.user, session: data.session, needsEmailConfirmation: !data.session };
       
     } catch (error) {
       console.error('[Auth] Unexpected error during sign up:', error);
@@ -958,7 +972,8 @@ export const AuthProvider = ({ children }) => {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: getSiteUrl() + '/dashboard'
+          // Same landing page as the first email from signUp
+          emailRedirectTo: getSiteUrl() + '/auth/callback'
         }
       });
       

@@ -1,4 +1,4 @@
-import { UPDATE_CHECK_INTERVAL_MS } from '../appUpdate';
+import { UPDATE_CHECK_INTERVAL_MS, IDLE_MS } from '../appUpdate';
 
 // The module keeps state (when the app started, whether it is reloading), so
 // each test gets a fresh copy
@@ -107,6 +107,54 @@ describe('new app versions', () => {
     notifyUpdateReady({ waiting });
     expect(shown).not.toHaveBeenCalled();
     expect(waiting.postMessage).toHaveBeenCalled();
+    window.removeEventListener(UPDATE_EVENT, shown);
+  });
+
+  it('on returning to the app, switches to a version that downloaded in the background', () => {
+    const { watchForUpdates, notifyUpdateReady } = loadAppUpdate();
+    fakeServiceWorker();
+    const registration = fakeRegistration();
+    watchForUpdates(registration, notifyUpdateReady);
+
+    // Downloaded while the app sat in the background
+    jest.advanceTimersByTime(3 * 60 * 60 * 1000);
+    registration.waiting = { postMessage: jest.fn() };
+    const checksBefore = registration.checks;
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    expect(registration.waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    expect(registration.checks).toBe(checksBefore); // no need to look again
+  });
+
+  it('switches without asking when the app has sat idle, but not over a half-filled form', () => {
+    const { UPDATE_EVENT, notifyUpdateReady, watchForUpdates, markScreenChanged } = loadAppUpdate();
+    fakeServiceWorker();
+    const shown = jest.fn();
+    window.addEventListener(UPDATE_EVENT, shown);
+    watchForUpdates(fakeRegistration(), jest.fn());
+
+    // Left open on screen, untouched
+    jest.advanceTimersByTime(IDLE_MS + 1000);
+    const idleWaiting = { postMessage: jest.fn() };
+    notifyUpdateReady({ waiting: idleWaiting });
+    expect(idleWaiting.postMessage).toHaveBeenCalled();
+    expect(shown).not.toHaveBeenCalled();
+
+    // Typed into a field, then left: ask instead of reloading under them
+    const field = document.createElement('input');
+    document.body.appendChild(field);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    jest.advanceTimersByTime(IDLE_MS + 1000);
+    const formWaiting = { postMessage: jest.fn() };
+    notifyUpdateReady({ waiting: formWaiting });
+    expect(formWaiting.postMessage).not.toHaveBeenCalled();
+    expect(shown).toHaveBeenCalledTimes(1);
+
+    // Moved to another screen: quiet again
+    markScreenChanged();
+    notifyUpdateReady({ waiting: formWaiting });
+    expect(formWaiting.postMessage).toHaveBeenCalled();
+    field.remove();
     window.removeEventListener(UPDATE_EVENT, shown);
   });
 
