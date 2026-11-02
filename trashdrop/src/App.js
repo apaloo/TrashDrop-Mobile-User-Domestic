@@ -68,7 +68,7 @@ const theme = createTheme(themeOptions);
  * App content component with routing logic
  */
 const AppContent = () => {
-  const { isAuthenticated, isLoading, authState, user } = useAuth();
+  const { isAuthenticated, isLoading, lastAction, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -144,7 +144,7 @@ const AppContent = () => {
         {/* The spinner is for the first session check only: swapping it in while
             someone signs in would throw away the page and its error message */}
         <Route path="/login" element={
-          isLoading && authState.lastAction !== 'signing_in' ? (
+          isLoading && lastAction !== 'signing_in' ? (
             <div className="flex justify-center items-center h-screen bg-white">
               <LoadingSpinner size="lg" />
             </div>
