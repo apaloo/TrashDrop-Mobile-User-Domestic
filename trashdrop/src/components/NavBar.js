@@ -186,19 +186,27 @@ const NavBar = () => {
   
   return (
     <>
-      <nav className="bg-white dark:bg-gray-800 py-2 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
-        <div className="container mx-auto flex flex-wrap items-center justify-between">
+      <nav className="bg-white dark:bg-gray-800 h-16 py-1 md:h-auto md:py-2 px-4 shadow-md fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto h-full md:h-auto flex flex-wrap items-center justify-between">
           {/* Logo and Title */}
           <NavLink to="/" className="flex items-center space-x-3 text-td-forest dark:text-[#66BB6A] text-2xl font-bold">
+            {/* Phones: the logo alone, as tall as the profile circle (the name is part of it). The
+                logo files carry wide blank margins, so each is cropped to its artwork. */}
+            <div className="md:hidden relative h-10 w-[62px] overflow-hidden dark:hidden">
+              <img src="/logo.svg" alt="TrashDrop" className="absolute -top-[10px] -left-[10px] h-[61px] w-auto max-w-none" />
+            </div>
+            <div className="md:hidden relative h-10 w-[62px] overflow-hidden hidden dark:block">
+              <img src="/logo-02.svg" alt="TrashDrop" className="absolute -top-[34px] -left-[19px] h-[104px] w-[104px] max-w-none brightness-0 invert" />
+            </div>
             {/* Light mode logo */}
-            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center p-1 dark:hidden">
+            <div className="hidden md:flex w-12 h-12 bg-white rounded-lg items-center justify-center p-1 dark:hidden">
               <img src="/logo.svg" alt="TrashDrop Logo" className="w-full h-full object-contain" />
             </div>
             {/* Dark mode logo */}
-            <div className="w-12 h-12 hidden dark:flex items-center justify-center">
+            <div className="w-12 h-12 hidden md:dark:flex items-center justify-center">
               <img src="/logo-02.svg" alt="TrashDrop Logo" className="w-full h-full object-contain brightness-0 invert" />
             </div>
-            <span>TrashDrop</span>
+            <span className="hidden md:inline">TrashDrop</span>
           </NavLink>
 
           {/* Mobile User Profile */}
@@ -410,57 +418,57 @@ const NavBar = () => {
       {isAuthenticated && (
         <div className="mobile-bottom-nav-container">
           <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg z-50">
-            <div className="container mx-auto flex justify-between items-center px-4 py-2">
+            <div className="container mx-auto flex justify-between items-center px-2 py-2">
               <NavLink 
                 to="/dashboard" 
                 className={({ isActive }) => `
-                  flex flex-col items-center py-1 px-3 font-medium transition-colors
+                  flex flex-col items-center py-1 px-2 font-medium transition-colors
                   ${isActive ? activeBottomNavStyle : inactiveBottomNavStyle}
                 `}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
-                <span className="text-xs">Dashboard</span>
+                <span className="text-xs whitespace-nowrap">Dashboard</span>
               </NavLink>
               
               <NavLink 
                 to="/qr-scanner" 
                 className={({ isActive }) => `
-                  flex flex-col items-center py-1 px-3 font-medium transition-colors
+                  flex flex-col items-center py-1 px-2 font-medium transition-colors
                   ${isActive ? activeBottomNavStyle : inactiveBottomNavStyle}
                 `}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                 </svg>
-                <span className="text-xs">Scan QR</span>
+                <span className="text-xs whitespace-nowrap">Scan QR</span>
               </NavLink>
               
               <NavLink 
                 to="/pickup-request" 
                 className={({ isActive }) => `
-                  flex flex-col items-center py-1 px-3 font-medium transition-colors
+                  flex flex-col items-center py-1 px-2 font-medium transition-colors
                   ${isActive ? activeBottomNavStyle : inactiveBottomNavStyle}
                 `}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                 </svg>
-                <span className="text-xs">Request Pickup</span>
+                <span className="text-xs whitespace-nowrap">Request Pickup</span>
               </NavLink>
               
               <NavLink 
                 to="/report" 
                 className={({ isActive }) => `
-                  flex flex-col items-center py-1 px-3 font-medium transition-colors
+                  flex flex-col items-center py-1 px-2 font-medium transition-colors
                   ${isActive ? activeBottomNavStyle : inactiveBottomNavStyle}
                 `}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span className="text-xs">Report</span>
+                <span className="text-xs whitespace-nowrap">Report</span>
               </NavLink>
 
             </div>

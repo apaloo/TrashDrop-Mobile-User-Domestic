@@ -19,8 +19,8 @@ const OptionTile = ({ selected, onClick, icon, label, hint, tone = 'green' }) =>
     }`}
   >
     <span className="text-2xl leading-none mb-1.5" aria-hidden="true">{icon}</span>
-    <span className={`text-[13px] leading-tight text-td-ink dark:text-gray-100 ${selected ? 'font-bold' : 'font-semibold'}`}>{label}</span>
-    {hint && <span className="text-xs leading-tight text-td-sage dark:text-gray-300 mt-0.5">{hint}</span>}
+    <span className={`max-w-full truncate text-[13px] leading-tight text-td-ink dark:text-gray-100 ${selected ? 'font-bold' : 'font-semibold'}`}>{label}</span>
+    {hint && <span className="max-w-full truncate text-xs leading-tight text-td-sage dark:text-gray-300 mt-0.5">{hint}</span>}
   </button>
 );
 

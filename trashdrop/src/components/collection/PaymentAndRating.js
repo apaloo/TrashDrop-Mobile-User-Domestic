@@ -155,7 +155,7 @@ export const PaymentAndRating = ({
             <button
               type="button"
               onClick={() => setPaymentMethod('wallet')}
-              className={`w-full p-4 rounded-lg border-2 ${paymentMethod === 'wallet' 
+              className={`w-full p-4 whitespace-normal rounded-lg border-2 ${paymentMethod === 'wallet' 
                 ? 'border-primary bg-primary/5' 
                 : 'border-td-border hover:border-gray-300'} transition-colors text-left`}
             >
@@ -178,7 +178,7 @@ export const PaymentAndRating = ({
             <button
               type="button"
               onClick={() => setPaymentMethod('cash')}
-              className={`w-full p-4 rounded-lg border-2 ${paymentMethod === 'cash' 
+              className={`w-full p-4 whitespace-normal rounded-lg border-2 ${paymentMethod === 'cash' 
                 ? 'border-primary bg-primary/5' 
                 : 'border-td-border hover:border-gray-300'} transition-colors text-left`}
             >

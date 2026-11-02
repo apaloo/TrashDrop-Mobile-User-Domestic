@@ -121,6 +121,12 @@ input[type="checkbox"], input[type="radio"] {
   accent-color: #1b6e35;
 }
 
+/* Button labels stay on one line. A card-style button that holds a paragraph
+   opts out with the whitespace-normal class. */
+button, [role="button"] {
+  white-space: nowrap;
+}
+
 /* Form fields: ink text on light screens */
 select, input, textarea, option {
   color: #0a0f0a !important;

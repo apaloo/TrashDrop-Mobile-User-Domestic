@@ -31,8 +31,8 @@ const SIZE_OPTIONS = [
 ];
 // [label, icon, hint, tone]
 const SEVERITY_OPTIONS = [
-  ['Low', '🟢', 'Minor issue', 'green'],
-  ['Medium', '🟡', 'Needs attention', 'amber'],
+  ['Low', '🟢', 'Minor', 'green'],
+  ['Medium', '🟡', 'Act soon', 'amber'],
   ['High', '🔴', 'Urgent', 'red'],
 ];
 
