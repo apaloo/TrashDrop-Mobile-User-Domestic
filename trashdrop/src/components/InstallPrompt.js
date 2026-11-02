@@ -78,7 +78,7 @@ const InstallPrompt = () => {
   if (!showPrompt) return null;
   
   return (
-    <div className="fixed bottom-20 left-4 right-4 md:bottom-8 md:left-auto md:right-8 md:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 z-50 border border-gray-200 dark:border-gray-700">
+    <div className="fixed bottom-20 left-4 right-4 xl:bottom-8 xl:left-auto xl:right-8 xl:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 z-50 border border-gray-200 dark:border-gray-700">
       <div className="flex items-start">
         <div className="flex-shrink-0 mt-1">
           <svg className="h-6 w-6 text-primary" fill="currentColor" viewBox="0 0 20 20">

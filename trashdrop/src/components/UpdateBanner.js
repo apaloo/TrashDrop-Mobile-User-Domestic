@@ -23,7 +23,7 @@ const UpdateBanner = () => {
   return (
     <div
       role="status"
-      className="fixed left-4 right-4 bottom-20 md:bottom-6 md:left-auto md:right-6 md:w-96 z-[10000] flex items-center gap-3 rounded-xl bg-td-ink text-white shadow-lg px-4 py-3"
+      className="fixed left-4 right-4 bottom-20 xl:bottom-6 xl:left-auto xl:right-6 xl:w-96 z-[10000] flex items-center gap-3 rounded-xl bg-td-ink text-white shadow-lg px-4 py-3"
     >
       <p className="flex-1 text-sm font-medium">New version available</p>
       <button
