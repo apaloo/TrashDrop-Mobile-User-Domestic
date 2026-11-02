@@ -63,7 +63,23 @@ for v in META_PHONE_NUMBER_ID META_ACCESS_TOKEN META_APP_SECRET \
 done
 
 # These four are easy to paste into the wrong box; check their shapes
-TOKEN=$(getv META_ACCESS_TOKEN); SECRET=$(getv META_APP_SECRET)
+TOKEN=$(getv META_ACCESS_TOKEN); SECRET=$(getv META_APP_SECRET); VT=$(getv WHATSAPP_VERIFY_TOKEN)
+
+# Variables marked "Contains secret values" in Netlify come back masked
+# (asterisks, then the last few characters). The deployed functions still get
+# the real value, so these are not errors, but nothing here can test with them.
+hidden() { printf '%s' "$1" | grep -qE '^\*{8,}.{0,4}$'; }
+HIDDEN=""
+hidden "$TOKEN"  && { HIDDEN="$HIDDEN META_ACCESS_TOKEN"; TOKEN=""; }
+hidden "$SECRET" && { HIDDEN="$HIDDEN META_APP_SECRET"; SECRET=""; }
+hidden "$VT"     && { HIDDEN="$HIDDEN WHATSAPP_VERIFY_TOKEN"; VT=""; }
+if [ -n "$HIDDEN" ]; then
+  note "hidden by Netlify (secret values):$HIDDEN — checks that need them are skipped"
+  note "see the real setup in Meta: app > WhatsApp > Configuration, and the Flow's endpoint"
+fi
+# Why a check was skipped: hidden, or simply not set
+why() { case " $HIDDEN " in *" $1 "*) echo "$1 is hidden by Netlify";; *) echo "$1 not set";; esac; }
+
 case "$TOKEN" in
   EAA*) ok "META_ACCESS_TOKEN has access-token shape";;
   "")   : ;;
@@ -127,7 +143,6 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/.netlify/functions/w
 [ "$code" = 401 ] && ok "webhook rejects an unsigned payload (401)" \
                   || bad "webhook returned $code for an unsigned payload — signature check not live"
 
-SECRET=$(getv META_APP_SECRET)
 if [ -n "$SECRET" ]; then
   BODY='{"entry":[]}'
   SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -r | cut -d' ' -f1)"
@@ -136,10 +151,9 @@ if [ -n "$SECRET" ]; then
   [ "$code" = 200 ] && ok "webhook accepts a correctly signed payload (200)" \
                     || bad "webhook returned $code for a correctly signed payload"
 else
-  note "skipped signed-payload test (META_APP_SECRET not set)"
+  note "skipped signed-payload test ($(why META_APP_SECRET))"
 fi
 
-VT=$(getv WHATSAPP_VERIFY_TOKEN)
 if [ -n "$VT" ]; then
   ch=$(curl -s "$URL/.netlify/functions/whatsapp-webhook?hub.mode=subscribe&hub.verify_token=$VT&hub.challenge=ping" --max-time 25)
   [ "$ch" = ping ] && ok "webhook completes Meta's verification handshake" \
@@ -161,7 +175,8 @@ echo "3. Meta-side delivery"
 # here. Both have been wrong before, and both fail silently.
 WABA=$(getv META_BUSINESS_ACCOUNT_ID)
 if [ -z "$WABA" ] || [ -z "$TOKEN" ]; then
-  note "skipped (needs META_BUSINESS_ACCOUNT_ID and META_ACCESS_TOKEN)"
+  if [ -z "$WABA" ]; then note "skipped subscription check (META_BUSINESS_ACCOUNT_ID not set)"
+  else note "skipped subscription check ($(why META_ACCESS_TOKEN))"; fi
 else
   SUBS=$(curl -s -H "Authorization: Bearer $TOKEN" \
          "https://graph.facebook.com/v21.0/${WABA}/subscribed_apps" --max-time 25)
@@ -201,6 +216,8 @@ print(c.get("phone_number") or c.get("whatsapp_business_account") or c.get("appl
   else
     check_meta_url "webhook callback URL" "$CALLBACK" "$URL/.netlify/functions/whatsapp-webhook" 401
   fi
+else
+  note "skipped webhook callback URL check ($(why META_ACCESS_TOKEN))"
 fi
 
 echo
@@ -250,6 +267,8 @@ for e in errs:
     # 421 is the endpoint's answer to a request it cannot decrypt
     check_meta_url "flow endpoint" "$ENDPOINT" "$URL/.netlify/functions/whatsapp-flow-endpoint" 421
   fi
+elif [ -n "$FID" ]; then
+  note "skipped flow status and endpoint check ($(why META_ACCESS_TOKEN))"
 fi
 
 echo
