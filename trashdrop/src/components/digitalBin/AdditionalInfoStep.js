@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FaCamera, FaTrash } from 'react-icons/fa';
 import CameraModal from '../CameraModal';
+import PhotoViewer from '../ui/PhotoViewer.js';
 import { toastService } from '../../services/toastService';
 import StepNav from './StepNav.js';
 import { card, fieldHint, infoNote, inputField, sectionTitle } from '../ui/styles.js';
@@ -18,6 +19,8 @@ const FREQUENCY_LABELS = {
 
 const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) => {
   const [photos, setPhotos] = useState(formData.photos || []);
+  // Index of the photo open full screen, or null
+  const [viewerIndex, setViewerIndex] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
 
   const handleNotesChange = (e) => {
@@ -123,13 +126,18 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
             <div className="grid grid-cols-3 gap-2.5">
               {photos.map((photo, index) => (
                 <div key={index} className="relative">
-                  <div className="w-full aspect-square bg-td-cream dark:bg-gray-900 rounded-xl border border-td-border dark:border-gray-700 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setViewerIndex(index)}
+                    aria-label={`Open photo ${index + 1} of ${photos.length}`}
+                    className="block w-full aspect-square bg-td-cream dark:bg-gray-900 rounded-xl border border-td-border dark:border-gray-700 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
                     <img 
                       src={photo} 
                       alt={`Waste Bin ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
-                  </div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => removePhoto(index)}
@@ -179,6 +187,15 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         missingText="Take at least one photo to continue."
         missingId="photos-step-missing"
       />
+
+      {viewerIndex !== null && photos.length > 0 && (
+        <PhotoViewer
+          photos={photos}
+          index={Math.min(viewerIndex, photos.length - 1)}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </div>
   );
 };
