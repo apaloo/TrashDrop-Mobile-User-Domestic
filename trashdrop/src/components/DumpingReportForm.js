@@ -10,6 +10,7 @@ import { notificationService } from '../services/notificationService.js';
 import CameraModal from './CameraModal.js';
 import OptionTile from './ui/OptionTile.js';
 import PageHeader from './ui/PageHeader.js';
+import PhotoViewer from './ui/PhotoViewer.js';
 import { card, errorNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from './ui/styles.js';
 
 // Choices on the form: [value, icon, label(, hint)]
@@ -181,6 +182,8 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const [mapPosition, setMapPosition] = useState([5.614736, -0.208811]);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
+  // Index of the photo open full screen, or null
+  const [viewerIndex, setViewerIndex] = useState(null);
   const [formData, setFormData] = useState({
     location: '',
     coordinates: null,
@@ -821,11 +824,18 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               <div className="grid grid-cols-2 min-[480px]:grid-cols-3 gap-2 mt-2">
                 {capturedPhotos.map((photo, i) => (
                   <div key={photo.id} className="relative">
-                    <img
-                      src={photo.url}
-                      alt={`Illegal dumping, shot ${i + 1}`}
-                      className="w-full h-32 object-cover rounded-xl"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setViewerIndex(i)}
+                      aria-label={`Open photo ${i + 1} of ${capturedPhotos.length}`}
+                      className="block w-full rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <img
+                        src={photo.url}
+                        alt={`Illegal dumping, shot ${i + 1}`}
+                        className="w-full h-32 object-cover rounded-xl"
+                      />
+                    </button>
                     <button
                       type="button"
                       onClick={() => removePhoto(photo.id)}
@@ -941,6 +951,15 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
           </svg>
           {error}
         </div>
+      )}
+
+      {viewerIndex !== null && capturedPhotos.length > 0 && (
+        <PhotoViewer
+          photos={capturedPhotos.map((p) => p.url)}
+          index={Math.min(viewerIndex, capturedPhotos.length - 1)}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
       )}
     </div>
   );
