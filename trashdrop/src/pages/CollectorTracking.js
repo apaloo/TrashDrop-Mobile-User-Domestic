@@ -9,6 +9,11 @@ import GeolocationService from '../utils/geolocationService.js';
 import { showDistanceAlert, showStatusNotification } from '../utils/toastNotifications.js';
 import supabase from '../utils/supabaseClient.js';
 
+// The household follows its collector only on the way to the pickup. From
+// the scan ('collecting') on, the collector's next stops are other people's
+// homes: the app stops receiving the location, not just showing it.
+export const TRACKABLE_STATUSES = ['accepted', 'active', 'en_route', 'in_transit', 'arrived'];
+
 /**
  * Collector Tracking page
  * Shows real-time collector locations and tracks active pickup requests
@@ -162,12 +167,19 @@ const CollectorTracking = () => {
     console.log('Collector location updated:', location);
   };
 
+  const canTrackCollector = TRACKABLE_STATUSES.includes(activePickup?.status);
+
   // Fetch initial collector location from collector_profiles when collector is assigned
   useEffect(() => {
+    let cancelled = false;
     const fetchCollectorLocation = async () => {
-      if (!activePickup?.collector_id) {
-        console.log('[CollectorTracking] No collector assigned yet');
+      if (!activePickup?.collector_id || !canTrackCollector) {
+        console.log('[CollectorTracking] Not following the collector (none yet, or the pickup is done)');
+        // Drop what we already hold too: where they were, and how far away
         setCollectorLocation(null);
+        setCollectorProfile(null);
+        setEta(null);
+        setDistance(null);
         return;
       }
 
@@ -179,6 +191,9 @@ const CollectorTracking = () => {
           .select('current_latitude, current_longitude, current_location, location_updated_at, status, is_online')
           .eq('user_id', activePickup.collector_id)
           .maybeSingle();
+
+        // The pickup moved on (or the page closed) while this was loading
+        if (cancelled) return;
 
         if (profileError) {
           console.error('[CollectorTracking] Error fetching collector profile:', profileError);
@@ -326,7 +341,8 @@ const CollectorTracking = () => {
     };
 
     fetchCollectorLocation();
-  }, [activePickup?.collector_id, activePickup?.location, activePickup?.id]);
+    return () => { cancelled = true; };
+  }, [activePickup?.collector_id, activePickup?.location, activePickup?.id, canTrackCollector]);
 
   // Get user's current location
   useEffect(() => {
@@ -354,7 +370,9 @@ const CollectorTracking = () => {
 
   // Subscribe to real-time collector location updates with smart throttling and notifications
   useEffect(() => {
-    if (!activePickup?.collector_id) return;
+    // Only on the way to the pickup; when the status moves on, the cleanup
+    // below unsubscribes
+    if (!activePickup?.collector_id || !canTrackCollector) return;
 
     console.log('[CollectorTracking] Setting up real-time location tracking for collector:', activePickup.collector_id);
     
@@ -438,7 +456,7 @@ const CollectorTracking = () => {
       console.log('[CollectorTracking] Cleaning up location subscription');
       locationSubscription.unsubscribe();
     };
-  }, [activePickup?.collector_id, activePickup?.id, activePickup?.location, activePickup?.coordinates]);
+  }, [activePickup?.collector_id, activePickup?.id, activePickup?.location, activePickup?.coordinates, canTrackCollector]);
   
   // Monitor pickup status changes and show notifications
   useEffect(() => {
