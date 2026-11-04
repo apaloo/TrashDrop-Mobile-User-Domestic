@@ -6,6 +6,13 @@
 import supabase from '../utils/supabaseClient.js';
 import { parsePostGISPoint } from '../utils/geoUtils.js';
 
+// Who is collecting: name, phone, rating and vehicle (no location, no email),
+// for a collector on one of the user's own pickups. The database lets a
+// household read a collector's full row only while that collector is on the
+// way; see 20261104000000_collector_profiles_read_by_job.sql.
+const fetchCollectorDisplay = (collectorId) =>
+  supabase.rpc('td_collector_display_profile', { p_collector_id: collectorId }).maybeSingle();
+
 export const pickupService = {
   /**
    * Get active pickup request for a user
@@ -75,11 +82,7 @@ export const pickupService = {
       // Fetch collector details separately if collector_id exists
       if (oneTimeData?.[0]?.collector_id) {
         try {
-          const { data: collectorData } = await supabase
-            .from('collector_profiles')
-            .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
-            .eq('user_id', oneTimeData[0].collector_id)
-            .single();
+          const { data: collectorData } = await fetchCollectorDisplay(oneTimeData[0].collector_id);
           
           if (collectorData) {
             oneTimeData[0].collector = {
@@ -138,11 +141,7 @@ export const pickupService = {
       // Fetch collector details for digital bin if collector_id exists
       if (digitalBinData?.[0]?.collector_id) {
         try {
-          const { data: collectorData } = await supabase
-            .from('collector_profiles')
-            .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
-            .eq('user_id', digitalBinData[0].collector_id)
-            .single();
+          const { data: collectorData } = await fetchCollectorDisplay(digitalBinData[0].collector_id);
           
           if (collectorData) {
             digitalBinData[0].collector = {
@@ -440,11 +439,7 @@ export const pickupService = {
           let collector = null;
           if (digitalBinData.collector_id) {
             try {
-              const { data: collectorData } = await supabase
-                .from('collector_profiles')
-                .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
-                .eq('user_id', digitalBinData.collector_id)
-                .maybeSingle();
+              const { data: collectorData } = await fetchCollectorDisplay(digitalBinData.collector_id);
               
               if (collectorData) {
                 collector = {
@@ -496,11 +491,7 @@ export const pickupService = {
         // Fetch collector details separately if collector_id exists
         if (data.collector_id) {
           try {
-            const { data: collectorData } = await supabase
-              .from('collector_profiles')
-              .select('user_id, first_name, last_name, email, phone, rating, vehicle_type, vehicle_plate, vehicle_color, profile_image_url, status, region')
-              .eq('user_id', data.collector_id)
-              .maybeSingle();
+            const { data: collectorData } = await fetchCollectorDisplay(data.collector_id);
             
             if (collectorData) {
               data.collector = {
