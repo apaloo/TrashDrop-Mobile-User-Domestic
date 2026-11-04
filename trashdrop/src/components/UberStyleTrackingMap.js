@@ -13,39 +13,43 @@ L.Icon.Default.mergeOptions({
   shadowUrl: '/assets/marker-shadow.png',
 });
 
-// Enhanced collector icon with navigation/vehicle style
+// Collector: the brand green disc with a lime ring and a truck, so it reads as "your collector"
 const collectorIcon = new L.Icon({
   iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="50" height="50">
-      <!-- Outer pulsing ring (will be animated via CSS) -->
-      <circle cx="25" cy="25" r="22" fill="none" stroke="#3B82F6" stroke-width="2" opacity="0.3"/>
-      <!-- Main vehicle icon background -->
-      <circle cx="25" cy="25" r="18" fill="#3B82F6" stroke="white" stroke-width="3"/>
-      <!-- Vehicle/truck icon -->
-      <path d="M15 20 L15 28 L18 28 L18 30 L20 30 L20 28 L30 28 L30 30 L32 30 L32 28 L35 28 L35 23 L32 20 Z" fill="white"/>
-      <circle cx="19" cy="30" r="2" fill="white"/>
-      <circle cx="31" cy="30" r="2" fill="white"/>
-      <!-- Direction arrow -->
-      <path d="M25 15 L28 20 L22 20 Z" fill="white"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+      <circle cx="24" cy="24" r="21" fill="#b6ee69" opacity="0.45"/>
+      <circle cx="24" cy="24" r="16" fill="#1b6e35" stroke="#ffffff" stroke-width="3"/>
+      <path d="M15 19h11v9H15z M26 22h4l3 3v3h-7z" fill="#ffffff"/>
+      <circle cx="19" cy="29.5" r="2" fill="#ffffff" stroke="#1b6e35" stroke-width="1"/>
+      <circle cx="29" cy="29.5" r="2" fill="#ffffff" stroke="#1b6e35" stroke-width="1"/>
     </svg>
   `),
-  iconSize: [50, 50],
-  iconAnchor: [25, 25],
-  popupAnchor: [0, -25],
+  iconSize: [48, 48],
+  iconAnchor: [24, 24],
+  popupAnchor: [0, -24],
   className: 'collector-marker-animated'
 });
 
+// Pickup point: a dark pin with a lime centre, distinct from the green collector
 const pickupIcon = new L.Icon({
   iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#3B82F6" stroke="white" stroke-width="1.5"/>
-      <circle cx="12" cy="9" r="2.5" fill="white"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="30" height="40">
+      <path d="M12 1C6 1 1.5 5.5 1.5 11.5 1.5 19 12 31 12 31s10.5-12 10.5-19.5C22.5 5.5 18 1 12 1z" fill="#0a0f0a" stroke="#ffffff" stroke-width="1.5"/>
+      <circle cx="12" cy="11.5" r="4.5" fill="#b6ee69"/>
     </svg>
   `),
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
+  iconSize: [30, 40],
+  iconAnchor: [15, 40],
   popupAnchor: [0, -40]
 });
+
+// Room to leave around the two pins: the sheet covers the bottom on phones
+// and the left side on wider screens; the back button sits top left
+const fitPadding = () => (
+  window.matchMedia && window.matchMedia('(min-width: 768px)').matches
+    ? { paddingTopLeft: [420, 40], paddingBottomRight: [60, 40] }
+    : { paddingTopLeft: [40, 90], paddingBottomRight: [40, 280] }
+);
 
 // Component to auto-fit map bounds
 const AutoFitBounds = ({ collectorLocation, pickupLocation, isValidLocation }) => {
@@ -78,8 +82,8 @@ const AutoFitBounds = ({ collectorLocation, pickupLocation, isValidLocation }) =
               // Force map invalidation before bounds adjustment
               map.invalidateSize();
               map.fitBounds(bounds, { 
-                padding: [50, 50], 
-                maxZoom: 15,
+                ...fitPadding(),
+                maxZoom: 16,
                 animate: hasInitialized.current, // Only animate after first load
                 duration: 0.5
               });
@@ -184,16 +188,23 @@ const AnimatedCollectorMarker = ({ position, prevPosition }) => {
     >
       <Popup>
         <div className="text-center">
-          <strong className="text-td-forest">Collector En Route</strong>
-          <p className="text-xs text-td-sage mt-1">Moving to your location</p>
-          <div className="mt-2 px-2 py-1 bg-td-tonal rounded text-xs text-td-forest font-medium">
-            🚚 Live tracking active
-          </div>
+          <strong className="text-td-ink">Your collector</strong>
+          <p className="text-xs text-td-sage mt-1">Live location</p>
         </div>
       </Popup>
     </Marker>
   );
 };
+
+// The steps on the Active Pickup panel, and the statuses that mean each is done.
+// 'disposed' is the last step: the collector has dropped the waste at a disposal site.
+const PROGRESS_STEPS = [
+  { key: 'accepted', label: 'Accepted', reachedBy: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
+  { key: 'en_route', label: 'En route', reachedBy: ['en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
+  { key: 'arrived', label: 'Arrived', reachedBy: ['arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
+  { key: 'collecting', label: 'Picked up', reachedBy: ['collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
+  { key: 'complete', label: 'Disposed', reachedBy: ['collected', 'completed', 'disposed'] },
+];
 
 const UberStyleTrackingMap = ({ 
   collectorLocation,
@@ -209,7 +220,8 @@ const UberStyleTrackingMap = ({
 }) => {
   const [prevCollectorLocation, setPrevCollectorLocation] = useState(null);
   const [routeLine, setRouteLine] = useState([]);
-  const [isCardExpanded, setIsCardExpanded] = useState(true);
+  // Collapsed at first, so the map stays in view
+  const [isCardExpanded, setIsCardExpanded] = useState(false);
 
   // How old the collector's last location is, re-checked every 30s so the
   // note appears even when no new location arrives
@@ -340,6 +352,7 @@ const UberStyleTrackingMap = ({
           zoom={13}
           style={{ width: '100%', height: '100%' }}
           zoomControl={false}
+          attributionControl={false}
           whenCreated={(mapInstance) => {
             // Ensure map container is properly initialized
             setTimeout(() => {
@@ -350,11 +363,10 @@ const UberStyleTrackingMap = ({
           }}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {/* Zoom controls positioned at top right */}
+          {/* Zoom buttons top right; hidden on phones, which pinch (see the CSS) */}
           <ZoomControl position="topright" />
 
           {/* Auto-fit bounds */}
@@ -364,28 +376,11 @@ const UberStyleTrackingMap = ({
             isValidLocation={isValidLocation}
           />
 
-          {/* Enhanced route line from collector to pickup with gradient effect */}
+          {/* Route: a white casing under the brand green line, readable on any street */}
           {routeLine.length === 2 && (
             <>
-              {/* Main route line with blue color */}
-              <Polyline 
-                positions={routeLine} 
-                color="#3B82F6"
-                weight={5}
-                opacity={0.8}
-                dashArray="15, 10"
-                dashOffset="0"
-                className="route-line-animated"
-              />
-              {/* Shadow/glow effect for depth */}
-              <Polyline 
-                positions={routeLine} 
-                color="#60A5FA"
-                weight={8}
-                opacity={0.3}
-                dashArray="15, 10"
-                dashOffset="0"
-              />
+              <Polyline positions={routeLine} pathOptions={{ color: '#ffffff', weight: 9, opacity: 0.9, lineCap: 'round' }} />
+              <Polyline positions={routeLine} pathOptions={{ color: '#1b6e35', weight: 5, opacity: 1, lineCap: 'round', dashArray: '1 10' }} className="route-line-animated" />
             </>
           )}
 
@@ -397,7 +392,7 @@ const UberStyleTrackingMap = ({
             >
               <Popup>
                 <div className="text-center">
-                  <strong className="text-td-forest">Your Location</strong>
+                  <strong className="text-td-ink">Your location</strong>
                   <p className="text-xs text-td-sage mt-1">Pickup point</p>
                 </div>
               </Popup>
@@ -414,410 +409,206 @@ const UberStyleTrackingMap = ({
         </MapContainer>
       </div>
 
-      {/* Top-Center ETA Badge - Prominent Display */}
-      {isValidLocation(collectorLocation) && typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0 && (
-        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-[1001]">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-full shadow-2xl px-5 py-2.5 flex items-center space-x-2.5 animate-pulse">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <div className="text-xs font-medium opacity-90">Arrives in</div>
-              <div className="text-xl font-bold">{eta} min</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Floating info card - Uber style */}
-      {isValidLocation(collectorLocation) && (() => {
+      {/* Active pickup: a bottom sheet on phones (a side card on wider screens),
+          collapsed to the essentials so the map and the alerts above it stay in view */}
+      {activePickup && (() => {
+        const collector = activePickup.collector;
+        const hasEta = typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0;
+        const hasDistance = typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0;
         const isActuallyArrived = displayStatus === 'arrived' || displayStatus === 'collecting';
         const isEnRoute = displayStatus === 'en_route' || displayStatus === 'in_transit';
         const isPickingUp = displayStatus === 'picked_up';
         const isDisposed = displayStatus === 'disposed';
         const isCollected = displayStatus === 'collected' || displayStatus === 'completed' || isDisposed;
-        
-        let statusText = 'Collector accepted';
-        if (isDisposed) {
-          statusText = 'Waste disposed';
-        } else if (isCollected) {
-          statusText = 'Waste collected';
-        } else if (isPickingUp) {
-          statusText = 'Collector picking up waste';
-        } else if (isActuallyArrived) {
-          statusText = 'Collector at pickup location';
-        } else if (isEnRoute) {
-          statusText = 'Collector en route';
-        }
-        
+
+        let statusText = collector ? 'Collector accepted' : 'Waiting for a collector';
+        if (isDisposed) statusText = 'Waste disposed';
+        else if (isCollected) statusText = 'Waste collected';
+        else if (isPickingUp) statusText = 'Collector picking up waste';
+        else if (isActuallyArrived) statusText = 'Collector at pickup location';
+        else if (isEnRoute) statusText = 'Collector en route';
+
+        // Steps reached, and the next one (none once all five are done)
+        const nextIndex = PROGRESS_STEPS.findIndex((step) => !step.reachedBy.includes(displayStatus));
+        const doneCount = nextIndex === -1 ? PROGRESS_STEPS.length : nextIndex;
+        const progressText = nextIndex === -1
+          ? 'All steps done'
+          : `${doneCount} of ${PROGRESS_STEPS.length} done · Next: ${PROGRESS_STEPS[nextIndex].label}`;
+
+        const toggle = () => setIsCardExpanded(!isCardExpanded);
+
         return (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-3 z-[1000] min-w-[260px] max-w-[90vw]">
-            <div className="flex items-center space-x-3">
-              {/* Collector Avatar */}
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-              </div>
+          <section
+            aria-label="Active pickup"
+            className="absolute inset-x-0 bottom-0 md:inset-x-auto md:left-4 md:top-4 md:bottom-auto md:w-96 z-[1000] flex flex-col max-h-[75%] md:max-h-[calc(100%-2rem)] bg-white dark:bg-gray-800 border border-td-border dark:border-gray-700 rounded-t-3xl md:rounded-3xl shadow-[0_-8px_24px_rgba(10,15,10,0.12)]"
+          >
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={isCardExpanded}
+              className="flex-shrink-0 flex justify-center pt-2.5 pb-1.5"
+            >
+              <span aria-hidden="true" className="w-10 h-1 rounded-full bg-td-border dark:bg-gray-600" />
+              <span className="sr-only">{isCardExpanded ? 'Show less' : 'Show pickup details'}</span>
+            </button>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-td-ink truncate">
-                  {statusText}
-                </p>
-                {isLocationStale && !isCollected && (
-                  <p className="text-xs text-amber-600">
-                    Location last updated {locationAgeMinutes < 60 ? `${locationAgeMinutes} min` : `${Math.floor(locationAgeMinutes / 60)} h`} ago
-                  </p>
-                )}
-                <div className="flex items-center space-x-3 mt-1">
-                  {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) ? (
-                    isActuallyArrived ? (
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 text-green-700 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-sm font-bold text-green-600">Arrived</span>
-                      </div>
-                    ) : (
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 text-td-sage mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-sm font-bold text-green-600">{eta} min</span>
-                    </div>
-                  )
+            <div className="overflow-y-auto overscroll-contain px-5 pb-4">
+              {/* Who, what's happening, how long */}
+              <div className="flex items-center gap-3">
+                {collector?.profile_image_url ? (
+                  <img src={collector.profile_image_url} alt="" className="w-12 h-12 flex-shrink-0 rounded-full object-cover" />
                 ) : (
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 text-td-sage mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span className="text-xs text-td-sage">Calculating...</span>
+                  <div aria-hidden="true" className="w-12 h-12 flex-shrink-0 rounded-full bg-td-forest text-white font-bold flex items-center justify-center">
+                    {collector ? `${collector.first_name?.[0] || ''}${collector.last_name?.[0] || ''}` : '…'}
                   </div>
                 )}
-                {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 text-td-sage mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                    <span className="text-sm text-td-sage">{formatDistance(distance)}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-td-ink dark:text-gray-100 truncate">{statusText}</p>
+                  {collector && (
+                    <p className="text-sm text-td-sage dark:text-gray-300 truncate">
+                      {collector.first_name} {collector.last_name}
+                      <span aria-hidden="true"> · </span>
+                      <span aria-label={`rated ${collector.rating || '5.0'}`}>★ {collector.rating || '5.0'}</span>
+                    </p>
+                  )}
+                  {isLocationStale && !isCollected && (
+                    <p className="text-[13px] text-td-orange-text">
+                      Location last updated {locationAgeMinutes < 60 ? `${locationAgeMinutes} min` : `${Math.floor(locationAgeMinutes / 60)} h`} ago
+                    </p>
+                  )}
+                </div>
+                {(hasEta || isActuallyArrived) && !isCollected && (
+                  <div className="flex-shrink-0 text-right" role="status">
+                    <p className="text-xl font-bold text-td-forest dark:text-green-300 leading-tight">
+                      {isActuallyArrived ? 'Here' : `${eta} min`}
+                    </p>
+                    {hasDistance && !isActuallyArrived && (
+                      <p className="text-[13px] text-td-sage dark:text-gray-300">{formatDistance(distance)} away</p>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Pulse indicator */}
-            <div className="flex-shrink-0">
-              <div className="relative">
-                <div className="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-2.5 h-2.5 bg-green-600 rounded-full animate-ping opacity-75"></div>
+              {/* Progress: one bar, one line, fits any phone */}
+              <div className="mt-4">
+                <div
+                  role="progressbar"
+                  aria-label="Pickup progress"
+                  aria-valuemin={0}
+                  aria-valuemax={PROGRESS_STEPS.length}
+                  aria-valuenow={doneCount}
+                  aria-valuetext={progressText}
+                  className="flex gap-1"
+                >
+                  {PROGRESS_STEPS.map((step, index) => (
+                    <span
+                      key={step.key}
+                      className={`h-1.5 flex-1 rounded-full ${
+                        index < doneCount ? 'bg-td-forest dark:bg-green-400' :
+                        index === doneCount ? 'bg-td-lime' :
+                        'bg-td-border dark:bg-gray-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="mt-2 text-[13px] text-td-sage dark:text-gray-300">{progressText}</p>
               </div>
+
+              {/* More, on request */}
+              {isCardExpanded && (
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <div className="bg-td-cream dark:bg-gray-900/40 rounded-2xl p-3">
+                    <p className="text-[13px] text-td-sage dark:text-gray-300">Waste type</p>
+                    <p className="font-semibold text-td-ink dark:text-gray-100 capitalize">{activePickup.waste_type || 'General'}</p>
+                  </div>
+                  <div className="bg-td-cream dark:bg-gray-900/40 rounded-2xl p-3">
+                    <p className="text-[13px] text-td-sage dark:text-gray-300">Bags</p>
+                    <p className="font-semibold text-td-ink dark:text-gray-100">{Math.round(Number(activePickup.estimated_volume)) || activePickup.bag_count || 0}</p>
+                  </div>
+                  {collector?.vehicle_plate && (
+                    <div className="col-span-2 bg-td-cream dark:bg-gray-900/40 rounded-2xl p-3">
+                      <p className="text-[13px] text-td-sage dark:text-gray-300">Vehicle</p>
+                      <p className="font-semibold text-td-ink dark:text-gray-100">{collector.vehicle_plate}</p>
+                    </div>
+                  )}
+                  {activePickup.special_instructions && (
+                    <div className="col-span-2 bg-td-tonal dark:bg-green-900/30 rounded-2xl p-3">
+                      <p className="text-[13px] font-medium text-td-forest-dk dark:text-green-300">Special instructions</p>
+                      <p className="text-sm text-td-ink dark:text-gray-100">{activePickup.special_instructions}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {collector?.phone ? (
+                  <a
+                    href={`tel:${collector.phone}`}
+                    className="h-11 rounded-full bg-td-forest hover:bg-td-forest-dk text-white text-[15px] font-semibold flex items-center justify-center gap-1.5"
+                  >
+                    <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    Call
+                  </a>
+                ) : (
+                  <span className="h-11 rounded-full bg-td-disabled-bg text-td-disabled-text text-[15px] font-semibold flex items-center justify-center" title="No phone number yet">
+                    Call
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to cancel this pickup?')) {
+                      try {
+                        const { pickupService } = await import('../services/pickupService.js');
+                        const { error: cancelError } = await pickupService.cancelPickupRequest(activePickup.id, 'Cancelled by user');
+                        if (cancelError) {
+                          alert(`Failed to cancel: ${cancelError.message}`);
+                        } else {
+                          alert('Pickup cancelled successfully.');
+                          window.location.href = '/dashboard';
+                        }
+                      } catch (err) {
+                        alert(`Error: ${err.message}`);
+                      }
+                    }
+                  }}
+                  className="h-11 rounded-full border-[1.5px] border-red-200 dark:border-red-800 text-td-error dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 text-[15px] font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={toggle}
+                  aria-expanded={isCardExpanded}
+                  className="h-11 rounded-full border-[1.5px] border-td-border-strong dark:border-gray-500 text-td-ink dark:text-gray-100 hover:bg-td-cream dark:hover:bg-gray-700 text-[15px] font-semibold"
+                >
+                  {isCardExpanded ? 'Less' : 'Details'}
+                </button>
+              </div>
+
+              {/* The map's credit, here because the sheet covers the map's corner */}
+              <p className="mt-3 text-[13px] text-td-sage dark:text-gray-400">
+                Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">OpenStreetMap</a> contributors
+              </p>
             </div>
-          </div>
-        </div>
+          </section>
         );
       })()}
 
-      {/* Enhanced Active Pickup Card with Collector Profile */}
-      {activePickup && (
-        <div className="absolute top-20 left-4 right-4 md:left-4 md:right-auto md:max-w-sm bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden z-[1000] transition-all duration-300">
-          {/* Drag Handle */}
-          <div 
-            className="flex items-center justify-center py-2 bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
-            onClick={() => setIsCardExpanded(!isCardExpanded)}
-          >
-            <div className="w-10 h-1 bg-gray-400 rounded-full"></div>
-          </div>
-
-          {/* Card Header - Always Visible */}
-          <div 
-            className="p-4 cursor-pointer"
-            onClick={() => setIsCardExpanded(!isCardExpanded)}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-bold text-td-ink">Active Pickup</h3>
-              <svg 
-                className={`w-5 h-5 text-td-sage transition-transform duration-300 ${isCardExpanded ? 'rotate-180' : ''}`}
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-
-            {/* Collector Mini Profile - Only Visible When Collapsed */}
-            {!isCardExpanded && activePickup.collector && (
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                  {activePickup.collector.first_name?.[0]}{activePickup.collector.last_name?.[0]}
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-td-ink text-sm">
-                    {activePickup.collector.first_name} {activePickup.collector.last_name}
-                  </p>
-                  <div className="flex items-center space-x-1">
-                    <span className="text-yellow-500 text-xs">⭐</span>
-                    <span className="text-sm text-td-sage">{activePickup.collector.rating || '5.0'}</span>
-                  </div>
-                </div>
-                {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
-                  <div className="text-right">
-                    <p className="text-xs text-td-sage">Distance</p>
-                    <p className="text-sm font-bold text-td-forest">{formatDistance(distance)}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Expandable Content */}
-          <div className={`transition-all duration-300 overflow-hidden ${isCardExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="px-4 pb-4 space-y-4">
-              {/* Collector Full Profile */}
-              {activePickup.collector && (
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      {activePickup.collector.profile_image_url ? (
-                        <img 
-                          src={activePickup.collector.profile_image_url} 
-                          alt="Collector" 
-                          className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-md"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
-                          {activePickup.collector.first_name?.[0]}{activePickup.collector.last_name?.[0]}
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-bold text-td-ink">
-                          {activePickup.collector.first_name} {activePickup.collector.last_name}
-                        </p>
-                        <div className="flex items-center space-x-1 mt-1">
-                          <span className="text-yellow-500">⭐</span>
-                          <span className="font-semibold text-td-ink">{activePickup.collector.rating || '5.0'}</span>
-                        </div>
-                        {activePickup.collector.vehicle_plate && (
-                          <p className="text-xs text-td-sage mt-1">
-                            Vehicle: <span className="font-medium">{activePickup.collector.vehicle_plate}</span>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${(() => {
-                      if (displayStatus === 'accepted' || displayStatus === 'active') return 'bg-blue-100 text-blue-700'; // status colour: assigned
-                      if (displayStatus === 'in_transit' || displayStatus === 'en_route') return 'bg-purple-100 text-purple-700';
-                      if (displayStatus === 'arrived') return 'bg-green-100 text-green-700';
-                      if (displayStatus === 'picked_up' || displayStatus === 'collecting') return 'bg-orange-100 text-orange-700';
-                      if (displayStatus === 'collected' || displayStatus === 'completed' || displayStatus === 'disposed') return 'bg-emerald-100 text-emerald-700';
-                      return 'bg-yellow-100 text-yellow-700';
-                    })()}`}>
-                      {displayStatus?.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Distance & ETA Info Box */}
-              {((typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0) || 
-                (typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0)) && (
-                <div className="bg-green-600 text-white rounded-lg p-2.5">
-                  <div className="grid grid-cols-2 gap-3">
-                    {typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0 && (
-                      <div>
-                        <p className="text-[10px] text-blue-200 mb-0.5">Distance</p>
-                        <p className="text-lg font-bold">{formatDistance(distance)}</p>
-                      </div>
-                    )}
-                    {typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0 && (
-                      <div>
-                        <p className="text-[10px] text-blue-200 mb-0.5">ETA</p>
-                        <p className="text-lg font-bold">{eta} min</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Progress Tracker */}
-              <div className="bg-td-cream rounded-xl p-4">
-                <p className="text-xs font-semibold text-td-sage mb-3">PROGRESS</p>
-                <div className="relative">
-                  {/* Progress Line */}
-                  <div className="absolute top-4 left-4 right-4 h-0.5 bg-gray-300"></div>
-                  <div 
-                    className="absolute top-4 left-4 h-0.5 bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-500"
-                    style={{ 
-                      width: `${(() => {
-                        if (displayStatus === 'available') return '0%';
-                        if (displayStatus === 'accepted' || displayStatus === 'active') return '25%';
-                        if (displayStatus === 'en_route' || displayStatus === 'in_transit') return '50%';
-                        if (displayStatus === 'arrived') return '75%';
-                        if (displayStatus === 'collecting' || displayStatus === 'picked_up') return '90%';
-                        return '100%';
-                      })()}` 
-                    }}
-                  ></div>
-                  
-                  {/* Progress Stages */}
-                  <div className="relative flex justify-between">
-                    {['accepted', 'en_route', 'arrived', 'collecting', 'complete'].map((stage, index) => {
-                      const currentStatus = displayStatus;
-                      
-                      // 'disposed' is the last step: the collector has dropped the waste at a disposal site
-                      const stageStatuses = {
-                        accepted: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'],
-                        en_route: ['en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'],
-                        arrived: ['arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'],
-                        collecting: ['collecting', 'picked_up', 'collected', 'completed', 'disposed'],
-                        complete: ['collected', 'completed', 'disposed']
-                      };
-                      const isCompleted = stageStatuses[stage]?.includes(currentStatus);
-                      const isCurrent = currentStatus === stage || 
-                        (stage === 'accepted' && currentStatus === 'active') ||
-                        (stage === 'en_route' && currentStatus === 'in_transit') ||
-                        (stage === 'collecting' && currentStatus === 'picked_up') ||
-                        (stage === 'complete' && (currentStatus === 'completed' || currentStatus === 'collected'));
-                      
-                      return (
-                        <div key={stage} className="flex flex-col items-center space-y-2 z-10">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                            isCompleted ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg' :
-                            isCurrent ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg animate-pulse' :
-                            'bg-gray-300 text-td-sage'
-                          }`}>
-                            {isCompleted ? (
-                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <span className="text-xs font-bold">{index + 1}</span>
-                            )}
-                          </div>
-                          <p className={`text-[10px] font-medium text-center max-w-[60px] ${
-                            isCurrent ? 'text-td-forest' : 'text-td-sage'
-                          }`}>
-                            {(() => {
-                              // Custom label mapping
-                              const labels = {
-                                'accepted': 'Accepted',
-                                'en_route': 'En Route',
-                                'arrived': 'Arrived',
-                                'collecting': 'Picked Up',
-                                'complete': 'Disposed'
-                              };
-                              return labels[stage] || stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                            })()}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Pickup Details */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-td-cream rounded-lg p-3">
-                  <p className="text-xs text-td-sage mb-1">Waste Type</p>
-                  <p className="text-sm font-semibold text-td-ink capitalize">{activePickup.waste_type || 'General'}</p>
-                </div>
-                <div className="bg-td-cream rounded-lg p-3">
-                  <p className="text-xs text-td-sage mb-1">Bags</p>
-                  <p className="text-sm font-semibold text-td-ink">{Math.round(Number(activePickup.estimated_volume)) || activePickup.bag_count || 0}</p>
-                </div>
-              </div>
-
-              {activePickup.special_instructions && (
-                <div className="p-3 bg-td-tonal rounded-lg">
-                  <p className="text-xs text-td-forest font-medium mb-1">Special Instructions</p>
-                  <p className="text-sm text-td-ink">{activePickup.special_instructions}</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              {activePickup.collector && (
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (activePickup.collector.phone) {
-                        window.location.href = `tel:${activePickup.collector.phone}`;
-                      }
-                    }}
-                    className="flex flex-col items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-xl p-3 transition-colors shadow-md"
-                  >
-                    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <span className="text-xs font-semibold">Call</span>
-                  </button>
-                  
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (window.confirm('Are you sure you want to cancel this pickup?')) {
-                        try {
-                          const { pickupService } = await import('../services/pickupService.js');
-                          const { error: cancelError } = await pickupService.cancelPickupRequest(activePickup.id, 'Cancelled by user');
-                          if (cancelError) {
-                            alert(`Failed to cancel: ${cancelError.message}`);
-                          } else {
-                            alert('Pickup cancelled successfully.');
-                            window.location.href = '/dashboard';
-                          }
-                        } catch (err) {
-                          alert(`Error: ${err.message}`);
-                        }
-                      }
-                    }}
-                    className="flex flex-col items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-xl p-3 transition-colors shadow-md"
-                  >
-                    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    <span className="text-xs font-semibold">Cancel</span>
-                  </button>
-                  
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Expand/collapse card to show full details
-                      setIsCardExpanded(!isCardExpanded);
-                    }}
-                    className="flex flex-col items-center justify-center bg-gray-600 hover:bg-gray-700 text-white rounded-xl p-3 transition-colors shadow-md"
-                  >
-                    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-xs font-semibold">Details</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Message */}
+      {/* Error Message: top centre, clear of the back button and the sheet */}
       {error && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-50 border border-red-200 rounded-lg px-4 py-2 z-[1000] max-w-md">
-          <p className="text-sm text-red-800">{error}</p>
+        <div role="alert" className="absolute top-4 left-1/2 -translate-x-1/2 w-[calc(100%-9rem)] max-w-md z-[1001] rounded-2xl border border-red-200 bg-red-50 px-4 py-2 shadow-lg">
+          <p className="text-sm text-td-error">{error}</p>
         </div>
       )}
 
       {/* No collector tracking message */}
       {!isValidLocation(collectorLocation) && !activePickup && isValidLocation(pickupLocation) && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 z-[1000]">
-          <p className="text-sm text-yellow-800">
-            <svg className="inline w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-            Waiting for collector to accept...
-          </p>
+        <div role="status" className="absolute top-4 left-1/2 -translate-x-1/2 w-[calc(100%-9rem)] max-w-md z-[1001] rounded-2xl border border-td-border bg-white px-4 py-2 shadow-lg">
+          <p className="text-sm text-td-ink">Waiting for a collector to accept…</p>
         </div>
       )}
 

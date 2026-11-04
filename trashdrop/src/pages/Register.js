@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import SocialLogin from '../components/SocialLogin.js';
 import CheckEmailModal from '../components/CheckEmailModal.js';
+import { connectionProblem, CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
 
 /**
  * Register page component for new user registration
@@ -156,6 +157,13 @@ const Register = () => {
         // Enhanced error message handling for registration
         const getRegistrationErrorMessage = (error) => {
           const errorMessage = typeof error === 'object' ? error.message : error;
+          const connection = connectionProblem(typeof error === 'object' ? error : { message: errorMessage });
+          if (connection === 'offline') {
+            return "You're offline. Connect to Wi-Fi or mobile data and try again.";
+          }
+          if (connection) {
+            return `${CONNECTION_MESSAGES[connection].title}. ${CONNECTION_MESSAGES[connection].message}`;
+          }
           
           if (errorMessage.includes('User already registered') || errorMessage.includes('already registered')) {
             return 'An account with this email already exists. Would you like to sign in instead?';
@@ -169,10 +177,6 @@ const Register = () => {
           if (errorMessage.includes('Too many requests') || errorMessage.includes('rate limit')) {
             return 'Too many registration attempts. Please wait a few minutes and try again.';
           }
-          if (errorMessage.includes('Failed to fetch') || errorMessage.includes('network')) {
-            return 'Network connection issue. Please check your internet connection and try again.';
-          }
-          
           return 'Unable to create account. Please check your information and try again.';
         };
         
