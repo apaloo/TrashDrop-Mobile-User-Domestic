@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { applyRememberMe } from '../utils/rememberMe.js';
+import { connectionProblem, CONNECTION_MESSAGES, withTimeout } from '../utils/connectionProblem.js';
 import supabase, { isTokenValid } from '../utils/supabaseClient.js';
 import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
 import { getSiteUrl } from '../utils/siteUrl.js';
@@ -694,16 +695,18 @@ export const AuthProvider = ({ children }) => {
       // Before Supabase stores the session: keep it after the app closes, or not
       applyRememberMe(rememberMe, email);
       console.log('[Auth DEBUG] Calling signInWithPassword with:', { email, rememberMe });
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-        options: {
-          // Set session persistence based on remember me preference
-          ...(rememberMe && { 
-            // For persistent sessions, we'll handle this in the session management
-          })
-        }
-      });
+      // A connection failure comes back as an error, a hang as a timeout, so
+      // both reach the connection check below instead of the generic catch
+      const attempt = () => withTimeout(supabase.auth.signInWithPassword({ email, password }))
+        .catch((attemptError) => {
+          if (connectionProblem(attemptError)) return { data: null, error: attemptError };
+          throw attemptError;
+        });
+      // Offline: no point sending it, say so at once. (A dropped request is
+      // already retried by the client's fetch, see supabaseClient.js.)
+      const { data, error } = connectionProblem(null) === 'offline'
+        ? { data: null, error: { name: 'Offline', message: 'Offline' } }
+        : await attempt();
       
       console.log('[Auth DEBUG] Sign-in response:', { 
         hasData: !!data, 
@@ -719,12 +722,16 @@ export const AuthProvider = ({ children }) => {
         // Provide user-friendly error messages for common authentication errors
         let userMessage = error.message || 'Failed to sign in';
         
-        // Handle network errors specifically
-        if (error.message === 'Failed to fetch' || 
-            error.message?.includes('Failed to fetch') ||
-            error.message?.includes('fetch') ||
-            !navigator.onLine) {
-          userMessage = 'You are not connected to the internet. Please ensure you are connected to the internet and try again.';
+        const connection = connectionProblem(error);
+        if (connection) {
+          const failure = {
+            ...CONNECTION_MESSAGES[connection],
+            code: 'NETWORK_ERROR',
+            connection,
+            originalMessage: error.message,
+          };
+          setAuthState({ status: AUTH_STATES.ERROR, user: null, error: failure, lastAction: 'sign_in_error' });
+          return { success: false, error: failure };
         } else {
           switch (error.message) {
             case 'Email not confirmed':
@@ -841,13 +848,7 @@ export const AuthProvider = ({ children }) => {
       console.error('[Auth] Unexpected error during sign-in:', error);
       
       // Handle network errors in catch block as well
-      let errorMessage = error.message || 'An unexpected error occurred during sign-in';
-      if (error.message === 'Failed to fetch' || 
-          error.message?.includes('Failed to fetch') ||
-          error.message?.includes('fetch') ||
-          !navigator.onLine) {
-        errorMessage = 'You are not connected to the internet. Please ensure you are connected to the internet and try again.';
-      }
+      const errorMessage = error.message || 'An unexpected error occurred during sign-in';
       
       setAuthState({
         status: AUTH_STATES.ERROR,

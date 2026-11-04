@@ -10,16 +10,16 @@
 
 /* Smooth pulsing glow effect using box-shadow */
 .collector-marker-animated img {
-  filter: drop-shadow(0 4px 6px rgba(59, 130, 246, 0.4));
+  filter: drop-shadow(0 4px 6px rgba(27, 110, 53, 0.35));
   animation: marker-glow 2.5s ease-in-out infinite;
 }
 
 @keyframes marker-glow {
   0%, 100% {
-    filter: drop-shadow(0 4px 8px rgba(59, 130, 246, 0.4));
+    filter: drop-shadow(0 4px 8px rgba(27, 110, 53, 0.35));
   }
   50% {
-    filter: drop-shadow(0 4px 20px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 30px rgba(59, 130, 246, 0.3));
+    filter: drop-shadow(0 4px 20px rgba(27, 110, 53, 0.6)) drop-shadow(0 0 30px rgba(182, 238, 105, 0.5));
   }
 }
 
@@ -58,7 +58,7 @@
 
 /* Collector marker hover effect - glow instead of scale to prevent bouncing */
 .leaflet-marker-icon.collector-marker-animated:hover {
-  filter: drop-shadow(0 4px 24px rgba(59, 130, 246, 0.9));
+  filter: drop-shadow(0 4px 24px rgba(27, 110, 53, 0.7));
   transition: filter 0.2s ease-in-out;
 }
 
@@ -79,5 +79,24 @@
   }
   50% {
     opacity: 0.5;
+  }
+}
+
+/* Zoom buttons: design-system shape; phones pinch instead, so hide them there */
+.leaflet-control-zoom.leaflet-bar {
+  border: 1px solid #dfe4dc;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(10, 15, 10, 0.12);
+}
+.leaflet-control-zoom.leaflet-bar a {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  color: #0a0f0a;
+}
+@media (max-width: 767px) {
+  .leaflet-control-zoom {
+    display: none;
   }
 }

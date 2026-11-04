@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiWifiOff, FiWifi, FiAlertTriangle, FiX, FiCheck } from 'react-icons/fi';
+import { FiWifiOff, FiX, FiCheck } from 'react-icons/fi';
 
 /**
  * NetworkStatusRibbon - Displays network connectivity status prominently
@@ -69,17 +69,10 @@ const NetworkStatusRibbon = () => {
   // Show online indicator when connection is restored
   if (isOnline && showOnlineIndicator) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-green-600 text-white">
-        <div className="flex items-center justify-center px-4 py-2">
-          <FiCheck className="w-4 h-4 mr-2" />
-          <p className="text-sm font-medium">
-            Connection restored - You're back online!
-          </p>
-        </div>
-        
-        {/* Success animation */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-400">
-          <div className="h-full bg-green-300 animate-pulse"></div>
+      <div className="fixed top-0 left-0 right-0 z-50 bg-td-forest text-white" role="status">
+        <div className="flex items-center justify-center px-4 py-2.5">
+          <FiCheck aria-hidden="true" className="w-4 h-4 mr-2" />
+          <p className="text-sm font-medium">You're back online</p>
         </div>
       </div>
     );
@@ -92,31 +85,22 @@ const NetworkStatusRibbon = () => {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center space-x-3">
-          <FiWifiOff className="w-5 h-5 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">
-              You are not connected to the internet
-            </p>
-            <p className="text-xs opacity-90">
-              Please ensure you are connected to the internet to continue using the app
-            </p>
-          </div>
+    <div className="fixed top-0 left-0 right-0 z-50 bg-td-ink text-white" role="status">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <FiWifiOff aria-hidden="true" className="w-5 h-5 flex-shrink-0 text-td-lime" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold">You're offline</p>
+          <p className="text-[13px] text-td-sage-dark">
+            Connect to Wi-Fi or mobile data. The app picks up again by itself.
+          </p>
         </div>
         <button
           onClick={handleDismiss}
-          className="ml-4 p-1 rounded-md hover:bg-red-700 transition-colors"
+          className="p-2 -mr-2 rounded-full hover:bg-white/10 transition-colors"
           aria-label="Dismiss network warning"
         >
-          <FiX className="w-4 h-4" />
+          <FiX aria-hidden="true" className="w-4 h-4" />
         </button>
-      </div>
-      
-      {/* Pulsing animation to draw attention */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-400">
-        <div className="h-full bg-red-300 animate-pulse"></div>
       </div>
     </div>
   );

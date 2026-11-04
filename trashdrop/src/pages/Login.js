@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 import SocialLogin from '../components/SocialLogin.js';
+import { FiAlertCircle, FiWifiOff } from 'react-icons/fi';
 import { rememberedSignIn } from '../utils/rememberMe.js';
+import { CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
 
 /**
  * Login page component
@@ -22,6 +24,8 @@ const Login = () => {
     password: '',
   });
   const [error, setError] = useState('');
+  // 'offline' | 'unreachable' | 'slow' | 'server' when the connection, not the account, failed
+  const [connection, setConnection] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResendButton, setShowResendButton] = useState(Boolean(fromSignUp));
   const [resendMessage, setResendMessage] = useState('');
@@ -35,9 +39,9 @@ const Login = () => {
 
   console.log('[Login] Login component rendering');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const submit = async () => {
     setError('');
+    setConnection(null);
     setShowResendButton(false);
     setResendMessage('');
     setIsSubmitting(true);
@@ -63,6 +67,10 @@ const Login = () => {
         }, 100);
       } else {
         console.error('[Login] Sign in failed:', result?.error);
+        if (result?.error?.connection) {
+          setConnection(result.error.connection);
+          return;
+        }
         // Enhanced error message handling
         const isUnconfirmed = (error) => {
           const errorMessage = error?.originalMessage || error?.message || '';
@@ -84,10 +92,6 @@ const Login = () => {
           if (errorMessage.includes('Too many requests') || errorMessage.includes('rate limit')) {
             return 'Too many login attempts. Please wait a few minutes and try again.';
           }
-          if (errorMessage.includes('Failed to fetch') || errorMessage.includes('network')) {
-            return 'Network connection issue. Please check your internet connection and try again.';
-          }
-          
           return 'Unable to sign in. Please check your credentials and try again.';
         };
         
@@ -105,6 +109,21 @@ const Login = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    submit();
+  };
+
+  // Offline: sign in by itself the moment the phone reconnects
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  useEffect(() => {
+    if (connection !== 'offline') return undefined;
+    const retry = () => submitRef.current();
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [connection]);
 
   const handleResendConfirmation = async () => {
     setResendMessage('');
@@ -139,9 +158,35 @@ const Login = () => {
           <p className="mt-2 text-td-sage">Sign in to your TrashDrop account</p>
         </div>
 
+        {connection && (
+          <div className="flex gap-3 rounded-2xl border border-td-border bg-td-cream px-4 py-3" role="alert">
+            {connection === 'server' ? (
+              <FiAlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 flex-shrink-0 text-td-orange-text" />
+            ) : (
+              <FiWifiOff aria-hidden="true" className="mt-0.5 h-5 w-5 flex-shrink-0 text-td-orange-text" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-td-ink">{CONNECTION_MESSAGES[connection].title}</p>
+              <p className="mt-0.5 text-sm text-td-sage">{CONNECTION_MESSAGES[connection].message}</p>
+              {connection === 'offline' ? (
+                <p className="mt-2 text-sm font-medium text-td-forest">Waiting for a connection…</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={isSubmitting}
+                  className="mt-2 text-sm font-semibold text-td-forest underline underline-offset-2 hover:text-td-forest-dk disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Trying again…' : 'Try again'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-td-error" role="alert">
+            {error}
           </div>
         )}
 

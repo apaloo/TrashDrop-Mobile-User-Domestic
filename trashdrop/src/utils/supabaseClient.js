@@ -248,34 +248,31 @@ const createCustomFetch = () => {
       }
       
       const maxRetries = 3;
+      const method = (options.method || 'GET').toUpperCase();
+      // Reading again is harmless; a write the server failed on is not resent
+      const canRetryServerError = method === 'GET' || method === 'HEAD';
       let attempt = 0;
       let lastError;
 
       while (attempt < maxRetries) {
+        attempt++;
         try {
           const response = await fetch(url, options);
-          
-          // Check if the response is ok (status in the range 200-299)
-          if (!response.ok) {
-            const error = new Error(`HTTP ${response.status}: ${await response.text()}`);
-            error.status = response.status;
-            throw error;
-          }
-          
-          return response;
-        } catch (error) {
-          lastError = error;
-          attempt++;
-          
-          // Only retry on network errors or 5xx server errors
-          if (!error.status || error.status >= 500) {
-            // Exponential backoff
+          const serverUnavailable = [502, 503, 504].includes(response.status);
+          if (serverUnavailable && canRetryServerError && attempt < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
             continue;
           }
-          
-          // Don't retry on client errors (4xx)
-          break;
+          // Any other answer, an error status included, goes back to Supabase
+          // as it came: thrown, a wrong password read as a network failure
+          return response;
+        } catch (error) {
+          // No answer at all (a dropped connection): try again with a backoff
+          lastError = error;
+          if (error.name === 'AbortError') break;
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+          }
         }
       }
       
