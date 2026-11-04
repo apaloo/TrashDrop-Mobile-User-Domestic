@@ -546,8 +546,9 @@ const CollectorTracking = () => {
         </svg>
       </button>
 
-      {/* Full-Screen Uber-Style Tracking Map */}
-      <div className="fixed inset-0 top-16 bottom-16 z-[60]">
+      {/* Full-Screen Uber-Style Tracking Map: below the top bar (z-50), so
+          the profile menu opens over the map instead of behind it */}
+      <div className="fixed inset-0 top-16 bottom-16 z-40">
         <UberStyleTrackingMap 
           collectorLocation={collectorLocation}
           collectorData={collectorProfile}

@@ -119,12 +119,13 @@ const LivePickupCard = ({ pickup, unreadNotifications = 0 }) => {
       </ol>
 
       {tracking ? (
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
+        // "Track Collector" needs more room than "Alerts" on a 360px phone
+        <div className="mt-4 grid grid-cols-[3fr_2fr] gap-2.5">
           <Link
             to={`/collector-tracking?pickupId=${pickup.id}`}
-            className="h-11 rounded-full bg-green-600 hover:bg-green-700 text-white text-[15px] font-bold flex items-center justify-center gap-2"
+            className="h-11 px-2.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-[15px] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
