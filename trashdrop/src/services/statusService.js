@@ -56,7 +56,7 @@ export const PICKUP_STATES = {
   collecting: {
     value: 'collecting',
     // Set by the collector's scan: the waste is theirs to take to a disposal site
-    display: 'Picked up',
+    display: 'Collected',
     description: 'Your collector has your waste and is taking it to a disposal site',
     color: '#F97316', // orange
     icon: '♻️',

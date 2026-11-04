@@ -203,7 +203,7 @@ const PROGRESS_STEPS = [
   { key: 'accepted', label: 'Accepted', reachedBy: ['accepted', 'active', 'en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
   { key: 'en_route', label: 'En route', reachedBy: ['en_route', 'in_transit', 'arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
   { key: 'arrived', label: 'Arrived', reachedBy: ['arrived', 'collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
-  { key: 'collecting', label: 'Picked up', reachedBy: ['collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
+  { key: 'collecting', label: 'Collected', reachedBy: ['collecting', 'picked_up', 'collected', 'completed', 'disposed'] },
   { key: 'complete', label: 'Disposed', reachedBy: ['collected', 'completed', 'disposed'] },
 ];
 
@@ -451,7 +451,7 @@ const UberStyleTrackingMap = ({
         let statusText = collector ? 'Collector accepted' : 'Waiting for a collector';
         if (isDisposed) statusText = 'Waste disposed';
         else if (isCollected) statusText = 'Waste collected';
-        else if (isWithCollector) statusText = 'Waste picked up';
+        else if (isWithCollector) statusText = 'Waste collected';
         else if (isActuallyArrived) statusText = 'Collector is here';
         else if (isEnRoute) statusText = 'Collector en route';
 

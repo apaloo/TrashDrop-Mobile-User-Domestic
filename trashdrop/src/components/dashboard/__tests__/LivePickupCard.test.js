@@ -27,7 +27,7 @@ it('links to tracking and alerts while the collector is on the way, with the unr
 
 it('marks a collected pickup as the last step', () => {
   show(pickup({ status: 'collecting' }));
-  expect(screen.getByText('Collected').closest('li')).toHaveAttribute('aria-current', 'step');
+  expect(within(screen.getByRole('list', { name: 'Pickup progress' })).getByText('Collected').closest('li')).toHaveAttribute('aria-current', 'step');
 });
 
 it('shows a digital bin and its frequency', () => {
@@ -73,5 +73,6 @@ describe('the digital bin QR code', () => {
 it('tells the household a picked-up pickup is heading for disposal', () => {
   show(pickup({ status: 'collecting' }));
   expect(screen.getByText("Your waste is on its way to a disposal site. You'll be notified when it's disposed.")).toBeInTheDocument();
-  expect(screen.getByText('Picked up')).toBeInTheDocument();
+  // The badge and the progress step use the same word
+  expect(screen.getAllByText('Collected')).toHaveLength(2);
 });

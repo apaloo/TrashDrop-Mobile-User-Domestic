@@ -27,7 +27,7 @@ const sheet = (status) => render(
 describe('the tracking sheet once the collector has the waste', () => {
   it('says it is picked up and heading for disposal, with nothing to cancel', () => {
     sheet('collecting');
-    expect(screen.getByText('Waste picked up')).toBeInTheDocument();
+    expect(screen.getByText('Waste collected')).toBeInTheDocument();
     expect(screen.getByText("On its way to a disposal site. You'll be notified when it's disposed.")).toBeInTheDocument();
     expect(screen.queryByText('Collector is here')).not.toBeInTheDocument();
     expect(screen.queryByText('Here')).not.toBeInTheDocument();
