@@ -4,9 +4,12 @@ import { card, errorNote, sectionTitle } from './ui/styles.js';
 import { useAuth } from '../context/AuthContext.js';
 import { notificationService, normalizeNotification } from '../services/notificationService.js';
 import supabase from '../utils/supabaseClient.js';
+import { useArrivalQR } from '../context/useArrivalQR.js';
 
 const NotificationList = () => {
   const { user } = useAuth();
+  // The collector's at the bin: its arrival message opens the QR code
+  const { arrivedBin, showBinQR } = useArrivalQR();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -282,6 +285,15 @@ const NotificationList = () => {
                     </p>
                     <p className="text-sm text-td-ink/80 dark:text-gray-200 mt-0.5">{notification.message}</p>
                     <p className="text-[13px] text-td-sage dark:text-gray-300 mt-0.5">{new Date(notification.created_at).toLocaleString()}</p>
+                    {notification.type === 'collector_arrived' && arrivedBin && (
+                      <button
+                        type="button"
+                        onClick={() => showBinQR(arrivedBin, { arrived: true })}
+                        className="mt-2 h-10 px-4 rounded-full bg-td-lime text-td-ink text-sm font-bold hover:brightness-95"
+                      >
+                        Show QR code
+                      </button>
+                    )}
                   </div>
                   {unread && (
                     <button

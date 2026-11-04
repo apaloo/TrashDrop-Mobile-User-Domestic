@@ -35,3 +35,37 @@ it('shows a digital bin and its frequency', () => {
   expect(screen.getByText('Digital bin · 1 bag')).toBeInTheDocument();
   expect(screen.getByText('weekly')).toBeInTheDocument();
 });
+
+describe('the digital bin QR code', () => {
+  // eslint-disable-next-line global-require
+  const { ArrivalQRContext } = require('../../../context/useArrivalQR.js');
+  const { fireEvent } = require('@testing-library/react');
+  const showBinQR = jest.fn();
+  const prepareBinQR = jest.fn();
+  const showWithQR = (p) => render(
+    <MemoryRouter>
+      <ArrivalQRContext.Provider value={{ arrivedBin: null, showBinQR, autoShowBinQR: jest.fn(), prepareBinQR }}>
+        <LivePickupCard pickup={p} />
+      </ArrivalQRContext.Provider>
+    </MemoryRouter>
+  );
+
+  it('is offered while the collector is on the way, and made ahead of time', () => {
+    showWithQR(pickup({ is_digital_bin: true, status: 'en_route', location_id: 'loc-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show QR code' }));
+    expect(showBinQR).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1', location_id: 'loc-1' }), { arrived: false });
+    expect(prepareBinQR).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
+  });
+
+  it('leads the card once the collector is here', () => {
+    showWithQR(pickup({ is_digital_bin: true, status: 'arrived' }));
+    expect(screen.getByText("Your collector is here. Show them your bin's QR code.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show QR code to collector' }));
+    expect(showBinQR).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }), { arrived: true });
+  });
+
+  it('is not offered for a pickup request', () => {
+    showWithQR(pickup({ status: 'arrived' }));
+    expect(screen.queryByRole('button', { name: /QR code/ })).not.toBeInTheDocument();
+  });
+});

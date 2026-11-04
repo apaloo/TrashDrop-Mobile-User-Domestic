@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import NavBar from './NavBar.js';
 import OfflineIndicator from './OfflineIndicator.js';
+import { ArrivalQRProvider } from '../context/ArrivalQRContext.js';
 
 /**
  * Main layout component that wraps all pages
@@ -29,19 +30,22 @@ const Layout = () => {
   console.log('[Layout] Layout rendering, location:', location.pathname);
   
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
-      <NavBar />
-      <OfflineIndicator />
-      {/* Add extra bottom padding for pages with maps on mobile */}
-      <main className={`flex-grow container mx-auto px-2 md:px-4 ${hasBottomPadding ? 'pb-10 xl:pb-6' : 'pb-2 xl:pb-6'}`}>
-        <Outlet />
-      </main>
-      <footer className="bg-gray-100 dark:bg-gray-800 py-4 text-center text-td-sage dark:text-gray-300 text-sm">
-        <div className="container mx-auto">
-          <p>&copy; {new Date().getFullYear()} TrashDrop. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
+    // Signed-in pages share one watcher for the collector reaching a digital bin
+    <ArrivalQRProvider>
+      <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
+        <NavBar />
+        <OfflineIndicator />
+        {/* Add extra bottom padding for pages with maps on mobile */}
+        <main className={`flex-grow container mx-auto px-2 md:px-4 ${hasBottomPadding ? 'pb-10 xl:pb-6' : 'pb-2 xl:pb-6'}`}>
+          <Outlet />
+        </main>
+        <footer className="bg-gray-100 dark:bg-gray-800 py-4 text-center text-td-sage dark:text-gray-300 text-sm">
+          <div className="container mx-auto">
+            <p>&copy; {new Date().getFullYear()} TrashDrop. All rights reserved.</p>
+          </div>
+        </footer>
+      </div>
+    </ArrivalQRProvider>
   );
 };
 

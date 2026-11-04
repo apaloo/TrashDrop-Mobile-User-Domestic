@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { statusService } from '../../services/statusService.js';
+import { useArrivalQR } from '../../context/useArrivalQR.js';
+
+// A digital bin's QR code is offered until the collector's scan moves it on
+const QR_STATUSES = ['accepted', 'active', 'en_route', 'in_transit', 'arrived'];
 
 // Progress steps, and which step each pickup status has reached
 const STEPS = ['Requested', 'Accepted', 'On the way', 'Collected'];
@@ -31,6 +35,19 @@ const UnreadBadge = ({ count }) => (count > 0 ? (
  */
 const LivePickupCard = ({ pickup, unreadNotifications = 0 }) => {
   const status = pickup.status;
+  const { showBinQR, prepareBinQR } = useArrivalQR();
+  const qrBin = pickup.is_digital_bin && QR_STATUSES.includes(status)
+    ? { id: pickup.id, location_id: pickup.location_id || null, location_name: pickup.location?.location_name || '' }
+    : null;
+  const arrived = status === 'arrived';
+  const qrBinId = qrBin?.id;
+  // Make the code ahead of time, so it shows at the gate even without signal
+  useEffect(() => {
+    if (qrBin) prepareBinQR(qrBin);
+    // qrBin is rebuilt each render; its id is what matters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrBinId, prepareBinQR]);
+
   const step = STEP_OF[status] ?? 1;
   const tracking = statusService.isTrackingAvailable(status);
   const bags = pickup.estimated_volume || pickup.bag_count || pickup.number_of_bags || 0;
@@ -65,6 +82,30 @@ const LivePickupCard = ({ pickup, unreadNotifications = 0 }) => {
           {pickup.is_digital_bin && pickup.frequency && (
             <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300">{pickup.frequency}</span>
           )}
+        </div>
+      )}
+
+      {qrBin && (
+        <div className={arrived ? 'mt-4 rounded-2xl bg-td-tonal dark:bg-green-900/30 p-4' : 'mt-4'}>
+          {arrived && (
+            <p className="mb-3 font-bold text-td-ink dark:text-gray-100">
+              Your collector is here. Show them your bin's QR code.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => showBinQR(qrBin, { arrived })}
+            className={`w-full rounded-full flex items-center justify-center gap-2 font-bold ${
+              arrived
+                ? 'h-12 bg-td-lime text-td-ink text-base hover:brightness-95'
+                : 'h-11 border-[1.5px] border-td-forest text-td-forest-dk dark:text-green-300 dark:border-green-400 text-[15px] hover:bg-td-tonal dark:hover:bg-green-900/30'
+            }`}
+          >
+            <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" />
+            </svg>
+            {arrived ? 'Show QR code to collector' : 'Show QR code'}
+          </button>
         </div>
       )}
 
