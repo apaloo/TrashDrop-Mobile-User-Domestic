@@ -425,8 +425,9 @@ const UberStyleTrackingMap = ({
             </Marker>
           )}
 
-          {/* Animated Collector Marker */}
-          {isValidLocation(collectorLocation) && (
+          {/* Animated Collector Marker: never once the collector has the waste
+              (the page also stops fetching it then; this is a second guard) */}
+          {isValidLocation(collectorLocation) && !afterPickup && (
             <AnimatedCollectorMarker 
               position={collectorLocation}
               prevPosition={prevCollectorLocation}
@@ -498,7 +499,7 @@ const UberStyleTrackingMap = ({
                       <span aria-label={`rated ${collector.rating || '5.0'}`}>★ {collector.rating || '5.0'}</span>
                     </p>
                   )}
-                  {isLocationStale && !isCollected && (
+                  {isLocationStale && !isCollected && !isWithCollector && (
                     <p className="text-[13px] text-td-orange-text">
                       Location last updated {locationAgeMinutes < 60 ? `${locationAgeMinutes} min` : `${Math.floor(locationAgeMinutes / 60)} h`} ago
                     </p>
