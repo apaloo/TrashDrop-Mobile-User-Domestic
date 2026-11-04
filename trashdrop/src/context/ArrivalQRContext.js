@@ -13,9 +13,9 @@ import { ArrivalQRContext } from './useArrivalQR.js';
  * It only reads statuses: what the collector's scan does is unchanged.
  */
 
-// Statuses after the scan: the code has done its job. ('collecting' is left
-// out: the code stays up until the collector moves the bin on.)
-const PAST_ARRIVAL = ['picked_up', 'collected', 'completed', 'disposed', 'cancelled'];
+// Statuses after the scan: the code has done its job. The collector's scan
+// moves a bin to 'collecting' (picked up, on its way to disposal).
+const PAST_ARRIVAL = ['collecting', 'picked_up', 'collected', 'completed', 'disposed', 'cancelled'];
 // Opened by itself once per arrival; a fresh arrival after this long opens again
 const AUTO_OPEN_KEY = (binId) => `td_arrival_qr_${binId}`;
 const AUTO_OPEN_WINDOW_MS = 6 * 60 * 60 * 1000;

@@ -78,7 +78,8 @@ describe('ArrivalQRProvider', () => {
     act(() => onBinUpdate({ new: { id: 'bin-2', status: 'arrived', location_id: null } }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Your collector is here');
 
-    act(() => onBinUpdate({ new: { id: 'bin-2', status: 'picked_up' } }));
+    // The collector's scan moves the bin to 'collecting'
+    act(() => onBinUpdate({ new: { id: 'bin-2', status: 'collecting' } }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByText('arrived: none')).toBeInTheDocument();
   });
