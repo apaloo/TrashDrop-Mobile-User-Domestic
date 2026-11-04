@@ -109,6 +109,12 @@ const LivePickupCard = ({ pickup, unreadNotifications = 0 }) => {
         </div>
       )}
 
+      {status === 'collecting' && (
+        <p className="mt-4 text-sm text-td-ink dark:text-gray-100">
+          Your waste is on its way to a disposal site. You'll be notified when it's disposed.
+        </p>
+      )}
+
       <ol aria-label="Pickup progress" className="mt-4 grid grid-cols-4 gap-1.5">
         {STEPS.map((label, i) => (
           <li key={label} className="flex flex-col gap-1.5" aria-current={i === step ? 'step' : undefined}>

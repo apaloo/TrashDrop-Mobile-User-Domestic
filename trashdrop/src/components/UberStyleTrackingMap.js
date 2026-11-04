@@ -269,6 +269,9 @@ const UberStyleTrackingMap = ({
     // qrBin is rebuilt each render; its id is what matters
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrBinId, displayStatus, autoShowBinQR]);
+  // After the scan the waste is with the collector, on its way to disposal:
+  // nothing to cancel, and no route back to the house
+  const afterPickup = ['collecting', 'picked_up', 'collected', 'completed', 'disposed'].includes(displayStatus);
   // Until the scan moves the bin on
   const canShowQR = Boolean(qrBin) &&
     ['accepted', 'active', 'en_route', 'in_transit', 'arrived'].includes(displayStatus);
@@ -400,7 +403,7 @@ const UberStyleTrackingMap = ({
           />
 
           {/* Route: a white casing under the brand green line, readable on any street */}
-          {routeLine.length === 2 && (
+          {routeLine.length === 2 && !afterPickup && (
             <>
               <Polyline positions={routeLine} pathOptions={{ color: '#ffffff', weight: 9, opacity: 0.9, lineCap: 'round' }} />
               <Polyline positions={routeLine} pathOptions={{ color: '#1b6e35', weight: 5, opacity: 1, lineCap: 'round', dashArray: '1 10' }} className="route-line-animated" />
@@ -438,16 +441,17 @@ const UberStyleTrackingMap = ({
         const collector = activePickup.collector;
         const hasEta = typeof eta === 'number' && !isNaN(eta) && isFinite(eta) && eta > 0;
         const hasDistance = typeof distance === 'number' && !isNaN(distance) && isFinite(distance) && distance > 0;
-        const isActuallyArrived = displayStatus === 'arrived' || displayStatus === 'collecting';
+        const isActuallyArrived = displayStatus === 'arrived';
         const isEnRoute = displayStatus === 'en_route' || displayStatus === 'in_transit';
-        const isPickingUp = displayStatus === 'picked_up';
+        // Scanned and taken: the collector carries it to a mapped disposal site
+        const isWithCollector = displayStatus === 'collecting' || displayStatus === 'picked_up';
         const isDisposed = displayStatus === 'disposed';
         const isCollected = displayStatus === 'collected' || displayStatus === 'completed' || isDisposed;
 
         let statusText = collector ? 'Collector accepted' : 'Waiting for a collector';
         if (isDisposed) statusText = 'Waste disposed';
         else if (isCollected) statusText = 'Waste collected';
-        else if (isPickingUp) statusText = 'Collector picking up waste';
+        else if (isWithCollector) statusText = 'Waste picked up';
         else if (isActuallyArrived) statusText = 'Collector is here';
         else if (isEnRoute) statusText = 'Collector en route';
 
@@ -499,8 +503,16 @@ const UberStyleTrackingMap = ({
                       Location last updated {locationAgeMinutes < 60 ? `${locationAgeMinutes} min` : `${Math.floor(locationAgeMinutes / 60)} h`} ago
                     </p>
                   )}
+                  {isWithCollector && (
+                    <p className="text-[13px] text-td-sage dark:text-gray-300">
+                      On its way to a disposal site. You'll be notified when it's disposed.
+                    </p>
+                  )}
+                  {isDisposed && (
+                    <p className="text-[13px] text-td-sage dark:text-gray-300">Disposed at an approved site.</p>
+                  )}
                 </div>
-                {(hasEta || isActuallyArrived) && !isCollected && (
+                {(hasEta || isActuallyArrived) && !isCollected && !isWithCollector && (
                   <div className="flex-shrink-0 text-right" role="status">
                     <p className="text-xl font-bold text-td-forest dark:text-green-300 leading-tight">
                       {isActuallyArrived ? 'Here' : `${eta} min`}
@@ -582,7 +594,7 @@ const UberStyleTrackingMap = ({
               )}
 
               {/* Actions */}
-              <div className={`${canShowQR ? 'mt-2.5' : 'mt-4'} grid grid-cols-3 gap-2`}>
+              <div className={`${canShowQR ? 'mt-2.5' : 'mt-4'} grid ${afterPickup ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
                 {collector?.phone ? (
                   <a
                     href={`tel:${collector.phone}`}
@@ -598,28 +610,31 @@ const UberStyleTrackingMap = ({
                     Call
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (window.confirm('Are you sure you want to cancel this pickup?')) {
-                      try {
-                        const { pickupService } = await import('../services/pickupService.js');
-                        const { error: cancelError } = await pickupService.cancelPickupRequest(activePickup.id, 'Cancelled by user');
-                        if (cancelError) {
-                          alert(`Failed to cancel: ${cancelError.message}`);
-                        } else {
-                          alert('Pickup cancelled successfully.');
-                          window.location.href = '/dashboard';
+                {/* Nothing to cancel once the collector has the waste */}
+                {!afterPickup && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('Are you sure you want to cancel this pickup?')) {
+                        try {
+                          const { pickupService } = await import('../services/pickupService.js');
+                          const { error: cancelError } = await pickupService.cancelPickupRequest(activePickup.id, 'Cancelled by user');
+                          if (cancelError) {
+                            alert(`Failed to cancel: ${cancelError.message}`);
+                          } else {
+                            alert('Pickup cancelled successfully.');
+                            window.location.href = '/dashboard';
+                          }
+                        } catch (err) {
+                          alert(`Error: ${err.message}`);
                         }
-                      } catch (err) {
-                        alert(`Error: ${err.message}`);
                       }
-                    }
-                  }}
-                  className="h-11 rounded-full border-[1.5px] border-red-200 dark:border-red-800 text-td-error dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 text-[15px] font-semibold"
-                >
-                  Cancel
-                </button>
+                    }}
+                    className="h-11 rounded-full border-[1.5px] border-red-200 dark:border-red-800 text-td-error dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 text-[15px] font-semibold"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={toggle}

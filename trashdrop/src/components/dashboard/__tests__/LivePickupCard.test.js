@@ -69,3 +69,9 @@ describe('the digital bin QR code', () => {
     expect(screen.queryByRole('button', { name: /QR code/ })).not.toBeInTheDocument();
   });
 });
+
+it('tells the household a picked-up pickup is heading for disposal', () => {
+  show(pickup({ status: 'collecting' }));
+  expect(screen.getByText("Your waste is on its way to a disposal site. You'll be notified when it's disposed.")).toBeInTheDocument();
+  expect(screen.getByText('Picked up')).toBeInTheDocument();
+});
