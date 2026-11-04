@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './UberStyleTrackingMap.css';
 import { formatDistance } from '../utils/geoUtils.js';
+import { useArrivalQR } from '../context/useArrivalQR.js';
 
 // Fix default Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -250,6 +251,28 @@ const UberStyleTrackingMap = ({
     return status;
   }, [activePickup?.status, activePickup?.is_digital_bin, distance]);
 
+  // Digital bins: the collector scans the bin's QR code on arrival. Have it
+  // ready on the phone, and open it by itself when the collector gets here.
+  const { showBinQR, autoShowBinQR, prepareBinQR } = useArrivalQR();
+  const qrBin = activePickup?.is_digital_bin ? {
+    id: activePickup.id,
+    location_id: activePickup.location_id || null,
+    location_name: activePickup.location?.location_name || '',
+  } : null;
+  const qrBinId = qrBin?.id;
+  useEffect(() => {
+    if (qrBin) prepareBinQR(qrBin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrBinId, prepareBinQR]);
+  useEffect(() => {
+    if (qrBin && displayStatus === 'arrived') autoShowBinQR(qrBin);
+    // qrBin is rebuilt each render; its id is what matters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrBinId, displayStatus, autoShowBinQR]);
+  // Until the scan moves the bin on
+  const canShowQR = Boolean(qrBin) &&
+    ['accepted', 'active', 'en_route', 'in_transit', 'arrived'].includes(displayStatus);
+
   // Debug logging for incoming props
   useEffect(() => {
     console.log('[UberStyleTrackingMap] Props received:', {
@@ -425,7 +448,7 @@ const UberStyleTrackingMap = ({
         if (isDisposed) statusText = 'Waste disposed';
         else if (isCollected) statusText = 'Waste collected';
         else if (isPickingUp) statusText = 'Collector picking up waste';
-        else if (isActuallyArrived) statusText = 'Collector at pickup location';
+        else if (isActuallyArrived) statusText = 'Collector is here';
         else if (isEnRoute) statusText = 'Collector en route';
 
         // Steps reached, and the next one (none once all five are done)
@@ -540,8 +563,26 @@ const UberStyleTrackingMap = ({
                 </div>
               )}
 
+              {/* The bin's QR code: the main action once the collector is here */}
+              {canShowQR && (
+                <button
+                  type="button"
+                  onClick={() => showBinQR(qrBin, { arrived: displayStatus === 'arrived' })}
+                  className={`mt-4 w-full rounded-full flex items-center justify-center gap-2 font-bold ${
+                    displayStatus === 'arrived'
+                      ? 'h-12 bg-td-lime text-td-ink text-base hover:brightness-95'
+                      : 'h-11 border-[1.5px] border-td-forest text-td-forest-dk dark:text-green-300 dark:border-green-400 text-[15px] hover:bg-td-tonal dark:hover:bg-green-900/30'
+                  }`}
+                >
+                  <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" />
+                  </svg>
+                  {displayStatus === 'arrived' ? 'Show QR code to collector' : 'Show QR code'}
+                </button>
+              )}
+
               {/* Actions */}
-              <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className={`${canShowQR ? 'mt-2.5' : 'mt-4'} grid grid-cols-3 gap-2`}>
                 {collector?.phone ? (
                   <a
                     href={`tel:${collector.phone}`}

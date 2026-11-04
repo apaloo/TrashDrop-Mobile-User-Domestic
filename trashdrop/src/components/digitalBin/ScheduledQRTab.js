@@ -8,6 +8,7 @@ import debug from '../../utils/debug.js';
 import ConfirmModal from '../ConfirmModal.js';
 import { transformBin } from '../../services/digitalBinService.js';
 import { shareQrImage } from '../../utils/shareQrImage.js';
+import { useArrivalQR } from '../../context/useArrivalQR.js';
 
 const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCreatedBinId = null, onNewBinExpanded = null }) => {
 
@@ -357,6 +358,16 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
     }
   };
 
+  // The collector is at one of these bins: open the Active tab on it, so its
+  // QR code is right there (a remembered Completed tab would hide it)
+  const { arrivedBin, showBinQR } = useArrivalQR();
+  const arrivedInList = arrivedBin && localPickups.some(bin => bin && bin.id === arrivedBin.id)
+    ? arrivedBin : null;
+  const arrivedBinId = arrivedInList?.id;
+  useEffect(() => {
+    if (arrivedBinId) setActiveTab('active');
+  }, [arrivedBinId]);
+
   // Store the active tab selection in localStorage
   useEffect(() => {
     localStorage.setItem('digitalBinActiveTab', activeTab);
@@ -423,6 +434,20 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
           </div>
         ) : (
           <>
+            {arrivedInList && activeTab === 'active' && (
+              <div role="status" className="mb-4 rounded-2xl bg-td-tonal dark:bg-green-900/30 p-4">
+                <p className="font-bold text-td-ink dark:text-gray-100">
+                  Your collector is here. Show them your bin's QR code.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => showBinQR(arrivedInList, { arrived: true })}
+                  className="mt-3 w-full h-12 rounded-full bg-td-lime text-td-ink text-base font-bold hover:brightness-95"
+                >
+                  Show QR code to collector
+                </button>
+              </div>
+            )}
             <QRCodeList 
               pickups={getCurrentBins()}
               onCancelPickup={handleCancelBin}
@@ -432,6 +457,7 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
               emptyStateMessage={getEmptyStateMessage()}
               newlyCreatedBinId={newlyCreatedBinId}
               onNewBinExpanded={onNewBinExpanded}
+              focusBinId={arrivedBinId}
             />
             
             {/* Help Text */}

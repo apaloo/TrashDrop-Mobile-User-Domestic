@@ -66,14 +66,23 @@ const formatRelativeTime = (dateString) => {
 };
 
 // Single QR code card component
-const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = false, onExpanded = null }) => {
-  const [isExpanded, setIsExpanded] = useState(isNewlyCreated);
+const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = false, onExpanded = null, isFocused = false }) => {
+  const [isExpanded, setIsExpanded] = useState(isNewlyCreated || isFocused);
+  const cardRef = useRef(null);
 
   useEffect(() => {
     if (isNewlyCreated) {
       setIsExpanded(true);
     }
   }, [isNewlyCreated]);
+
+  // The bin the collector has reached: open it and bring it into view
+  useEffect(() => {
+    if (isFocused) {
+      setIsExpanded(true);
+      cardRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [isFocused]);
 
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -242,9 +251,10 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
   
   return (
     <div 
+      ref={cardRef}
       className={`bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-td-border dark:border-gray-600 overflow-hidden mb-4 transition-all duration-200 ${
         pickup.status === 'cancelled' ? 'opacity-70' : ''
-      }`}
+      } ${isFocused ? 'ring-2 ring-td-lime' : ''}`}
     >
       {/* Header */}
       <div 
@@ -553,7 +563,8 @@ const QRCodeList = ({
   isLoading = false,
   emptyStateMessage = "No digital bins found.",
   newlyCreatedBinId = null,
-  onNewBinExpanded = null
+  onNewBinExpanded = null,
+  focusBinId = null
 }) => {
   if (isLoading) {
     return (
@@ -587,6 +598,7 @@ const QRCodeList = ({
           onShare={onShareQRCode}
           isNewlyCreated={pickup.id === newlyCreatedBinId}
           onExpanded={onNewBinExpanded}
+          isFocused={Boolean(focusBinId) && pickup.id === focusBinId}
         />
       ))}
     </div>
