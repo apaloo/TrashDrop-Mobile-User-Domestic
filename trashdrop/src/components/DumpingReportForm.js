@@ -12,6 +12,7 @@ import OptionTile from './ui/OptionTile.js';
 import PageHeader from './ui/PageHeader.js';
 import PhotoViewer from './ui/PhotoViewer.js';
 import { describeLocationProblem, readLocationPermission } from '../utils/locationProblem.js';
+import { LocationRequiredModal } from './ui/LocationRequired.js';
 import { card, errorNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from './ui/styles.js';
 
 // Choices on the form: [value, icon, label(, hint)]
@@ -165,57 +166,7 @@ export const SubmissionModal = ({ summary, onDone, onReportAnother }) => {
   );
 };
 
-/**
- * Blocks the report until the phone's location is on. A location request made
- * straight from a tap lets Android Chrome show its own "Turn on location?"
- * dialog, which a request made on page load cannot.
- */
-export const LocationRequiredModal = ({ problem, requesting, onTurnOn, onLeave }) => {
-  const blocked = problem.kind === 'blocked';
-  return (
-    <div className="fixed inset-0 z-[99999] overflow-y-auto">
-      <div className="fixed inset-0 bg-black/60" aria-hidden="true"></div>
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="location-required-title"
-          aria-describedby="location-required-text"
-          className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-sm w-full px-6 pt-7 pb-6 text-center"
-        >
-          <div className="mx-auto flex items-center justify-center h-14 w-14 rounded-2xl bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 mb-4" aria-hidden="true">
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-              <path d="M12 21s-7-6.1-7-11.5A7 7 0 0119 9.5C19 14.9 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />
-            </svg>
-          </div>
-          <h2 id="location-required-title" className="text-[20px] font-bold text-td-ink dark:text-gray-100">
-            {blocked ? 'Allow location to report' : 'Turn on location to report'}
-          </h2>
-          <div id="location-required-text" className="text-[15px] text-td-sage dark:text-gray-300 mt-2 space-y-2">
-            <p>We need the exact spot of the dumping so the cleanup team can find it.</p>
-            {blocked ? (
-              <ol className="list-decimal pl-5 text-left text-sm space-y-1">
-                {problem.steps.map((step) => <li key={step}>{step}</li>)}
-              </ol>
-            ) : (
-              <p className="text-sm">Tap the button and choose <span className="font-semibold">Turn on</span> when your phone asks. If nothing appears, swipe down from the top of the screen and tap Location.</p>
-            )}
-          </div>
-          <div className="grid grid-cols-1 gap-2.5 mt-5">
-            <button type="button" autoFocus onClick={onTurnOn} disabled={requesting} className={primaryButton}>
-              {requesting ? 'Waiting for location...' : blocked ? 'I have allowed it - try again' : 'Turn on location'}
-            </button>
-            {onLeave && (
-              <button type="button" onClick={onLeave} className={secondaryButton}>
-                Back to Dashboard
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+export { LocationRequiredModal };
 
 const DumpingReportForm = ({ onSuccess, onDone }) => {
   const { user } = useAuth();
@@ -226,6 +177,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const [gpsWatching, setGpsWatching] = useState(false); // GPS keeps improving until Submit
   const [locationProblem, setLocationProblem] = useState(null); // Why the location could not be read, and how to fix it
   const [requestingLocation, setRequestingLocation] = useState(false); // A tap-started location request is in flight
+  const [failedLocationTries, setFailedLocationTries] = useState(0); // Taps on the location button that still got no location
   // GPS keeps running (watchPosition) while the user fills in the form and takes
   // photos, keeping the most accurate fix, and stops when the report is submitted
   // or the user pins the spot on the map
@@ -320,7 +272,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     document.addEventListener('visibilitychange', retry);
     window.addEventListener('focus', retry);
     let permissionStatus = null;
-    navigator.permissions?.query?.({ name: 'geolocation' })
+    Promise.resolve(navigator.permissions?.query?.({ name: 'geolocation' }))
       .then((status) => {
         permissionStatus = status;
         if (status) status.onchange = retry;
@@ -468,9 +420,14 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       return;
     }
     setRequestingLocation(true);
+    const startedAt = Date.now();
+    // A blocked browser refuses at once; keep "Checking..." up briefly so the
+    // tap visibly did something before the result shows
+    const settle = (fn) => setTimeout(fn, Math.max(0, 800 - (Date.now() - startedAt)));
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setRequestingLocation(false);
+        setFailedLocationTries(0);
         const { latitude, longitude, accuracy } = position.coords;
         bestAccuracyRef.current = Number.isFinite(accuracy) ? accuracy : Infinity;
         setFormData(prev => ({ ...prev, coordinates: { latitude, longitude } }));
@@ -480,10 +437,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         setIsLocating(false);
         handleUseMyLocation(false);
       },
-      (geoError) => {
+      (geoError) => settle(async () => {
+        await handleGeolocationFallback(geoError);
+        setFailedLocationTries(n => n + 1);
         setRequestingLocation(false);
-        handleGeolocationFallback(geoError);
-      },
+      }),
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
   };
@@ -778,7 +736,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         <LocationRequiredModal
           problem={locationProblem}
           requesting={requestingLocation}
+          failedTries={failedLocationTries}
           onTurnOn={requestLocationFromTap}
+          onReload={() => window.location.reload()}
           onLeave={onDone}
         />
       )}

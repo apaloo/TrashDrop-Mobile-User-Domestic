@@ -8,6 +8,7 @@ import toastService from '../../services/toastService.js';
 import GeolocationService from '../../utils/geolocationService.js';
 import { checkServiceCoverage, joinCoverageWaitlist } from '../../services/serviceCoverageService.js';
 import StepNav from './StepNav.js';
+import { LocationRequiredModal, needsLocationTurnedOn, useLocationRequired } from '../ui/LocationRequired.js';
 import { card, errorNote, fieldHint, inputField, sectionTitle, tonalButton, warningNote } from '../ui/styles.js';
 
 // Fix for default marker icon in Leaflet with React
@@ -81,6 +82,9 @@ const DraggableMarker = ({ position, setPosition }) => {
 };
 
 const LocationStep = ({ formData, updateFormData, nextStep }) => {
+  // When the phone's location is off, offer to turn it on. Closing the
+  // prompt leaves the step as it was: map pin, address and saved places
+  const locationGate = useLocationRequired();
   const { user } = useAuth();
   
   // NO DEFAULT LOCATION - require actual GPS coordinates
@@ -144,6 +148,24 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     });
   }, []);
 
+  // Put a GPS fix on the map and the form
+  const applyGpsFix = ({ latitude, longitude, accuracy }) => {
+    setPosition([latitude, longitude]);
+    setIsNewLocation(true);
+    updateFormData({
+      latitude,
+      longitude,
+      gps_accuracy: accuracy,
+      useCurrentLocation: true,
+      location_id: null,
+      isNewLocation: true
+    });
+    setTimeout(() => setIsNewLocation(false), 2000);
+    setGpsHint(accuracy > GeolocationService.REQUIRED_ACCURACY_METERS
+      ? `GPS accuracy is ${accuracy?.toFixed(0)}m. For better accuracy, move to an open area away from buildings.`
+      : '');
+  };
+
   // Auto-fetch current location on modal launch to center the map, fill address, and check checkbox
   useEffect(() => {
     const autoFetchLocation = async () => {
@@ -194,6 +216,10 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           if (locationResult.accuracyWarning) {
             setGpsHint(`GPS accuracy is ${accuracy?.toFixed(0)}m. For better accuracy, move to an open area away from buildings.`);
           }
+        } else if (locationResult.error?.code === 1 || locationResult.error?.code === 2) {
+          // Location off or blocked: ask the user to turn it on
+          locationGate.setOnFix(applyGpsFix);
+          locationGate.reportFailure({ code: locationResult.error.code });
         }
       } catch (error) {
         console.warn('[LocationStep] Auto-fetch location failed:', error);
@@ -501,7 +527,13 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
         // GPS completely failed - show error but don't block
         const errorMsg = locationResult.error?.message || 'Could not get GPS location';
         console.error('[LocationStep] GPS failed:', errorMsg);
-        toastService.error(`GPS Error: ${errorMsg}`);
+        if (locationResult.error?.code === 1 || locationResult.error?.code === 2) {
+          // Location off or blocked: the prompt explains how to turn it on
+          locationGate.setOnFix(applyGpsFix);
+          locationGate.reportFailure({ code: locationResult.error.code });
+        } else {
+          toastService.error(`GPS Error: ${errorMsg}`);
+        }
         updateFormData({ useCurrentLocation: false });
         setLoadingLocation(false);
       }
@@ -572,8 +604,24 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     nextStep();
   };
 
+  const hasLocation = !!(position && position[0] && position[1]);
+  const showLocationPrompt = needsLocationTurnedOn(locationGate.problem) && !hasLocation;
+
   return (
     <div className="space-y-4">
+      {showLocationPrompt && (
+        <LocationRequiredModal
+          problem={locationGate.problem}
+          requesting={locationGate.requesting}
+          failedTries={locationGate.failedTries}
+          onTurnOn={() => locationGate.requestFromTap(applyGpsFix)}
+          onReload={() => window.location.reload()}
+          action="set your bin location"
+          reason="Collectors use your phone's GPS to find the exact spot of your bin."
+          onLeave={locationGate.clear}
+          leaveLabel={savedLocations.length > 0 ? 'Use the map or a saved place' : 'Pick the spot on the map'}
+        />
+      )}
       <section className={`${card} px-4 py-4 space-y-4`}>
         <div>
           <h2 className={sectionTitle}>Digital Bin Location</h2>

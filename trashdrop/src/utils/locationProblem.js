@@ -40,9 +40,10 @@ export const describeLocationProblem = (error, permission = 'unknown') => {
       kind: 'blocked',
       title: 'TrashDrop is not allowed to use your location',
       steps: [
-        'Tap the lock or settings icon next to the web address at the top of your browser.',
-        'Open Permissions (or Site settings), then set Location to Allow.',
-        'Come back here and tap Try again.',
+        'In the browser: tap the lock or settings icon next to the web address, open Permissions (or Site settings), and set Location to Allow.',
+        'Using the installed TrashDrop app? Press and hold its icon, tap App info, then Permissions, then Location, and choose Allow.',
+        "Still blocked? Open your phone's Settings, then Apps, then Chrome (your browser), then Permissions, then Location, and choose Allow.",
+        "Make sure your phone's Location is on, then come back and tap Try again.",
       ],
     };
   }
