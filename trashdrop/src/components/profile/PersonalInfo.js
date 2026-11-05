@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import { userService } from '../../services/userService.js';
 import supabase from '../../utils/supabaseClient.js';
+import { uploadAvatar } from '../../services/avatarService.js';
 
 // Module-level cache to persist across remounts
 const profileCache = {
@@ -32,6 +33,7 @@ const PersonalInfo = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // State to track form changes (initialized with same initial values as userData)
   const [formData, setFormData] = useState({
@@ -200,32 +202,36 @@ const PersonalInfo = () => {
     });
   };
 
-  // Handle profile image upload
+  // Profile photo: shrunk on the phone, uploaded to Storage and saved straight
+  // away. It used to go into the profile row as ~2 MB of text on "Save
+  // Changes", which timed out on mobile data.
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        setSaveMessage({ type: 'error', text: 'Image must be less than 2MB' });
-        setTimeout(() => setSaveMessage(null), 3000);
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newProfileImage = reader.result;
-        
-        // Update form data with new image
-        setFormData({
-          ...formData,
-          profileImage: newProfileImage
-        });
-        
-        // Note: Image will be saved to database when user clicks Save Changes
-        setSaveMessage({ type: 'info', text: 'Click "Save Changes" to upload your profile picture' });
-        setTimeout(() => setSaveMessage(null), 3000);
-      };
-      reader.readAsDataURL(file);
+    const file = e.target.files?.[0];
+    e.target.value = ''; // let the same photo be picked again after a failure
+    if (!file || !user?.id) return;
+
+    const previous = formData.profileImage;
+    const preview = URL.createObjectURL(file);
+    setFormData(prev => ({ ...prev, profileImage: preview }));
+    setIsUploadingPhoto(true);
+    setSaveMessage(null);
+    try {
+      const url = await uploadAvatar(user.id, file);
+      if (!isMountedRef.current) return;
+      setFormData(prev => ({ ...prev, profileImage: url }));
+      setUserData(prev => ({ ...prev, profileImage: url }));
+      profileCache.data = { ...(profileCache.data || {}), profileImage: url };
+      try { localStorage.setItem(`profile_avatar_${user.id}`, url); } catch (err) { /* storage full: not needed */ }
+      setSaveMessage({ type: 'success', text: 'Profile photo updated.' });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (err) {
+      console.error('[PersonalInfo] Photo upload failed:', err);
+      if (!isMountedRef.current) return;
+      setFormData(prev => ({ ...prev, profileImage: previous }));
+      setSaveMessage({ type: 'error', text: err.message || "Your photo didn't upload. Please try again." });
+    } finally {
+      URL.revokeObjectURL(preview);
+      if (isMountedRef.current) setIsUploadingPhoto(false);
     }
   };
 
@@ -249,8 +255,7 @@ const PersonalInfo = () => {
         first_name: formData.firstName,
         last_name: formData.lastName,
         phone: formData.phone,
-        address: formData.address,
-        avatar_url: formData.profileImage
+        address: formData.address
       };
       
       // Update profile in Supabase
@@ -265,11 +270,8 @@ const PersonalInfo = () => {
       setUserData({ ...formData });
       
       // Update localStorage cache (avatar stored separately)
-      const { profileImage: savedAvatar, ...formWithoutAvatar } = formData;
+      const { profileImage: _avatar, ...formWithoutAvatar } = formData;
       localStorage.setItem(`profile_${user.id}`, JSON.stringify(formWithoutAvatar));
-      if (savedAvatar) {
-        localStorage.setItem(`profile_avatar_${user.id}`, savedAvatar);
-      }
       
       console.log('[PersonalInfo] Profile updated successfully');
       setSaveMessage({ type: 'success', text: 'Personal information updated successfully!' });
@@ -323,9 +325,15 @@ const PersonalInfo = () => {
               ) : (
                 <span className="text-td-sage dark:text-gray-300 text-4xl">👤</span>
               )}
+              {isUploadingPhoto && (
+                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center" role="status" aria-label="Uploading photo">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
+                </div>
+              )}
             </div>
             <label 
               htmlFor="profile-upload" 
+              aria-label="Change profile photo"
               className="absolute bottom-0 right-0 bg-td-forest hover:bg-td-forest-dk text-white p-2 rounded-full cursor-pointer ring-4 ring-white dark:ring-gray-800"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -338,6 +346,7 @@ const PersonalInfo = () => {
               type="file" 
               accept="image/*"
               onChange={handleImageUpload}
+              disabled={isUploadingPhoto}
               className="hidden"
             />
           </div>

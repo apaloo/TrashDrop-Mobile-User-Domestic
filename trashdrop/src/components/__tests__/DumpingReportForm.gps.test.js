@@ -89,8 +89,39 @@ describe('DumpingReportForm GPS', () => {
       return 7;
     });
     render(<DumpingReportForm />);
-    expect(await screen.findByText(/Location access denied/i)).toBeInTheDocument();
+    expect(await screen.findByText(/location is turned off/i)).toBeInTheDocument();
+    expect(screen.queryByText(/approximate/i)).not.toBeInTheDocument();
     expect(toastService.warning).not.toHaveBeenCalled();
+  });
+
+  it('says the site is blocked when the browser permission is denied', async () => {
+    const saved = navigator.permissions;
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: jest.fn().mockResolvedValue({ state: 'denied' }) },
+    });
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      error({ code: 1, PERMISSION_DENIED: 1, message: 'denied' });
+      return 7;
+    });
+    render(<DumpingReportForm />);
+    expect(await screen.findByText(/not allowed to use your location/i)).toBeInTheDocument();
+    Object.defineProperty(navigator, 'permissions', { configurable: true, value: saved });
+  });
+
+  it('tries again by itself when the user comes back with location on', async () => {
+    let calls = 0;
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      calls += 1;
+      if (calls === 1) error({ code: 2, POSITION_UNAVAILABLE: 2, message: 'off' });
+      else success({ coords: { latitude: 5.6, longitude: -0.2, accuracy: 8 } });
+      return 7;
+    });
+    render(<DumpingReportForm />);
+    expect(await screen.findByText(/location is turned off/i)).toBeInTheDocument();
+    act(() => { window.dispatchEvent(new Event('focus')); });
+    expect(await screen.findByText(/Lat: 5\.600000/)).toBeInTheDocument();
+    expect(screen.queryByText(/location is turned off/i)).not.toBeInTheDocument();
   });
 
   it('stops watching when the form closes', () => {
