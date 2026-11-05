@@ -176,7 +176,8 @@ const AdditionalInfoStep = ({ formData, updateFormData, nextStep, prevStep }) =>
         <p className="font-semibold text-[15px] mb-1">Service Details</p>
         <p>Service fee will be calculated based on waste type, size, and number of bins</p>
         <p className="mt-1">
-          Based on your selected frequency: {FREQUENCY_LABELS[formData.frequency] || formData.frequency}
+          Frequency: {FREQUENCY_LABELS[formData.frequency] || formData.frequency}
+          {formData.frequency && formData.frequency !== 'one-time' ? ' - this request is one collection; we remind you before the next.' : ''}
         </p>
       </div>
       

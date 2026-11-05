@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import NavBar from './NavBar.js';
 import OfflineIndicator from './OfflineIndicator.js';
+import BinReminderPopup from './BinReminderPopup.js';
 import { ArrivalQRProvider } from '../context/ArrivalQRContext.js';
 
 /**
@@ -35,6 +36,8 @@ const Layout = () => {
       <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
         <NavBar />
         <OfflineIndicator />
+        {/* Day-before reminder for repeat digital bin collections */}
+        <BinReminderPopup />
         {/* Add extra bottom padding for pages with maps on mobile */}
         <main className={`flex-grow container mx-auto px-2 md:px-4 ${hasBottomPadding ? 'pb-10 xl:pb-6' : 'pb-2 xl:pb-6'}`}>
           <Outlet />
