@@ -165,6 +165,58 @@ export const SubmissionModal = ({ summary, onDone, onReportAnother }) => {
   );
 };
 
+/**
+ * Blocks the report until the phone's location is on. A location request made
+ * straight from a tap lets Android Chrome show its own "Turn on location?"
+ * dialog, which a request made on page load cannot.
+ */
+export const LocationRequiredModal = ({ problem, requesting, onTurnOn, onLeave }) => {
+  const blocked = problem.kind === 'blocked';
+  return (
+    <div className="fixed inset-0 z-[99999] overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60" aria-hidden="true"></div>
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="location-required-title"
+          aria-describedby="location-required-text"
+          className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-sm w-full px-6 pt-7 pb-6 text-center"
+        >
+          <div className="mx-auto flex items-center justify-center h-14 w-14 rounded-2xl bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 mb-4" aria-hidden="true">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <path d="M12 21s-7-6.1-7-11.5A7 7 0 0119 9.5C19 14.9 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />
+            </svg>
+          </div>
+          <h2 id="location-required-title" className="text-[20px] font-bold text-td-ink dark:text-gray-100">
+            {blocked ? 'Allow location to report' : 'Turn on location to report'}
+          </h2>
+          <div id="location-required-text" className="text-[15px] text-td-sage dark:text-gray-300 mt-2 space-y-2">
+            <p>We need the exact spot of the dumping so the cleanup team can find it.</p>
+            {blocked ? (
+              <ol className="list-decimal pl-5 text-left text-sm space-y-1">
+                {problem.steps.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+            ) : (
+              <p className="text-sm">Tap the button and choose <span className="font-semibold">Turn on</span> when your phone asks. If nothing appears, swipe down from the top of the screen and tap Location.</p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-2.5 mt-5">
+            <button type="button" autoFocus onClick={onTurnOn} disabled={requesting} className={primaryButton}>
+              {requesting ? 'Waiting for location...' : blocked ? 'I have allowed it - try again' : 'Turn on location'}
+            </button>
+            {onLeave && (
+              <button type="button" onClick={onLeave} className={secondaryButton}>
+                Back to Dashboard
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DumpingReportForm = ({ onSuccess, onDone }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -173,6 +225,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const [gpsAccuracy, setGpsAccuracy] = useState(null); // ± metres of the best fix so far
   const [gpsWatching, setGpsWatching] = useState(false); // GPS keeps improving until Submit
   const [locationProblem, setLocationProblem] = useState(null); // Why the location could not be read, and how to fix it
+  const [requestingLocation, setRequestingLocation] = useState(false); // A tap-started location request is in flight
   // GPS keeps running (watchPosition) while the user fills in the form and takes
   // photos, keeping the most accurate fix, and stops when the report is submitted
   // or the user pins the spot on the map
@@ -406,6 +459,34 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       }
     }
   }, [handleGeolocationFallback, stopGpsWatch]);
+
+  // Started from a tap, so Android Chrome can show its "Turn on location?"
+  // dialog when the phone's location is off. Then keep watching for a better fix.
+  const requestLocationFromTap = () => {
+    if (!navigator.geolocation?.getCurrentPosition) {
+      handleGeolocationFallback(null);
+      return;
+    }
+    setRequestingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setRequestingLocation(false);
+        const { latitude, longitude, accuracy } = position.coords;
+        bestAccuracyRef.current = Number.isFinite(accuracy) ? accuracy : Infinity;
+        setFormData(prev => ({ ...prev, coordinates: { latitude, longitude } }));
+        setMapPosition([latitude, longitude]);
+        setGpsAccuracy(Number.isFinite(accuracy) ? Math.round(accuracy) : null);
+        setLocationProblem(null);
+        setIsLocating(false);
+        handleUseMyLocation(false);
+      },
+      (geoError) => {
+        setRequestingLocation(false);
+        handleGeolocationFallback(geoError);
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  };
 
   const handleMapClick = (latlng) => {
     setLocationProblem(null);
@@ -692,6 +773,16 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         subtitle="Help keep our community clean. Your report goes to the local authorities for cleanup."
       />
 
+      {/* Location is required: block the form until the phone's location is on */}
+      {locationProblem && !formData?.coordinates && ['device-off', 'blocked'].includes(locationProblem.kind) && !submissionSuccess && (
+        <LocationRequiredModal
+          problem={locationProblem}
+          requesting={requestingLocation}
+          onTurnOn={requestLocationFromTap}
+          onLeave={onDone}
+        />
+      )}
+
       {/* Submission confirmation: a popup that returns to the dashboard on its own */}
       {submissionSuccess && (
         <SubmissionModal
@@ -807,7 +898,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                 </div>
               )}
             </div>
-            <button type="button" onClick={() => handleUseMyLocation(true)} className={`${tonalButton} flex-shrink-0 h-10`}>
+            <button type="button" onClick={() => (locationProblem && !formData?.coordinates ? requestLocationFromTap() : handleUseMyLocation(true))} className={`${tonalButton} flex-shrink-0 h-10`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
               </svg>

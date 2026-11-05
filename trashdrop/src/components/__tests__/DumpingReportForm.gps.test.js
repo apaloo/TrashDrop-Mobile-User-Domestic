@@ -124,6 +124,52 @@ describe('DumpingReportForm GPS', () => {
     expect(screen.queryByText(/location is turned off/i)).not.toBeInTheDocument();
   });
 
+  it('blocks the form with a turn-on-location prompt when the phone location is off, and a tap asks the phone', async () => {
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      error({ code: 2, POSITION_UNAVAILABLE: 2, message: 'off' });
+      return 7;
+    });
+    navigator.geolocation.getCurrentPosition = jest.fn((success) => {
+      success({ coords: { latitude: 5.61, longitude: -0.21, accuracy: 9 } });
+    });
+    render(<DumpingReportForm />);
+
+    const dialog = await screen.findByRole('alertdialog', { name: /Turn on location to report/i });
+    expect(dialog).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Turn on location$/i }));
+
+    expect(navigator.geolocation.getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function), expect.any(Function), expect.objectContaining({ enableHighAccuracy: true })
+    );
+    expect(await screen.findByText(/Lat: 5\.610000/)).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps the prompt up when location is still off, and can go back to the dashboard', async () => {
+    const onDone = jest.fn();
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      error({ code: 1, PERMISSION_DENIED: 1, message: 'off' });
+      return 7;
+    });
+    navigator.geolocation.getCurrentPosition = jest.fn((success, error) => error({ code: 1, PERMISSION_DENIED: 1 }));
+    render(<DumpingReportForm onDone={onDone} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Turn on location$/i }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Back to Dashboard/i }));
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it('does not block the form for a slow GPS fix', async () => {
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      error({ code: 3, TIMEOUT: 3, message: 'slow' });
+      return 7;
+    });
+    render(<DumpingReportForm />);
+    expect(await screen.findByText(/couldn't find your position yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
   it('stops watching when the form closes', () => {
     const { unmount } = render(<DumpingReportForm />);
     unmount();
