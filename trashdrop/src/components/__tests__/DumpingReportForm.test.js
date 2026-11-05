@@ -169,8 +169,8 @@ describe('DumpingReportForm', () => {
 
     render(<DumpingReportForm />);
 
-    expect(await screen.findByText(/No location set yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/Location access denied/i)).toBeInTheDocument();
+    expect(await screen.findByText(/location is turned off/i)).toBeInTheDocument();
+    expect(screen.getByText(/Location is needed to report illegal dumping/i)).toBeInTheDocument();
     expect(screen.getByText(/A location - tap the map/i)).toBeInTheDocument();
     expect(screen.queryByText(/Lat:/)).not.toBeInTheDocument();
   });

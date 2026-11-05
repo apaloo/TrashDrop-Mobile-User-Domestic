@@ -11,6 +11,7 @@ import CameraModal from './CameraModal.js';
 import OptionTile from './ui/OptionTile.js';
 import PageHeader from './ui/PageHeader.js';
 import PhotoViewer from './ui/PhotoViewer.js';
+import { describeLocationProblem, readLocationPermission } from '../utils/locationProblem.js';
 import { card, errorNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from './ui/styles.js';
 
 // Choices on the form: [value, icon, label(, hint)]
@@ -171,6 +172,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const [isLocating, setIsLocating] = useState(true); // First GPS fix is in flight on mount
   const [gpsAccuracy, setGpsAccuracy] = useState(null); // ± metres of the best fix so far
   const [gpsWatching, setGpsWatching] = useState(false); // GPS keeps improving until Submit
+  const [locationProblem, setLocationProblem] = useState(null); // Why the location could not be read, and how to fix it
   // GPS keeps running (watchPosition) while the user fills in the form and takes
   // photos, keeping the most accurate fix, and stops when the report is submitted
   // or the user pins the spot on the map
@@ -252,6 +254,32 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     return () => stopGpsWatch();
   }, []);
 
+  // After the user turns Location on (in the phone's settings or the site's
+  // permissions) and comes back, try again without making them tap.
+  const retryRef = useRef(null);
+  retryRef.current = () => {
+    if (locationProblem && !formData?.coordinates) handleUseMyLocation(false);
+  };
+  useEffect(() => {
+    const retry = () => {
+      if (document.visibilityState === 'visible') retryRef.current?.();
+    };
+    document.addEventListener('visibilitychange', retry);
+    window.addEventListener('focus', retry);
+    let permissionStatus = null;
+    navigator.permissions?.query?.({ name: 'geolocation' })
+      .then((status) => {
+        permissionStatus = status;
+        if (status) status.onchange = retry;
+      })
+      .catch(() => {});
+    return () => {
+      document.removeEventListener('visibilitychange', retry);
+      window.removeEventListener('focus', retry);
+      if (permissionStatus) permissionStatus.onchange = null;
+    };
+  }, []);
+
   const handleChange = (e) => {
     const { name, value, checked } = e.target;
     setFormData(prev => ({
@@ -268,26 +296,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     }));
   };
 
-  // Helper to get user-friendly geolocation error messages
-  const getGeolocationErrorMessage = (error) => {
-    switch(error.code) {
-      case error.PERMISSION_DENIED:
-        return 'Location access denied. Using approximate location. You can adjust by tapping on the map.';
-      case error.POSITION_UNAVAILABLE:
-        return 'GPS signal unavailable. Using approximate location. You can adjust by tapping on the map.';
-      case error.TIMEOUT:
-        return 'Location request timed out. Using approximate location instead. You can adjust by tapping on the map.';
-      default:
-        return 'Location not available. Please select your location on the map.';
-    }
-  };
-
-  // Helper to handle geolocation fallback
-  const handleGeolocationFallback = useCallback((errorMessage) => {
-    // Keep the default Accra coordinates that map is already showing
-    // User can click on map to adjust location
-    // Shown on the form under the map; no pop-up on top of it
-    setError(errorMessage || 'Location not available. Please click on the map to set your location.');
+  // Show why the location could not be read, and how to fix it, in the
+  // Location section. No location is set until GPS or the user sets one.
+  const handleGeolocationFallback = useCallback(async (geoError) => {
+    const permission = geoError ? await readLocationPermission() : 'unknown';
+    setLocationProblem(describeLocationProblem(geoError, permission));
   }, []);
 
   const stopGpsWatch = useCallback(() => {
@@ -302,8 +315,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   // getCurrentPosition returned the phone's first (often coarse) fix and
   // stopped, so leaving for the camera early kept a rough point.
   const handleUseMyLocation = useCallback((showFeedback = true) => {
-    // Clear any previous errors
-    setError(null);
+    setLocationProblem(null);
     setIsLocating(true);
     stopGpsWatch();
     bestAccuracyRef.current = Infinity;
@@ -346,7 +358,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               if (!gotFix) {
                 gotFix = true;
                 setIsLocating(false);
-                setError(null);
+                setLocationProblem(null);
                 // The coordinates and accuracy on the form show it; no pop-up
                 if (showFeedback) {
                   setLoading(false);
@@ -355,7 +367,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             } catch (processingError) {
               console.warn('Error processing location data:', processingError);
               if (!gotFix) {
-                handleGeolocationFallback('Could not process your location data');
+                handleGeolocationFallback({ code: 0 });
                 setIsLocating(false);
                 if (showFeedback) {
                   setLoading(false);
@@ -368,7 +380,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             // After a fix, a slow update is not a problem: keep the best fix and keep watching
             if (gotFix && error.code !== error.PERMISSION_DENIED) return;
             if (error.code === error.PERMISSION_DENIED) stopGpsWatch();
-            handleGeolocationFallback(`${getGeolocationErrorMessage(error)}`);
+            handleGeolocationFallback(error);
             setIsLocating(false);
             if (showFeedback) {
               setLoading(false);
@@ -380,26 +392,23 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       } catch (exception) {
         console.warn('Geolocation exception:', exception);
         stopGpsWatch();
-        handleGeolocationFallback('Unexpected error accessing location services');
+        handleGeolocationFallback({ code: 0 });
         setIsLocating(false);
         if (showFeedback) {
           setLoading(false);
         }
       }
     } else {
-      handleGeolocationFallback('Geolocation is not supported by your browser');
+      handleGeolocationFallback(null);
       setIsLocating(false);
       if (showFeedback) {
         setLoading(false);
       }
     }
-  }, [handleGeolocationFallback, getGeolocationErrorMessage, setError, stopGpsWatch]);
+  }, [handleGeolocationFallback, stopGpsWatch]);
 
   const handleMapClick = (latlng) => {
-    // Clear any location errors when user manually selects location
-    if (error && error.includes('location')) {
-      setError(null);
-    }
+    setLocationProblem(null);
     
     // The spot the user pinned wins over GPS
     stopGpsWatch();
@@ -771,7 +780,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               />
               <MapViewController position={mapPosition} />
               <LocationMarker position={mapPosition} setPosition={setMapPosition} onMapClick={handleMapClick} disabled={showCamera} />
-              {mapPosition && <Marker position={mapPosition} />}
+              {formData?.coordinates && <Marker position={mapPosition} />}
             </MapContainer>
           </div>
 
@@ -792,7 +801,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
                     </div>
                   )}
                 </>
-              ) : (
+              ) : locationProblem ? null : (
                 <div className="text-amber-800 dark:text-amber-300">
                   No location set yet - tap the map or use the button.
                 </div>
@@ -802,9 +811,20 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
               </svg>
-              Use My Location
+              {locationProblem && !formData?.coordinates ? 'Try again' : 'Use My Location'}
             </button>
           </div>
+
+          {locationProblem && !formData?.coordinates && (
+            <div className={`${warningNote} px-4 py-3 mt-3`} role="alert" data-testid="location-problem">
+              <p className="font-bold text-[15px]">{locationProblem.title}</p>
+              <p className="text-sm mt-1">Location is needed to report illegal dumping, so collectors can find it.</p>
+              <ol className="list-decimal pl-5 mt-2 space-y-1 text-sm">
+                {locationProblem.steps.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+              <p className="text-sm mt-2">You can also tap the map where the dumping is.</p>
+            </div>
+          )}
         </section>
 
         {/* Take Photos */}
