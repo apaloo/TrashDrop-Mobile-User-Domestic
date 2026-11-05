@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import { FaSpinner, FaSync, FaTimes, FaPlus } from 'react-icons/fa';
@@ -22,6 +22,7 @@ import { prepareDigitalBinData, transformBin } from '../services/digitalBinServi
 import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
 import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees } from '../services/promotionalService.js';
+import { answerReminder, createReminderPlan, isRepeatFrequency } from '../services/binReminderService.js';
 
 
 // Pickup time windows offered in ScheduleDetailsStep
@@ -44,6 +45,11 @@ const WASTE_TYPE_LABELS = {
 function DigitalBin() {
   const { user, session, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const routeLocation = useLocation();
+
+  // Set when the form was opened from a collection reminder pop-up: the
+  // booking answers that reminder instead of starting a new reminder plan
+  const reminderRef = useRef(null);
   
   // View state: 'list' or 'create'
   const [viewMode, setViewMode] = useState('list');
@@ -375,6 +381,38 @@ function DigitalBin() {
     }
   }, [user, authLoading, navigate]);
   
+  // Opened from a collection reminder: fill in the booking from the reminder
+  // plan and start at the photo step, since everything else is known
+  useEffect(() => {
+    const reminder = routeLocation.state?.bookFromReminder;
+    if (!reminder || !user) return;
+    reminderRef.current = reminder.reminder_id;
+    setFormData(prev => ({
+      ...prev,
+      location_id: reminder.location_id || null,
+      location_name: reminder.location_name || 'Home',
+      address: reminder.address || '',
+      latitude: reminder.latitude ?? null,
+      longitude: reminder.longitude ?? null,
+      isNewLocation: !reminder.location_id,
+      frequency: reminder.frequency,
+      startDate: reminder.due_date,
+      preferredTime: reminder.preferred_time || 'morning',
+      numberOfBags: reminder.bag_count || 1,
+      bag_count: reminder.bag_count || 1,
+      wasteType: reminder.waste_type || 'general',
+      waste_type: reminder.waste_type || 'general',
+      bin_size_liters: reminder.bin_size_liters || 120,
+      is_urgent: false,
+      notes: reminder.notes || '',
+      photos: []
+    }));
+    setViewMode('create');
+    setCurrentStep(4);
+    // Don't fill the form again on a reload or when coming back to the page
+    navigate(routeLocation.pathname, { replace: true, state: null });
+  }, [routeLocation.state, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // NO CACHING: Removed migration function
 
   // Load data - SERVER-FIRST approach
@@ -804,24 +842,15 @@ function DigitalBin() {
       const binId = crypto.randomUUID();
       const qrCodeUrl = `https://trashdrop.app/bin/${binId}`;
 
-      // Calculate expiry date based on frequency
+      // Every request is a single collection (repeats come from reminders), so
+      // it stays open for a week from its collection date, not from today
       const expiryDate = new Date();
-      switch (formData.frequency) {
-        case 'one-time':
-          expiryDate.setDate(expiryDate.getDate() + 7); // One-time requests stay open for a week
-          break;
-        case 'weekly':
-          expiryDate.setDate(expiryDate.getDate() + 7);
-          break;
-        case 'biweekly':
-          expiryDate.setDate(expiryDate.getDate() + 14);
-          break;
-        case 'monthly':
-          expiryDate.setMonth(expiryDate.getMonth() + 1);
-          break;
-        default:
-          expiryDate.setDate(expiryDate.getDate() + 7); // Default to weekly
+      if (formData.startDate) {
+        const [year, month, day] = formData.startDate.split('-').map(Number);
+        const collectionDay = new Date(year, month - 1, day, 23, 59, 59);
+        if (collectionDay > expiryDate) expiryDate.setTime(collectionDay.getTime());
       }
+      expiryDate.setDate(expiryDate.getDate() + 7);
 
       // SERVER-FIRST: Always try to create in database first
       debug.log('[DigitalBin] Creating digital bin in database');
@@ -938,6 +967,30 @@ function DigitalBin() {
         });
       }
 
+      // Repeat collections: answer the reminder this booking came from, or
+      // save a reminder plan for the next ones. The booking itself is done,
+      // so a failure here only costs the reminder.
+      let remindersOn = false;
+      const fromReminder = reminderRef.current;
+      reminderRef.current = null;
+      if (fromReminder) {
+        answerReminder(fromReminder, 'booked', binData.id)
+          .catch(err => console.warn('[DigitalBin] Could not mark the reminder as booked:', err.message));
+      } else if (isRepeatFrequency(formData.frequency)) {
+        try {
+          await createReminderPlan({
+            binId: binData.id,
+            startDate: formData.startDate,
+            preferredTime: formData.preferredTime,
+            notes: formData.notes?.trim()
+          });
+          remindersOn = true;
+        } catch (err) {
+          console.warn('[DigitalBin] Reminder plan not saved:', err.message);
+          toastService.error("Your request is booked, but we couldn't set up reminders for the next collections.");
+        }
+      }
+
       // Store the newly created bin ID for auto-expand in the list
       setNewlyCreatedBinId(binData.id);
       debug.log('[DigitalBin] Set newlyCreatedBinId:', binData.id);
@@ -967,7 +1020,8 @@ function DigitalBin() {
         frequency: formData.frequency,
         startDate: formData.startDate,
         preferredTime: PREFERRED_TIME_LABELS[formData.preferredTime] || formData.preferredTime,
-        isUrgent: !!formData.is_urgent
+        isUrgent: !!formData.is_urgent,
+        remindersOn
       };
 
       // Reset form and update UI
@@ -1103,6 +1157,13 @@ function DigitalBin() {
                   <p className="text-sm text-td-sage dark:text-gray-300 mt-1">
                     Your QR code is ready below - print or show it to the collector on pickup day.
                   </p>
+                  {submissionSuccess.remindersOn && (
+                    <p className="text-sm text-td-sage dark:text-gray-300 mt-1" data-testid="reminders-on">
+                      We'll remind you in the app the day before each {
+                        { weekly: 'weekly', biweekly: 'bi-weekly', monthly: 'monthly' }[submissionSuccess.frequency]
+                      } collection, so you can book it.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1141,6 +1202,12 @@ function DigitalBin() {
               <button
                 type="button"
                 onClick={() => {
+                  // Leaving a booking started from a reminder: the reminder
+                  // stays open, and the next new bin starts from a clean form
+                  if (reminderRef.current) {
+                    reminderRef.current = null;
+                    resetForm();
+                  }
                   setViewMode('list');
                   setCurrentStep(1);
                 }}

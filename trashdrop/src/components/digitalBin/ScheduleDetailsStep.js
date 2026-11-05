@@ -39,13 +39,13 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
   const getFrequencyHelperText = () => {
     switch (formData.frequency) {
       case 'one-time':
-        return 'Your digital bin will be serviced once on the scheduled date';
+        return 'We collect once, on the date you choose.';
       case 'weekly':
-        return 'Your digital bin will be serviced every week on the same day';
+        return "This books the first collection. We'll remind you in the app the day before each weekly collection after it, so you can book it in a few taps.";
       case 'biweekly':
-        return 'Your digital bin will be serviced every two weeks on the same day';
+        return "This books the first collection. We'll remind you in the app the day before each collection every two weeks after it, so you can book it in a few taps.";
       case 'monthly':
-        return 'Your digital bin will be serviced once a month on the same date';
+        return "This books the first collection. We'll remind you in the app the day before the same date each month, so you can book it in a few taps.";
       default:
         return '';
     }
