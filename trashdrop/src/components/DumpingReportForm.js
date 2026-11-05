@@ -170,7 +170,7 @@ export const SubmissionModal = ({ summary, onDone, onReportAnother }) => {
  * straight from a tap lets Android Chrome show its own "Turn on location?"
  * dialog, which a request made on page load cannot.
  */
-export const LocationRequiredModal = ({ problem, requesting, onTurnOn, onLeave }) => {
+export const LocationRequiredModal = ({ problem, requesting, failedTries = 0, onTurnOn, onReload, onLeave }) => {
   const blocked = problem.kind === 'blocked';
   return (
     <div className="fixed inset-0 z-[99999] overflow-y-auto">
@@ -201,10 +201,28 @@ export const LocationRequiredModal = ({ problem, requesting, onTurnOn, onLeave }
               <p className="text-sm">Tap the button and choose <span className="font-semibold">Turn on</span> when your phone asks. If nothing appears, swipe down from the top of the screen and tap Location.</p>
             )}
           </div>
+          {failedTries > 0 && !requesting && (
+            <div className={`${errorNote} px-4 py-3 mt-4 text-left text-sm`} role="alert" data-testid="location-still-off">
+              <p className="font-semibold">
+                {blocked ? 'Location is still blocked for TrashDrop.' : "We still can't get your location."}
+                {failedTries > 1 ? ` (tried ${failedTries} times)` : ''}
+              </p>
+              <p className="mt-1">
+                {blocked
+                  ? 'Check each place in the list above. If you have just changed a setting, reload the page.'
+                  : "Check that Location is on in your phone's quick settings, then try again."}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-2.5 mt-5">
             <button type="button" autoFocus onClick={onTurnOn} disabled={requesting} className={primaryButton}>
-              {requesting ? 'Waiting for location...' : blocked ? 'I have allowed it - try again' : 'Turn on location'}
+              {requesting ? 'Checking your location...' : blocked ? 'I have allowed it - try again' : 'Turn on location'}
             </button>
+            {failedTries > 0 && onReload && (
+              <button type="button" onClick={onReload} className={secondaryButton}>
+                Reload page
+              </button>
+            )}
             {onLeave && (
               <button type="button" onClick={onLeave} className={secondaryButton}>
                 Back to Dashboard
@@ -226,6 +244,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const [gpsWatching, setGpsWatching] = useState(false); // GPS keeps improving until Submit
   const [locationProblem, setLocationProblem] = useState(null); // Why the location could not be read, and how to fix it
   const [requestingLocation, setRequestingLocation] = useState(false); // A tap-started location request is in flight
+  const [failedLocationTries, setFailedLocationTries] = useState(0); // Taps on the location button that still got no location
   // GPS keeps running (watchPosition) while the user fills in the form and takes
   // photos, keeping the most accurate fix, and stops when the report is submitted
   // or the user pins the spot on the map
@@ -320,7 +339,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     document.addEventListener('visibilitychange', retry);
     window.addEventListener('focus', retry);
     let permissionStatus = null;
-    navigator.permissions?.query?.({ name: 'geolocation' })
+    Promise.resolve(navigator.permissions?.query?.({ name: 'geolocation' }))
       .then((status) => {
         permissionStatus = status;
         if (status) status.onchange = retry;
@@ -468,9 +487,14 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       return;
     }
     setRequestingLocation(true);
+    const startedAt = Date.now();
+    // A blocked browser refuses at once; keep "Checking..." up briefly so the
+    // tap visibly did something before the result shows
+    const settle = (fn) => setTimeout(fn, Math.max(0, 800 - (Date.now() - startedAt)));
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setRequestingLocation(false);
+        setFailedLocationTries(0);
         const { latitude, longitude, accuracy } = position.coords;
         bestAccuracyRef.current = Number.isFinite(accuracy) ? accuracy : Infinity;
         setFormData(prev => ({ ...prev, coordinates: { latitude, longitude } }));
@@ -480,10 +504,11 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         setIsLocating(false);
         handleUseMyLocation(false);
       },
-      (geoError) => {
+      (geoError) => settle(async () => {
+        await handleGeolocationFallback(geoError);
+        setFailedLocationTries(n => n + 1);
         setRequestingLocation(false);
-        handleGeolocationFallback(geoError);
-      },
+      }),
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
   };
@@ -778,7 +803,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         <LocationRequiredModal
           problem={locationProblem}
           requesting={requestingLocation}
+          failedTries={failedLocationTries}
           onTurnOn={requestLocationFromTap}
+          onReload={() => window.location.reload()}
           onLeave={onDone}
         />
       )}

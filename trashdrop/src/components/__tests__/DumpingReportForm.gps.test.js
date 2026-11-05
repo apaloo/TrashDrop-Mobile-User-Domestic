@@ -155,9 +155,38 @@ describe('DumpingReportForm GPS', () => {
     render(<DumpingReportForm onDone={onDone} />);
 
     await userEvent.click(await screen.findByRole('button', { name: /^Turn on location$/i }));
+    // The tap visibly does something, then says it is still off and offers a reload
+    expect(screen.getByRole('button', { name: /Checking your location/i })).toBeDisabled();
+    expect(await screen.findByText(/still can't get your location/i, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reload page/i })).toBeInTheDocument();
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Turn on location$/i }));
+    expect(await screen.findByText(/tried 2 times/i, {}, { timeout: 3000 })).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole('button', { name: /Back to Dashboard/i }));
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it('tells the user location is still blocked after "I have allowed it - try again"', async () => {
+    const saved = navigator.permissions;
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: jest.fn().mockResolvedValue({ state: 'denied' }) },
+    });
+    navigator.geolocation.watchPosition = jest.fn((success, error) => {
+      error({ code: 1, PERMISSION_DENIED: 1, message: 'denied' });
+      return 7;
+    });
+    navigator.geolocation.getCurrentPosition = jest.fn((success, error) => error({ code: 1, PERMISSION_DENIED: 1 }));
+    render(<DumpingReportForm />);
+
+    expect(await screen.findByRole('alertdialog', { name: /Allow location to report/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/App info, then Permissions/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Apps, then Chrome/i).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: /I have allowed it - try again/i }));
+    expect(await screen.findByText(/still blocked for TrashDrop/i, {}, { timeout: 3000 })).toBeInTheDocument();
+    Object.defineProperty(navigator, 'permissions', { configurable: true, value: saved });
   });
 
   it('does not block the form for a slow GPS fix', async () => {
