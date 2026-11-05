@@ -26,9 +26,11 @@ export const userServiceOptimized = {
       // Use deduplicated request to prevent duplicate concurrent calls
       const requestFn = async () => {
         // Single query to the optimized view instead of 8 separate queries
+        // Everything but avatar_url: only Profile shows the photo, and old
+        // photos stored as text can be close to 2 MB
         const { data, error } = await supabase
           .from('user_stats_dashboard')
-          .select('*')
+          .select('user_id, email, first_name, last_name, level, user_created_at, pickups, pickup_points, digital_bins, digital_bin_points, total_pickups, reports, report_points, batches, total_bags, available_bags, total_points, last_updated')
           .eq('user_id', userId)
           .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows
 
@@ -115,7 +117,6 @@ export const userServiceOptimized = {
           email: data.email || '',
           firstName: data.first_name || '',
           lastName: data.last_name || '',
-          avatar: data.avatar_url || '',
           // Include additional optimization metadata
           last_updated: data.last_updated,
           _source: 'optimized_view',

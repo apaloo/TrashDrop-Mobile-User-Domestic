@@ -175,9 +175,25 @@ const PersonalInfo = () => {
           const { profileImage: avatar, ...profileWithoutAvatar } = freshData;
           localStorage.setItem(`profile_${user.id}`, JSON.stringify(profileWithoutAvatar));
           if (avatar) {
-            localStorage.setItem(`profile_avatar_${user.id}`, avatar);
+            try { localStorage.setItem(`profile_avatar_${user.id}`, avatar); } catch (err) { /* too big for storage */ }
           }
-          
+
+          // A photo saved the old way (the whole image as text in the profile)
+          // is moved to photo storage once, quietly, so the profile stays small
+          if (typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+            fetch(avatar)
+              .then((res) => res.blob())
+              .then((blob) => uploadAvatar(user.id, blob))
+              .then((url) => {
+                if (!isMountedRef.current) return;
+                setUserData(prev => ({ ...prev, profileImage: url }));
+                setFormData(prev => ({ ...prev, profileImage: url }));
+                profileCache.data = { ...(profileCache.data || {}), profileImage: url };
+                try { localStorage.setItem(`profile_avatar_${user.id}`, url); } catch (err) { /* not needed */ }
+              })
+              .catch((err) => console.warn('[PersonalInfo] Could not move the old photo to storage:', err?.message || err));
+          }
+
           console.log('[PersonalInfo] Profile updated from server');
         }
       } catch (error) {
