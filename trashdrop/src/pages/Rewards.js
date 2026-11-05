@@ -28,7 +28,8 @@ const Rewards = () => {
   const [userPoints, setUserPoints] = useState(0);
   const [rewards, setRewards] = useState([]);
   const [recentRedemptions, setRecentRedemptions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Rewards list still loading
+  const [pointsLoading, setPointsLoading] = useState(true); // Balance still loading
   const [isRedemptionsLoading, setIsRedemptionsLoading] = useState(true);
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(null);
@@ -192,7 +193,9 @@ const Rewards = () => {
   }, [user?.id]);
   
   useEffect(() => {
-    // Fetch user points and available rewards from Supabase
+    // Balance, rewards list and redemptions load at the same time, and the
+    // page shows straight away: each part fills in when its data arrives.
+    // They used to load one after another behind a full-page spinner.
     const fetchRewardsData = async () => {
       if (!user) return;
       
@@ -204,66 +207,66 @@ const Rewards = () => {
       
       isLoadingRef.current = true;
       setIsLoading(true);
+      setPointsLoading(true);
       setErrorMessage('');
-      
+
+      const loadPoints = async () => {
+        try {
+          const statsResult = await userService.getUserStats(user.id);
+          if (!mountedRef.current) return;
+          if (statsResult.error) {
+            console.warn('Error fetching user stats:', statsResult.error);
+            setUserPoints(0);
+          } else {
+            setUserPoints(statsResult.data.points || 0);
+          }
+        } finally {
+          if (mountedRef.current) setPointsLoading(false);
+        }
+      };
+
+      const loadRewards = async () => {
+        try {
+          const { data: rewardsData, error: rewardsError } = await supabase
+            .from('rewards')
+            .select('*')
+            .eq('active', true)
+            .order('points_cost', { ascending: true })
+            .order('name', { ascending: true });
+          if (!mountedRef.current) return;
+          if (rewardsError) {
+            console.warn('Error fetching rewards:', rewardsError);
+            setRewards([]);
+            setErrorMessage('Failed to load rewards. Please try again later.');
+          } else {
+            setRewards((rewardsData || []).map(reward => ({
+              id: reward.id,
+              name: reward.name,
+              description: reward.description,
+              pointsCost: reward.points_cost,
+              image: reward.image_url || '',
+              expiresAt: reward.expires_at,
+              partnerId: reward.partner_id,
+              category: reward.category
+            })));
+          }
+        } finally {
+          if (mountedRef.current) setIsLoading(false);
+        }
+      };
+
       try {
-        // Fetch user points from pickup_requests table via userService (single source of truth)
-        const statsResult = await userService.getUserStats(user.id);
-        
-        if (statsResult.error) {
-          console.warn('Error fetching user stats:', statsResult.error);
-          setUserPoints(0);
-        } else {
-          // Use points calculated from pickup_requests table
-          setUserPoints(statsResult.data.points || 0);
-          console.log('[Rewards] Loaded user points from pickup_requests table:', statsResult.data.points || 0);
-        }
-        
-        // Fetch available rewards from Supabase
-        const { data: rewardsData, error: rewardsError } = await supabase
-          .from('rewards')
-          .select('*')
-          .eq('active', true)
-          .order('points_cost', { ascending: true })
-          .order('name', { ascending: true });
-        
-        if (rewardsError) {
-          console.warn('Error fetching rewards:', rewardsError);
-          setRewards([]);
-        } else if (rewardsData && rewardsData.length > 0) {
-          // Format rewards data to match our component's expected structure
-          const formattedRewards = rewardsData.map(reward => ({
-            id: reward.id,
-            name: reward.name,
-            description: reward.description,
-            pointsCost: reward.points_cost,
-            image: reward.image_url || '',
-            expiresAt: reward.expires_at,
-            partnerId: reward.partner_id,
-            category: reward.category
-          }));
-          
-          setRewards(formattedRewards);
-          console.log('[Rewards] Loaded rewards from database:', formattedRewards.length);
-        } else {
-          // No rewards found in database
-          console.log('[Rewards] No rewards found in database');
-          setRewards([]);
-        }
-        
-        // Fetch recent redemptions
-        await fetchRecentRedemptions();
+        await Promise.all([loadPoints(), loadRewards(), fetchRecentRedemptions()]);
       } catch (error) {
         console.error('Error fetching rewards data:', error);
-        setErrorMessage('Failed to load rewards. Please try again later.');
+        if (mountedRef.current) setErrorMessage('Failed to load rewards. Please try again later.');
       } finally {
         isLoadingRef.current = false;
-        setIsLoading(false);
       }
     };
     
     fetchRewardsData();
-  }, [user]);
+  }, [user?.id]);
 
   // Airtime and data: ask which number and network first (prefilled from the profile)
   const openRedeemDialog = async (reward) => {
@@ -357,14 +360,6 @@ const Rewards = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   const next = nextReward(userPoints);
 
   return (
@@ -379,13 +374,19 @@ const Rewards = () => {
         <span className="absolute -top-16 -right-16 w-56 h-56 rounded-full border-[28px] border-white/10" aria-hidden="true" />
         <div className="relative flex items-start justify-between gap-3">
           <p className="text-[13px] font-bold uppercase tracking-wide text-white/90">Your balance</p>
-          <span className="rounded-full bg-td-lime px-3 py-1 text-[13px] font-bold text-td-ink">Level {pointsLevel(userPoints)}</span>
+          {!pointsLoading && (
+            <span className="rounded-full bg-td-lime px-3 py-1 text-[13px] font-bold text-td-ink">Level {pointsLevel(userPoints)}</span>
+          )}
         </div>
-        <p className="relative mt-2 flex items-baseline gap-2">
-          <span className="text-[44px] leading-none font-bold">{userPoints.toLocaleString()}</span>
+        <p className="relative mt-2 flex items-baseline gap-2" aria-busy={pointsLoading}>
+          {pointsLoading ? (
+            <span className="inline-block h-11 w-28 rounded-xl bg-white/20 animate-pulse" aria-label="Loading your points" />
+          ) : (
+            <span className="text-[44px] leading-none font-bold">{userPoints.toLocaleString()}</span>
+          )}
           <span className="text-lg font-semibold">Points</span>
         </p>
-        <p className="relative mt-1 text-[15px] text-white/90">Worth GH₵{pointsToCedis(userPoints)} in airtime or data</p>
+        <p className="relative mt-1 text-[15px] text-white/90">{pointsLoading ? 'Checking your balance...' : `Worth GH₵${pointsToCedis(userPoints)} in airtime or data`}</p>
         <div
           className="relative mt-4 h-2 rounded-full bg-white/20 overflow-hidden"
           role="progressbar"
@@ -397,7 +398,7 @@ const Rewards = () => {
           <span className="block h-full rounded-full bg-td-lime" style={{ width: `${Math.round(next.progress * 100)}%` }} />
         </div>
         <p className="relative mt-2 text-[13px] text-white/90">
-          {next.top
+          {pointsLoading ? '\u00a0' : next.top
             ? `You can redeem any reward, up to GH₵${next.cedis}`
             : `${next.remaining.toLocaleString()} more points to GH₵${next.cedis} airtime`}
         </p>
@@ -414,9 +415,22 @@ const Rewards = () => {
       <section aria-labelledby="available-rewards" className={`${card} px-4 pt-3.5 pb-2`}>
         <h2 id="available-rewards" className={sectionTitle}>Available Rewards</h2>
 
+        {isLoading && (
+          <ul className="mt-1" aria-label="Loading rewards">
+            {[0, 1, 2].map(i => (
+              <li key={i} className={`flex gap-3 py-3.5 ${i === 0 ? '' : 'border-t border-td-border dark:border-gray-700'}`}>
+                <span className="w-11 h-11 rounded-xl bg-td-cream dark:bg-gray-700 animate-pulse flex-shrink-0" />
+                <span className="flex-1 space-y-2">
+                  <span className="block h-4 w-2/3 rounded bg-td-cream dark:bg-gray-700 animate-pulse" />
+                  <span className="block h-3 w-1/2 rounded bg-td-cream dark:bg-gray-700 animate-pulse" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="mt-1">
           {rewards.map((reward, i) => {
-            const affordable = userPoints >= reward.pointsCost;
+            const affordable = !pointsLoading && userPoints >= reward.pointsCost;
             return (
               <li key={reward.id} className={`py-3.5 ${i === 0 ? '' : 'border-t border-td-border dark:border-gray-700'}`}>
                 <div className="flex items-start gap-3">
@@ -462,11 +476,13 @@ const Rewards = () => {
                     ) : (
                       <button
                         onClick={() => (isMobileReward(reward) ? openRedeemDialog(reward) : handleRedeemReward(reward))}
-                        disabled={isRedeeming || !affordable}
+                        disabled={isRedeeming || pointsLoading || !affordable}
                         className={`mt-2.5 ${affordable ? `${primaryButton} h-10 px-5 text-[15px]` : 'inline-flex items-center h-10 px-4 rounded-full bg-td-cream dark:bg-gray-700 text-td-sage dark:text-gray-300 text-sm font-semibold cursor-not-allowed'}`}
                       >
                         {isRedeeming ? (
                           <LoadingSpinner size="sm" color="white" />
+                        ) : pointsLoading ? (
+                          'Checking points...'
                         ) : affordable ? (
                           'Redeem Reward'
                         ) : (
