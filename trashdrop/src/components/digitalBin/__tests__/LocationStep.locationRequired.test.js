@@ -33,14 +33,13 @@ jest.mock('../../../services/serviceCoverageService.js', () => ({
   joinCoverageWaitlist: async () => true,
 }));
 
-const Harness = ({ onCancel }) => {
+const Harness = () => {
   const [formData, setFormData] = useState({});
   return (
     <LocationStep
       formData={formData}
       updateFormData={(d) => setFormData(prev => ({ ...prev, ...d }))}
       nextStep={jest.fn()}
-      onCancel={onCancel}
     />
   );
 };
@@ -67,11 +66,18 @@ describe('Digital bin location step with the phone location off', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
-  it('can be cancelled when there are no saved places', async () => {
-    const onCancel = jest.fn();
-    render(<Harness onCancel={onCancel} />);
-    await userEvent.click(await screen.findByRole('button', { name: /^Cancel$/i }));
-    expect(onCancel).toHaveBeenCalled();
+  it('closing the prompt keeps the user on the step, and GPS does not take over afterwards', async () => {
+    render(<Harness />);
+    await userEvent.click(await screen.findByRole('button', { name: /Pick the spot on the map/i }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    // Still on the Bin Location step with its normal controls
+    expect(screen.getByText('Digital Bin Location')).toBeInTheDocument();
+    expect(screen.getByLabelText('Address')).toBeInTheDocument();
+
+    // Coming back to the app does not start a GPS request over the user's choice
+    window.dispatchEvent(new Event('focus'));
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
   });
 
   it('does not ask when GPS just timed out', async () => {

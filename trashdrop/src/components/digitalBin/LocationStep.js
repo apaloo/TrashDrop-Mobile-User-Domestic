@@ -81,11 +81,10 @@ const DraggableMarker = ({ position, setPosition }) => {
     /> : null;
 };
 
-const LocationStep = ({ formData, updateFormData, nextStep, onCancel }) => {
-  // The bin's location comes from the phone's GPS: block the step while
-  // location is off, unless the user picks one of their saved places
+const LocationStep = ({ formData, updateFormData, nextStep }) => {
+  // When the phone's location is off, offer to turn it on. Closing the
+  // prompt leaves the step as it was: map pin, address and saved places
   const locationGate = useLocationRequired();
-  const [usingSavedPlace, setUsingSavedPlace] = useState(false);
   const { user } = useAuth();
   
   // NO DEFAULT LOCATION - require actual GPS coordinates
@@ -530,7 +529,6 @@ const LocationStep = ({ formData, updateFormData, nextStep, onCancel }) => {
         console.error('[LocationStep] GPS failed:', errorMsg);
         if (locationResult.error?.code === 1 || locationResult.error?.code === 2) {
           // Location off or blocked: the prompt explains how to turn it on
-          setUsingSavedPlace(false);
           locationGate.setOnFix(applyGpsFix);
           locationGate.reportFailure({ code: locationResult.error.code });
         } else {
@@ -607,7 +605,7 @@ const LocationStep = ({ formData, updateFormData, nextStep, onCancel }) => {
   };
 
   const hasLocation = !!(position && position[0] && position[1]);
-  const showLocationPrompt = needsLocationTurnedOn(locationGate.problem) && !hasLocation && !usingSavedPlace;
+  const showLocationPrompt = needsLocationTurnedOn(locationGate.problem) && !hasLocation;
 
   return (
     <div className="space-y-4">
@@ -620,8 +618,8 @@ const LocationStep = ({ formData, updateFormData, nextStep, onCancel }) => {
           onReload={() => window.location.reload()}
           action="set your bin location"
           reason="Collectors use your phone's GPS to find the exact spot of your bin."
-          onLeave={savedLocations.length > 0 ? () => setUsingSavedPlace(true) : onCancel}
-          leaveLabel={savedLocations.length > 0 ? 'Use a saved place instead' : 'Cancel'}
+          onLeave={locationGate.clear}
+          leaveLabel={savedLocations.length > 0 ? 'Use the map or a saved place' : 'Pick the spot on the map'}
         />
       )}
       <section className={`${card} px-4 py-4 space-y-4`}>

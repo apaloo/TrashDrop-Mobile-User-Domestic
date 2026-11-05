@@ -625,7 +625,6 @@ const LocationStep = ({ onLocationSet, isLoading }) => {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   // Location off or blocked: a prompt explains how to turn it on
   const locationGate = useLocationRequired();
-  const [promptClosed, setPromptClosed] = useState(false);
 
   const applyFix = ({ latitude, longitude }) => {
     setIsGettingLocation(false);
@@ -647,7 +646,6 @@ const LocationStep = ({ onLocationSet, isLoading }) => {
           console.error('Geolocation error:', error);
           setIsGettingLocation(false);
           if (error?.code === 1 || error?.code === 2) {
-            setPromptClosed(false);
             locationGate.setOnFix(applyFix);
             locationGate.reportFailure(error);
           }
@@ -661,7 +659,7 @@ const LocationStep = ({ onLocationSet, isLoading }) => {
   
   return (
     <div>
-      {needsLocationTurnedOn(locationGate.problem) && !promptClosed && (
+      {needsLocationTurnedOn(locationGate.problem) && (
         <LocationRequiredModal
           problem={locationGate.problem}
           requesting={locationGate.requesting}
@@ -670,7 +668,7 @@ const LocationStep = ({ onLocationSet, isLoading }) => {
           onReload={() => window.location.reload()}
           action="set your location"
           reason="We use your location to send collectors to the right place."
-          onLeave={() => setPromptClosed(true)}
+          onLeave={locationGate.clear}
           leaveLabel="Not now"
         />
       )}

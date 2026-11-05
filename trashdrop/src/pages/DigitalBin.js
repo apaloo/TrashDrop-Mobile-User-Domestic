@@ -1183,10 +1183,6 @@ function DigitalBin() {
                 formData={formData}
                 updateFormData={updateFormData}
                 nextStep={nextStep}
-                onCancel={() => {
-                  setViewMode('list');
-                  setCurrentStep(1);
-                }}
               />
             )}
             
