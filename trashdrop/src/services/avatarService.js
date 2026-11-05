@@ -53,7 +53,7 @@ export const uploadAvatar = async (userId, file) => {
     .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false });
   if (uploadError) {
     console.error('[Avatar] Upload failed:', uploadError);
-    throw new Error("Your photo didn't upload. Check your connection and try again.");
+    throw new Error("Your photo didn't upload. Please try again in a moment.");
   }
 
   const { data: { publicUrl } } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
