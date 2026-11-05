@@ -38,11 +38,11 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border" style={{ backgroundColor: '#ffffff' }}>
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream dark:bg-gray-900">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border dark:bg-gray-800 dark:border-gray-700">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
+            <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16 rounded-xl" />
           </div>
           <h1 className="text-3xl font-bold text-td-ink dark:text-white">Reset Password</h1>
           <p className="mt-2 text-td-sage dark:text-gray-300">
@@ -57,7 +57,7 @@ const ResetPassword = () => {
         )}
 
         {successMessage && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative dark:bg-green-900/40 dark:text-green-200 dark:border-green-700" role="alert">
             <span className="block sm:inline">{successMessage}</span>
           </div>
         )}

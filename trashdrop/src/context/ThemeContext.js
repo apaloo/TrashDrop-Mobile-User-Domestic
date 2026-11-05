@@ -4,6 +4,15 @@ import supabase from '../utils/supabaseClient.js';
 
 const ThemeContext = createContext(null);
 
+/** 'dark' or 'light': the theme last applied on this device */
+export const readDeviceTheme = () => {
+  try {
+    return localStorage.getItem(appConfig.storage.themeKey) === 'dark' ? 'dark' : 'light';
+  } catch (err) {
+    return 'light';
+  }
+};
+
 // Profile > Preferences > Accessibility: classes on <html> (see index.css)
 const ACCESSIBILITY_CLASSES = { largerText: 'td-larger-text', reduceMotion: 'td-reduce-motion' };
 export const applyAccessibility = (settings = {}) => {
@@ -23,8 +32,9 @@ export const useTheme = () => {
 export const ThemeProvider = ({ children }) => {
   console.log('[ThemeContext] 🚀 ThemeProvider component mounting');
   
-  // Always start with light theme during initialization
-  const [theme, setTheme] = useState('light');
+  // Start with the theme last used on this device, so pages shown before
+  // sign-in (Sign in, Sign up, password reset) match it
+  const [theme, setTheme] = useState(readDeviceTheme);
   const [isInitialized, setIsInitialized] = useState(false);
   const [userId, setUserId] = useState(null);
   
@@ -36,9 +46,10 @@ export const ThemeProvider = ({ children }) => {
       if (session?.user?.id) {
         setUserId(session.user.id);
       } else {
+        // Signed out: keep the theme the device was using; the next
+        // sign-in loads that account's own setting
         setUserId(null);
         setIsInitialized(false);
-        setTheme('light');
         applyAccessibility({});
       }
     });
@@ -95,8 +106,7 @@ export const ThemeProvider = ({ children }) => {
   }, [userId]); // Only depend on userId
 
   useEffect(() => {
-    // Only apply theme after initialization
-    if (isInitialized) {
+    {
       // Apply theme to document
       document.documentElement.setAttribute('data-theme', theme);
       
@@ -107,12 +117,12 @@ export const ThemeProvider = ({ children }) => {
         document.documentElement.classList.remove('dark');
       }
       
-      // Save theme preference to localStorage
-      localStorage.setItem(appConfig.storage.themeKey, theme);
+      // Remember it on this device for the signed-out pages
+      try { localStorage.setItem(appConfig.storage.themeKey, theme); } catch (err) { /* storage blocked */ }
       
       console.log('[Theme] Applied theme:', theme);
     }
-  }, [theme, isInitialized]);
+  }, [theme]);
 
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));

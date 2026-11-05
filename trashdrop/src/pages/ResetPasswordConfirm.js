@@ -122,8 +122,8 @@ const ResetPasswordConfirm = () => {
   // Show loading while validating tokens
   if (isValidating) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
-        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border text-center" style={{ backgroundColor: '#ffffff' }}>
+      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream dark:bg-gray-900">
+        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border text-center dark:bg-gray-800 dark:border-gray-700">
           <LoadingSpinner size="lg" />
           <p className="text-td-sage dark:text-gray-300">Validating reset link...</p>
         </div>
@@ -134,11 +134,11 @@ const ResetPasswordConfirm = () => {
   // Show error if invalid token
   if (!isValidToken) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
-        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border" style={{ backgroundColor: '#ffffff' }}>
+      <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream dark:bg-gray-900">
+        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border dark:bg-gray-800 dark:border-gray-700">
           <div className="text-center">
             <div className="flex justify-center mb-4">
-              <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
+              <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16 rounded-xl" />
             </div>
             <h1 className="text-3xl font-bold text-red-600 dark:text-red-400">Invalid Reset Link</h1>
           </div>
@@ -162,11 +162,11 @@ const ResetPasswordConfirm = () => {
 
   // Show password reset form
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream" style={{ backgroundColor: '#f6f8f4', minHeight: '100vh' }}>
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border" style={{ backgroundColor: '#ffffff' }}>
+    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-td-cream dark:bg-gray-900">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl border border-td-border dark:bg-gray-800 dark:border-gray-700">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16" />
+            <img src="/logo.svg" alt="TrashDrop Logo" className="w-16 h-16 rounded-xl" />
           </div>
           <h1 className="text-3xl font-bold text-td-ink dark:text-white">Set New Password</h1>
           <p className="mt-2 text-td-sage dark:text-gray-300">
