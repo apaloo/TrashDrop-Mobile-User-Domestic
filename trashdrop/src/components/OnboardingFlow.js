@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { LocationRequiredModal, needsLocationTurnedOn, useLocationRequired } from './ui/LocationRequired.js';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import onboardingService from '../services/onboardingService.js';
@@ -622,37 +623,57 @@ const ChooseServiceStep = ({ onServiceSelect, isLoading }) => (
 
 const LocationStep = ({ onLocationSet, isLoading }) => {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  // Location off or blocked: a prompt explains how to turn it on
+  const locationGate = useLocationRequired();
+  const [promptClosed, setPromptClosed] = useState(false);
+
+  const applyFix = ({ latitude, longitude }) => {
+    setIsGettingLocation(false);
+    onLocationSet({
+      name: 'Home',
+      address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      latitude,
+      longitude
+    });
+  };
   
   const handleGetCurrentLocation = () => {
     setIsGettingLocation(true);
     
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Create location data
-          const locationData = {
-            name: 'Home',
-            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-            latitude,
-            longitude
-          };
-          
-          onLocationSet(locationData);
-          setIsGettingLocation(false);
-        },
+        (position) => applyFix(position.coords),
         (error) => {
           console.error('Geolocation error:', error);
           setIsGettingLocation(false);
-          // Fallback to manual entry
-        }
+          if (error?.code === 1 || error?.code === 2) {
+            setPromptClosed(false);
+            locationGate.setOnFix(applyFix);
+            locationGate.reportFailure(error);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
       );
+    } else {
+      setIsGettingLocation(false);
     }
   };
   
   return (
     <div>
+      {needsLocationTurnedOn(locationGate.problem) && !promptClosed && (
+        <LocationRequiredModal
+          problem={locationGate.problem}
+          requesting={locationGate.requesting}
+          failedTries={locationGate.failedTries}
+          onTurnOn={() => locationGate.requestFromTap(applyFix)}
+          onReload={() => window.location.reload()}
+          action="set your location"
+          reason="We use your location to send collectors to the right place."
+          onLeave={() => setPromptClosed(true)}
+          leaveLabel="Not now"
+        />
+      )}
       <h3 className="text-[20px] font-bold mb-2 text-td-ink dark:text-gray-100">Set Your Location</h3>
       <p className="text-[15px] text-td-sage dark:text-gray-300 mb-5">We need your location to provide pickup service</p>
       
