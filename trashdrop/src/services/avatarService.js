@@ -51,7 +51,10 @@ export const uploadAvatar = async (userId, file) => {
   const { error: uploadError } = await supabase.storage
     .from(AVATAR_BUCKET)
     .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false });
-  if (uploadError) throw new Error(`The photo didn't upload: ${uploadError.message}`);
+  if (uploadError) {
+    console.error('[Avatar] Upload failed:', uploadError);
+    throw new Error("Your photo didn't upload. Check your connection and try again.");
+  }
 
   const { data: { publicUrl } } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
 
@@ -59,7 +62,10 @@ export const uploadAvatar = async (userId, file) => {
     .from('profiles')
     .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
     .eq('id', userId);
-  if (saveError) throw new Error(`The photo uploaded but wasn't saved: ${saveError.message}`);
+  if (saveError) {
+    console.error('[Avatar] Saving the photo on the profile failed:', saveError);
+    throw new Error("Your photo uploaded but wasn't saved to your profile. Please try again.");
+  }
 
   // Tidy up older photos in this user's folder; failure here doesn't matter
   supabase.storage.from(AVATAR_BUCKET).list(userId)

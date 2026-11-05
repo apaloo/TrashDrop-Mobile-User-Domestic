@@ -62,7 +62,7 @@ it('uploads a small JPEG to the user folder and saves only the URL on the profil
 it('reports an upload failure and does not touch the profile', async () => {
   mockUpload.mockResolvedValue({ data: null, error: { message: 'Bucket not found' } });
   const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
-  await expect(uploadAvatar('user-1', file)).rejects.toThrow(/didn't upload/);
+  await expect(uploadAvatar('user-1', file)).rejects.toThrow(/^Your photo didn't upload\. Check your connection and try again\.$/);
   expect(mockUpdate).not.toHaveBeenCalled();
 });
 

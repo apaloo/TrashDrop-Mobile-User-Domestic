@@ -228,7 +228,7 @@ const PersonalInfo = () => {
       console.error('[PersonalInfo] Photo upload failed:', err);
       if (!isMountedRef.current) return;
       setFormData(prev => ({ ...prev, profileImage: previous }));
-      setSaveMessage({ type: 'error', text: `${err.message || "Your photo didn't upload."} Please try again.` });
+      setSaveMessage({ type: 'error', text: err.message || "Your photo didn't upload. Please try again." });
     } finally {
       URL.revokeObjectURL(preview);
       if (isMountedRef.current) setIsUploadingPhoto(false);
