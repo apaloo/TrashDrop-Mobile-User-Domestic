@@ -6,6 +6,8 @@ import SocialLogin from '../components/SocialLogin.js';
 import { FiAlertCircle, FiWifiOff } from 'react-icons/fi';
 import { rememberedSignIn } from '../utils/rememberMe.js';
 import { CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
+import { suggestEmailFix } from '../utils/emailTypo.js';
+import SignInHelpSheet from '../components/ui/SignInHelpSheet.js';
 
 /**
  * Login page component
@@ -13,7 +15,7 @@ import { CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, isLoading, resendConfirmationEmail } = useAuth();
+  const { signIn, signInWithGoogle, isLoading, resendConfirmationEmail } = useAuth();
   // Arriving from sign-up: the new account's email still needs confirming
   const fromSignUp = location.state?.awaitingConfirmation ? location.state.email : '';
   
@@ -24,6 +26,24 @@ const Login = () => {
     password: '',
   });
   const [error, setError] = useState('');
+  // Email and password didn't match: shown as a guided card, not one line.
+  // Holds the email that was tried so the person can spot a typo.
+  const [badCredentials, setBadCredentials] = useState(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [capsLockOn, setCapsLockOn] = useState(false);
+  // "Trouble signing in?" sheet: opens on its own after a second failed try
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
+  const fieldsRef = useRef(null);
+  // Replay the shake without remounting the inputs (keeps focus and autofill)
+  useEffect(() => {
+    const el = fieldsRef.current;
+    if (!shakeKey || !el) return;
+    el.classList.remove('td-shake');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('td-shake');
+  }, [shakeKey]);
+  const passwordRef = useRef(null);
   // 'offline' | 'unreachable' | 'slow' | 'server' when the connection, not the account, failed
   const [connection, setConnection] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,12 +55,14 @@ const Login = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'email') setBadCredentials(null);
   };
 
   console.log('[Login] Login component rendering');
 
   const submit = async () => {
     setError('');
+    setBadCredentials(null);
     setConnection(null);
     setShowResendButton(false);
     setResendMessage('');
@@ -52,7 +74,8 @@ const Login = () => {
         passwordLength: formData.password ? formData.password.length : 0 
       });
       
-      const result = await signIn(formData.email, formData.password, rememberMe);
+      const email = formData.email.trim();
+      const result = await signIn(email, formData.password, rememberMe);
       console.log('[Login] Sign in result:', { 
         success: result?.success, 
         hasError: !!result?.error,
@@ -83,9 +106,6 @@ const Login = () => {
           if (isUnconfirmed(error)) {
             return `Your email address isn't confirmed yet. Open the link we sent to ${formData.email} to finish signing up, then sign in.`;
           }
-          if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('invalid')) {
-            return 'Incorrect email or password. Please check your credentials and try again.';
-          }
           if (errorMessage.includes('User not found')) {
             return 'No account found with this email address. Would you like to create an account?';
           }
@@ -95,6 +115,26 @@ const Login = () => {
           return 'Unable to sign in. Please check your credentials and try again.';
         };
         
+        const errorMessage = result?.error?.originalMessage || result?.error?.message || '';
+        if (!isUnconfirmed(result?.error) &&
+            (result?.error?.code === 'invalid_credentials' || /invalid login credentials|invalid/i.test(errorMessage))) {
+          // Supabase gives the same answer for a wrong password and an unknown
+          // email, so the card covers both without saying which
+          setBadCredentials({ email, suggestion: suggestEmailFix(email) });
+          const attempts = failedAttempts + 1;
+          setFailedAttempts(attempts);
+          setFormData((prev) => ({ ...prev, password: '' }));
+          // Feel it like an app: a short buzz and a shake of the fields
+          try { navigator.vibrate?.(80); } catch (_) { /* not supported */ }
+          setShakeKey((k) => k + 1);
+          if (attempts >= 2) {
+            setHelpOpen(true);
+          } else {
+            setTimeout(() => passwordRef.current?.focus(), 0);
+          }
+          return;
+        }
+
         setError(getErrorMessage(result?.error));
         
         // Show resend button if email is not confirmed
@@ -219,7 +259,11 @@ const Login = () => {
         )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
+          <style>{`
+            @keyframes td-shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+            @media (prefers-reduced-motion: no-preference) { .td-shake { animation: td-shake 320ms ease-in-out; } }
+          `}</style>
+          <div ref={fieldsRef} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-td-ink dark:text-gray-100">
                 Email Address
@@ -232,9 +276,25 @@ const Login = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-td-border-strong rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                inputMode="email"
+                autoCapitalize="none"
+                aria-invalid={badCredentials ? 'true' : undefined}
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 ${badCredentials ? 'border-td-error dark:border-red-400' : 'border-td-border-strong dark:border-gray-600'}`}
                 placeholder="your.email@example.com"
               />
+              {badCredentials?.suggestion && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev) => ({ ...prev, email: badCredentials.suggestion }));
+                    setBadCredentials(null);
+                    passwordRef.current?.focus();
+                  }}
+                  className="mt-2 inline-flex max-w-full items-center rounded-full bg-td-tonal px-3 py-1.5 text-sm text-td-forest-dk dark:bg-green-900/40 dark:text-green-200"
+                >
+                  <span className="truncate">Did you mean <span className="font-semibold">{badCredentials.suggestion}</span>?</span>
+                </button>
+              )}
             </div>
             
             <div>
@@ -255,7 +315,12 @@ const Login = () => {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 pr-10 border border-td-border-strong rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                  ref={passwordRef}
+                  onKeyUp={(e) => setCapsLockOn(Boolean(e.getModifierState?.('CapsLock')))}
+                  onBlur={() => setCapsLockOn(false)}
+                  aria-invalid={badCredentials ? 'true' : undefined}
+                  aria-describedby={[badCredentials && 'signin-error', capsLockOn && 'caps-lock-note'].filter(Boolean).join(' ') || undefined}
+                  className={`mt-1 block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 ${badCredentials ? 'border-td-error dark:border-red-400' : 'border-td-border-strong dark:border-gray-600'}`}
                   placeholder="••••••••"
                 />
                 <button
@@ -277,6 +342,25 @@ const Login = () => {
                   )}
                 </button>
               </div>
+              {badCredentials && (
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <p id="signin-error" role="alert" className="text-sm font-medium text-td-error dark:text-red-300">
+                    Wrong email or password
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    className="text-sm font-semibold text-td-forest underline underline-offset-2 dark:text-green-300"
+                  >
+                    Need help signing in?
+                  </button>
+                </div>
+              )}
+              {capsLockOn && (
+                <p id="caps-lock-note" className="mt-1 text-sm font-medium text-td-orange-text dark:text-amber-300">
+                  Caps Lock is on
+                </p>
+              )}
             </div>
           </div>
 
@@ -305,6 +389,21 @@ const Login = () => {
           </div>
         </form>
         
+        {helpOpen && (
+          <SignInHelpSheet
+            email={badCredentials?.email || formData.email.trim()}
+            onClose={() => {
+              setHelpOpen(false);
+              setTimeout(() => passwordRef.current?.focus(), 0);
+            }}
+            onGoogle={async () => {
+              setHelpOpen(false);
+              const result = await signInWithGoogle?.();
+              if (result && !result.success) setError(result.error?.message || 'Google sign-in did not finish. Please try again.');
+            }}
+          />
+        )}
+
         {/* Social Login */}
         <SocialLogin isSubmitting={isSubmitting} onError={setError} />
         
