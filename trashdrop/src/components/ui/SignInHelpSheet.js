@@ -66,7 +66,7 @@ const SignInHelpSheet = ({ email, onClose, onGoogle }) => {
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="h-12 w-full text-[15px] font-semibold text-td-forest dark:text-green-300"
+            className="h-12 w-full rounded-full text-[15px] font-semibold text-td-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-td-forest/40 dark:text-green-300"
           >
             Try again
           </button>

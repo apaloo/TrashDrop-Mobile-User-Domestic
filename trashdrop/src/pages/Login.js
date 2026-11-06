@@ -34,6 +34,15 @@ const Login = () => {
   // "Trouble signing in?" sheet: opens on its own after a second failed try
   const [helpOpen, setHelpOpen] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
+  const fieldsRef = useRef(null);
+  // Replay the shake without remounting the inputs (keeps focus and autofill)
+  useEffect(() => {
+    const el = fieldsRef.current;
+    if (!shakeKey || !el) return;
+    el.classList.remove('td-shake');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('td-shake');
+  }, [shakeKey]);
   const passwordRef = useRef(null);
   // 'offline' | 'unreachable' | 'slow' | 'server' when the connection, not the account, failed
   const [connection, setConnection] = useState(null);
@@ -254,7 +263,7 @@ const Login = () => {
             @keyframes td-shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
             @media (prefers-reduced-motion: no-preference) { .td-shake { animation: td-shake 320ms ease-in-out; } }
           `}</style>
-          <div key={shakeKey} className={`space-y-4 ${shakeKey ? 'td-shake' : ''}`}>
+          <div ref={fieldsRef} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-td-ink dark:text-gray-100">
                 Email Address
