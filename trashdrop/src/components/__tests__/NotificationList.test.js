@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import NotificationList from '../NotificationList.js';
@@ -130,6 +130,52 @@ describe('NotificationList', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to load notifications')).toBeInTheDocument();
     });
+  });
+
+  it('keeps the list and shows no error when a background refresh fails', async () => {
+    jest.useFakeTimers();
+    try {
+      render(<NotificationList />);
+      await waitFor(() => expect(screen.getByText('Pickup Complete')).toBeInTheDocument());
+
+      notificationService.getUserNotifications.mockResolvedValueOnce({
+        data: [],
+        error: { message: 'network error' }
+      });
+      jest.advanceTimersByTime(60000);
+      await waitFor(() => expect(notificationService.getUserNotifications).toHaveBeenCalledTimes(3));
+      // let the failed refresh finish updating the page
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByText('Pickup Complete')).toBeInTheDocument();
+      expect(screen.queryByText('Failed to load notifications')).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('clears the load error once a later refresh works', async () => {
+    notificationService.getUserNotifications
+      .mockResolvedValueOnce({ data: [], error: { message: 'network error' } });
+
+    render(<NotificationList />);
+    await waitFor(() => expect(screen.getByText('Failed to load notifications')).toBeInTheDocument());
+
+    window.dispatchEvent(new Event('online'));
+    await waitFor(() => expect(screen.getByText('Pickup Complete')).toBeInTheDocument());
+    expect(screen.queryByText('Failed to load notifications')).not.toBeInTheDocument();
+  });
+
+  it('says the phone is offline rather than "failed"', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      notificationService.getUserNotifications.mockResolvedValue({ data: [], error: { message: 'Failed to fetch' } });
+      render(<NotificationList />);
+      expect(await screen.findByText(/You're offline/)).toBeInTheDocument();
+      expect(screen.queryByText('Failed to load notifications')).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+    }
   });
 
   it('refreshes notifications periodically', async () => {

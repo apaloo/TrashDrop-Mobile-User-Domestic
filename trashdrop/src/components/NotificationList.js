@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Switch from './profile/Switch.js';
 import { card, errorNote, sectionTitle } from './ui/styles.js';
 import { useAuth } from '../context/AuthContext.js';
@@ -19,7 +19,8 @@ const NotificationList = () => {
   const { arrivedBin, showBinQR } = useArrivalQR();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); // a failed action (mark read, delete, settings)
+  const [loadError, setLoadError] = useState(null); // the list could not be loaded
   const [showPreferences, setShowPreferences] = useState(false);
   const [preferences, setPreferences] = useState({
     pickup_status: true,
@@ -27,9 +28,14 @@ const NotificationList = () => {
     promo: true
   });
 
-  // Fetch notifications
+  // Fetch notifications. The list refreshes every minute and when the phone
+  // comes back online; a refresh that fails (weak signal, switching between
+  // Wi-Fi and data) keeps the list already on screen instead of showing an
+  // error, and a later success clears any load error.
+  const loadedRef = useRef(false);
   useEffect(() => {
     if (!userId) return undefined;
+    let cancelled = false;
 
     const fetchNotifications = async () => {
       try {
@@ -39,20 +45,34 @@ const NotificationList = () => {
         );
 
         if (fetchError) throw new Error(fetchError.message);
+        if (cancelled) return;
         setNotifications(data);
-
+        loadedRef.current = true;
+        setLoadError(null);
       } catch (err) {
         console.error('Error fetching notifications:', err);
-        setError('Failed to load notifications');
+        if (cancelled) return;
+        const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        if (offline) {
+          setLoadError(loadedRef.current
+            ? "You're offline. These are the notifications you already had."
+            : "You're offline. Notifications will load when you're back online.");
+        } else if (!loadedRef.current) {
+          setLoadError('Failed to load notifications');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchNotifications();
-    // Refresh notifications every minute
     const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
+    window.addEventListener('online', fetchNotifications);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('online', fetchNotifications);
+    };
   }, [userId]);
 
   // Real-time subscription for new notifications
@@ -256,11 +276,11 @@ const NotificationList = () => {
         </div>
       </div>
 
-      {error && (
+      {(error || loadError) && (
         <div role="alert" className={`${errorNote} px-4 py-3 flex items-start justify-between gap-3`}>
-          <span className="text-[15px]">{error}</span>
+          <span className="text-[15px]">{error || loadError}</span>
           <button
-            onClick={() => setError(null)}
+            onClick={() => (error ? setError(null) : setLoadError(null))}
             aria-label="Dismiss error"
             className="-mr-1 -mt-0.5 w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xl leading-none hover:bg-red-100 dark:hover:bg-red-900/40"
           >

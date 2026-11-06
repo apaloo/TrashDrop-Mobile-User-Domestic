@@ -172,6 +172,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Offline at Submit: the report and photos stay on this screen and are sent
+  // on their own when the connection comes back
+  const [waitingForConnection, setWaitingForConnection] = useState(false);
   const [isLocating, setIsLocating] = useState(true); // First GPS fix is in flight on mount
   const [gpsAccuracy, setGpsAccuracy] = useState(null); // ± metres of the best fix so far
   const [gpsWatching, setGpsWatching] = useState(false); // GPS keeps improving until Submit
@@ -607,8 +610,10 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   }
   const canSubmit = missingRequirements.length === 0 && !loading;
 
+  const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     
     // Check if user is authenticated
     if (!user?.id) {
@@ -636,10 +641,18 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       return;
     }
 
+    // No connection: don't try to upload photos that can't go anywhere
+    if (isOffline()) {
+      setError(null);
+      setWaitingForConnection(true);
+      return;
+    }
+
     // GPS stops here: the report uses the most accurate fix collected so far
     stopGpsWatch();
     setLoading(true);
     setError(null);
+    setWaitingForConnection(false);
 
     try {
       const { data, error: reportError } = await dumpingService.createReport(
@@ -648,7 +661,9 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       );
 
       if (reportError) {
-        throw new Error(reportError.message);
+        const err = new Error(reportError.message);
+        err.code = reportError.code;
+        throw err;
       }
 
       // Ensure we have valid report data before proceeding
@@ -711,11 +726,26 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       }
 
     } catch (err) {
-      setError(err.message);
+      if (isOffline()) {
+        // The connection dropped while sending: wait for it instead of failing
+        setWaitingForConnection(true);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Send the waiting report as soon as the phone is back online
+  const submitRef = useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+  useEffect(() => {
+    if (!waitingForConnection) return undefined;
+    const sendNow = () => submitRef.current();
+    window.addEventListener('online', sendNow);
+    return () => window.removeEventListener('online', sendNow);
+  }, [waitingForConnection]);
 
   const spinner = (cls) => (
     <svg className={`animate-spin ${cls}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -1014,6 +1044,16 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
           )}
         </button>
       </form>
+
+      {waitingForConnection && !error && (
+        <div role="status" className={`${warningNote} px-4 py-3 text-[15px]`}>
+          <p className="font-semibold">You're offline</p>
+          <p className="mt-1">
+            Your report and photos are kept on this screen. They'll be sent automatically when
+            your connection is back - keep this page open.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className={`${errorNote} px-4 py-3 flex items-center gap-2`}>
