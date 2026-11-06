@@ -193,6 +193,53 @@ describe('DumpingReportForm', () => {
     });
   });
 
+  describe('when the phone is offline', () => {
+    const setOnline = (value) => {
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => value });
+    };
+    afterEach(() => setOnline(true));
+
+    it('keeps the report and sends it when the connection comes back', async () => {
+      render(<DumpingReportForm />);
+
+      await pickWasteType('Mixed');
+      await pickSize('Few bags');
+      await takePhoto();
+      setOnline(false);
+      await submitWhenReady();
+
+      expect(await screen.findByText(/You're offline/i)).toBeInTheDocument();
+      expect(screen.getByText(/sent automatically when\s+your connection is back/i)).toBeInTheDocument();
+      expect(screen.queryByText(/could not be uploaded/i)).not.toBeInTheDocument();
+      expect(dumpingService.createReport).not.toHaveBeenCalled();
+
+      setOnline(true);
+      window.dispatchEvent(new Event('online'));
+
+      await waitFor(() => expect(dumpingService.createReport).toHaveBeenCalledWith(
+        'user123',
+        expect.objectContaining({ photos: expect.arrayContaining(['blob://photo-1']) })
+      ));
+      await waitFor(() => expect(screen.queryByText(/You're offline/i)).not.toBeInTheDocument());
+    });
+
+    it('waits instead of failing when the connection drops while sending', async () => {
+      dumpingService.createReport.mockImplementationOnce(async () => {
+        setOnline(false);
+        return { data: null, error: { message: '1 photo could not be uploaded. Check your connection and try again.', code: 'PHOTO_UPLOAD_FAILED' } };
+      });
+      render(<DumpingReportForm />);
+
+      await pickWasteType('Mixed');
+      await pickSize('Few bags');
+      await takePhoto();
+      await submitWhenReady();
+
+      expect(await screen.findByText(/You're offline/i)).toBeInTheDocument();
+      expect(screen.queryByText(/could not be uploaded/i)).not.toBeInTheDocument();
+    });
+  });
+
   it('shows and toggles contact consent checkbox', async () => {
     render(<DumpingReportForm />);
 
