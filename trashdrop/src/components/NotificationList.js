@@ -6,6 +6,9 @@ import { notificationService, normalizeNotification } from '../services/notifica
 import supabase from '../utils/supabaseClient.js';
 import { useArrivalQR } from '../context/useArrivalQR.js';
 
+// Messages that mark a finished step: shown with a check mark
+const DONE_TYPES = ['pickup_status', 'pickup_collected', 'pickup_disposed'];
+
 const NotificationList = () => {
   const { user } = useAuth();
   // The collector's at the bin: its arrival message opens the QR code
@@ -176,7 +179,7 @@ const NotificationList = () => {
   };
 
   const getNotificationIcon = (type) => {
-    const kind = type === 'pickup_status' ? 'done' : type === 'error' ? 'error' : 'info';
+    const kind = DONE_TYPES.includes(type) ? 'done' : type === 'error' ? 'error' : 'info';
     const tint = {
       done: 'bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300',
       error: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
