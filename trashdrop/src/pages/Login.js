@@ -7,6 +7,7 @@ import { FiAlertCircle, FiWifiOff } from 'react-icons/fi';
 import { rememberedSignIn } from '../utils/rememberMe.js';
 import { CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
 import { suggestEmailFix } from '../utils/emailTypo.js';
+import SignInHelpSheet from '../components/ui/SignInHelpSheet.js';
 
 /**
  * Login page component
@@ -14,7 +15,7 @@ import { suggestEmailFix } from '../utils/emailTypo.js';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, isLoading, resendConfirmationEmail } = useAuth();
+  const { signIn, signInWithGoogle, isLoading, resendConfirmationEmail } = useAuth();
   // Arriving from sign-up: the new account's email still needs confirming
   const fromSignUp = location.state?.awaitingConfirmation ? location.state.email : '';
   
@@ -30,6 +31,9 @@ const Login = () => {
   const [badCredentials, setBadCredentials] = useState(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [capsLockOn, setCapsLockOn] = useState(false);
+  // "Trouble signing in?" sheet: opens on its own after a second failed try
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const passwordRef = useRef(null);
   // 'offline' | 'unreachable' | 'slow' | 'server' when the connection, not the account, failed
   const [connection, setConnection] = useState(null);
@@ -42,6 +46,7 @@ const Login = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'email') setBadCredentials(null);
   };
 
   console.log('[Login] Login component rendering');
@@ -107,9 +112,17 @@ const Login = () => {
           // Supabase gives the same answer for a wrong password and an unknown
           // email, so the card covers both without saying which
           setBadCredentials({ email, suggestion: suggestEmailFix(email) });
-          setFailedAttempts((n) => n + 1);
+          const attempts = failedAttempts + 1;
+          setFailedAttempts(attempts);
           setFormData((prev) => ({ ...prev, password: '' }));
-          setTimeout(() => passwordRef.current?.focus(), 0);
+          // Feel it like an app: a short buzz and a shake of the fields
+          try { navigator.vibrate?.(80); } catch (_) { /* not supported */ }
+          setShakeKey((k) => k + 1);
+          if (attempts >= 2) {
+            setHelpOpen(true);
+          } else {
+            setTimeout(() => passwordRef.current?.focus(), 0);
+          }
           return;
         }
 
@@ -202,53 +215,6 @@ const Login = () => {
           </div>
         )}
 
-        {badCredentials && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm dark:bg-red-950/40 dark:border-red-900" role="alert">
-            <p className="font-semibold text-td-error dark:text-red-300">That email and password don't match</p>
-            <p className="mt-1 text-td-ink dark:text-gray-100">
-              We couldn't sign in <span className="font-medium break-all">{badCredentials.email}</span>.
-            </p>
-            {badCredentials.suggestion && (
-              <p className="mt-2 text-td-ink dark:text-gray-100">
-                Did you mean{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData((prev) => ({ ...prev, email: badCredentials.suggestion }));
-                    setBadCredentials(null);
-                    passwordRef.current?.focus();
-                  }}
-                  className="font-semibold text-td-forest underline underline-offset-2 break-all dark:text-green-300"
-                >
-                  {badCredentials.suggestion}
-                </button>
-                ?
-              </p>
-            )}
-            <ul className="mt-2 list-disc pl-5 space-y-1 text-td-ink dark:text-gray-100">
-              <li>Check the email for typos and make sure Caps Lock is off.</li>
-              <li>Signed up with Google? Use <span className="font-medium">Continue with Google</span> below.</li>
-              <li>
-                New to TrashDrop?{' '}
-                <Link to="/register" className="font-semibold text-td-forest underline underline-offset-2 dark:text-green-300">
-                  Create an account
-                </Link>
-              </li>
-            </ul>
-            <Link
-              to="/reset-password"
-              state={{ email: badCredentials.email }}
-              className={`mt-3 inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold ${
-                failedAttempts >= 2
-                  ? 'bg-primary text-white hover:bg-primary-dark'
-                  : 'border border-td-border-strong text-td-forest hover:bg-white dark:text-green-300 dark:border-gray-600'
-              }`}
-            >
-              {failedAttempts >= 2 ? 'Forgot your password? Reset it now' : 'Reset password'}
-            </Link>
-          </div>
-        )}
-
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-td-error dark:bg-red-950/40 dark:border-red-900 dark:text-red-300" role="alert">
             {error}
@@ -284,7 +250,11 @@ const Login = () => {
         )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
+          <style>{`
+            @keyframes td-shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+            @media (prefers-reduced-motion: no-preference) { .td-shake { animation: td-shake 320ms ease-in-out; } }
+          `}</style>
+          <div key={shakeKey} className={`space-y-4 ${shakeKey ? 'td-shake' : ''}`}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-td-ink dark:text-gray-100">
                 Email Address
@@ -297,9 +267,25 @@ const Login = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-td-border-strong rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                inputMode="email"
+                autoCapitalize="none"
+                aria-invalid={badCredentials ? 'true' : undefined}
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 ${badCredentials ? 'border-td-error dark:border-red-400' : 'border-td-border-strong dark:border-gray-600'}`}
                 placeholder="your.email@example.com"
               />
+              {badCredentials?.suggestion && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev) => ({ ...prev, email: badCredentials.suggestion }));
+                    setBadCredentials(null);
+                    passwordRef.current?.focus();
+                  }}
+                  className="mt-2 inline-flex max-w-full items-center rounded-full bg-td-tonal px-3 py-1.5 text-sm text-td-forest-dk dark:bg-green-900/40 dark:text-green-200"
+                >
+                  <span className="truncate">Did you mean <span className="font-semibold">{badCredentials.suggestion}</span>?</span>
+                </button>
+              )}
             </div>
             
             <div>
@@ -323,8 +309,9 @@ const Login = () => {
                   ref={passwordRef}
                   onKeyUp={(e) => setCapsLockOn(Boolean(e.getModifierState?.('CapsLock')))}
                   onBlur={() => setCapsLockOn(false)}
-                  aria-describedby={capsLockOn ? 'caps-lock-note' : undefined}
-                  className="mt-1 block w-full px-3 py-2 pr-10 border border-td-border-strong rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                  aria-invalid={badCredentials ? 'true' : undefined}
+                  aria-describedby={[badCredentials && 'signin-error', capsLockOn && 'caps-lock-note'].filter(Boolean).join(' ') || undefined}
+                  className={`mt-1 block w-full px-3 py-2 pr-10 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 ${badCredentials ? 'border-td-error dark:border-red-400' : 'border-td-border-strong dark:border-gray-600'}`}
                   placeholder="••••••••"
                 />
                 <button
@@ -346,6 +333,20 @@ const Login = () => {
                   )}
                 </button>
               </div>
+              {badCredentials && (
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <p id="signin-error" role="alert" className="text-sm font-medium text-td-error dark:text-red-300">
+                    Wrong email or password
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    className="text-sm font-semibold text-td-forest underline underline-offset-2 dark:text-green-300"
+                  >
+                    Need help signing in?
+                  </button>
+                </div>
+              )}
               {capsLockOn && (
                 <p id="caps-lock-note" className="mt-1 text-sm font-medium text-td-orange-text dark:text-amber-300">
                   Caps Lock is on
@@ -379,6 +380,21 @@ const Login = () => {
           </div>
         </form>
         
+        {helpOpen && (
+          <SignInHelpSheet
+            email={badCredentials?.email || formData.email.trim()}
+            onClose={() => {
+              setHelpOpen(false);
+              setTimeout(() => passwordRef.current?.focus(), 0);
+            }}
+            onGoogle={async () => {
+              setHelpOpen(false);
+              const result = await signInWithGoogle?.();
+              if (result && !result.success) setError(result.error?.message || 'Google sign-in did not finish. Please try again.');
+            }}
+          />
+        )}
+
         {/* Social Login */}
         <SocialLogin isSubmitting={isSubmitting} onError={setError} />
         

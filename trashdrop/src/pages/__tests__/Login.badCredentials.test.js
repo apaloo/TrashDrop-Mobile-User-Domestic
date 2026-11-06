@@ -31,53 +31,76 @@ const signInWith = (email, password = 'Wrong123!') => {
 
 describe('Login when the email and password do not match', () => {
   const signIn = jest.fn();
+  const signInWithGoogle = jest.fn().mockResolvedValue({ success: true });
 
   beforeEach(() => {
     jest.clearAllMocks();
-    useAuth.mockReturnValue({ signIn, isLoading: false, resendConfirmationEmail: jest.fn() });
+    useAuth.mockReturnValue({ signIn, signInWithGoogle, isLoading: false, resendConfirmationEmail: jest.fn() });
     signIn.mockResolvedValue({
       success: false,
       error: { message: 'Invalid login credentials', originalMessage: 'Invalid login credentials' }
     });
   });
 
-  it('names the email tried and says what to do next', async () => {
+  it('marks the fields and says it briefly, under the password', async () => {
     renderLogin();
     signInWith('ama@gmail.com');
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent("That email and password don't match");
-    expect(alert).toHaveTextContent('ama@gmail.com');
-    expect(alert).toHaveTextContent(/Caps Lock is off/);
-    expect(alert).toHaveTextContent(/Signed up with Google\? Use Continue with Google/);
-    expect(screen.getByRole('link', { name: 'Create an account' })).toHaveAttribute('href', '/register');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Wrong email or password');
+    expect(screen.getByLabelText('Email Address')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.queryByText(/Incorrect email or password/)).not.toBeInTheDocument();
     // The password is cleared for a fresh try; the email stays
     expect(screen.getByLabelText('Password')).toHaveValue('');
     expect(screen.getByLabelText('Email Address')).toHaveValue('ama@gmail.com');
+    // No sheet yet after the first try
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens the help sheet from "Need help signing in?"', async () => {
+    renderLogin();
+    signInWith('ama@gmail.com');
+    fireEvent.click(await screen.findByRole('button', { name: 'Need help signing in?' }));
+
+    const sheet = screen.getByRole('dialog', { name: 'Trouble signing in?' });
+    expect(sheet).toHaveTextContent('ama@gmail.com');
+    expect(screen.getByRole('button', { name: /I signed up with Google/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create a new account' })).toHaveAttribute('href', '/register');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens the help sheet by itself after a second failed try', async () => {
+    renderLogin();
+    signInWith('ama@gmail.com');
+    await screen.findByRole('button', { name: 'Need help signing in?' });
+    signInWith('ama@gmail.com', 'Another1!');
+    expect(await screen.findByRole('dialog', { name: 'Trouble signing in?' })).toBeInTheDocument();
   });
 
   it('opens password reset with the email already filled in', async () => {
     renderLogin();
     signInWith('ama@gmail.com');
+    fireEvent.click(await screen.findByRole('button', { name: 'Need help signing in?' }));
 
-    fireEvent.click(await screen.findByRole('link', { name: 'Reset password' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Reset password' }));
     expect(screen.getByText('reset page for ama@gmail.com')).toBeInTheDocument();
   });
 
-  it('pushes the reset after a second failed try', async () => {
+  it('signs in with Google from the sheet', async () => {
     renderLogin();
     signInWith('ama@gmail.com');
-    await screen.findByRole('link', { name: 'Reset password' });
-    signInWith('ama@gmail.com', 'Another1!');
-    expect(await screen.findByRole('link', { name: /Reset it now/ })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Need help signing in?' }));
+    fireEvent.click(screen.getByRole('button', { name: /I signed up with Google/ }));
+    await waitFor(() => expect(signInWithGoogle).toHaveBeenCalled());
   });
 
   it('offers a fix for a mistyped email domain', async () => {
     renderLogin();
     signInWith('ama@gmial.com');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'ama@gmail.com' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Did you mean ama@gmail.com/ }));
     expect(screen.getByLabelText('Email Address')).toHaveValue('ama@gmail.com');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
