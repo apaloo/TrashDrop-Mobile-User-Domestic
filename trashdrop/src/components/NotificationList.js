@@ -11,6 +11,10 @@ const DONE_TYPES = ['pickup_status', 'pickup_collected', 'pickup_disposed'];
 
 const NotificationList = () => {
   const { user } = useAuth();
+  // user can be null for a moment while the session is re-checked (app back
+  // in the foreground, token refresh) before the route redirects; never read
+  // user.id directly or the page crashes into the auth error screen
+  const userId = user?.id;
   // The collector's at the bin: its arrival message opens the QR code
   const { arrivedBin, showBinQR } = useArrivalQR();
   const [notifications, setNotifications] = useState([]);
@@ -25,10 +29,12 @@ const NotificationList = () => {
 
   // Fetch notifications
   useEffect(() => {
+    if (!userId) return undefined;
+
     const fetchNotifications = async () => {
       try {
         const { data, error: fetchError } = await notificationService.getUserNotifications(
-          user.id,
+          userId,
           { limit: 50 }
         );
 
@@ -47,23 +53,23 @@ const NotificationList = () => {
     // Refresh notifications every minute
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
-  }, [user.id]);
+  }, [userId]);
 
   // Real-time subscription for new notifications
   useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return undefined;
 
     console.log('[NotificationList] Setting up real-time notification subscription');
 
     const notificationSubscription = supabase
-      .channel(`user_notifications_${user.id}`)
+      .channel(`user_notifications_${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${userId}`
         },
         (payload) => {
           console.log('[NotificationList] New notification received:', payload.new);
@@ -91,7 +97,7 @@ const NotificationList = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${userId}`
         },
         (payload) => {
           console.log('[NotificationList] Notification updated:', payload.new);
@@ -113,13 +119,15 @@ const NotificationList = () => {
       console.log('[NotificationList] Cleaning up notification subscription');
       supabase.removeChannel(notificationSubscription);
     };
-  }, [user?.id]);
+  }, [userId]);
 
   // Fetch user preferences
   useEffect(() => {
+    if (!userId) return;
+
     const fetchPreferences = async () => {
       try {
-        const { data: profile } = await notificationService.getUserNotifications(user.id);
+        const { data: profile } = await notificationService.getUserNotifications(userId);
         if (profile?.notification_preferences) {
           setPreferences(prev => ({
             ...prev,
@@ -132,11 +140,12 @@ const NotificationList = () => {
     };
 
     fetchPreferences();
-  }, [user.id]);
+  }, [userId]);
 
   const handleMarkAsRead = async (notificationId) => {
+    if (!userId) return;
     try {
-      await notificationService.markAsRead(user.id, [notificationId]);
+      await notificationService.markAsRead(userId, [notificationId]);
       setNotifications(prev =>
         prev.map(n =>
           n.id === notificationId ? { ...n, status: 'read' } : n
@@ -149,8 +158,9 @@ const NotificationList = () => {
   };
 
   const handleDeleteOld = async () => {
+    if (!userId) return;
     try {
-      await notificationService.deleteOldNotifications(user.id, 30); // Delete notifications older than 30 days
+      await notificationService.deleteOldNotifications(userId, 30); // Delete notifications older than 30 days
       setNotifications(prev =>
         prev.filter(n => {
           const age = (Date.now() - new Date(n.created_at).getTime()) / (1000 * 60 * 60 * 24);
@@ -169,8 +179,9 @@ const NotificationList = () => {
       [type]: !preferences[type]
     };
     
+    if (!userId) return;
     try {
-      await notificationService.updateNotificationPreferences(user.id, newPreferences);
+      await notificationService.updateNotificationPreferences(userId, newPreferences);
       setPreferences(newPreferences);
     } catch (err) {
       console.error('Error updating preferences:', err);
@@ -196,7 +207,7 @@ const NotificationList = () => {
     );
   };
 
-  if (loading) {
+  if (loading || !userId) {
     return (
       <div className="flex justify-center p-6" role="status" aria-label="Loading notifications">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-td-forest dark:border-green-300" />

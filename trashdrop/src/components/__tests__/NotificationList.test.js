@@ -183,6 +183,31 @@ describe('NotificationList', () => {
     expect(container.querySelectorAll('path[d="M12 11v5M12 8v.01"]')).toHaveLength(1);
   });
 
+  it('does not crash when the user is briefly null during a session re-check', async () => {
+    const { rerender } = render(<NotificationList />);
+    await waitFor(() => {
+      expect(screen.getByText('Pickup Complete')).toBeInTheDocument();
+    });
+
+    // AuthContext sets user to null for a moment before the route redirects
+    useAuth.mockReturnValue({ user: null });
+    expect(() => rerender(<NotificationList />)).not.toThrow();
+    expect(screen.getByRole('status', { name: 'Loading notifications' })).toBeInTheDocument();
+
+    // And it recovers once the user is back
+    useAuth.mockReturnValue({ user: mockUser });
+    rerender(<NotificationList />);
+    await waitFor(() => {
+      expect(screen.getByText('Pickup Complete')).toBeInTheDocument();
+    });
+  });
+
+  it('renders a loading state, not a crash, when opened with no user', () => {
+    useAuth.mockReturnValue({ user: null });
+    expect(() => render(<NotificationList />)).not.toThrow();
+    expect(notificationService.getUserNotifications).not.toHaveBeenCalled();
+  });
+
   it('displays notifications in correct order', async () => {
     render(<NotificationList />);
 
