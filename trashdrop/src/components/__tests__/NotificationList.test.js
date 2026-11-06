@@ -163,6 +163,26 @@ describe('NotificationList', () => {
     });
   });
 
+  it('shows collected and disposed messages with a check mark', async () => {
+    notificationService.getUserNotifications.mockResolvedValue({
+      data: [
+        { id: 'n1', type: 'pickup_collected', title: 'Waste Collected ✅', message: 'Picked up', status: 'unread', created_at: '2026-11-06T05:50:00Z' },
+        { id: 'n2', type: 'pickup_disposed', title: 'Waste Disposed ♻️', message: 'Disposed', status: 'unread', created_at: '2026-11-06T06:30:00Z' },
+        { id: 'n3', type: 'collector_arrived', title: 'Collector Arrived', message: 'Here', status: 'read', created_at: '2026-11-06T05:47:00Z' }
+      ],
+      error: null
+    });
+
+    const { container } = render(<NotificationList />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Waste Collected ✅')).toBeInTheDocument();
+    });
+    // The check-mark icon path; the arrived message keeps the info icon
+    expect(container.querySelectorAll('path[d="M8 12.5l3 3 5-6"]')).toHaveLength(2);
+    expect(container.querySelectorAll('path[d="M12 11v5M12 8v.01"]')).toHaveLength(1);
+  });
+
   it('displays notifications in correct order', async () => {
     render(<NotificationList />);
 

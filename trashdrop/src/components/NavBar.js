@@ -7,8 +7,9 @@ import supabase from '../utils/supabaseClient.js';
 import SignOutModal from './SignOutModal.js';
 import { showToast } from '../utils/toastNotifications.js';
 
-// Notification types the collector app sends about an active pickup
-const COLLECTOR_MESSAGE_TYPES = ['pickup_accepted', 'collector_enroute', 'eta_update', 'collector_arrived', 'pickup_disposed'];
+// Notification types about an active pickup: sent by the collector app, plus
+// pickup_collected / pickup_disposed written by the database on status change
+const COLLECTOR_MESSAGE_TYPES = ['pickup_accepted', 'collector_enroute', 'eta_update', 'collector_arrived', 'pickup_collected', 'pickup_disposed'];
 
 /**
  * Main navigation component for the application
