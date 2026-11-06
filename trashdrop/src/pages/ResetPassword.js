@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
 
@@ -8,8 +8,10 @@ import LoadingSpinner from '../components/LoadingSpinner.js';
  */
 const ResetPassword = () => {
   const { resetPassword } = useAuth();
-  
-  const [email, setEmail] = useState('');
+  // Arriving from a failed sign-in: start with the email that was tried
+  const location = useLocation();
+
+  const [email, setEmail] = useState(location.state?.email || '');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');

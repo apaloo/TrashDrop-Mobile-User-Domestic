@@ -6,6 +6,7 @@ import SocialLogin from '../components/SocialLogin.js';
 import { FiAlertCircle, FiWifiOff } from 'react-icons/fi';
 import { rememberedSignIn } from '../utils/rememberMe.js';
 import { CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
+import { suggestEmailFix } from '../utils/emailTypo.js';
 
 /**
  * Login page component
@@ -24,6 +25,12 @@ const Login = () => {
     password: '',
   });
   const [error, setError] = useState('');
+  // Email and password didn't match: shown as a guided card, not one line.
+  // Holds the email that was tried so the person can spot a typo.
+  const [badCredentials, setBadCredentials] = useState(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [capsLockOn, setCapsLockOn] = useState(false);
+  const passwordRef = useRef(null);
   // 'offline' | 'unreachable' | 'slow' | 'server' when the connection, not the account, failed
   const [connection, setConnection] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,6 +48,7 @@ const Login = () => {
 
   const submit = async () => {
     setError('');
+    setBadCredentials(null);
     setConnection(null);
     setShowResendButton(false);
     setResendMessage('');
@@ -52,7 +60,8 @@ const Login = () => {
         passwordLength: formData.password ? formData.password.length : 0 
       });
       
-      const result = await signIn(formData.email, formData.password, rememberMe);
+      const email = formData.email.trim();
+      const result = await signIn(email, formData.password, rememberMe);
       console.log('[Login] Sign in result:', { 
         success: result?.success, 
         hasError: !!result?.error,
@@ -83,9 +92,6 @@ const Login = () => {
           if (isUnconfirmed(error)) {
             return `Your email address isn't confirmed yet. Open the link we sent to ${formData.email} to finish signing up, then sign in.`;
           }
-          if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('invalid')) {
-            return 'Incorrect email or password. Please check your credentials and try again.';
-          }
           if (errorMessage.includes('User not found')) {
             return 'No account found with this email address. Would you like to create an account?';
           }
@@ -95,6 +101,18 @@ const Login = () => {
           return 'Unable to sign in. Please check your credentials and try again.';
         };
         
+        const errorMessage = result?.error?.originalMessage || result?.error?.message || '';
+        if (!isUnconfirmed(result?.error) &&
+            (result?.error?.code === 'invalid_credentials' || /invalid login credentials|invalid/i.test(errorMessage))) {
+          // Supabase gives the same answer for a wrong password and an unknown
+          // email, so the card covers both without saying which
+          setBadCredentials({ email, suggestion: suggestEmailFix(email) });
+          setFailedAttempts((n) => n + 1);
+          setFormData((prev) => ({ ...prev, password: '' }));
+          setTimeout(() => passwordRef.current?.focus(), 0);
+          return;
+        }
+
         setError(getErrorMessage(result?.error));
         
         // Show resend button if email is not confirmed
@@ -184,6 +202,53 @@ const Login = () => {
           </div>
         )}
 
+        {badCredentials && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm dark:bg-red-950/40 dark:border-red-900" role="alert">
+            <p className="font-semibold text-td-error dark:text-red-300">That email and password don't match</p>
+            <p className="mt-1 text-td-ink dark:text-gray-100">
+              We couldn't sign in <span className="font-medium break-all">{badCredentials.email}</span>.
+            </p>
+            {badCredentials.suggestion && (
+              <p className="mt-2 text-td-ink dark:text-gray-100">
+                Did you mean{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev) => ({ ...prev, email: badCredentials.suggestion }));
+                    setBadCredentials(null);
+                    passwordRef.current?.focus();
+                  }}
+                  className="font-semibold text-td-forest underline underline-offset-2 break-all dark:text-green-300"
+                >
+                  {badCredentials.suggestion}
+                </button>
+                ?
+              </p>
+            )}
+            <ul className="mt-2 list-disc pl-5 space-y-1 text-td-ink dark:text-gray-100">
+              <li>Check the email for typos and make sure Caps Lock is off.</li>
+              <li>Signed up with Google? Use <span className="font-medium">Continue with Google</span> below.</li>
+              <li>
+                New to TrashDrop?{' '}
+                <Link to="/register" className="font-semibold text-td-forest underline underline-offset-2 dark:text-green-300">
+                  Create an account
+                </Link>
+              </li>
+            </ul>
+            <Link
+              to="/reset-password"
+              state={{ email: badCredentials.email }}
+              className={`mt-3 inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold ${
+                failedAttempts >= 2
+                  ? 'bg-primary text-white hover:bg-primary-dark'
+                  : 'border border-td-border-strong text-td-forest hover:bg-white dark:text-green-300 dark:border-gray-600'
+              }`}
+            >
+              {failedAttempts >= 2 ? 'Forgot your password? Reset it now' : 'Reset password'}
+            </Link>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-td-error dark:bg-red-950/40 dark:border-red-900 dark:text-red-300" role="alert">
             {error}
@@ -255,6 +320,10 @@ const Login = () => {
                   required
                   value={formData.password}
                   onChange={handleChange}
+                  ref={passwordRef}
+                  onKeyUp={(e) => setCapsLockOn(Boolean(e.getModifierState?.('CapsLock')))}
+                  onBlur={() => setCapsLockOn(false)}
+                  aria-describedby={capsLockOn ? 'caps-lock-note' : undefined}
                   className="mt-1 block w-full px-3 py-2 pr-10 border border-td-border-strong rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary bg-white text-td-ink dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
                   placeholder="••••••••"
                 />
@@ -277,6 +346,11 @@ const Login = () => {
                   )}
                 </button>
               </div>
+              {capsLockOn && (
+                <p id="caps-lock-note" className="mt-1 text-sm font-medium text-td-orange-text dark:text-amber-300">
+                  Caps Lock is on
+                </p>
+              )}
             </div>
           </div>
 
