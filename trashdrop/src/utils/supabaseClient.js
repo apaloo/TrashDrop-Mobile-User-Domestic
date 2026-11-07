@@ -115,7 +115,6 @@ const isTokenValid = (token) => {
     if (payload.exp) {
       const expiryTime = payload.exp * 1000;
       const currentTime = Date.now();
-      const timeToExpiry = expiryTime - currentTime;
       
       // If token is already expired
       if (currentTime >= expiryTime) {
@@ -123,26 +122,8 @@ const isTokenValid = (token) => {
         return false;
       }
       
-      // Only refresh when token is close to expiry (less than 5 minutes left)
-      if (timeToExpiry < 5 * 60 * 1000) {
-        console.log('[Supabase] Token will expire in ' + Math.floor(timeToExpiry / 60000) + ' minutes, triggering refresh');
-        
-        // Set a global flag to notify that token needs refresh
-        window.trashdropTokenNeedsRefresh = true;
-        
-        // Schedule token refresh (don't await to avoid blocking)
-        setTimeout(() => {
-          try {
-            supabase.auth.refreshSession();
-            console.log('[Supabase] Session refresh triggered');
-          } catch (e) {
-            console.error('[Supabase] Failed to refresh session:', e);
-          }
-        }, 0);
-        
-        // Still return true to allow current operation to continue while refresh happens in background
-        return true;
-      }
+      // Renewing is left to Supabase (autoRefreshToken); renewing here too
+      // raced it and could get the session revoked
     }
     
     return true;
@@ -371,30 +352,10 @@ try {
     }
   });
   
-  // Check for corrupted token on load
-  const checkSession = () => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        // Check if token is corrupted
-        const token = localStorage.getItem(appConfig.storage.tokenKey);
-        if (token) {
-          console.log('[Supabase] Found token, checking validity...');
-          if (!isTokenValid(token)) {
-            console.warn('[Supabase] Found invalid or corrupted token, clearing auth data');
-            clearAuthData();
-          } else {
-            console.log('[Supabase] Token format validation passed');
-            // Token will still be verified with Supabase on refresh
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[Supabase] Error checking session:', error);
-      clearAuthData(); // Clear on any error to be safe
-    }
-  };
-  
-  checkSession();
+  // The stored session is left to Supabase, which renews an expired access
+  // token (they last an hour) and removes the session only if its server
+  // refuses it. Clearing it here on an expired token signed people out
+  // whenever they had not opened the app for an hour.
   
 } catch (error) {
   console.error('[Supabase] Failed to initialize client:', error);

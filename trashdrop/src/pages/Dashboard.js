@@ -951,8 +951,10 @@ const Dashboard = () => {
     }
 
     try {
-      const { data, error } = await supabase.auth.refreshSession();
-      const result = error ? 
+      // getSession renews the session only when it has expired (Supabase
+      // does that one renewal at a time); refreshSession here raced it
+      const { data, error } = await supabase.auth.getSession();
+      const result = (error || !data?.session) ? 
         { success: true, noSession: true, error } : 
         { success: true, session: data.session };
       

@@ -57,7 +57,8 @@ const Activity = () => {
   const refreshAndValidateSession = async () => {
     try {
       console.log('Attempting to refresh session for activity fetch');
-      const { data, error } = await supabase.auth.refreshSession();
+      // getSession renews only an expired session, one renewal at a time
+      const { data, error } = await supabase.auth.getSession();
       
       if (error) {
         console.warn('Session refresh failed in Activity component:', error.message);

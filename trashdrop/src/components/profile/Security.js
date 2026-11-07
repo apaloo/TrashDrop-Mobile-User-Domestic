@@ -226,7 +226,7 @@ const Security = () => {
       // Use AuthContext signOut which handles Supabase signOut + state cleanup
       // This avoids calling signOut twice (once directly, once via AuthContext)
       if (signOut) {
-        await signOut();
+        await signOut({ scope: 'global' });
       }
       
       // Clear any remaining local storage

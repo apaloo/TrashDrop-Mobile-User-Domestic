@@ -115,8 +115,8 @@ const Locations = () => {
             // Set a timeout to prevent hanging on this request
             const supabasePromise = new Promise(async (resolve) => {
               try {
-                // Try to get a fresh session first
-                const { data: sessionData } = await supabase.auth.refreshSession();
+                // Make sure the session is current (renewed only if expired)
+                await supabase.auth.getSession();
                 
                 const { data, error } = await supabase
                   .from('locations')
@@ -527,8 +527,8 @@ const Locations = () => {
       
       // Try to get a valid session with token
       try {
-        // Refresh the session first to ensure we have a valid token
-        const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+        // Make sure the session is current (renewed only if expired)
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
           console.error('Error refreshing session:', sessionError);

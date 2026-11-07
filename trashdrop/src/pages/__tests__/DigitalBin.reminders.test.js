@@ -30,7 +30,15 @@ jest.mock('../../utils/supabaseClient.js', () => {
     });
     return b;
   };
-  return { __esModule: true, default: { from: (table) => builder(table), rpc: async () => ({ data: null, error: null }) } };
+  return {
+    __esModule: true,
+    default: {
+      from: (table) => builder(table),
+      rpc: async () => ({ data: null, error: null }),
+      // The booking asks Supabase for the current session before it saves
+      auth: { getSession: async () => ({ data: { session: { access_token: 't', user: { id: 'user-1' } } }, error: null }) }
+    }
+  };
 });
 
 jest.mock('../../services/binReminderService.js', () => {
