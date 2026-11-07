@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { applyRememberMe } from '../utils/rememberMe.js';
 import { connectionProblem, CONNECTION_MESSAGES, withTimeout } from '../utils/connectionProblem.js';
-import supabase, { isTokenValid } from '../utils/supabaseClient.js';
+import supabase from '../utils/supabaseClient.js';
 import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
 import { getSiteUrl } from '../utils/siteUrl.js';
 import performanceMonitor from '../utils/performanceMonitor.js';
@@ -33,6 +33,9 @@ const getStoredUser = () => {
 /**
  * Auth state constants
  */
+// A session check that takes longer keeps the person signed in and moves on
+const SESSION_CHECK_TIMEOUT_MS = 8000;
+
 const AUTH_STATES = {
   INITIAL: 'INITIAL',
   LOADING: 'LOADING',
@@ -295,7 +298,13 @@ export const AuthProvider = ({ children }) => {
   const handleAuthSuccess = useCallback((user, session) => {
     // Prevent duplicate authentication for the same user
     if (authState.user?.id === user?.id && authState.status === AUTH_STATES.AUTHENTICATED) {
-      console.log('[Auth] Skipping duplicate auth success for same user');
+      // Same person: keep the newer session (Supabase may have just renewed it)
+      if (session?.access_token) {
+        updateAuthState({ status: AUTH_STATES.AUTHENTICATED, session, error: null, lastAction: 'session_updated' });
+        try {
+          localStorage.setItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token', session.access_token);
+        } catch (e) { /* storage full or blocked: the session itself is kept by Supabase */ }
+      }
       return { success: true, user, session };
     }
     
@@ -367,8 +376,13 @@ export const AuthProvider = ({ children }) => {
       errorCode = error.code;
     }
     
-    // Categorize common errors for better user feedback
-    if (
+    // Categorize common errors for better user feedback (connection first:
+    // "Failed to fetch" while renewing a token is not a bad token)
+    if (connectionProblem(error)) {
+      errorCode = 'NETWORK_ERROR';
+      errorMessage = 'You are not connected to the internet. Please ensure you are connected to the internet and try again.';
+      errorCategory = ERROR_CATEGORIES.NETWORK;
+    } else if (
       error?.message?.includes('JWT') || 
       error?.message?.includes('token') || 
       error?.message?.includes('signature')
@@ -404,11 +418,8 @@ export const AuthProvider = ({ children }) => {
       lastAction: action
     });
     
-    // Clear invalid tokens for JWT errors
-    if (errorCode === 'INVALID_TOKEN') {
-      console.log('[Auth] Clearing auth data due to JWT error');
-      clearAuthData();
-    }
+    // The stored sign-in is not cleared here: Supabase removes it, and sends
+    // SIGNED_OUT, when its server refuses it
     
     // If rate limited, schedule a retry
     if (errorCode === 'RATE_LIMIT') {
@@ -418,9 +429,32 @@ export const AuthProvider = ({ children }) => {
     }
     
     return { success: false, error: { message: errorMessage, code: errorCode } };
-  }, [clearAuthData, updateAuthState]);
+  }, [updateAuthState]);
 
-  // Check and refresh the current session
+  // The connection failed while checking the session: stay signed in with the
+  // user we already know, instead of sending them to the sign-in page
+  const keepSignedInDespiteConnection = useCallback((cause) => {
+    const knownUser = getStoredUser();
+    if (knownUser) {
+      updateAuthState({
+        status: AUTH_STATES.AUTHENTICATED,
+        user: knownUser,
+        error: null,
+        lastAction: 'kept_signed_in_offline'
+      });
+      return { success: true, user: knownUser, offline: true };
+    }
+    updateAuthState({
+      status: AUTH_STATES.UNAUTHENTICATED,
+      user: null,
+      session: null,
+      error: null,
+      lastAction: 'session_check_offline'
+    });
+    return { success: false, error: { message: cause?.message || 'Connection problem', code: 'NETWORK_ERROR' } };
+  }, [updateAuthState]);
+
+  // Check the current session (Supabase renews it when needed)
   const checkSession = useCallback(async (force = false) => {
     console.log('[Auth] Starting session check (real authentication only)...');
     
@@ -507,149 +541,29 @@ export const AuthProvider = ({ children }) => {
     }
     
     try {
-      // First check if the stored token is valid before attempting to use it
-      const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
-      if (storedToken && !isTokenValid(storedToken)) {
-        console.warn('[Auth] Stored token is invalid or malformed, clearing auth data');
-        clearAuthData();
-      }
-      
-      // Check if there's any session in localStorage before trying to refresh
-      const storageUserKey = appConfig?.storage?.userKey || 'trashdrop_user';
-      const storedUser = localStorage.getItem(storageUserKey);
-      
-      // Skip refresh if no token exists to avoid unnecessary API calls
-      if (!storedToken) {
-        console.log('[Auth] No token found in localStorage');
-        
-        updateAuthState({
-          status: AUTH_STATES.UNAUTHENTICATED,
-          lastAction: 'session_check',
-          user: null,
-          session: null,
-          error: null
-        });
-        return { success: false, error: { message: 'No token to refresh' } };
-      }
-      
-      // First try to refresh the session to get a fresh token
-      console.log('[Auth] Refreshing session...');
-      
-      // Add additional error handling for the session refresh
-      let refreshResult;
-      try {
-        // In standalone mode, add timeout protection to session refresh
-        if (isStandalone) {
-          const refreshTimeoutDuration = 2000; // 2 seconds in standalone mode
-          const refreshTimeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Session refresh timeout in standalone mode')), refreshTimeoutDuration)
-          );
-          
-          refreshResult = await Promise.race([
-            supabase.auth.refreshSession(),
-            refreshTimeout
-          ]);
-        } else {
-          refreshResult = await supabase.auth.refreshSession();
-        }
-      } catch (refreshErr) {
-        console.error('[Auth] Unhandled error during session refresh:', refreshErr);
-        
-        // In standalone mode, if refresh fails/times out, try to use stored credentials
-        if (isStandalone && storedToken && storedUser) {
-          console.warn('[Auth] Standalone mode: Session refresh failed, using stored credentials');
-          try {
-            const userData = JSON.parse(storedUser);
-            updateAuthState({
-              status: AUTH_STATES.AUTHENTICATED,
-              user: userData,
-              session: { access_token: storedToken },
-              lastAction: 'standalone_cached_auth',
-              error: null
-            });
-            isCheckingSession.current = false;
-            return { success: true, user: userData, session: { access_token: storedToken } };
-          } catch (parseErr) {
-            console.error('[Auth] Failed to parse stored user:', parseErr);
-          }
-        }
-        
-        // Clear any corrupted auth data
-        clearAuthData();
-        return handleAuthError(refreshErr, 'session_refresh');
-      }
-      
-      const { data: { session }, error: refreshError } = refreshResult;
-      
-      if (refreshError) {
-        console.warn('[Auth] Session refresh failed:', refreshError.message);
-        
-        // Handle refresh_token_not_found specifically - this is normal when token expires
-        if (refreshError.message.includes('refresh_token_not_found') || 
-            refreshError.message.includes('Invalid Refresh Token')) {
-          console.log('[Auth] Refresh token expired (normal behavior), cleaning up gracefully');
-          await resetAuthState({
-            message: 'Your session has expired. Please sign in again.',
-            code: 'REFRESH_TOKEN_EXPIRED'
-          });
-          return { success: false, error: { message: 'Session expired' } };
-        }
-        
-        // Handle auth session missing specifically to prevent infinite loading
-        if (refreshError.message.includes('Auth session missing')) {
-          console.log('[Auth] No existing session to refresh, cleaning up and updating state');
-          // Clear any corrupted auth data - but not for test account
-          clearAuthData();
-          updateAuthState({
-            status: AUTH_STATES.UNAUTHENTICATED,
-            lastAction: 'session_missing',
-            user: null,
-            session: null,
-            error: null
-          });
-          return { success: false, error: { message: 'No session to refresh' } };
-        }
-        
-        // If refresh failed with JWT error, reset auth state
-        if (refreshError.message.includes('JWT') || 
-            refreshError.message.includes('token') || 
-            refreshError.message.includes('malformed')) {
-          console.log('[Auth] JWT error detected, resetting auth state');
-          await resetAuthState({
-            message: 'Your session has expired. Please sign in again.',
-            code: 'SESSION_EXPIRED'
-          });
-          return { success: false, error: { message: 'Session expired' } };
-        }
-        
-        // For network errors, try again later or prompt user
-        if (!navigator.onLine || 
-            refreshError.message.includes('network') || 
-            refreshError.message.includes('fetch')) {
-          return handleAuthError(refreshError, 'network_error');
-        }
-        
-        // For other errors, just return the error
-        return handleAuthError(refreshError, 'refresh_error');
-      }
-      
-      // If we have a valid session, update auth state
+      // Supabase keeps the session in storage and renews it itself, one renewal
+      // at a time. getSession() returns the stored session, renewing it first
+      // when it has expired. Supabase removes the session (and sends SIGNED_OUT)
+      // only when its server refuses it; a dropped connection leaves it in place.
+      // So this never clears the sign-in itself: an expired access token (they
+      // last an hour) is normal and is renewed, not a reason to sign out.
+      const { data, error: sessionError } = await withTimeout(
+        supabase.auth.getSession(),
+        SESSION_CHECK_TIMEOUT_MS
+      );
+      const session = data?.session;
+
       if (session?.user) {
-        // Validate the token format before accepting it
-        if (session.access_token && !isTokenValid(session.access_token)) {
-          console.error('[Auth] Received invalid token format from Supabase');
-          return handleAuthError({
-            message: 'Invalid token format received',
-            code: 'INVALID_TOKEN'
-          }, 'token_validation');
-        }
-        
         console.log('[Auth] Session check successful, user:', session.user.email);
         return handleAuthSuccess(session.user, session);
       }
-      
-      // No valid session found
-      console.log('[Auth] No valid session found, updating state to unauthenticated');
+
+      if (sessionError && connectionProblem(sessionError)) {
+        return keepSignedInDespiteConnection(sessionError);
+      }
+
+      // No session in storage, or the server refused it (Supabase has removed it)
+      if (sessionError) console.warn('[Auth] Session was refused:', sessionError.message);
       updateAuthState({
         status: AUTH_STATES.UNAUTHENTICATED,
         lastAction: 'session_check',
@@ -658,16 +572,16 @@ export const AuthProvider = ({ children }) => {
         error: null
       });
       return { success: false, error: { message: 'No valid session' } };
-      
     } catch (error) {
-      console.error('[Auth] Error during session check:', error);
-      return handleAuthError(error, 'session_check');
+      // A timeout or a dropped request: the stored session is still there and
+      // Supabase renews it when the connection is back
+      console.warn('[Auth] Session check did not finish:', error?.message);
+      return keepSignedInDespiteConnection(error);
     } finally {
       isCheckingSession.current = false;
-      // Make sure to clear any loading timeouts if an error occurs
       clearLoadingTimeout();
     }
-  }, [updateAuthState, resetAuthState, handleAuthError, handleAuthSuccess, clearLoadingTimeout]);
+  }, [updateAuthState, handleAuthSuccess, keepSignedInDespiteConnection, clearLoadingTimeout]);
 
   // Authentication methods
   const signIn = useCallback(async (email, password, rememberMe = false) => {
@@ -912,12 +826,14 @@ export const AuthProvider = ({ children }) => {
     }
   }, [handleAuthError, updateAuthState]);
   
-  const signOut = useCallback(async () => {
-    console.log('[Auth] Signing out...');
+  // Signs out this phone only. { scope: 'global' } signs out every device
+  // on the account, { scope: 'others' } every device except this one.
+  const signOut = useCallback(async ({ scope = 'local' } = {}) => {
+    console.log('[Auth] Signing out...', scope);
     updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_out' });
     
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope });
       if (error) {
         console.error('[Auth] Sign out error:', error);
         // Continue with reset even if sign out fails
@@ -1081,66 +997,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, [handleAuthError, updateAuthState]);
   
-  // Periodic token validation function
-  const validateToken = useCallback(async () => {
-    console.log('[Auth] Validating token with Supabase...');
-    
-    const storedToken = localStorage.getItem(appConfig?.storage?.tokenKey || 'trashdrop_auth_token');
-    if (!storedToken) {
-      return { valid: false, reason: 'no_token' };
-    }
-
-    try {
-      // Basic structure check
-      const parts = storedToken.split('.');
-      if (parts.length !== 3) {
-        return { valid: false, reason: 'invalid_format' };
-      }
-      
-      // Parse the payload
-      const payloadBase64 = parts[1];
-      let paddedPayload = payloadBase64;
-      while (paddedPayload.length % 4 !== 0) {
-        paddedPayload += '=';
-      }
-      
-      const payloadStr = atob(paddedPayload.replace(/-/g, '+').replace(/_/g, '/'));
-      const payload = JSON.parse(payloadStr);
-      
-      // Check expiry
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      if (payload.exp) {
-        // Token is expired
-        if (currentTime >= payload.exp) {
-          console.warn('[Auth] Token validation: Token has expired');
-          return { valid: false, reason: 'expired', expiry: payload.exp };
-        }
-        
-        // Token is near expiry (within 15 minutes)
-        const timeToExpiry = payload.exp - currentTime;
-        if (timeToExpiry < 15 * 60) {
-          console.log(`[Auth] Token validation: Token will expire soon (${timeToExpiry} seconds left)`);
-          return { valid: true, nearExpiry: true, expiry: payload.exp };
-        }
-        
-        return { valid: true, expiry: payload.exp };
-      } else {
-        console.warn('[Auth] Token validation: No expiration found in token');
-        return { valid: true, noExpiry: true };
-      }
-    } catch (error) {
-      console.error('[Auth] Token validation error:', error);
-      return { valid: false, reason: 'parse_error', error };
-    }
-  }, []);
-  
   // Set up auth on mount
   useEffect(() => {
     console.log('[Auth] Setting up auth context');
     let subscription;
-    let refreshInterval;
-    let tokenValidationInterval;
     
     const initializeAuth = async () => {
       console.log('[Auth] Initializing auth, current status:', authState.status);
@@ -1245,7 +1105,7 @@ export const AuthProvider = ({ children }) => {
               
             case 'TOKEN_REFRESHED':
               console.log('[Auth] Token refreshed');
-              if (session?.user && authState.status === AUTH_STATES.AUTHENTICATED) {
+              if (session?.user) {
                 updateAuthState({
                   session,
                   lastAction: 'token_refreshed'
@@ -1276,87 +1136,9 @@ export const AuthProvider = ({ children }) => {
     // Call initialization function once
     initializeAuth();
     
-    // Set up periodic session check and token validation
-    const setupRefreshIntervals = () => {
-      // Clear any existing intervals first
-      if (refreshInterval) clearInterval(refreshInterval);
-      if (tokenValidationInterval) clearInterval(tokenValidationInterval);
-      
-      // Set up hourly session refresh for authenticated users
-      refreshInterval = setInterval(async () => {
-        if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Running scheduled hourly session refresh');
-          await checkSession(true);
-        }
-      }, 60 * 60 * 1000); // Every hour
-      
-      // Set up token validation every 5 minutes
-      tokenValidationInterval = setInterval(async () => {
-        if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          console.log('[Auth] Running scheduled token validation check');
-          const result = await validateToken();
-          
-          if (!result.valid) {
-            console.warn(`[Auth] Token validation failed: ${result.reason}`);
-            await checkSession(true); // Force refresh
-          } else if (result.nearExpiry) {
-            console.log('[Auth] Token near expiry, triggering refresh');
-            await checkSession(true); // Force refresh
-          }
-        }
-      }, 5 * 60 * 1000); // Every 5 minutes
-    };
-    
-    // Set up visibility change event listener to refresh session when app becomes visible
-    const setupVisibilityListener = () => {
-      const handleVisibilityChange = async () => {
-        if (document.visibilityState === 'visible' && authState.status === AUTH_STATES.AUTHENTICATED) {
-          // Only check session if it's been more than 5 minutes since last check
-          const lastCheck = localStorage.getItem('trashdrop_last_session_check');
-          const now = Date.now();
-          const fiveMinutes = 5 * 60 * 1000;
-          
-          if (!lastCheck || (now - parseInt(lastCheck)) > fiveMinutes) {
-            console.log('[Auth] App became visible and 5+ minutes passed, checking session');
-            await checkSession();
-            localStorage.setItem('trashdrop_last_session_check', now.toString());
-          } else {
-            console.log('[Auth] App became visible but recent check, skipping');
-          }
-        }
-      };
-      
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-    
-    // Set up window focus event listener
-    const setupFocusListener = () => {
-      const handleFocus = async () => {
-        if (authState.status === AUTH_STATES.AUTHENTICATED) {
-          // Only check session if it's been more than 5 minutes since last check
-          const lastCheck = localStorage.getItem('trashdrop_last_session_check');
-          const now = Date.now();
-          const fiveMinutes = 5 * 60 * 1000;
-          
-          if (!lastCheck || (now - parseInt(lastCheck)) > fiveMinutes) {
-            console.log('[Auth] Window focused and 5+ minutes passed, checking session');
-            await checkSession();
-            localStorage.setItem('trashdrop_last_session_check', now.toString());
-          } else {
-            console.log('[Auth] Window focused but recent check, skipping');
-          }
-        }
-      };
-      
-      window.addEventListener('focus', handleFocus);
-      return () => window.removeEventListener('focus', handleFocus);
-    };
-    
-    // Set up all listeners and intervals after initialization
-    const removeVisibilityListener = setupVisibilityListener();
-    const removeFocusListener = setupFocusListener();
-    setupRefreshIntervals();
+    // No timers or focus checks here: Supabase renews the session itself
+    // (autoRefreshToken), including when the app comes back to the screen.
+    // Extra renewals here raced it and could get the session revoked.
     
     // Cleanup function
     return () => {
@@ -1364,14 +1146,6 @@ export const AuthProvider = ({ children }) => {
       if (subscription) {
         subscription.unsubscribe();
       }
-      
-      // Clear intervals
-      if (refreshInterval) clearInterval(refreshInterval);
-      if (tokenValidationInterval) clearInterval(tokenValidationInterval);
-      
-      // Remove event listeners
-      removeVisibilityListener();
-      removeFocusListener();
       
       // Reset initialization flag on unmount
       isAuthInitialized.current = false;

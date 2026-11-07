@@ -43,7 +43,7 @@ const WASTE_TYPE_LABELS = {
  * Multi-step form for getting a digital bin
  */
 function DigitalBin() {
-  const { user, session, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const routeLocation = useLocation();
 
@@ -509,18 +509,20 @@ function DigitalBin() {
 
   // Handler for form submission
   const handleSubmit = async () => {
-    // Use session from component state
-    if (!session || !user) {
+    if (!user) {
       console.error('No active session found');
       toastService.error('Please log in to continue');
       navigate('/login', { state: { returnTo: '/digital-bin' } });
       return;
     }
 
-    // Verify token hasn't expired
-    const tokenExpiry = session.expires_at * 1000; // Convert to milliseconds
-    if (Date.now() >= tokenExpiry) {
-      console.error('Session token expired');
+    // Ask Supabase for the current session rather than trusting the one held
+    // in state, which can be an hour old after the phone slept: getSession
+    // renews it if it has expired. Only a session Supabase no longer has
+    // means signing in again; a connection problem is left to the request.
+    const { data: current, error: sessionError } = await supabase.auth.getSession();
+    if (!current?.session && !sessionError) {
+      console.error('Session ended');
       toastService.error('Your session has expired. Please log in again.');
       navigate('/login', { state: { returnTo: '/digital-bin' } });
       return;

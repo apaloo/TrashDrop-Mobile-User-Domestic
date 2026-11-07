@@ -218,7 +218,7 @@ class SyncService {
     try {
       // Try to refresh the session before syncing reports
       try {
-        await supabase.auth.refreshSession();
+        await supabase.auth.getSession(); // renews only an expired session
       } catch (refreshError) {
         console.warn('Failed to refresh auth session during sync:', refreshError);
         // Continue anyway - the operation might still work
