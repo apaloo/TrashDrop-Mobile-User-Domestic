@@ -4,7 +4,7 @@ import React from 'react';
  * Custom modal for sign out confirmation
  * Replaces browser's native confirm() dialog
  */
-const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut }) => {
+const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut, signInMethod = null }) => {
   if (!isOpen) return null;
 
   return (
@@ -50,6 +50,12 @@ const SignOutModal = ({ isOpen, onClose, onConfirm, isSigningOut }) => {
             <p id="sign-out-text" className="text-[15px] text-td-sage dark:text-gray-300 mb-6">
               Are you sure you want to sign out? You'll need to sign in again to access your account.
             </p>
+
+            {signInMethod && (
+              <p data-testid="sign-in-reminder" className="-mt-3 mb-6 rounded-2xl bg-td-cream dark:bg-gray-700 px-4 py-3 text-[15px] text-td-ink dark:text-gray-100 break-words">
+                Next time, sign in with <span className="font-semibold">{signInMethod}</span>.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-2.5">
               <button
