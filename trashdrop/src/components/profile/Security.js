@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
 import supabase from '../../utils/supabaseClient.js';
+import SignOutModal from '../SignOutModal.js';
+import ConfirmModal from '../ConfirmModal.js';
+import { describeSignIn } from '../../utils/signInMethod.js';
 
 /**
  * Security tab component for the Profile page
@@ -8,6 +12,7 @@ import supabase from '../../utils/supabaseClient.js';
  */
 const Security = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   
   // State for password form
   const [passwordForm, setPasswordForm] = useState({
@@ -22,6 +27,9 @@ const Security = () => {
   // UI state
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showSignOut, setShowSignOut] = useState(false);
+  const [showSignOutOthers, setShowSignOutOthers] = useState(false);
+  const [isSigningOutOthers, setIsSigningOutOthers] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
   
   // Device/session info
@@ -213,37 +221,36 @@ const Security = () => {
     }
   };
 
-  // Handle logout from all devices
-  const handleLogoutAllDevices = async () => {
-    if (!window.confirm('Are you sure you want to logout from all devices? You will need to log in again.')) {
-      return;
-    }
-    
+  // Sign out of this phone. The remembered email stays, so signing back
+  // in is easier.
+  const handleSignOutConfirm = async () => {
+    setIsLoggingOut(true);
     try {
-      setIsLoggingOut(true);
-      console.log('[Security] Logging out from all devices');
-      
-      // Use AuthContext signOut which handles Supabase signOut + state cleanup
-      // This avoids calling signOut twice (once directly, once via AuthContext)
-      if (signOut) {
-        await signOut({ scope: 'global' });
-      }
-      
-      // Clear any remaining local storage
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      console.log('[Security] Logged out from all devices successfully');
-      
+      await signOut();
     } catch (error) {
-      console.error('[Security] Error in handleLogoutAllDevices:', error);
-      setSaveMessage({ 
-        type: 'error', 
-        text: error.message || 'Failed to logout. Please try again.' 
-      });
-      setTimeout(() => setSaveMessage(null), 5000);
+      console.error('[Security] Sign out error:', error);
     } finally {
       setIsLoggingOut(false);
+      setShowSignOut(false);
+      navigate('/login', { replace: true });
+    }
+  };
+
+  // Sign out every other phone or browser; this one stays signed in
+  const handleSignOutOthers = async () => {
+    setIsSigningOutOthers(true);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) throw error;
+      setSaveMessage({ type: 'success', text: 'Signed out of your other devices. You are still signed in here.' });
+      setTimeout(() => setSaveMessage(null), 4000);
+    } catch (error) {
+      console.error('[Security] Sign out of other devices failed:', error);
+      setSaveMessage({ type: 'error', text: "Couldn't sign out your other devices. Check your connection and try again." });
+      setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setIsSigningOutOthers(false);
+      setShowSignOutOthers(false);
     }
   };
 
@@ -361,32 +368,48 @@ const Security = () => {
           </div>
         </div>
         
-        {/* Logout Button */}
-        <div className="flex justify-end">
+        {/* Sign out of this phone */}
+        <button
+          type="button"
+          onClick={() => setShowSignOut(true)}
+          disabled={isLoggingOut}
+          className="w-full inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full text-[15px] transition-colors border-[1.5px] border-red-700 text-red-700 dark:border-red-400 dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Sign out
+        </button>
+
+        {/* Lost phone: end the sign-in everywhere else */}
+        <div className="mt-4 text-center">
           <button
-            onClick={handleLogoutAllDevices}
-            disabled={isLoggingOut}
-            className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full text-[15px] transition-colors border-[1.5px] border-red-700 text-red-700 dark:border-red-400 dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 disabled:cursor-not-allowed"
+            type="button"
+            onClick={() => setShowSignOutOthers(true)}
+            className="text-sm font-medium text-td-sage dark:text-gray-300 underline underline-offset-2 hover:text-td-ink dark:hover:text-gray-100"
           >
-            {isLoggingOut ? (
-              <>
-                <svg className="animate-spin h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Logging out...
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Logout from All Devices
-              </>
-            )}
+            Sign out of other devices
           </button>
         </div>
       </section>
+
+      <SignOutModal
+        isOpen={showSignOut}
+        onClose={() => setShowSignOut(false)}
+        onConfirm={handleSignOutConfirm}
+        isSigningOut={isLoggingOut}
+        signInMethod={describeSignIn(user)}
+      />
+      <ConfirmModal
+        isOpen={showSignOutOthers}
+        onClose={() => setShowSignOutOthers(false)}
+        onConfirm={handleSignOutOthers}
+        title="Sign out of other devices?"
+        message="Any other phone or browser signed in to your account will be signed out. You stay signed in on this phone."
+        confirmText="Sign out others"
+        variant="warning"
+        isProcessing={isSigningOutOthers}
+      />
     </div>
   );
 };
