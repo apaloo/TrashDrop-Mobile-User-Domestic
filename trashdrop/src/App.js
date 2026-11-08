@@ -5,7 +5,6 @@ import { ThemeProvider } from './context/ThemeContext.js';
 import LoadingSpinner from './components/LoadingSpinner.js';
 import PrivateRoute from './components/PrivateRoute.js';
 import Layout from './components/Layout.js';
-import InstallPrompt from './components/InstallPrompt.js';
 import NetworkStatusRibbon from './components/NetworkStatusRibbon.js';
 
 // Regular imports for common components
@@ -137,7 +136,6 @@ const AppContent = () => {
   return (
     <>
       <NetworkStatusRibbon />
-      <InstallPrompt />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

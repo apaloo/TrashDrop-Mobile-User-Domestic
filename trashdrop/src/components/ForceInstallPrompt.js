@@ -1,226 +1,196 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+const INSTALLED_KEY = 'trashdrop_app_installed';
+// How long a tap waits for the browser to say it can install. The tap only
+// stays valid for the install dialog for about five seconds.
+const INSTALL_READY_WAIT_MS = 3000;
+
+const BENEFITS = [
+  { title: 'Works Offline', detail: 'Use the app even without internet' },
+  { title: 'Quick Access', detail: 'Launch directly from your home screen' },
+  { title: 'Push Notifications', detail: 'Get notified when your pickup is collected' },
+];
+
+const isStandalone = () =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  window.navigator.standalone === true ||
+  document.referrer.includes('android-app://');
 
 /**
- * Force Install Prompt - Full-screen modal shown on first app visit
- * Prompts users to install the PWA for best experience
+ * Full-screen install screen, shown on every visit in a browser until the app
+ * is installed.
+ *
+ * Tapping install opens the browser's own install dialog wherever the browser
+ * offers one. Where it doesn't, the steps to install by hand replace the
+ * benefits list, so the tap always visibly does something.
+ *
+ * The buttons sit outside the scrolling area so they stay on screen on short
+ * phones.
  */
 const ForceInstallPrompt = () => {
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [installing, setInstalling] = useState(false);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isAndroid = /Android/.test(navigator.userAgent);
+
+  const [showPrompt, setShowPrompt] = useState(() => {
+    if (isStandalone()) {
+      localStorage.setItem(INSTALLED_KEY, 'true');
+      return false;
+    }
+    return localStorage.getItem(INSTALLED_KEY) !== 'true';
+  });
+  // iOS has no install dialog, so its steps are the way to install
+  const [showManualSteps, setShowManualSteps] = useState(isIOS);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const deferredPromptRef = useRef(null);
+  const installReadyRef = useRef(null);
 
   useEffect(() => {
-    console.log('[ForceInstallPrompt] Initializing...');
-    
-    // Check if already in standalone mode (PWA installed)
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || 
-                      window.navigator.standalone === true;
-    setIsStandalone(standalone);
-    
-    if (standalone) {
-      console.log('[ForceInstallPrompt] Already in standalone mode');
-      localStorage.setItem('trashdrop_app_installed', 'true');
-      return;
-    }
-
-    // Check if this is first visit
-    const hasSeenPrompt = localStorage.getItem('trashdrop_install_prompt_seen');
-    const isInstalled = localStorage.getItem('trashdrop_app_installed') === 'true';
-    
-    console.log('[ForceInstallPrompt] localStorage check:', { hasSeenPrompt, isInstalled });
-    
-    if (hasSeenPrompt || isInstalled) {
-      console.log('[ForceInstallPrompt] Prompt already seen or installed - exiting');
-      return;
-    }
-
-    // Detect iOS
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    setIsIOS(iOS);
-    console.log('[ForceInstallPrompt] Platform detection:', { iOS, userAgent: navigator.userAgent });
-
-    // For iOS, show prompt immediately (no beforeinstallprompt event)
-    if (iOS) {
-      setShowPrompt(true);
-      return;
-    }
-
-    // For Android/Chrome, listen for beforeinstallprompt
-    const handleBeforeInstallPrompt = (e) => {
-      console.log('[ForceInstallPrompt] beforeinstallprompt event fired');
+    const handleInstallOffer = (e) => {
       e.preventDefault();
-      setDeferredPrompt(e);
-      setShowPrompt(true);
+      deferredPromptRef.current = e;
+      installReadyRef.current?.();
     };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    console.log('[ForceInstallPrompt] Event listener registered for beforeinstallprompt');
-
-    // Also show after a delay if beforeinstallprompt doesn't fire (some browsers)
-    // Reduced to 50ms to fire before auth redirect (which happens at 100ms)
-    console.log('[ForceInstallPrompt] Setting 50ms timeout for fallback prompt');
-    const timeoutId = setTimeout(() => {
-      console.log('[ForceInstallPrompt] Timeout callback executing, deferredPrompt:', !!deferredPrompt);
-      if (!deferredPrompt) {
-        console.log('[ForceInstallPrompt] Timeout fired - showing prompt');
-        setShowPrompt(true);
-      } else {
-        console.log('[ForceInstallPrompt] Timeout skipped - prompt already shown via event');
-      }
-    }, 50);
-
+    const handleInstalled = () => {
+      localStorage.setItem(INSTALLED_KEY, 'true');
+      setShowPrompt(false);
+    };
+    window.addEventListener('beforeinstallprompt', handleInstallOffer);
+    window.addEventListener('appinstalled', handleInstalled);
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      clearTimeout(timeoutId);
+      window.removeEventListener('beforeinstallprompt', handleInstallOffer);
+      window.removeEventListener('appinstalled', handleInstalled);
     };
-    // Empty dependency array to prevent re-running on navigation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstall = useCallback(async () => {
-    if (deferredPrompt) {
-      setInstalling(true);
-      try {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-          localStorage.setItem('trashdrop_app_installed', 'true');
-          localStorage.setItem('trashdrop_install_prompt_seen', 'true');
-          setShowPrompt(false);
-        }
-      } catch (error) {
-        console.error('Install prompt error:', error);
-      } finally {
-        setInstalling(false);
-        setDeferredPrompt(null);
+    setIsInstalling(true);
+    try {
+      // The browser can announce it's ready a moment after this screen appears
+      if (!deferredPromptRef.current) {
+        await new Promise((resolve) => {
+          installReadyRef.current = resolve;
+          setTimeout(resolve, INSTALL_READY_WAIT_MS);
+        });
+        installReadyRef.current = null;
       }
-    }
-  }, [deferredPrompt]);
 
-  const handleDismiss = useCallback(() => {
-    localStorage.setItem('trashdrop_install_prompt_seen', 'true');
-    setShowPrompt(false);
+      const installOffer = deferredPromptRef.current;
+      if (!installOffer) {
+        setShowManualSteps(true);
+        return;
+      }
+
+      deferredPromptRef.current = null;
+      await installOffer.prompt();
+      const { outcome } = await installOffer.userChoice;
+      if (outcome === 'accepted') {
+        localStorage.setItem(INSTALLED_KEY, 'true');
+        setShowPrompt(false);
+      }
+    } catch (error) {
+      console.error('Install prompt error:', error);
+      setShowManualSteps(true);
+    } finally {
+      setIsInstalling(false);
+    }
   }, []);
 
-  // Don't render if already installed or prompt shouldn't show
-  if (isStandalone || !showPrompt) {
-    return null;
-  }
+  // Use it in the browser this time. Asks again on the next visit.
+  const handleSkip = useCallback(() => setShowPrompt(false), []);
+
+  if (!showPrompt) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
-        {/* Header with app icon */}
-        <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 text-center">
-          <div className="w-20 h-20 bg-white rounded-2xl shadow-lg mx-auto mb-4 flex items-center justify-center">
+    <div className="fixed inset-0 h-[100dvh] z-[9999] bg-gradient-to-b from-green-600 to-green-800 flex flex-col">
+      <div data-testid="install-scroll" className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div className="min-h-full flex flex-col items-center justify-center p-6">
+          <div className="w-20 h-20 bg-white rounded-2xl shadow-lg mb-4 flex items-center justify-center">
             <img src="/logo.svg" alt="TrashDrop logo" className="w-14 h-14 object-contain" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Install TrashDrop</h2>
-          <p className="text-green-100 mt-1">Get the best experience</p>
-        </div>
+          <h1 className="text-2xl font-bold text-white mb-6">TrashDrop</h1>
 
-        {/* Content */}
-        <div className="p-6">
-          <div className="space-y-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">Works Offline</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Access your pickups even without internet</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">Quick Access</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Launch directly from your home screen</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">Push Notifications</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Get notified when your pickup is collected</p>
-              </div>
-            </div>
-          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">Install TrashDrop</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-5">
+              Add TrashDrop to your phone to book pickups and track them in one tap.
+            </p>
 
-          {/* iOS-specific instructions */}
-          {isIOS && (
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 mb-6">
-              <p className="font-medium text-gray-900 dark:text-white mb-3">To install on iOS:</p>
-              <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                <li className="flex items-center gap-2">
-                  <span className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                  Tap the <span className="inline-flex items-center px-1">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M16 5l-1.42 1.42-1.59-1.59V16h-2V4.83L9.41 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V10c0-1.11.9-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .89 2 2z"/>
-                    </svg>
-                  </span> Share button
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                  Scroll and tap "Add to Home Screen"
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                  Tap "Add" to confirm
-                </li>
-              </ol>
-            </div>
-          )}
-
-          {/* Buttons */}
-          <div className="space-y-3">
-            {!isIOS && deferredPrompt && (
-              <button
-                onClick={handleInstall}
-                disabled={installing}
-                className="w-full py-3 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {installing ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                    </svg>
-                    Installing...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/>
-                    </svg>
-                    Install App
-                  </>
-                )}
-              </button>
+            {!showManualSteps ? (
+              <div className="space-y-4">
+                {BENEFITS.map(({ title, detail }) => (
+                  <div key={title} className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{title}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                <p className="font-medium text-gray-900 dark:text-white mb-3">To install:</p>
+                <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-300 list-decimal list-inside">
+                  {isIOS ? (
+                    <>
+                      <li>Tap the <strong>Share</strong> button in your browser</li>
+                      <li>Scroll and tap <strong>"Add to Home Screen"</strong></li>
+                      <li>Tap <strong>"Add"</strong> to confirm</li>
+                    </>
+                  ) : isAndroid ? (
+                    <>
+                      <li>Tap the <strong>⋮</strong> menu in your browser</li>
+                      <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
+                      <li>Tap <strong>"Add"</strong> to confirm</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Click the <strong>install icon</strong> in your browser's address bar</li>
+                      <li>Or open the browser menu and choose <strong>"Install TrashDrop"</strong></li>
+                    </>
+                  )}
+                </ol>
+              </div>
             )}
-            
-            <button
-              onClick={handleDismiss}
-              className="w-full py-3 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors"
-            >
-              {isIOS ? "I'll do it later" : (deferredPrompt ? "Maybe Later" : "Continue to App")}
-            </button>
           </div>
+        </div>
+      </div>
+
+      {/* Always on screen, whatever the phone's height */}
+      <div className="shrink-0 bg-white dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="space-y-3 max-w-sm mx-auto">
+          {!showManualSteps ? (
+            <>
+              <button
+                type="button"
+                onClick={handleInstall}
+                disabled={isInstalling}
+                className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isInstalling ? 'Getting ready…' : isAndroid ? 'Add to Home Screen' : 'Install App'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={isInstalling}
+                className="w-full py-3 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors text-sm disabled:opacity-50"
+              >
+                {isAndroid ? 'Open App' : 'Maybe Later'}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors"
+            >
+              Done
+            </button>
+          )}
         </div>
       </div>
     </div>
