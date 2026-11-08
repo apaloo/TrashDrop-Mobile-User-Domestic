@@ -1254,9 +1254,8 @@ const Dashboard = () => {
       
       <DashboardOptimizer />
       {/* Top of the dashboard, in the page flow (it used to be pinned at fixed
-          offsets): the Rewards card, the bin pickup button, then the totals.
-          The top padding leaves room for the floating "Live" indicator. */}
-      <div className="max-w-3xl mx-auto px-2 pt-[3.25rem] space-y-4">
+          offsets): the Rewards card, the bin pickup button, then the totals. */}
+      <div className="max-w-3xl mx-auto px-2 pt-4 space-y-4">
         {/* Once a collector has the pickup, it leads the page and the rewards shrink to one row */}
         {hasCollectorAssigned && (
           <LivePickupCard pickup={activePickups[0]} unreadNotifications={unreadNotifications} />

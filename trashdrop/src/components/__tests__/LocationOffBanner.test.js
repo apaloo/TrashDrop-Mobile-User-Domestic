@@ -117,4 +117,41 @@ describe('LocationOffBanner', () => {
     const banner = await screen.findByRole('button', { name: /Tap to turn on/ });
     expect(banner.parentElement.className).toContain('7.5rem');
   });
+
+  describe('when TrashDrop is blocked', () => {
+    beforeEach(() => {
+      setPermission('denied');
+      failWith(DENIED);
+    });
+
+    it('tapping shows the steps to allow it, then closes', async () => {
+      render(<LocationOffBanner />);
+      fireEvent.click(await screen.findByRole('button', { name: /Tap to allow/ }));
+
+      expect(await screen.findByRole('dialog', { name: 'Allow location for TrashDrop' })).toBeInTheDocument();
+      expect(screen.getByText(/Tap Settings, then Site settings, then Location/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('goes away by itself once location is allowed', async () => {
+      render(<LocationOffBanner />);
+      fireEvent.click(await screen.findByRole('button', { name: /Tap to allow/ }));
+      await screen.findByRole('dialog');
+
+      setPermission('granted');
+      succeed();
+      await act(async () => { window.dispatchEvent(new Event('focus')); });
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.queryByText(/Tap to allow/)).not.toBeInTheDocument();
+    });
+  });
+
+  it('lets long help text wrap on a phone', async () => {
+    failWith(UNAVAILABLE);
+    render(<LocationOffBanner />);
+    expect(await screen.findByRole('button', { name: /Tap to turn on/ })).toHaveClass('whitespace-normal');
+  });
 });
