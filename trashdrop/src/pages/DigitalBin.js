@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import { FaSpinner, FaSync, FaTimes, FaPlus } from 'react-icons/fa';
 import toastService from '../services/toastService.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
 import debug from '../utils/debug.js';
 // QR storage removed - using server-first approach
 // Real-time and sync utilities removed - server-first approach only
@@ -227,9 +228,9 @@ function DigitalBin() {
         fetchUserLocations(user.id)
       ]);
       
-      // Update state with fetched data
-      setScheduledPickups(pickups);
-      setFormData(prev => ({ ...prev, savedLocations: locations }));
+      // Update state with fetched data (null: couldn't connect, keep what's there)
+      if (pickups) setScheduledPickups(pickups);
+      if (locations) setFormData(prev => ({ ...prev, savedLocations: locations }));
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -295,6 +296,8 @@ function DigitalBin() {
       }
     } catch (error) {
       console.error('[DigitalBin] Error in fetchScheduledPickups:', error);
+      // No connection: say nothing, the page refreshes itself on reconnect
+      if (connectionProblem(error)) return null;
       if (!silent) {
         toastService.error('Failed to fetch digital bins');
         setError(error.message);
@@ -320,7 +323,7 @@ function DigitalBin() {
       return locations || [];
     } catch (error) {
       console.error('Error fetching user locations:', error);
-      return [];
+      return connectionProblem(error) ? null : [];
     }
   };
   
@@ -1040,7 +1043,7 @@ function DigitalBin() {
       // message with a fetch error for a bin that was created just fine.
       fetchScheduledPickups(user.id, { silent: true })
         .then(bins => {
-          if (bins.length > 0 && !bins.some(bin => bin.id === optimisticBin.id)) {
+          if (bins?.length > 0 && !bins.some(bin => bin.id === optimisticBin.id)) {
             debug.log('[DigitalBin] New bin missing from server refresh, keeping optimistic row');
             setScheduledPickups([optimisticBin, ...bins]);
           }
