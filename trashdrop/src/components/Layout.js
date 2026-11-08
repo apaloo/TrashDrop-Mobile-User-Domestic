@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import NavBar from './NavBar.js';
 import BinReminderPopup from './BinReminderPopup.js';
 import { ArrivalQRProvider } from '../context/ArrivalQRContext.js';
+import LocationOffBanner from './LocationOffBanner.js';
 
 /**
  * Main layout component that wraps all pages
@@ -34,6 +35,8 @@ const Layout = () => {
     <ArrivalQRProvider>
       <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900" style={{ minHeight: '100vh' }}>
         <NavBar />
+        {/* One tap to turn location on, above the bottom bar */}
+        <LocationOffBanner />
         {/* Day-before reminder for repeat digital bin collections */}
         <BinReminderPopup />
         {/* Add extra bottom padding for pages with maps on mobile */}
