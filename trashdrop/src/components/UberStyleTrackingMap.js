@@ -5,14 +5,9 @@ import 'leaflet/dist/leaflet.css';
 import './UberStyleTrackingMap.css';
 import { formatDistance } from '../utils/geoUtils.js';
 import { useArrivalQR } from '../context/useArrivalQR.js';
+import '../utils/leafletDefaultIcon.js';
 
 // Fix default Leaflet marker icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/assets/marker-icon-2x.png',
-  iconUrl: '/assets/marker-icon.png',
-  shadowUrl: '/assets/marker-shadow.png',
-});
 
 // Collector: the brand green disc with a lime ring and a truck, so it reads as "your collector"
 const collectorIcon = new L.Icon({

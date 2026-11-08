@@ -9,6 +9,9 @@ import RedeemDialog from '../components/rewards/RedeemDialog.js';
 import { formatGhanaPhone } from '../utils/ghanaPhone.js';
 import { nextReward, pointsLevel, pointsToCedis } from '../utils/rewardsMath.js';
 import PageHeader from '../components/ui/PageHeader.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
+import { readLastKnown, saveLastKnown } from '../utils/lastKnown.js';
+import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 import { card, errorNote, infoNote, primaryButton, sectionTitle } from '../components/ui/styles.js';
 
 // Airtime and data rewards: sent by TrashDrop staff to a phone number
@@ -36,13 +39,22 @@ const Rewards = () => {
   const [confirmReward, setConfirmReward] = useState(null);
   const [profilePhone, setProfilePhone] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  // No connection: showing the last saved copy and reloading by itself
+  const [waitingForConnection, setWaitingForConnection] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+  const waitingRef = useRef(false);
   const mountedRef = useRef(true);
   const isLoadingRef = useRef(false);
 
   const fetchRecentRedemptions = async (limit = 5) => {
-    if (!user) return;
+    if (!user) return false;
     
-    setIsRedemptionsLoading(true);
+    if (!waitingRef.current) setIsRedemptionsLoading(true);
+    // Returns true when it couldn't connect
+    const showSavedRedemptions = () => {
+      setRecentRedemptions(readLastKnown('redemptions', user.id) || []);
+      return true;
+    };
     try {
       console.log('[Rewards] Fetching recent redemptions');
       
@@ -69,8 +81,9 @@ const Rewards = () => {
       
       if (error) {
         console.warn('Error fetching redemptions:', error);
+        if (connectionProblem(error)) return showSavedRedemptions();
         setRecentRedemptions([]);
-        return;
+        return false;
       }
       
       if (redemptions && redemptions.length > 0) {
@@ -88,13 +101,19 @@ const Rewards = () => {
         }));
         
         setRecentRedemptions(formattedRedemptions);
+        // The saved copy leaves out the phone number
+        saveLastKnown('redemptions', user.id, formattedRedemptions.map(r => ({ ...r, phone: '' })));
         console.log(`[Rewards] Found ${formattedRedemptions.length} recent redemptions`);
       } else {
         setRecentRedemptions([]);
+        saveLastKnown('redemptions', user.id, []);
       }
+      return false;
     } catch (error) {
       console.error('Error fetching recent redemptions:', error);
+      if (connectionProblem(error)) return showSavedRedemptions();
       setRecentRedemptions([]);
+      return false;
     } finally {
       setIsRedemptionsLoading(false);
     }
@@ -206,22 +225,36 @@ const Rewards = () => {
       }
       
       isLoadingRef.current = true;
-      setIsLoading(true);
-      setPointsLoading(true);
+      // Quiet reloads keep what's on screen instead of flashing spinners
+      if (!waitingRef.current) {
+        setIsLoading(true);
+        setPointsLoading(true);
+      }
       setErrorMessage('');
+      let couldNotConnect = false;
 
       const loadPoints = async () => {
+        let balanceKnown = true;
         try {
           const statsResult = await userService.getUserStats(user.id);
           if (!mountedRef.current) return;
           if (statsResult.error) {
             console.warn('Error fetching user stats:', statsResult.error);
-            setUserPoints(0);
+            if (connectionProblem(statsResult.error)) {
+              couldNotConnect = true;
+              // Never show 0 for a balance we just couldn't fetch
+              const saved = readLastKnown('points', user.id);
+              if (saved === null) balanceKnown = false;
+              else setUserPoints(saved);
+            } else {
+              setUserPoints(0);
+            }
           } else {
             setUserPoints(statsResult.data.points || 0);
+            saveLastKnown('points', user.id, statsResult.data.points || 0);
           }
         } finally {
-          if (mountedRef.current) setPointsLoading(false);
+          if (mountedRef.current && balanceKnown) setPointsLoading(false);
         }
       };
 
@@ -236,10 +269,15 @@ const Rewards = () => {
           if (!mountedRef.current) return;
           if (rewardsError) {
             console.warn('Error fetching rewards:', rewardsError);
-            setRewards([]);
-            setErrorMessage('Failed to load rewards. Please try again later.');
+            if (connectionProblem(rewardsError)) {
+              couldNotConnect = true;
+              setRewards(readLastKnown('rewards', user.id) || []);
+            } else {
+              setRewards([]);
+              setErrorMessage('Failed to load rewards. Please try again later.');
+            }
           } else {
-            setRewards((rewardsData || []).map(reward => ({
+            const loadedRewards = (rewardsData || []).map(reward => ({
               id: reward.id,
               name: reward.name,
               description: reward.description,
@@ -248,7 +286,9 @@ const Rewards = () => {
               expiresAt: reward.expires_at,
               partnerId: reward.partner_id,
               category: reward.category
-            })));
+            }));
+            setRewards(loadedRewards);
+            saveLastKnown('rewards', user.id, loadedRewards);
           }
         } finally {
           if (mountedRef.current) setIsLoading(false);
@@ -256,17 +296,23 @@ const Rewards = () => {
       };
 
       try {
-        await Promise.all([loadPoints(), loadRewards(), fetchRecentRedemptions()]);
+        const [, , redemptionsFailed] = await Promise.all([loadPoints(), loadRewards(), fetchRecentRedemptions()]);
+        if (redemptionsFailed) couldNotConnect = true;
       } catch (error) {
         console.error('Error fetching rewards data:', error);
-        if (mountedRef.current) setErrorMessage('Failed to load rewards. Please try again later.');
+        if (connectionProblem(error)) couldNotConnect = true;
+        else if (mountedRef.current) setErrorMessage('Failed to load rewards. Please try again later.');
       } finally {
         isLoadingRef.current = false;
+        waitingRef.current = couldNotConnect;
+        if (mountedRef.current) setWaitingForConnection(couldNotConnect);
       }
     };
     
     fetchRewardsData();
-  }, [user?.id]);
+  }, [user?.id, reloadTick]);
+
+  useReloadWhenBack(waitingForConnection, () => setReloadTick(tick => tick + 1));
 
   // Airtime and data: ask which number and network first (prefilled from the profile)
   const openRedeemDialog = async (reward) => {
@@ -498,7 +544,9 @@ const Rewards = () => {
         </ul>
 
         {rewards.length === 0 && !isLoading && (
-          <p className="text-center py-10 text-td-sage dark:text-gray-300">No rewards available at this time.</p>
+          <p className="text-center py-10 text-td-sage dark:text-gray-300">
+            {waitingForConnection ? "Rewards will appear when you're back online." : 'No rewards available at this time.'}
+          </p>
         )}
       </section>
 
@@ -543,6 +591,8 @@ const Rewards = () => {
               </li>
             ))}
           </ul>
+        ) : waitingForConnection ? (
+          <p className="text-center py-8 text-td-sage dark:text-gray-300">Your redemptions will appear when you're back online.</p>
         ) : (
           <div className="text-center py-8">
             <p className="text-td-sage dark:text-gray-300">You haven't redeemed any rewards yet.</p>

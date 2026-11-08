@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext.js';
 import { dumpingService } from '../services/dumpingService.js';
@@ -14,6 +13,7 @@ import PhotoViewer from './ui/PhotoViewer.js';
 import { describeLocationProblem, readLocationPermission } from '../utils/locationProblem.js';
 import { LocationRequiredModal } from './ui/LocationRequired.js';
 import { card, errorNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from './ui/styles.js';
+import '../utils/leafletDefaultIcon.js';
 
 // Choices on the form: [value, icon, label(, hint)]
 const WASTE_OPTIONS = [
@@ -41,12 +41,6 @@ const SEVERITY_OPTIONS = [
 
 
 // Fix for default markers in react-leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 // Component to handle map view updates when position changes
 const MapViewController = ({ position }) => {

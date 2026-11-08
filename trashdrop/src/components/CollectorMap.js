@@ -22,14 +22,9 @@ import {
 import { useAuth } from '../context/AuthContext.js';
 import { collectorService } from '../services/collectorService.js';
 import GeolocationService from '../utils/geolocationService.js';
+import '../utils/leafletDefaultIcon.js';
 
 // Fix default Leaflet marker icons - use local files instead of unpkg
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/assets/marker-icon-2x.png',
-  iconUrl: '/assets/marker-icon.png',
-  shadowUrl: '/assets/marker-shadow.png',
-});
 
 // Create custom icon for current location
 const currentLocationIcon = new L.Icon({

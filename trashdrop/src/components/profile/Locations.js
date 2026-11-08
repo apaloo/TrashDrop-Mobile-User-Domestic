@@ -2,19 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import { useLocation, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import supabase from '../../utils/supabaseClient.js';
 import appConfig from '../../utils/app-config.js';
 import { saveOfflineLocation, getOfflineLocations, isOnline } from '../../utils/offlineStorage.js';
 import { useAuth } from '../../context/AuthContext.js';
+import '../../utils/leafletDefaultIcon.js';
 
 // Fix leaflet icon issue
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/leaflet/dist/images/marker-icon-2x.png',
-  iconUrl: '/leaflet/dist/images/marker-icon.png',
-  shadowUrl: '/leaflet/dist/images/marker-shadow.png',
-});
 
 // Default coordinates for fallback (San Francisco)
 const DEFAULT_COORDINATES = [37.7749, -122.4194];
