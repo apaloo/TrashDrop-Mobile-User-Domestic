@@ -5,6 +5,7 @@ import supabase from '../utils/supabaseClient.js';
 import { FaSpinner, FaSync, FaTimes, FaPlus } from 'react-icons/fa';
 import toastService from '../services/toastService.js';
 import { connectionProblem } from '../utils/connectionProblem.js';
+import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 import debug from '../utils/debug.js';
 // QR storage removed - using server-first approach
 // Real-time and sync utilities removed - server-first approach only
@@ -65,6 +66,9 @@ function DigitalBin() {
   
   // Digital bins state
   const [scheduledPickups, setScheduledPickups] = useState([]);
+  // Bins or locations couldn't load: retried in the background
+  const [dataIncomplete, setDataIncomplete] = useState(false);
+  const dataIncompleteRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -224,11 +228,14 @@ function DigitalBin() {
     try {
       // Fetch both scheduled pickups and locations
       const [pickups, locations] = await Promise.all([
-        fetchScheduledPickups(user.id),
+        // One message at most: the background retries stay silent
+        fetchScheduledPickups(user.id, { silent: dataIncompleteRef.current }),
         fetchUserLocations(user.id)
       ]);
+      dataIncompleteRef.current = pickups === null || locations === null;
+      setDataIncomplete(dataIncompleteRef.current);
       
-      // Update state with fetched data (null: couldn't connect, keep what's there)
+      // Update state with fetched data (null: couldn't load, keep what's there)
       if (pickups) setScheduledPickups(pickups);
       if (locations) setFormData(prev => ({ ...prev, savedLocations: locations }));
       setLastUpdated(new Date());
@@ -302,7 +309,7 @@ function DigitalBin() {
         toastService.error('Failed to fetch digital bins');
         setError(error.message);
       }
-      return [];
+      return null;
     } 
   };
   
@@ -323,7 +330,7 @@ function DigitalBin() {
       return locations || [];
     } catch (error) {
       console.error('Error fetching user locations:', error);
-      return connectionProblem(error) ? null : [];
+      return null;
     }
   };
   
@@ -466,6 +473,8 @@ function DigitalBin() {
     }
   }, [refreshTrigger, user?.id]);
 
+
+  useReloadWhenBack(dataIncomplete, () => fetchData(false).catch(() => {}));
 
   // Set up online/offline listeners with proper closure handling
   useEffect(() => {

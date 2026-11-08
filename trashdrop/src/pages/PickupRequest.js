@@ -363,7 +363,7 @@ const PickupRequest = () => {
   }, [user, dataReloadTick]);
 
   // Bags, saved locations and active pickups reload by themselves
-  useReloadWhenBack(bagsUnknown, () => setDataReloadTick(tick => tick + 1));
+  useReloadWhenBack(bagsUnknown || locationsLoadFailed, () => setDataReloadTick(tick => tick + 1));
 
   // Fetch active pickup requests to calculate already-requested bags
   useEffect(() => {
@@ -716,10 +716,7 @@ const PickupRequest = () => {
 
           {(bagsLoadFailed || locationsLoadFailed) && (
             <div className={`${errorNote} px-4 py-3 mt-4`} role="alert">
-              <p className="text-[15px]">We couldn't load everything on this page.</p>
-              <button type="button" onClick={() => setDataReloadTick(tick => tick + 1)} className={`${secondaryButton} h-10 mt-3 bg-white dark:bg-transparent`}>
-                Try again
-              </button>
+              <p className="text-[15px]">We couldn't load everything on this page. We'll keep trying.</p>
             </div>
           )}
 

@@ -91,7 +91,7 @@ describe('Rewards when the server fails', () => {
   it('says so plainly, with no false zero or empty lists', async () => {
     mount();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't load everything on this page.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't load everything on this page. We'll keep trying.");
     expect(screen.getByText("Rewards couldn't load.")).toBeInTheDocument();
     expect(screen.getByText("Your redemptions couldn't load.")).toBeInTheDocument();
     expect(screen.getByLabelText('Balance unavailable')).toBeInTheDocument();
@@ -101,19 +101,28 @@ describe('Rewards when the server fails', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
-  it('Try again reloads the page and clears the note', async () => {
-    mount();
-    const retry = await screen.findByRole('button', { name: 'Try again' });
+  it('has no retry button and recovers by itself', async () => {
+    jest.useFakeTimers();
+    try {
+      mount();
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByRole('alert')).toHaveTextContent("We'll keep trying");
+      expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
 
-    mockTables = (name) => (name === 'rewards'
-      ? { data: [{ id: 'r1', name: 'GH₵5 airtime', description: 'MTN', points_cost: 100, category: 'airtime' }], error: null }
-      : { data: [], error: null });
-    userService.getUserStats.mockResolvedValue({ data: { points: 42 }, error: null });
-    await act(async () => { retry.click(); });
+      mockTables = (name) => (name === 'rewards'
+        ? { data: [{ id: 'r1', name: 'GH₵5 airtime', description: 'MTN', points_cost: 100, category: 'airtime' }], error: null }
+        : { data: [], error: null });
+      userService.getUserStats.mockResolvedValue({ data: { points: 42 }, error: null });
 
-    expect(await screen.findByText('GH₵5 airtime')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      await act(async () => { jest.advanceTimersByTime(30000); });
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByText('GH₵5 airtime')).toBeInTheDocument();
+      expect(screen.getByText('42')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('only the part that failed says so', async () => {

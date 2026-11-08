@@ -12,7 +12,7 @@ import PageHeader from '../components/ui/PageHeader.js';
 import { connectionProblem } from '../utils/connectionProblem.js';
 import { readLastKnown, saveLastKnown } from '../utils/lastKnown.js';
 import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
-import { card, errorNote, infoNote, primaryButton, secondaryButton, sectionTitle } from '../components/ui/styles.js';
+import { card, errorNote, infoNote, primaryButton, sectionTitle } from '../components/ui/styles.js';
 
 // Airtime and data rewards: sent by TrashDrop staff to a phone number
 const isMobileReward = (reward) => ['airtime', 'data'].includes(reward?.category);
@@ -297,7 +297,8 @@ const Rewards = () => {
         else problems.rewards = true;
       } finally {
         isLoadingRef.current = false;
-        waitingRef.current = couldNotConnect;
+        // Either way the retries run quietly, keeping what's on screen
+        waitingRef.current = couldNotConnect || problems.balance || problems.rewards || problems.redemptions;
         if (mountedRef.current) {
           setWaitingForConnection(couldNotConnect);
           setLoadProblems(problems);
@@ -308,7 +309,10 @@ const Rewards = () => {
     fetchRewardsData();
   }, [user?.id, reloadTick]);
 
-  useReloadWhenBack(waitingForConnection, () => setReloadTick(tick => tick + 1));
+  useReloadWhenBack(
+    waitingForConnection || loadProblems.balance || loadProblems.rewards || loadProblems.redemptions,
+    () => setReloadTick(tick => tick + 1)
+  );
 
   // Airtime and data: ask which number and network first (prefilled from the profile)
   const openRedeemDialog = async (reward) => {
@@ -451,10 +455,7 @@ const Rewards = () => {
       {/* Error message */}
       {(loadProblems.balance || loadProblems.rewards || loadProblems.redemptions) && (
         <div className={`${errorNote} px-4 py-3`} role="alert">
-          <p className="text-[15px]">We couldn't load everything on this page.</p>
-          <button type="button" onClick={() => setReloadTick(tick => tick + 1)} className={`${secondaryButton} h-10 mt-3 bg-white dark:bg-transparent`}>
-            Try again
-          </button>
+          <p className="text-[15px]">We couldn't load everything on this page. We'll keep trying.</p>
         </div>
       )}
 
