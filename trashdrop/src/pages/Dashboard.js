@@ -11,6 +11,7 @@ import userServiceOptimized from '../services/userServiceOptimized.js';
 import { notificationService } from '../services/notificationService.js';
 import onboardingService from '../services/onboardingService.js';
 import { connectionProblem } from '../utils/connectionProblem.js';
+import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 import { statusService } from '../services/statusService.js';
 import smartNotificationService from '../services/smartNotificationService.js';
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
@@ -131,10 +132,10 @@ const Dashboard = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false); // Initial load exhausted its retries
   const quietRetryRef = useRef(null);
+  const backgroundRetryRef = useRef(false);
   const loadDashboardRef = useRef(null);
   const onboardingCheckDeferredRef = useRef(false);
   const [onboardingRecheck, setOnboardingRecheck] = useState(0);
-  const [isRetryingLoad, setIsRetryingLoad] = useState(false);
   const seamlessSubscriptionsRef = useRef({});
   
   // Onboarding state
@@ -719,7 +720,9 @@ const Dashboard = () => {
 
     console.log('[Dashboard] 🚀 Seamless data loading started for user:', user.id);
     setUpdateType('initial');
-    setIsLoading(true);
+    // A background retry keeps what's on screen
+    if (!backgroundRetryRef.current) setIsLoading(true);
+    backgroundRetryRef.current = false;
 
     let lastError = null;
 
@@ -799,7 +802,9 @@ const Dashboard = () => {
       clearTimeout(quietRetryRef.current);
       if (isOnline()) {
         quietRetryRef.current = setTimeout(() => {
-          if (mountedRef.current) loadDashboardRef.current?.();
+          if (!mountedRef.current) return;
+          backgroundRetryRef.current = true;
+          loadDashboardRef.current?.();
         }, QUIET_RETRY_MS);
       }
       return;
@@ -813,17 +818,11 @@ const Dashboard = () => {
 
   useEffect(() => () => clearTimeout(quietRetryRef.current), []);
 
-  // Explicit "Try again" from the failure banner
-  const handleRetryInitialLoad = useCallback(async () => {
-    if (isRetryingLoad) return;
-    setIsRetryingLoad(true);
-    setLoadFailed(false);
-    try {
-      await loadDashboardDataSeamless();
-    } finally {
-      if (mountedRef.current) setIsRetryingLoad(false);
-    }
-  }, [isRetryingLoad, loadDashboardDataSeamless]);
+  // The server failed: keep retrying out of sight until it answers
+  useReloadWhenBack(loadFailed, () => {
+    backgroundRetryRef.current = true;
+    loadDashboardDataSeamless();
+  });
 
   // Setup seamless subscriptions for real-time updates
   useEffect(() => {
@@ -1375,16 +1374,8 @@ const Dashboard = () => {
                 Couldn't refresh your dashboard
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                You're seeing what we had last.
+                You're seeing what we had last. We'll keep trying.
               </p>
-              <button
-                type="button"
-                onClick={handleRetryInitialLoad}
-                disabled={isRetryingLoad}
-                className="mt-3 inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-              >
-                {isRetryingLoad ? 'Retrying...' : 'Try again'}
-              </button>
             </div>
           </div>
         )}

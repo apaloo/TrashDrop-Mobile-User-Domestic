@@ -42,6 +42,8 @@ const Rewards = () => {
   // No connection: showing the last saved copy and reloading by itself
   const [waitingForConnection, setWaitingForConnection] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  // The server answered with a failure: which parts couldn't load
+  const [loadProblems, setLoadProblems] = useState({ balance: false, rewards: false, redemptions: false });
   const waitingRef = useRef(false);
   const mountedRef = useRef(true);
   const isLoadingRef = useRef(false);
@@ -50,10 +52,10 @@ const Rewards = () => {
     if (!user) return false;
     
     if (!waitingRef.current) setIsRedemptionsLoading(true);
-    // Returns true when it couldn't connect
-    const showSavedRedemptions = () => {
+    // Returns 'connection' or 'server' when it couldn't load, otherwise false
+    const showSavedRedemptions = (problem) => {
       setRecentRedemptions(readLastKnown('redemptions', user.id) || []);
-      return true;
+      return connectionProblem(problem) ? 'connection' : 'server';
     };
     try {
       console.log('[Rewards] Fetching recent redemptions');
@@ -81,9 +83,7 @@ const Rewards = () => {
       
       if (error) {
         console.warn('Error fetching redemptions:', error);
-        if (connectionProblem(error)) return showSavedRedemptions();
-        setRecentRedemptions([]);
-        return false;
+        return showSavedRedemptions(error);
       }
       
       if (redemptions && redemptions.length > 0) {
@@ -111,9 +111,7 @@ const Rewards = () => {
       return false;
     } catch (error) {
       console.error('Error fetching recent redemptions:', error);
-      if (connectionProblem(error)) return showSavedRedemptions();
-      setRecentRedemptions([]);
-      return false;
+      return showSavedRedemptions(error);
     } finally {
       setIsRedemptionsLoading(false);
     }
@@ -232,6 +230,7 @@ const Rewards = () => {
       }
       setErrorMessage('');
       let couldNotConnect = false;
+      const problems = { balance: false, rewards: false, redemptions: false };
 
       const loadPoints = async () => {
         let balanceKnown = true;
@@ -240,15 +239,12 @@ const Rewards = () => {
           if (!mountedRef.current) return;
           if (statsResult.error) {
             console.warn('Error fetching user stats:', statsResult.error);
-            if (connectionProblem(statsResult.error)) {
-              couldNotConnect = true;
-              // Never show 0 for a balance we just couldn't fetch
-              const saved = readLastKnown('points', user.id);
-              if (saved === null) balanceKnown = false;
-              else setUserPoints(saved);
-            } else {
-              setUserPoints(0);
-            }
+            if (connectionProblem(statsResult.error)) couldNotConnect = true;
+            else problems.balance = true;
+            // Never show 0 for a balance we just couldn't fetch
+            const saved = readLastKnown('points', user.id);
+            if (saved === null) balanceKnown = false;
+            else setUserPoints(saved);
           } else {
             setUserPoints(statsResult.data.points || 0);
             saveLastKnown('points', user.id, statsResult.data.points || 0);
@@ -269,13 +265,9 @@ const Rewards = () => {
           if (!mountedRef.current) return;
           if (rewardsError) {
             console.warn('Error fetching rewards:', rewardsError);
-            if (connectionProblem(rewardsError)) {
-              couldNotConnect = true;
-              setRewards(readLastKnown('rewards', user.id) || []);
-            } else {
-              setRewards([]);
-              setErrorMessage('Failed to load rewards. Please try again later.');
-            }
+            if (connectionProblem(rewardsError)) couldNotConnect = true;
+            else problems.rewards = true;
+            setRewards(readLastKnown('rewards', user.id) || []);
           } else {
             const loadedRewards = (rewardsData || []).map(reward => ({
               id: reward.id,
@@ -296,23 +288,31 @@ const Rewards = () => {
       };
 
       try {
-        const [, , redemptionsFailed] = await Promise.all([loadPoints(), loadRewards(), fetchRecentRedemptions()]);
-        if (redemptionsFailed) couldNotConnect = true;
+        const [, , redemptionsProblem] = await Promise.all([loadPoints(), loadRewards(), fetchRecentRedemptions()]);
+        if (redemptionsProblem === 'connection') couldNotConnect = true;
+        if (redemptionsProblem === 'server') problems.redemptions = true;
       } catch (error) {
         console.error('Error fetching rewards data:', error);
         if (connectionProblem(error)) couldNotConnect = true;
-        else if (mountedRef.current) setErrorMessage('Failed to load rewards. Please try again later.');
+        else problems.rewards = true;
       } finally {
         isLoadingRef.current = false;
-        waitingRef.current = couldNotConnect;
-        if (mountedRef.current) setWaitingForConnection(couldNotConnect);
+        // Either way the retries run quietly, keeping what's on screen
+        waitingRef.current = couldNotConnect || problems.balance || problems.rewards || problems.redemptions;
+        if (mountedRef.current) {
+          setWaitingForConnection(couldNotConnect);
+          setLoadProblems(problems);
+        }
       }
     };
     
     fetchRewardsData();
   }, [user?.id, reloadTick]);
 
-  useReloadWhenBack(waitingForConnection, () => setReloadTick(tick => tick + 1));
+  useReloadWhenBack(
+    waitingForConnection || loadProblems.balance || loadProblems.rewards || loadProblems.redemptions,
+    () => setReloadTick(tick => tick + 1)
+  );
 
   // Airtime and data: ask which number and network first (prefilled from the profile)
   const openRedeemDialog = async (reward) => {
@@ -425,14 +425,16 @@ const Rewards = () => {
           )}
         </div>
         <p className="relative mt-2 flex items-baseline gap-2" aria-busy={pointsLoading}>
-          {pointsLoading ? (
+          {pointsLoading && loadProblems.balance ? (
+            <span className="text-[44px] leading-none font-bold" aria-label="Balance unavailable">—</span>
+          ) : pointsLoading ? (
             <span className="inline-block h-11 w-28 rounded-xl bg-white/20 animate-pulse" aria-label="Loading your points" />
           ) : (
             <span className="text-[44px] leading-none font-bold">{userPoints.toLocaleString()}</span>
           )}
           <span className="text-lg font-semibold">Points</span>
         </p>
-        <p className="relative mt-1 text-[15px] text-white/90">{pointsLoading ? 'Checking your balance...' : `Worth GH₵${pointsToCedis(userPoints)} in airtime or data`}</p>
+        <p className="relative mt-1 text-[15px] text-white/90">{pointsLoading ? (loadProblems.balance ? "Couldn't check your balance" : 'Checking your balance...') : `Worth GH₵${pointsToCedis(userPoints)} in airtime or data`}</p>
         <div
           className="relative mt-4 h-2 rounded-full bg-white/20 overflow-hidden"
           role="progressbar"
@@ -451,6 +453,12 @@ const Rewards = () => {
       </section>
 
       {/* Error message */}
+      {(loadProblems.balance || loadProblems.rewards || loadProblems.redemptions) && (
+        <div className={`${errorNote} px-4 py-3`} role="alert">
+          <p className="text-[15px]">We couldn't load everything on this page. We'll keep trying.</p>
+        </div>
+      )}
+
       {errorMessage && (
         <div className={`${errorNote} px-4 py-3`} role="alert">
           <p className="text-[15px]">{errorMessage}</p>
@@ -545,7 +553,7 @@ const Rewards = () => {
 
         {rewards.length === 0 && !isLoading && (
           <p className="text-center py-10 text-td-sage dark:text-gray-300">
-            {waitingForConnection ? "Rewards will appear when you're back online." : 'No rewards available at this time.'}
+            {waitingForConnection ? "Rewards will appear when you're back online." : loadProblems.rewards ? "Rewards couldn't load." : 'No rewards available at this time.'}
           </p>
         )}
       </section>
@@ -591,8 +599,10 @@ const Rewards = () => {
               </li>
             ))}
           </ul>
-        ) : waitingForConnection ? (
-          <p className="text-center py-8 text-td-sage dark:text-gray-300">Your redemptions will appear when you're back online.</p>
+        ) : waitingForConnection || loadProblems.redemptions ? (
+          <p className="text-center py-8 text-td-sage dark:text-gray-300">
+            {waitingForConnection ? "Your redemptions will appear when you're back online." : "Your redemptions couldn't load."}
+          </p>
         ) : (
           <div className="text-center py-8">
             <p className="text-td-sage dark:text-gray-300">You haven't redeemed any rewards yet.</p>

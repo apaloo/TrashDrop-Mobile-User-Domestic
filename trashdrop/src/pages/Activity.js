@@ -8,7 +8,7 @@ import PageHeader from '../components/ui/PageHeader.js';
 import { connectionProblem } from '../utils/connectionProblem.js';
 import { readLastKnown, saveLastKnown } from '../utils/lastKnown.js';
 import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
-import { card, errorNote, secondaryButton, tonalButton } from '../components/ui/styles.js';
+import { card, errorNote, tonalButton } from '../components/ui/styles.js';
 
 // Title, icon and tint for each kind of activity (reports orange, as on the dashboard)
 const GREEN = 'bg-td-tonal text-td-forest dark:bg-green-900/40 dark:text-green-300';
@@ -126,7 +126,7 @@ const Activity = () => {
       setIsLoadingMore(true);
     }
     
-    setError('');
+    if (!quiet) setError('');
 
     // Define timeout wrapper for network operations
     const fetchWithTimeout = async (operation) => {
@@ -561,7 +561,8 @@ const Activity = () => {
         return;
       }
       
-      setError("We couldn't load your activity.");
+      setError("We couldn't load your activity. We'll keep trying.");
+      waitingRef.current = true; // the background retries keep this on screen
       
       if (!isLoadMore) {
         setActivities([]);
@@ -627,7 +628,7 @@ const Activity = () => {
     return () => window.removeEventListener('local-activity', onLocalActivity);
   }, [user?.id, fetchActivities]);
 
-  useReloadWhenBack(waitingForConnection, () => fetchActivities(false));
+  useReloadWhenBack(waitingForConnection || !!error, () => fetchActivities(false));
 
   // Manual refresh handler
   const handleRefresh = () => {
@@ -784,9 +785,6 @@ const Activity = () => {
       {error && !isLoading && (
         <div className={`${errorNote} px-4 py-3`} role="alert">
           <p className="text-[15px]">{error}</p>
-          <button onClick={handleRefresh} className={`${secondaryButton} h-10 mt-3 bg-white dark:bg-transparent`}>
-            Try Again
-          </button>
         </div>
       )}
 

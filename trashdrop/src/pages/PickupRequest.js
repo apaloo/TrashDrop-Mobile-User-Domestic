@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import 'leaflet/dist/leaflet.css';
 import '../utils/leafletDefaultIcon.js';
 import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
@@ -103,6 +104,9 @@ const PickupRequest = () => {
   const [insufficientBags, setInsufficientBags] = useState(false);
   // Bag count couldn't be loaded: unknown, which is not the same as zero
   const [bagsUnknown, setBagsUnknown] = useState(false);
+  // The server answered with a failure (a dropped connection stays quiet)
+  const [bagsLoadFailed, setBagsLoadFailed] = useState(false);
+  const [locationsLoadFailed, setLocationsLoadFailed] = useState(false);
   const [dataReloadTick, setDataReloadTick] = useState(0);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   
@@ -196,6 +200,7 @@ const PickupRequest = () => {
         }
         
         console.log('[PickupRequest] Raw locations from database:', locationsData);
+        setLocationsLoadFailed(false);
         
         if (locationsData && locationsData.length > 0) {
           // Format locations to match component's expected structure
@@ -246,7 +251,8 @@ const PickupRequest = () => {
         }
       } catch (error) {
         console.error('Error loading saved locations:', error);
-        // No connection: the locations saved on this phone still work
+        if (!connectionProblem(error)) setLocationsLoadFailed(true);
+        // The locations saved on this phone still work
         try {
           const saved = JSON.parse(localStorage.getItem(cacheKey) || '[]');
           if (saved.length > 0) setSavedLocations(saved);
@@ -336,6 +342,7 @@ const PickupRequest = () => {
             const totalBagsVal = statsData.totalBags || 0;
             const totalBatchesVal = statsData.batches || 0;
             setBagsUnknown(false);
+            setBagsLoadFailed(false);
 
             // Avoid clobbering optimistic increases from 'trashdrop:bags-updated'
             setUserStats(prev => {
@@ -347,6 +354,7 @@ const PickupRequest = () => {
         } catch (error) {
           console.error('Error fetching user stats:', error);
           setBagsUnknown(true);
+          setBagsLoadFailed(!connectionProblem(error));
         }
       }
     };
@@ -355,7 +363,7 @@ const PickupRequest = () => {
   }, [user, dataReloadTick]);
 
   // Bags, saved locations and active pickups reload by themselves
-  useReloadWhenBack(bagsUnknown, () => setDataReloadTick(tick => tick + 1));
+  useReloadWhenBack(bagsUnknown || locationsLoadFailed, () => setDataReloadTick(tick => tick + 1));
 
   // Fetch active pickup requests to calculate already-requested bags
   useEffect(() => {
@@ -692,7 +700,11 @@ const PickupRequest = () => {
             </span>
             <div className="min-w-0">
               <p className="text-[15px] text-td-ink dark:text-gray-100">
-                You have <span className="font-bold">{availableBags}</span> bag(s) available for pickup.
+                {bagsLoadFailed
+                  ? "We couldn't load your bag count."
+                  : bagsUnknown
+                    ? "Your bag count will show when you're back online."
+                    : <>You have <span className="font-bold">{availableBags}</span> bag(s) available for pickup.</>}
               </p>
               {requestedBags > 0 && (
                 <p className="text-xs text-td-sage dark:text-gray-300 mt-0.5">
@@ -701,6 +713,12 @@ const PickupRequest = () => {
               )}
             </div>
           </div>
+
+          {(bagsLoadFailed || locationsLoadFailed) && (
+            <div className={`${errorNote} px-4 py-3 mt-4`} role="alert">
+              <p className="text-[15px]">We couldn't load everything on this page. We'll keep trying.</p>
+            </div>
+          )}
 
           {insufficientBags && !bagsUnknown && (
             <div className={`${warningNote} px-4 py-3 mt-4`}>
@@ -851,7 +869,7 @@ const PickupRequest = () => {
                       );
                     })}
                     {availableBags <= 0 && (
-                      <option value="1">{bagsUnknown ? "Bags will show when you're back online" : 'No bags available'}</option>
+                      <option value="1">{bagsLoadFailed ? "Couldn't load your bags" : bagsUnknown ? "Bags will show when you're back online" : 'No bags available'}</option>
                     )}
                   </Field>
                   {touched.numberOfBags && errors.numberOfBags && (

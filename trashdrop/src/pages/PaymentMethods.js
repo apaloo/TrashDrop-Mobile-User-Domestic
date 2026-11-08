@@ -6,6 +6,8 @@ import { paymentService } from '../services/paymentService.js';
 import { connectionProblem } from '../utils/connectionProblem.js';
 import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 
+const LIST_FAILED_MESSAGE = 'Failed to load payment methods';
+
 /**
  * Payment Methods management page
  * Allows users to add, view, and manage their payment methods
@@ -21,6 +23,7 @@ const PaymentMethods = () => {
   // list waits for the connection instead of claiming there are none.
   const [waitingForConnection, setWaitingForConnection] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  const [listFailed, setListFailed] = useState(false);
 
   // Fetch user's payment methods
   useEffect(() => {
@@ -32,10 +35,16 @@ const PaymentMethods = () => {
         if (fetchError) throw new Error(fetchError.message);
         setPaymentMethods(data);
         setWaitingForConnection(false);
+        setListFailed(false);
+        setError(prev => (prev === LIST_FAILED_MESSAGE ? null : prev));
       } catch (err) {
         console.error('Error fetching payment methods:', err);
-        if (connectionProblem(err)) setWaitingForConnection(true);
-        else setError('Failed to load payment methods');
+        if (connectionProblem(err)) {
+          setWaitingForConnection(true);
+        } else {
+          setListFailed(true);
+          setError(LIST_FAILED_MESSAGE);
+        }
       } finally {
         setLoading(false);
       }
@@ -44,7 +53,7 @@ const PaymentMethods = () => {
     fetchPaymentMethods();
   }, [user, reloadTick]);
 
-  useReloadWhenBack(waitingForConnection, () => setReloadTick(tick => tick + 1));
+  useReloadWhenBack(waitingForConnection || listFailed, () => setReloadTick(tick => tick + 1));
 
   const handlePaymentMethodAdded = (newMethod) => {
     setPaymentMethods(prev => [...prev, newMethod]);
@@ -187,9 +196,9 @@ const PaymentMethods = () => {
                   </div>
                 ))}
               </div>
-            ) : waitingForConnection ? (
+            ) : waitingForConnection || listFailed ? (
               <p className="text-center py-8 text-sm text-td-sage dark:text-gray-400">
-                Your payment methods will appear when you're back online.
+                {waitingForConnection ? "Your payment methods will appear when you're back online." : "Your payment methods couldn't load. We'll keep trying."}
               </p>
             ) : (
               <div className="text-center py-8">
