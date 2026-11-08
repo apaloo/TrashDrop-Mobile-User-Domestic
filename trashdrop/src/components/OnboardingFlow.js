@@ -223,7 +223,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
         
       } catch (error) {
         console.error('[Onboarding] Initialization error:', error);
-        setError('Failed to initialize onboarding');
+        setError("We couldn't start your setup.");
       } finally {
         initDoneRef.current = true;
         setIsLoading(false);
@@ -245,10 +245,8 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
         hasCompletedHasBags: true 
       }));
       
-      // Save to localStorage as fallback for network issues
-      localStorage.setItem(`trashdrop_has_bags_${user.id}`, hasBags.toString());
-      
-      await onboardingService.setHasBags(user.id, hasBags);
+      // Kept on the phone and sent when it can be: the answer never stops setup
+      await onboardingService.saveHasBagsChoice(user.id, hasBags);
       
       if (hasBags) {
         // Dismiss onboarding since user is proceeding to profile
@@ -264,7 +262,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
       
     } catch (error) {
       console.error('[Onboarding] Error setting has bags:', error);
-      setError('Failed to save preference');
+      setError("We couldn't continue your setup.");
     } finally {
       setIsLoading(false);
     }
@@ -294,7 +292,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
       
     } catch (error) {
       console.error('[Onboarding] Error setting location:', error);
-      setError('Failed to save location');
+      setError("We couldn't save your location.");
       setProgressMilestones(prev => ({ ...prev, hasCompletedLocation: false })); // Reset on error
     } finally {
       setIsLoading(false);
@@ -337,7 +335,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
       
     } catch (error) {
       console.error('[Onboarding] Error processing QR:', error);
-      setError('Failed to process QR code');
+      setError("We couldn't read that QR code.");
       setProgressMilestones(prev => ({ ...prev, hasCompletedQR: false }));
     } finally {
       setIsLoading(false);
@@ -374,7 +372,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
       
     } catch (error) {
       console.error('[Onboarding] Error selecting service:', error);
-      setError('Failed to select service');
+      setError("We couldn't open that service.");
     } finally {
       setIsLoading(false);
     }
@@ -461,10 +459,21 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
   if (error) {
     console.log('[OnboardingFlow] Rendering error state:', error);
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl" role="alertdialog" aria-labelledby="onboarding-error-title">
-          <h3 id="onboarding-error-title" className="text-[20px] font-bold text-red-700 dark:text-red-300 mb-2">Error</h3>
-          <p className="text-[15px] text-td-sage dark:text-gray-300 mb-5">{error}</p>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-[9999]">
+        <div className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-3xl p-6 max-w-md w-full sm:mx-4 shadow-2xl" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }} role="alertdialog" aria-labelledby="onboarding-error-title">
+          <h3 id="onboarding-error-title" className="text-[20px] font-bold text-td-ink dark:text-gray-100 mb-2">
+            {navigator.onLine === false ? "You're offline" : "That didn't work"}
+          </h3>
+          <p className="text-[15px] text-td-sage dark:text-gray-300 mb-5">
+            {navigator.onLine === false ? 'Connect to Wi-Fi or mobile data, then try again.' : error}
+          </p>
+          {/* Back to the step they were on: nothing they entered is lost */}
+          <button
+            onClick={() => setError(null)}
+            className="mb-3 w-full h-12 px-6 inline-flex items-center justify-center rounded-full transition-colors bg-td-forest hover:bg-td-forest-dk text-white text-[16px] font-bold antialiased"
+          >
+            Try again
+          </button>
           <button
             onClick={onClose}
             className="w-full h-12 px-6 inline-flex items-center justify-center gap-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-[1.5px] border-td-border-strong dark:border-gray-500 text-td-ink dark:text-gray-100 text-[15px] font-semibold hover:bg-td-cream dark:hover:bg-gray-700 antialiased"
@@ -478,8 +487,8 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
 
   console.log('[OnboardingFlow] Rendering main modal with step:', currentStep);
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]" style={{zIndex: 9999}}>
-      <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-[9999]" style={{zIndex: 9999}}>
+      <div className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-3xl max-w-lg w-full sm:mx-4 max-h-[90vh] overflow-y-auto shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
         {/* Header */}
         <div className="px-6 pt-6 pb-5 border-b border-td-border dark:border-gray-700">
           <div className="flex justify-between items-center gap-3">
@@ -493,7 +502,7 @@ const OnboardingFlow = ({ onComplete, onClose, initialStep }) => {
                 className="h-9 px-3 rounded-full text-sm font-semibold text-td-sage dark:text-gray-300 hover:bg-td-cream dark:hover:bg-gray-700 antialiased"
                 title="Don't show this again"
               >
-                Dismiss
+                Skip setup
               </button>
               <button
                 onClick={onClose}
@@ -546,7 +555,7 @@ const WelcomeStep = ({ onHasBags, onServiceSelect, isLoading }) => (
       <h2 className="text-[22px] leading-tight font-bold text-td-ink dark:text-gray-100 mb-2">
           Start Your First TrashDrop Service
         </h2>
-      <p className="text-[15px] text-td-sage dark:text-gray-300 antialiased leading-relaxed">Do you have TrashDrop bags ready to use?</p>
+      <p className="text-[15px] text-td-sage dark:text-gray-300 antialiased leading-relaxed">Do you have TrashDrop QR Bags ready to use?</p>
     </div>
     
     <div className="space-y-3">
@@ -555,7 +564,7 @@ const WelcomeStep = ({ onHasBags, onServiceSelect, isLoading }) => (
         disabled={isLoading}
         className="w-full h-12 px-6 inline-flex items-center justify-center gap-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-td-forest hover:bg-td-forest-dk text-white text-[16px] font-bold antialiased"
       >
-        Yes, I have bags
+        Yes, I have QR Bags
       </button>
       
       <button

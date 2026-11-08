@@ -10,6 +10,7 @@ import { userService, pickupService } from '../services/index.js';
 import userServiceOptimized from '../services/userServiceOptimized.js';
 import { notificationService } from '../services/notificationService.js';
 import onboardingService from '../services/onboardingService.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
 import { statusService } from '../services/statusService.js';
 import smartNotificationService from '../services/smartNotificationService.js';
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
@@ -86,6 +87,7 @@ const ActivityListSkeleton = () => (
 // Backoff schedule for the initial dashboard load, in ms. Length also decides
 // how many retries happen before the user sees a failure banner.
 const LOAD_RETRY_DELAYS = [500, 1500, 4000];
+const QUIET_RETRY_MS = 30000; // Weak signal: keep trying out of sight
 
 /**
  * Dashboard page component showing user's activity and nearby trash drop points
@@ -128,6 +130,10 @@ const Dashboard = () => {
   const bagsPulseTimerRef = useRef(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false); // Initial load exhausted its retries
+  const quietRetryRef = useRef(null);
+  const loadDashboardRef = useRef(null);
+  const onboardingCheckDeferredRef = useRef(false);
+  const [onboardingRecheck, setOnboardingRecheck] = useState(0);
   const [isRetryingLoad, setIsRetryingLoad] = useState(false);
   const seamlessSubscriptionsRef = useRef({});
   
@@ -207,6 +213,9 @@ const Dashboard = () => {
           const onboardingResult = await onboardingService.checkOnboardingStatus(user.id);
           console.log('[Dashboard] checkOnboardingStatus result:', JSON.stringify(onboardingResult));
           
+          // Couldn't tell without a connection: ask again on reconnect
+          onboardingCheckDeferredRef.current = onboardingResult.unknown === true;
+          
           if (onboardingResult.show) {
             setOnboardingStartingStep(onboardingResult.startingStep);
             setShowOnboarding(true);
@@ -231,7 +240,7 @@ const Dashboard = () => {
       console.error('[Dashboard] useEffect error details:', error.stack);
     }
     
-      }, [user?.id]);
+      }, [user?.id, onboardingRecheck]);
 
   // Load recent activities from all activity sources (pickup_requests, illegal_dumping_mobile, digital_bins, user_activity)
   const getDatabaseActivities = useCallback(async (limit = 5) => {
@@ -783,8 +792,26 @@ const Dashboard = () => {
     setIsLoading(false);
     setDataSource('error');
     setActivitiesLoaded(true);
+
+    // A connection problem is handled out of sight: what is on screen stays
+    // and the page tries again by itself. Only a real server failure is shown.
+    if (connectionProblem(lastError)) {
+      clearTimeout(quietRetryRef.current);
+      if (isOnline()) {
+        quietRetryRef.current = setTimeout(() => {
+          if (mountedRef.current) loadDashboardRef.current?.();
+        }, QUIET_RETRY_MS);
+      }
+      return;
+    }
     setLoadFailed(true);
   }, [user?.id, applyRecentActivities]);
+
+  useEffect(() => {
+    loadDashboardRef.current = loadDashboardDataSeamless;
+  }, [loadDashboardDataSeamless]);
+
+  useEffect(() => () => clearTimeout(quietRetryRef.current), []);
 
   // Explicit "Try again" from the failure banner
   const handleRetryInitialLoad = useCallback(async () => {
@@ -871,6 +898,12 @@ const Dashboard = () => {
       
       if (online && user?.id) {
         console.log('[Dashboard] 🌐 Back online, refreshing seamless cache');
+        setLoadFailed(false);
+        onboardingService.flushHasBagsChoice(user.id);
+        if (onboardingCheckDeferredRef.current) {
+          onboardingCheckDeferredRef.current = false;
+          setOnboardingRecheck(count => count + 1);
+        }
         // Refresh data when coming back online. The browser fires 'online' as
         // soon as it has a link, which can be before the API is reachable, so
         // swallow the failure here - whatever is already rendered stays put.

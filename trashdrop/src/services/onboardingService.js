@@ -4,6 +4,17 @@
  */
 
 import supabase from '../utils/supabaseClient.js';
+import { connectionProblem, withTimeout } from '../utils/connectionProblem.js';
+
+// "Can't tell yet": no setup screen for now, and Dashboard asks again on reconnect
+const STATUS_UNKNOWN = { show: false, startingStep: null, unknown: true };
+const HAS_BAGS_SAVE_WAIT_MS = 4000;
+const pendingHasBagsKey = (userId) => `trashdrop_has_bags_pending_${userId}`;
+const rememberPendingHasBags = (userId, hasBags) => {
+  try {
+    localStorage.setItem(pendingHasBagsKey(userId), hasBags.toString());
+  } catch (storageError) { /* storage blocked: nothing more we can do */ }
+};
 
 export const onboardingService = {
   /**
@@ -415,6 +426,48 @@ export const onboardingService = {
   },
 
   /**
+   * Keeps the person's answer and moves on, whatever the connection is doing.
+   * The answer is only a record of their choice, so it is kept on the phone
+   * and sent when it can be; it never stops the setup. Never throws.
+   */
+  async saveHasBagsChoice(userId, hasBags) {
+    try {
+      localStorage.setItem(`trashdrop_has_bags_${userId}`, hasBags.toString());
+    } catch (storageError) { /* storage blocked: the send below still runs */ }
+
+    if (connectionProblem(null)) {
+      rememberPendingHasBags(userId, hasBags);
+      return { saved: false };
+    }
+    try {
+      await withTimeout(this.setHasBags(userId, hasBags), HAS_BAGS_SAVE_WAIT_MS);
+      try {
+        localStorage.removeItem(pendingHasBagsKey(userId)); // superseded by this answer
+      } catch (storageError) { /* storage blocked */ }
+      return { saved: true };
+    } catch (error) {
+      console.warn('[Onboarding] Will send the bags answer later:', error?.message);
+      rememberPendingHasBags(userId, hasBags);
+      return { saved: false };
+    }
+  },
+
+  /** Sends an answer given while offline. Never throws. */
+  async flushHasBagsChoice(userId) {
+    let pending = null;
+    try {
+      pending = localStorage.getItem(pendingHasBagsKey(userId));
+    } catch (storageError) { return; }
+    if (pending === null || connectionProblem(null)) return;
+    try {
+      await this.setHasBags(userId, pending === 'true');
+      localStorage.removeItem(pendingHasBagsKey(userId));
+    } catch (error) {
+      console.warn('[Onboarding] Bags answer still waiting to send:', error?.message);
+    }
+  },
+
+  /**
    * Add user location
    * Uses RPC function to create location in bin_locations table
    */
@@ -529,7 +582,13 @@ export const onboardingService = {
   async checkOnboardingStatus(userId) {
     console.log('[Onboarding] checkOnboardingStatus called for userId:', userId);
     
+    // Without a connection every lookup comes back empty, which looks exactly
+    // like a brand-new account. Don't guess: Dashboard checks again on reconnect.
+    if (connectionProblem(null)) return { ...STATUS_UNKNOWN };
+    
     try {
+      await this.flushHasBagsChoice(userId);
+      
       // Check for force parameter in URL
       const urlParams = new URLSearchParams(window.location.search);
       const forceOnboarding = urlParams.get('force') === 'true' || urlParams.get('reset') === 'true';
@@ -561,6 +620,7 @@ export const onboardingService = {
       
       if (error) {
         console.error('[Onboarding] RPC error:', error.message, error.code);
+        if (connectionProblem(error)) return { ...STATUS_UNKNOWN };
         return this.fallbackCheckOnboarding(userId, forceOnboarding, forceParam);
       }
       
@@ -608,6 +668,7 @@ export const onboardingService = {
       return { show: false, startingStep: null };
     } catch (error) {
       console.error('[Onboarding] Error in checkOnboardingStatus:', error);
+      if (connectionProblem(error)) return { ...STATUS_UNKNOWN };
       return this.fallbackCheckOnboarding(userId, false, null);
     }
   },
