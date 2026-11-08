@@ -16,7 +16,6 @@ import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCac
 import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
 import realtimeManager from '../utils/realtimeOptimized.js';
 import seamlessDashboardService from '../services/seamlessDashboardService.js';
-import DataFreshnessIndicator from '../components/DataFreshnessIndicator.js';
 import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
 import CoverageArrivalBanner from '../components/CoverageArrivalBanner.js';
 import RewardsCard from '../components/dashboard/RewardsCard.js';
@@ -1208,12 +1207,6 @@ const Dashboard = () => {
 
   return (
     <div className="bg-white dark:bg-gray-900">
-      {/* Data Freshness Indicator */}
-      <DataFreshnessIndicator 
-        dataSource={dataSource}
-        updateType={updateType}
-        lastUpdate={Date.now()}
-      />
       
       {/* Onboarding Flow */}
       {showOnboarding && (
@@ -1333,9 +1326,10 @@ const Dashboard = () => {
 
       {/* Scrollable Content - Tab-based: Recent Activity or Active Pickup */}
       <div className="max-w-3xl mx-auto px-2 pt-6 pb-24 space-y-6">
-        {/* Initial load gave up after retries - plain language plus a way out,
-            never a raw error dump */}
-        {loadFailed && (
+        {/* Initial load gave up after retries while online. Offline is not
+            mentioned here: the app-wide "Offline" pill says it once, what is
+            already shown stays, and the page refreshes itself on reconnect. */}
+        {loadFailed && isOnlineStatus && (
           <div
             role="alert"
             className="bg-amber-50 dark:bg-amber-900 dark:bg-opacity-20 border border-amber-300 dark:border-amber-700 rounded-lg p-4 flex items-start gap-3"
@@ -1345,12 +1339,10 @@ const Dashboard = () => {
             </svg>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                We couldn't load your latest dashboard data
+                Couldn't refresh your dashboard
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                {isOnlineStatus
-                  ? "Anything shown below may be out of date."
-                  : "You're offline - anything shown below may be out of date."}
+                You're seeing what we had last.
               </p>
               <button
                 type="button"
