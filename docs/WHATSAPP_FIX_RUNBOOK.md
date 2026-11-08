@@ -823,8 +823,7 @@ git rm trashdrop/src/App.js.backup trashdrop/src/context/AuthContext.patch.js \
        trashdrop/src/contexts/AuthContext.js \
        trashdrop/src/components/DumpingReportForm.js.bak2 \
        trashdrop/src/components/DumpingReportForm.js.before_fix \
-       trashdrop/src/components/DumpingReportForm.js.orig \
-       trashdrop/src/pages/CollectorPickup.js.fixed
+       trashdrop/src/components/DumpingReportForm.js.orig
 
 # Archive fix-log docs out of the root
 mkdir -p docs/history && git mv *_FIX.md *_FIXES.md *_SUMMARY.md docs/history/ 2>/dev/null
