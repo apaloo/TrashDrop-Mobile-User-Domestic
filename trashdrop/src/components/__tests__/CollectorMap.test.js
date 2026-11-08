@@ -239,7 +239,7 @@ describe('CollectorMap', () => {
   it('handles service errors gracefully', async () => {
     collectorService.getNearbyCollectors.mockResolvedValueOnce({
       data: null,
-      error: { message: 'Failed to fetch collectors' }
+      error: { message: 'Server error while listing collectors' }
     });
 
     render(<CollectorMap />);

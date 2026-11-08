@@ -29,3 +29,36 @@ describe('Onboarding "Request Bin Pickup" step', () => {
     expect(localStorage.getItem('trashdrop_onboarding_dismissed_user-1')).toBe('true');
   });
 });
+
+describe('"Do you have bags?" step', () => {
+  const setOnline = (value) => Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => value });
+  afterEach(() => setOnline(true));
+
+  it('says QR Bags on the Yes button', async () => {
+    render(<OnboardingFlow onComplete={jest.fn()} onClose={jest.fn()} initialStep="welcome" />);
+    expect(await screen.findByRole('button', { name: 'Yes, I have QR Bags' })).toBeInTheDocument();
+  });
+
+  it('offline, "No" moves on to choosing a service with no error', async () => {
+    setOnline(false);
+    render(<OnboardingFlow onComplete={jest.fn()} onClose={jest.fn()} initialStep="welcome" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: "No, I don't have bags" }));
+
+    expect(await screen.findByText('Choose Your Service')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(localStorage.getItem('trashdrop_has_bags_pending_user-1')).toBe('false');
+  });
+
+  it('online, "Yes" still goes to adding a location', async () => {
+    supabase.rpc.mockResolvedValue({ data: {}, error: null });
+    const onComplete = jest.fn();
+    render(<OnboardingFlow onComplete={onComplete} onClose={jest.fn()} initialStep="welcome" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Yes, I have QR Bags' }));
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/profile?tab=locations&source=onboarding'));
+    expect(onComplete).toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith('set_has_bags', { user_uuid: 'user-1', has_bags: true });
+  });
+});

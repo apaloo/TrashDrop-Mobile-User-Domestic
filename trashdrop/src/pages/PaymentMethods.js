@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import PaymentMethodForm from '../components/PaymentMethodForm.js';
 import { paymentService } from '../services/paymentService.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
+import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 
 /**
  * Payment Methods management page
@@ -15,6 +17,10 @@ const PaymentMethods = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  // Couldn't connect. Payment details are never saved on the phone, so the
+  // list waits for the connection instead of claiming there are none.
+  const [waitingForConnection, setWaitingForConnection] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   // Fetch user's payment methods
   useEffect(() => {
@@ -25,16 +31,20 @@ const PaymentMethods = () => {
         const { data, error: fetchError } = await paymentService.getUserPaymentMethods(user.id);
         if (fetchError) throw new Error(fetchError.message);
         setPaymentMethods(data);
+        setWaitingForConnection(false);
       } catch (err) {
         console.error('Error fetching payment methods:', err);
-        setError('Failed to load payment methods');
+        if (connectionProblem(err)) setWaitingForConnection(true);
+        else setError('Failed to load payment methods');
       } finally {
         setLoading(false);
       }
     };
 
     fetchPaymentMethods();
-  }, [user]);
+  }, [user, reloadTick]);
+
+  useReloadWhenBack(waitingForConnection, () => setReloadTick(tick => tick + 1));
 
   const handlePaymentMethodAdded = (newMethod) => {
     setPaymentMethods(prev => [...prev, newMethod]);
@@ -177,6 +187,10 @@ const PaymentMethods = () => {
                   </div>
                 ))}
               </div>
+            ) : waitingForConnection ? (
+              <p className="text-center py-8 text-sm text-td-sage dark:text-gray-400">
+                Your payment methods will appear when you're back online.
+              </p>
             ) : (
               <div className="text-center py-8">
                 <svg className="mx-auto h-12 w-12 text-td-sage" fill="none" viewBox="0 0 24 24" stroke="currentColor">

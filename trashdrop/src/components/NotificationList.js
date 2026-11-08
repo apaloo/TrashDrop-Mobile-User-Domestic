@@ -53,10 +53,10 @@ const NotificationList = () => {
         console.error('Error fetching notifications:', err);
         if (cancelled) return;
         const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        // Offline with notifications already showing: say nothing (the
+        // app-wide "Offline" pill covers it, and they reload by themselves)
         if (offline) {
-          setLoadError(loadedRef.current
-            ? "You're offline. These are the notifications you already had."
-            : "You're offline. Notifications will load when you're back online.");
+          if (!loadedRef.current) setLoadError("Notifications will load when you're back online.");
         } else if (!loadedRef.current) {
           setLoadError('Failed to load notifications');
         }

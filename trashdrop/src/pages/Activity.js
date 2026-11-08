@@ -5,6 +5,9 @@ import LoadingSpinner from '../components/LoadingSpinner.js';
 import { reportPoints, reportPointsPending } from '../utils/reportPoints.js';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
+import { readLastKnown, saveLastKnown } from '../utils/lastKnown.js';
+import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 import { card, errorNote, secondaryButton, tonalButton } from '../components/ui/styles.js';
 
 // Title, icon and tint for each kind of activity (reports orange, as on the dashboard)
@@ -49,6 +52,8 @@ const Activity = () => {
   });
   const itemsPerPage = 20; // Increased for better infinite scroll experience
   const mountedRef = useRef(true);
+  const waitingRef = useRef(false);
+  const [waitingForConnection, setWaitingForConnection] = useState(false);
   const observerRef = useRef(null);
   const loadingRef = useRef(null);
   const cursorsRef = useRef({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null, batches: null });
@@ -93,9 +98,27 @@ const Activity = () => {
     
     console.log('Fetching activities for user:', user.id, 'isLoadMore:', isLoadMore);
     
+    // Showing saved items while waiting for a connection: keep them on screen
+    // during the quiet reloads instead of flashing a spinner
+    const quiet = waitingRef.current;
+
+    // No connection: show the last saved list and reload by itself later
+    const showSavedActivities = () => {
+      waitingRef.current = true;
+      setWaitingForConnection(true);
+      setHasMoreData(false);
+      if (isLoadMore) return;
+      const saved = readLastKnown('activity', user.id) || [];
+      const inFilter = (a) => filter === 'all' || a.type === filter
+        || (filter === 'pickup_request' && a.type === 'digital_bin');
+      setActivities(saved.filter(inFilter));
+    };
+
     if (!isLoadMore) {
-      setIsLoading(true);
-      setActivities([]);
+      if (!quiet) {
+        setIsLoading(true);
+        setActivities([]);
+      }
       setCursors({ user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null, batches: null });
       cursorsRef.current = { user_activity: null, illegal_dumping_mobile: null, pickup_requests: null, digital_bins: null, batches: null };
       setHasMoreData(true);
@@ -113,7 +136,7 @@ const Activity = () => {
     };
     
     if (isOffline) {
-      setError('Internet connection required to load activities. Please connect and try again.');
+      showSavedActivities();
       setIsLoading(false);
       setIsLoadingMore(false);
       return;
@@ -128,6 +151,15 @@ const Activity = () => {
         console.warn('Session refresh failed before fetching activities');
       }
     }
+
+    // Every lookup failing on the connection is "couldn't reach the server",
+    // not "this person has no activity"
+    const throwIfConnectionLost = (results) => {
+      const failures = results.map(r => (r.status === 'rejected' ? r.reason : r.value?.error));
+      if (failures.every(f => f && (connectionProblem(f) || /timeout/i.test(String(f.message || ''))))) {
+        throw failures[0];
+      }
+    };
 
     try {
       let newActivities = [];
@@ -229,6 +261,8 @@ const Activity = () => {
           })
         ]);
         
+        throwIfConnectionLost([activityResult, dumpingResult, pickupResult, digitalBinResult]);
+
         let allTableActivities = [];
         
         // Process user_activity results
@@ -312,6 +346,8 @@ const Activity = () => {
           })
         ]);
         
+        throwIfConnectionLost([pickupResult, digitalBinResult]);
+
         let allPickupActivities = [];
         
         // Process pickup requests results
@@ -496,8 +532,11 @@ const Activity = () => {
         setActivities(prev => [...prev, ...formattedActivities]);
       } else {
         setActivities(formattedActivities);
+        if (filter === 'all') saveLastKnown('activity', user.id, formattedActivities);
       }
       
+      waitingRef.current = false;
+      setWaitingForConnection(false);
       setError('');
       console.log('Loaded activities:', {
         new: formattedActivities.length,
@@ -517,11 +556,12 @@ const Activity = () => {
         return;
       }
       
-      if (error?.message?.includes('timeout')) {
-        setError('Connection is slow. Activity data will load when network improves.');
-      } else {
-        setError('Unable to load activity history. Please check your connection.');
+      if (connectionProblem(error) || error?.message?.includes('timeout')) {
+        showSavedActivities();
+        return;
       }
+      
+      setError("We couldn't load your activity.");
       
       if (!isLoadMore) {
         setActivities([]);
@@ -586,6 +626,8 @@ const Activity = () => {
     window.addEventListener('local-activity', onLocalActivity);
     return () => window.removeEventListener('local-activity', onLocalActivity);
   }, [user?.id, fetchActivities]);
+
+  useReloadWhenBack(waitingForConnection, () => fetchActivities(false));
 
   // Manual refresh handler
   const handleRefresh = () => {
@@ -741,7 +783,7 @@ const Activity = () => {
       {/* Error state */}
       {error && !isLoading && (
         <div className={`${errorNote} px-4 py-3`} role="alert">
-          <p className="text-[15px]"><strong className="font-bold">Error: </strong>{error}</p>
+          <p className="text-[15px]">{error}</p>
           <button onClick={handleRefresh} className={`${secondaryButton} h-10 mt-3 bg-white dark:bg-transparent`}>
             Try Again
           </button>
@@ -762,6 +804,10 @@ const Activity = () => {
             <div ref={loadingRef}>
               <InfiniteScrollLoader />
             </div>
+          </section>
+        ) : waitingForConnection ? (
+          <section className={`${card} px-5 py-10 text-center`}>
+            <p className="text-[15px] text-td-sage dark:text-gray-300">Your activity will appear when you're back online.</p>
           </section>
         ) : (
           <section className={`${card} px-5 py-8 text-center`}>

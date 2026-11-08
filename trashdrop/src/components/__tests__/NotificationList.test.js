@@ -166,13 +166,32 @@ describe('NotificationList', () => {
     expect(screen.queryByText('Failed to load notifications')).not.toBeInTheDocument();
   });
 
-  it('says the phone is offline rather than "failed"', async () => {
+  it('offline with nothing loaded yet: says they will load, not "failed"', async () => {
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     try {
       notificationService.getUserNotifications.mockResolvedValue({ data: [], error: { message: 'Failed to fetch' } });
       render(<NotificationList />);
-      expect(await screen.findByText(/You're offline/)).toBeInTheDocument();
+      expect(await screen.findByText("Notifications will load when you're back online.")).toBeInTheDocument();
       expect(screen.queryByText('Failed to load notifications')).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+    }
+  });
+
+  it('offline with notifications showing: no message (the app-wide pill says it)', async () => {
+    render(<NotificationList />);
+    await waitFor(() => expect(screen.getByText('Pickup Complete')).toBeInTheDocument());
+
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      notificationService.getUserNotifications.mockResolvedValue({ data: [], error: { message: 'Failed to fetch' } });
+      window.dispatchEvent(new Event('online')); // any refresh attempt
+      await waitFor(() => expect(notificationService.getUserNotifications.mock.calls.length).toBeGreaterThan(1));
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByText('Pickup Complete')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByText(/offline|Failed to load/i)).not.toBeInTheDocument();
     } finally {
       Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
     }

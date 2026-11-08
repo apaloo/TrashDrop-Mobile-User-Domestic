@@ -22,14 +22,10 @@ import {
 import { useAuth } from '../context/AuthContext.js';
 import { collectorService } from '../services/collectorService.js';
 import GeolocationService from '../utils/geolocationService.js';
+import '../utils/leafletDefaultIcon.js';
+import { connectionProblem } from '../utils/connectionProblem.js';
 
 // Fix default Leaflet marker icons - use local files instead of unpkg
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/assets/marker-icon-2x.png',
-  iconUrl: '/assets/marker-icon.png',
-  shadowUrl: '/assets/marker-shadow.png',
-});
 
 // Create custom icon for current location
 const currentLocationIcon = new L.Icon({
@@ -131,8 +127,9 @@ const CollectorMap = ({ pickupLocation, onCollectorLocationUpdate }) => {
 
       } catch (err) {
         console.error('[CollectorMap] Error fetching collectors:', err);
-        // Don't show error for missing location, just log it
-        if (!err.message.includes('location')) {
+        // Don't show error for missing location, just log it. A connection
+        // problem isn't shown either: this retries every 30 seconds anyway.
+        if (!err.message.includes('location') && !connectionProblem(err)) {
           setError('Failed to fetch nearby collectors');
         }
       }

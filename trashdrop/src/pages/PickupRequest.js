@@ -4,6 +4,8 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import '../utils/leafletDefaultIcon.js';
+import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 import { useAuth } from '../context/AuthContext.js';
 import supabase from '../utils/supabaseClient.js';
 import LoadingSpinner from '../components/LoadingSpinner.js';
@@ -99,6 +101,9 @@ const PickupRequest = () => {
   });
   const [requestedBags, setRequestedBags] = useState(0); // Bags already in active pickups
   const [insufficientBags, setInsufficientBags] = useState(false);
+  // Bag count couldn't be loaded: unknown, which is not the same as zero
+  const [bagsUnknown, setBagsUnknown] = useState(false);
+  const [dataReloadTick, setDataReloadTick] = useState(0);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   
   // Calculate available bags: total bags - requested bags (never below 0)
@@ -171,8 +176,9 @@ const PickupRequest = () => {
       // User-specific cache key
       const cacheKey = `trashdrop_locations_${user.id}`;
       
-      // Clear any existing saved locations in state (not localStorage)
-      setSavedLocations([]);
+      // Clear any existing saved locations in state (not localStorage).
+      // A reload after reconnecting keeps them on screen.
+      if (dataReloadTick === 0) setSavedLocations([]);
       
       try {
         // IMPORTANT: Always fetch fresh from database to ensure we have PostGIS coordinates
@@ -240,6 +246,11 @@ const PickupRequest = () => {
         }
       } catch (error) {
         console.error('Error loading saved locations:', error);
+        // No connection: the locations saved on this phone still work
+        try {
+          const saved = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+          if (saved.length > 0) setSavedLocations(saved);
+        } catch (_) { /* unreadable cache: leave the list as it is */ }
       }
     };
     
@@ -272,7 +283,7 @@ const PickupRequest = () => {
       try { subscription.unsubscribe(); } catch (_) {}
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user?.id]);
+  }, [user?.id, dataReloadTick]);
 
   // Update position when saved location is selected
   useEffect(() => {
@@ -324,6 +335,7 @@ const PickupRequest = () => {
             // userServiceOptimized returns a different structure: totalBags, batches, etc.
             const totalBagsVal = statsData.totalBags || 0;
             const totalBatchesVal = statsData.batches || 0;
+            setBagsUnknown(false);
 
             // Avoid clobbering optimistic increases from 'trashdrop:bags-updated'
             setUserStats(prev => {
@@ -334,12 +346,16 @@ const PickupRequest = () => {
           }
         } catch (error) {
           console.error('Error fetching user stats:', error);
+          setBagsUnknown(true);
         }
       }
     };
     
     fetchUserStats();
-  }, [user]);
+  }, [user, dataReloadTick]);
+
+  // Bags, saved locations and active pickups reload by themselves
+  useReloadWhenBack(bagsUnknown, () => setDataReloadTick(tick => tick + 1));
 
   // Fetch active pickup requests to calculate already-requested bags
   useEffect(() => {
@@ -388,7 +404,7 @@ const PickupRequest = () => {
     return () => {
       try { subscription.unsubscribe(); } catch (_) {}
     };
-  }, [user?.id]);
+  }, [user?.id, dataReloadTick]);
 
   // Subscribe to real-time stats updates so bag counts stay in sync after scans
   useEffect(() => {
@@ -686,7 +702,7 @@ const PickupRequest = () => {
             </div>
           </div>
 
-          {insufficientBags && (
+          {insufficientBags && !bagsUnknown && (
             <div className={`${warningNote} px-4 py-3 mt-4`}>
               <p className="text-sm">You don't have any bags available. Please purchase bags to continue OR use the Digital Bin module.</p>
               <div className="mt-3 grid grid-cols-1 min-[480px]:grid-cols-2 gap-2.5">
@@ -835,7 +851,7 @@ const PickupRequest = () => {
                       );
                     })}
                     {availableBags <= 0 && (
-                      <option value="1">No bags available</option>
+                      <option value="1">{bagsUnknown ? "Bags will show when you're back online" : 'No bags available'}</option>
                     )}
                   </Field>
                   {touched.numberOfBags && errors.numberOfBags && (
@@ -918,7 +934,7 @@ const PickupRequest = () => {
                 <p className="text-[15px] text-td-sage dark:text-gray-300 mt-1">No standard pickup fee</p>
               </section>
 
-              {userStats.totalBags <= 0 && (
+              {userStats.totalBags <= 0 && !bagsUnknown && (
                 <div className={`${warningNote} px-4 py-3 text-sm`} role="alert">
                   No bags available. Scan a batch to enable pickup.
                 </div>
