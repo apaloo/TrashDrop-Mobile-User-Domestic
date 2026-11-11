@@ -12,6 +12,12 @@ const FUNCTIONS_BASE = process.env.NODE_ENV === 'development'
   ? 'http://localhost:9999/.netlify/functions'  
   : (process.env.REACT_APP_FUNCTIONS_URL || '/.netlify/functions').replace(/\/$/, '');
 
+// ilike with no wildcards is a case-insensitive exact match, but _ and %
+// are LIKE wildcards, so escape them (and the escape character). Batch codes
+// are matched exactly, never by "contains": a partial code must not pick
+// another batch (TD36; check-batch does the same on the server).
+export const likeExact = (value) => String(value).replace(/[\\%_]/g, (c) => `\\${c}`);
+
 export const batchService = {
   // ---- Runtime helpers (timeout/retry) ----
   _DEFAULT_TIMEOUT_MS: 45000,
@@ -137,17 +143,12 @@ export const batchService = {
         if (res.error) return { data: null, error: res.error };
         row = Array.isArray(res.data) ? res.data[0] : null;
       } else {
-        // Try exact, then ilike, then contains
+        // Exact, then exact ignoring case
         let res = await supabase.from(this._BATCH_TABLE).select('*').eq('batch_number', batchId).limit(1);
         if (res.error) return { data: null, error: res.error };
         row = Array.isArray(res.data) ? res.data[0] : null;
         if (!row) {
-          res = await supabase.from(this._BATCH_TABLE).select('*').ilike('batch_number', batchId).limit(1);
-          if (res.error) return { data: null, error: res.error };
-          row = Array.isArray(res.data) ? res.data[0] : null;
-        }
-        if (!row) {
-          res = await supabase.from(this._BATCH_TABLE).select('*').ilike('batch_number', `%${batchId}%`).limit(1);
+          res = await supabase.from(this._BATCH_TABLE).select('*').ilike('batch_number', likeExact(batchId)).limit(1);
           if (res.error) return { data: null, error: res.error };
           row = Array.isArray(res.data) ? res.data[0] : null;
         }
@@ -428,22 +429,13 @@ export const batchService = {
             const found = Array.isArray(res.data) ? res.data[0] : null;
             if (found) { batch = found; break; }
           }
-          // Case-insensitive fallback
+          // Exact, ignoring case
           if (!batch) {
             for (const cand of buildCandidates(normalized)) {
-              const res = await supabase.from('batches').select('*').ilike('batch_number', cand).limit(1);
+              const res = await supabase.from('batches').select('*').ilike('batch_number', likeExact(cand)).limit(1);
               if (res.error) throw res.error;
               const found = Array.isArray(res.data) ? res.data[0] : null;
               if (found) { batch = found; break; }
-            }
-            // Wildcard contains fallback
-            if (!batch) {
-              for (const cand of buildCandidates(normalized)) {
-                const res = await supabase.from('batches').select('*').ilike('batch_number', `%${cand}%`).limit(1);
-                if (res.error) throw res.error;
-                const found = Array.isArray(res.data) ? res.data[0] : null;
-                if (found) { batch = found; break; }
-              }
             }
           }
         }
@@ -459,52 +451,39 @@ export const batchService = {
         console.log('[BatchService] Skipping qr_code field lookup - not implemented in current schema');
       }
 
-      if (!batch) { // Purely for testing and debugging purposes only
-        console.warn('[BatchService] No direct match in batches or batches_mobile. Running diagnostics...');
-        
-        // Skip diagnostics to reduce console noise
-        console.warn('[BatchService] Batch not found in direct lookup, trying server verification...');
-        
-        console.warn('[BatchService] Attempting server-side verification...');
-        
-        // For the test batch, skip server verification and create a mock batch
-        if (normalized === 'e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed') {
-          console.log('[BatchService] Test batch - creating mock batch for testing');
-          batch = {
-            id: 'e9dcf72b-6759-4b1d-8ad8-ea5f380ea9ed',
-            batch_number: 'TEST-BATCH-001',
-            status: 'active', // Force active status for testing
-            bag_count: 15,
-            created_by: '123e4567-e89b-12d3-a456-426614174000', // Test user ID
-            created_at: new Date().toISOString()
-          };
-        } else {
-          // Policy-safe server-side verification via Netlify Function
-          try {
-            const qs = isUUID(normalized)
-              ? `id=${encodeURIComponent(normalized)}`
-              : `batch_number=${encodeURIComponent(normalized)}`;
-            // Abortable fetch to avoid hanging connections
-            const controller = new AbortController();
-            const fetchTimeout = setTimeout(() => controller.abort('function_fetch_timeout'), 8000); // Reduced timeout
-            const resp = await fetch(`${FUNCTIONS_BASE}/check-batch?${qs}`, {
-              method: 'GET',
-              headers: { 'Accept': 'application/json' },
-              signal: controller.signal,
-            });
-            clearTimeout(fetchTimeout);
-            if (resp.ok) {
-              const payload = await resp.json();
-              if (payload?.data?.id) {
-                batch = payload.data;
-                console.log('[BatchService] Server-side verification succeeded via', payload?.meta?.by);
-              }
-            } else {
-              console.warn('[BatchService] Server-side verification HTTP', resp.status);
+      if (!batch) {
+        // Not visible to this user (an unclaimed batch belongs to whoever printed it):
+        // ask check-batch, which looks it up with the service key, exact matches only
+        // Policy-safe server-side verification via Netlify Function
+        try {
+          const qs = isUUID(normalized)
+            ? `id=${encodeURIComponent(normalized)}`
+            : `batch_number=${encodeURIComponent(normalized)}`;
+          // Abortable fetch to avoid hanging connections
+          const controller = new AbortController();
+          const fetchTimeout = setTimeout(() => controller.abort('function_fetch_timeout'), 8000); // Reduced timeout
+          // check-batch only answers signed-in users
+          const { data: { session: fnSession } = {} } = await supabase.auth.getSession();
+          const resp = await fetch(`${FUNCTIONS_BASE}/check-batch?${qs}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              ...(fnSession?.access_token ? { 'Authorization': `Bearer ${fnSession.access_token}` } : {}),
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(fetchTimeout);
+          if (resp.ok) {
+            const payload = await resp.json();
+            if (payload?.data?.id) {
+              batch = payload.data;
+              console.log('[BatchService] Server-side verification succeeded via', payload?.meta?.by);
             }
-          } catch (e) {
-            console.warn('[BatchService] Server-side verification failed:', e?.name === 'AbortError' ? 'aborted (timeout)' : (e?.message || e));
+          } else {
+            console.warn('[BatchService] Server-side verification HTTP', resp.status);
           }
+        } catch (e) {
+          console.warn('[BatchService] Server-side verification failed:', e?.name === 'AbortError' ? 'aborted (timeout)' : (e?.message || e));
         }
 
         if (!batch) {
@@ -888,19 +867,10 @@ export const batchService = {
           }
           if (!batch && !batchError) {
             for (const cand of buildCandidates(normalized)) {
-              const res = await supabase.from('batches').select('*').ilike('batch_number', cand).limit(1);
+              const res = await supabase.from('batches').select('*').ilike('batch_number', likeExact(cand)).limit(1);
               if (res.error) { batchError = res.error; break; }
               const found = Array.isArray(res.data) ? res.data[0] : null;
               if (found) { batch = found; break; }
-            }
-            // Wildcard contains fallback
-            if (!batch && !batchError) {
-              for (const cand of buildCandidates(normalized)) {
-                const res = await supabase.from('batches').select('*').ilike('batch_number', `%${cand}%`).limit(1);
-                if (res.error) { batchError = res.error; break; }
-                const found = Array.isArray(res.data) ? res.data[0] : null;
-                if (found) { batch = found; break; }
-              }
             }
           }
         }
@@ -929,13 +899,9 @@ export const batchService = {
           }
           if (!batch && !batchError) {
             for (const cand of buildCandidates(normalized)) {
-              let res = await supabase.from('bag_orders').select('*').ilike('batch_qr_code', cand).limit(1);
+              const res = await supabase.from('bag_orders').select('*').ilike('batch_qr_code', likeExact(cand)).limit(1);
               if (res.error) { batchError = res.error; break; }
-              let found = Array.isArray(res.data) ? res.data[0] : null;
-              if (found) { batch = found; break; }
-              res = await supabase.from('bag_orders').select('*').ilike('batch_qr_code', `%${cand}%`).limit(1);
-              if (res.error) { batchError = res.error; break; }
-              found = Array.isArray(res.data) ? res.data[0] : null;
+              const found = Array.isArray(res.data) ? res.data[0] : null;
               if (found) { batch = found; break; }
             }
           }

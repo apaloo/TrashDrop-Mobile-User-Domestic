@@ -1,0 +1,13 @@
+# Files behind the critical workflows and the protected TrashDrop Digital
+# Bin Pricing (CLAUDE.md). CI shows their test coverage on every pull
+# request (scripts/ci/coverage-summary.mjs). Add a file when it starts
+# carrying money or a critical workflow.
+src/services/digitalBinService.js
+src/services/promotionalService.js
+src/services/gpsPricingService.js
+src/utils/costCalculator.js
+src/components/digitalBin/ReviewStep.js
+src/services/paymentService.js
+src/services/pickupService.js
+src/services/batchService.js
+src/context/AuthContext.js

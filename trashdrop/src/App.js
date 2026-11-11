@@ -206,11 +206,13 @@ const AppContent = () => {
               <Activity />
             </PrivateRoute>
           } />
-          <Route path="/schema-test" element={
-            <PrivateRoute>
-              <SchemaTest />
-            </PrivateRoute>
-          } />
+          {process.env.NODE_ENV !== 'production' && (
+            <Route path="/schema-test" element={
+              <PrivateRoute>
+                <SchemaTest />
+              </PrivateRoute>
+            } />
+          )}
           <Route path="/collection/:collectionId" element={
             <PrivateRoute>
               <CollectionForm />
@@ -241,16 +243,20 @@ const AppContent = () => {
               <CollectorTracking />
             </PrivateRoute>
           } />
-          <Route path="/toast-test" element={
-            <PrivateRoute>
-              <ToastTest />
-            </PrivateRoute>
-          } />
-          <Route path="/network-test" element={
-            <PrivateRoute>
-              <NetworkTest />
-            </PrivateRoute>
-          } />
+          {process.env.NODE_ENV !== 'production' && (
+            <Route path="/toast-test" element={
+              <PrivateRoute>
+                <ToastTest />
+              </PrivateRoute>
+            } />
+          )}
+          {process.env.NODE_ENV !== 'production' && (
+            <Route path="/network-test" element={
+              <PrivateRoute>
+                <NetworkTest />
+              </PrivateRoute>
+            } />
+          )}
           <Route path="/store" element={<Navigate to="/rewards" replace />} />
         </Route>
         

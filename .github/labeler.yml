@@ -1,0 +1,55 @@
+# Labels added to pull requests from the files they change (actions/labeler).
+# They tell reviewers where to look and feed the release notes and reports.
+
+protected-pricing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/DIGITAL_BIN_PRICING.md
+          - trashdrop/supabase/migrations/20261024*
+          - trashdrop/src/services/digitalBinService.js
+          - trashdrop/src/services/promotionalService.js
+          - trashdrop/src/services/gpsPricingService.js
+          - trashdrop/src/utils/costCalculator.js
+          - trashdrop/src/components/digitalBin/ReviewStep.js
+          - trashdrop/netlify/functions/utils/pricing.js
+          - trashdrop/src/services/__tests__/digitalBinService.promotion.test.js
+          - trashdrop/netlify/functions/__checks__/pricing-promo.js
+
+database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - trashdrop/supabase/**
+          - supabase/**
+
+product:whatsapp:
+  - changed-files:
+      - any-glob-to-any-file:
+          - trashdrop/netlify/functions/whatsapp-*.js
+          - trashdrop/netlify/functions/utils/conversation-engine.js
+          - trashdrop/whatsapp-flows/**
+
+product:household:
+  - changed-files:
+      - any-glob-to-any-file:
+          - trashdrop/src/**
+          - trashdrop/public/**
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - trashdrop/scripts/ci/**
+          - .gitleaks.toml
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - engineering/**
+          - docs/**
+          - '**/*.md'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - trashdrop/package.json
+          - trashdrop/package-lock.json

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureLabels } = require('./bootstrap');
 const monthlyReport = require('./monthly-report');
+const repoHealth = require('./repo-health');
 
 const TASKS = {
   'backup-restore-test': { every: 'month', title: (p) => `[Governance] Backup restore test: ${p}`, file: 'backup-restore-test.md', owner: 'DevOps engineer' },
@@ -27,7 +28,7 @@ async function openIfMissing({ github, context, core }, title, body, labels) {
   return data;
 }
 
-module.exports = async ({ github, context, core }, { only = 'all', now = new Date() } = {}) => {
+module.exports = async ({ github, context, core, getOctokit }, { only = 'all', now = new Date() } = {}) => {
   await ensureLabels({ github, context, core });
   const { month, quarter, isQuarterStart } = periodLabels(now);
   const base = path.join(process.env.GITHUB_WORKSPACE || process.cwd(), 'engineering', 'checklists');
@@ -43,8 +44,16 @@ module.exports = async ({ github, context, core }, { only = 'all', now = new Dat
     if (issue) created.push(issue.number);
   }
 
+  if (only === 'all' || only === 'repo-health') {
+    const health = await repoHealth({ github, context, getOctokit }, monthlyReport.reportRepos(context), now);
+    if (health.needsAction) {
+      const issue = await openIfMissing({ github, context, core }, `[Governance] Repository health: ${month}`, health.body, ['governance']);
+      if (issue) created.push(issue.number);
+    } else core.info('All repositories healthy');
+  }
+
   if (only === 'all' || only === 'monthly-report') {
-    const report = await monthlyReport({ github, context, core }, now);
+    const report = await monthlyReport({ github, context, core, getOctokit }, now);
     const issue = await openIfMissing({ github, context, core }, report.title, report.body, ['report:monthly', 'governance']);
     if (issue) created.push(issue.number);
   }

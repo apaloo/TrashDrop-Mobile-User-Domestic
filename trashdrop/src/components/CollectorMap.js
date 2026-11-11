@@ -42,7 +42,9 @@ const mapContainerStyle = {
   height: '400px'
 };
 
-const defaultCenter = [-1.286389, 36.817223]; // Nairobi coordinates [lat, lng]
+// Accra [lat, lng], as in the bin LocationStep. This used to be Nairobi, so a
+// household without location searched for collectors in Kenya.
+const defaultCenter = [5.6037, -0.1870];
 
 const CollectorMap = ({ pickupLocation, onCollectorLocationUpdate }) => {
   const { user } = useAuth();

@@ -3,6 +3,8 @@ name: Governance cadence
 # On the 1st of every month: opens the backup restore test and risk review
 # issues, drafts the monthly CTO report for the previous month, and (in
 # January, April, July, October) opens the quarterly access review.
+# Also monthly: repository health across all three repositories (standards in
+# place, known-failing tests, old pull requests, branches to delete).
 # Never opens the same issue twice. Policies: engineering/policies/.
 on:
   schedule:
@@ -12,7 +14,7 @@ on:
       only:
         description: Run one task only
         type: choice
-        options: [all, monthly-report, backup-restore-test, risk-review, access-review]
+        options: [all, monthly-report, backup-restore-test, risk-review, access-review, repo-health]
         default: all
 
 permissions:
@@ -27,7 +29,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/github-script@v7
+        env:
+          # Delivery figures for all three apps in the monthly report. The
+          # other repositories need ENGINEERING_REPORT_TOKEN: a fine-grained
+          # token with read-only access to pull requests, actions and
+          # metadata on those repositories. Without it, only this one is reported.
+          REPORT_REPOS: >-
+            apaloo/TrashDrop-Mobile-User-Domestic:ci-cd.yml,
+            apaloo/TrashDrop-Mobile-Collector-Driver:ci.yml,
+            apaloo/TrashDrop_Management_webApp_admins:ci.yml
+          ENGINEERING_REPORT_TOKEN: ${{ secrets.ENGINEERING_REPORT_TOKEN }}
         with:
           script: |
             const run = require(`${process.env.GITHUB_WORKSPACE}/engineering/automation/cadence.js`);
-            await run({ github, context, core }, { only: '${{ inputs.only || 'all' }}' });
+            await run({ github, context, core, getOctokit }, { only: '${{ inputs.only || 'all' }}' });

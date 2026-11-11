@@ -8,9 +8,6 @@ useDefault = true
 [allowlist]
 description = "Known-safe files"
 paths = [
-  # Self-signed certificates for local HTTPS development only
-  # (regenerate with generate-cert.js). Tracked as tech debt for removal.
-  '''(^|/)localhost(-key)?\.pem$''',
   # Lockfiles contain integrity hashes, not secrets.
   '''(^|/)package-lock\.json$''',
   # Example env files contain placeholders only.

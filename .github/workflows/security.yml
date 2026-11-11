@@ -61,7 +61,7 @@ jobs:
         run: gitleaks dir . --no-banner --redact --verbose --config .gitleaks.toml
 
   dependency-audit:
-    name: Dependency audit (report)
+    name: Dependency audit
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,11 +71,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # Report only for now: most findings sit in the Create React App build
-      # toolchain. Dependabot opens the fixes. Becomes blocking for critical
-      # runtime findings once the backlog is cleared (tech-debt register).
+      # Fails on a critical finding in a runtime dependency (TD11). High and
+      # lower are reported in the summary; most sit in the Create React App
+      # build toolchain (TD32). When a new critical advisory turns this red,
+      # fix it in its own PR first: engineering/policies/vulnerability-management.md.
       - name: npm audit
-        continue-on-error: true
         run: |
           npm audit --omit=dev --audit-level=critical > audit.txt 2>&1; status=$?
           {

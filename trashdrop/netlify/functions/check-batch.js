@@ -1,187 +1,142 @@
 // Netlify Function: check-batch
-// Policy-safe server-side verification using Supabase service role key
-// Endpoint: /.netlify/functions/check-batch?id=<uuid>|batch_number=<text>
+//
+// Looks up one batch for the signed-in household that scanned it. The batch
+// may not be visible to them yet under row-level security (an unclaimed batch
+// belongs to whoever printed it), so this reads it with the service key.
+//
+//   GET /.netlify/functions/check-batch?id=<uuid> | ?batch_number=<text>
+//   Authorization: Bearer <the user's Supabase access token>
+//
+// Rules (TD7 in engineering/registers/tech-debt.md):
+// - Only signed-in users: the token is checked with Supabase Auth.
+// - Exact matches only: a UUID, or a batch number compared case-insensitively
+//   with and without the BATCH- prefix. No partial matches, so batch numbers
+//   can't be guessed by searching.
+// - Only the fields the app needs. An owner field that isn't the caller is
+//   returned as 'another-user', never as someone else's ID.
+// Claiming a batch is decided in the database (activate_batch_for_user); this
+// function only finds it.
 
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
+const { getServiceClient } = require('./utils/supabase-admin.js');
 
-// Time budgets to avoid Netlify 504s (configurable via env)
-const QUERY_TIMEOUT_MS = parseInt(process.env.CHECK_BATCH_QUERY_TIMEOUT_MS || '5000', 10);     // per-query budget
-const TOTAL_TIMEOUT_MS = parseInt(process.env.CHECK_BATCH_TOTAL_TIMEOUT_MS || '9000', 10);     // overall handler budget
+const TOTAL_TIMEOUT_MS = parseInt(process.env.CHECK_BATCH_TOTAL_TIMEOUT_MS || '9000', 10);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Batch numbers are short codes like BATCH-7F3K2: letters, digits, - and _
+const BATCH_NUMBER = /^[A-Za-z0-9_-]{3,64}$/;
+const OWNER_FIELDS = ['created_by', 'user_id', 'assigned_to', 'owner_id'];
+const RETURNED_FIELDS = ['id', 'batch_number', 'status', 'bag_count', 'total_bags_count', 'created_at', 'updated_at'];
+const OTHER_OWNER = 'another-user';
 
-// Lightweight debug logging controlled by env
-const DEBUG = /^(1|true|yes)$/i.test(process.env.CHECK_BATCH_DEBUG || '');
-const dlog = (...args) => { if (DEBUG) console.log('[check-batch]', ...args); };
-
-function withTimeout(promise, ms, label = 'operation') {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms))
-  ]);
-}
-
-function loadEnvFallback() {
-  try {
-    const cwd = process.cwd();
-    const candidates = [
-      path.join(cwd, '.env.development.local'),
-      path.join(cwd, '.env.local'),
-      path.join(cwd, '.env.development'),
-      path.join(cwd, '.env'),
-    ];
-    for (const file of candidates) {
-      if (!fs.existsSync(file)) continue;
-      const txt = fs.readFileSync(file, 'utf8');
-      txt.split('\n').forEach((line) => {
-        const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-        if (!m) return;
-        const key = m[1];
-        let val = m[2];
-        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-        if (val.startsWith("'") && val.endsWith("'")) val = val.slice(1, -1);
-        if (!process.env[key]) process.env[key] = val;
-      });
-      dlog('Loaded env from', path.basename(file));
-      break;
-    }
-  } catch (_) {
-    // silent
-  }
-}
-
-function getClient() {
-  // Load local env for dev if not provided by Netlify CLI
-  if (process.env.NODE_ENV !== 'production') {
-    loadEnvFallback();
-  }
-
-  const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    return { error: new Error('Missing Supabase URL or service role key on server') };
-  }
-  const supabase = createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return { supabase };
-}
-
-// Basic CORS headers for browser access
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
 
+const reply = (statusCode, body) => ({
+  statusCode,
+  headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+// The caller's user id from their access token, or null
+async function callerId(supabase, headers) {
+  const auth = headers?.authorization || headers?.Authorization || '';
+  const match = /^Bearer\s+(\S+)$/i.exec(auth);
+  if (!match) return null;
+  const { data, error } = await supabase.auth.getUser(match[1]);
+  if (error || !data?.user?.id) return null;
+  return data.user.id;
+}
+
+// BATCH-ABC and ABC are the same printed code
+function batchNumberCandidates(value) {
+  const bare = value.replace(/^batch-/i, '');
+  return [...new Set([value, `BATCH-${bare}`, bare])];
+}
+
+// ilike with no wildcards is a case-insensitive exact match; _ is a wildcard
+// in LIKE, so escape it (and the escape character)
+const likeExact = (value) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+async function findBatch(supabase, { id, batchNumber }) {
+  if (id) {
+    const { data, error } = await supabase.from('batches').select('*').eq('id', id).limit(1);
+    if (error) throw error;
+    return data?.[0] || null;
+  }
+  for (const candidate of batchNumberCandidates(batchNumber)) {
+    const { data, error } = await supabase
+      .from('batches').select('*').ilike('batch_number', likeExact(candidate)).limit(2);
+    if (error) throw error;
+    if (data?.length === 1) return data[0];
+    if (data?.length > 1) {
+      // Two batches differing only in letter case: don't guess
+      const exact = data.find((row) => row.batch_number === candidate);
+      if (exact) return exact;
+    }
+  }
+  return null;
+}
+
+// Only what the app needs; other people's ids never leave the server
+function forCaller(batch, userId) {
+  const out = {};
+  for (const field of RETURNED_FIELDS) if (batch[field] !== undefined) out[field] = batch[field];
+  for (const field of OWNER_FIELDS) {
+    const value = batch[field];
+    if (value === undefined) continue;
+    out[field] = value === null || value === '' || String(value) === userId ? value : OTHER_OWNER;
+  }
+  return out;
+}
+
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { ...CORS_HEADERS }, body: '' };
+  if (event.httpMethod !== 'GET') return reply(405, { error: 'Method Not Allowed' });
+
+  const params = event.queryStringParameters || {};
+  const id = params.id ? String(params.id).trim() : null;
+  const batchNumber = params.batch_number ? String(params.batch_number).trim() : null;
+
+  if (id && !UUID.test(id)) return reply(400, { error: 'id must be a batch UUID' });
+  if (!id && !(batchNumber && BATCH_NUMBER.test(batchNumber))) {
+    return reply(400, { error: 'Provide id (UUID) or batch_number (letters, digits, - or _)' });
+  }
+
+  let supabase;
   try {
-    const started = Date.now();
-    const remaining = () => Math.max(250, TOTAL_TIMEOUT_MS - (Date.now() - started));
-    // Handle CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-      return { statusCode: 204, headers: { ...CORS_HEADERS }, body: '' };
-    }
-    if (event.httpMethod !== 'GET') {
-      return { statusCode: 405, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: 'Method Not Allowed' }) };
-    }
-    const params = event.queryStringParameters || {};
-    const id = params.id || null;
-    const batchNumber = params.batch_number || null;
-
-    dlog('Start', { id, batchNumber, QUERY_TIMEOUT_MS, TOTAL_TIMEOUT_MS });
-
-    const { supabase, error } = getClient();
-    if (error) {
-      return { statusCode: 500, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: error.message }) };
-    }
-
-    let data = null;
-    let meta = { by: null };
-
-    if (id) {
-      dlog('Query by id');
-      const { data: row, error: err } = await withTimeout(
-        supabase
-          .from('batches')
-          .select('*')
-          .eq('id', id)
-          .maybeSingle(),
-        Math.min(QUERY_TIMEOUT_MS, remaining()),
-        'id lookup'
-      );
-      if (err) {
-        dlog('Error id lookup', err?.message || String(err));
-        return { statusCode: 500, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: err.message }) };
-      }
-      if (row) { data = row; meta.by = 'id'; dlog('Found by id'); }
-    }
-
-    if (!data && batchNumber) {
-      // Timeboxed exact match
-      dlog('Exact match by batch_number');
-      const exact = await withTimeout(
-        supabase.from('batches').select('*').eq('batch_number', batchNumber).maybeSingle(),
-        Math.min(QUERY_TIMEOUT_MS, remaining()),
-        'exact batch_number lookup'
-      ).catch((e) => ({ error: e }));
-      if (exact && exact.data) {
-        data = exact.data; meta.by = 'batch_number'; dlog('Found exact batch_number');
-      } else if (exact && exact.error) {
-        dlog('Error exact batch_number lookup', exact.error?.message || String(exact.error));
-        return { statusCode: 500, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: exact.error.message || String(exact.error) }) };
-      }
-
-      // If still not found and time permits, try contains search (case-insensitive)
-      if (!data && remaining() > 400) {
-        dlog('Contains match by batch_number');
-        const contains = await withTimeout(
-          supabase.from('batches').select('*').ilike('batch_number', `%${batchNumber}%`).maybeSingle(),
-          Math.min(QUERY_TIMEOUT_MS, remaining()),
-          'contains batch_number lookup'
-        ).catch((e) => ({ error: e }));
-        if (contains && contains.data) {
-          data = contains.data; meta.by = 'batch_number'; dlog('Found contains batch_number');
-        } else if (contains && contains.error && String(contains.error?.message || contains.error).includes('timed out')) {
-          // If search timed out, return 504 to client so it can fallback gracefully
-          dlog('Contains search timed out');
-          return { statusCode: 504, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: 'Lookup timed out', meta: { by: 'batch_number' } }) };
-        } else if (contains && contains.error) {
-          dlog('Error contains batch_number lookup', contains.error?.message || String(contains.error));
-          return { statusCode: 500, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: contains.error.message || String(contains.error) }) };
-        }
-      }
-    }
-
-    // Not found - return 404 instead of 500
-    if (!data) {
-      dlog('Batch not found in database');
-      return {
-        statusCode: 404,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          error: 'Batch not found in batches table for provided identifier', 
-          identifier: id || batch_number,
-          meta 
-        }),
-      };
-    }
-
-    dlog('Success', { ms: Date.now() - started, by: meta.by });
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-      body: JSON.stringify({ data, meta, timing: { ms: Date.now() - started } }),
-    };
+    supabase = getServiceClient('[check-batch]');
   } catch (e) {
-    dlog('Handler error', e?.message || String(e));
-    // If the handler itself timed out by our budget, signal 504 to help clients fallback gracefully
-    if ((e?.message || '').includes('timed out')) {
-      return { statusCode: 504, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: 'Server operation timed out' }) };
-    }
-    return { statusCode: 500, headers: { ...CORS_HEADERS }, body: JSON.stringify({ error: e.message || 'Server error' }) };
+    console.error(e.message);
+    return reply(500, { error: 'Batch lookup is not configured on the server' });
+  }
+
+  try {
+    return await withTimeout((async () => {
+      const userId = await callerId(supabase, event.headers);
+      if (!userId) return reply(401, { error: 'Sign in to scan a batch' });
+
+      const batch = await findBatch(supabase, { id, batchNumber });
+      if (!batch) {
+        return reply(404, { error: 'Batch not found in batches table for provided identifier', meta: { by: id ? 'id' : 'batch_number' } });
+      }
+      return reply(200, { data: forCaller(batch, userId), meta: { by: id ? 'id' : 'batch_number' } });
+    })(), TOTAL_TIMEOUT_MS, 'Batch lookup');
+  } catch (e) {
+    if (String(e?.message || '').includes('timed out')) return reply(504, { error: 'Lookup timed out' });
+    console.error('[check-batch] lookup failed:', e?.message || e);
+    return reply(500, { error: 'Batch lookup failed' });
   }
 };
+
+// For the checks in __checks__/check-batch.js
+exports._internals = { batchNumberCandidates, likeExact, forCaller };

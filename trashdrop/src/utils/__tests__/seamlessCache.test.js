@@ -101,12 +101,8 @@ describe('SeamlessCache', () => {
         ttl: 30000
       });
 
-      try {
-        await seamlessCache.optimisticUpdate(cacheKey, updateFn, confirmFn);
-        fail('Should have thrown an error');
-      } catch (error) {
-        expect(error.message).toBe('Server error');
-      }
+      await expect(seamlessCache.optimisticUpdate(cacheKey, updateFn, confirmFn))
+        .rejects.toThrow('Server error');
 
       // Should rollback to original data
       const cachedData = seamlessCache.peek(cacheKey);
@@ -184,12 +180,13 @@ describe('SeamlessCache', () => {
       expect(endTime - startTime).toBeLessThan(50);
       expect(result).toEqual(staleData);
 
-      // Wait for background update
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Cache should be updated with fresh data
-      const cachedData = seamlessCache.peek(cacheKey);
-      expect(cachedData).toEqual(freshData);
+      // The background update waits backgroundUpdateDelay (150 ms on the shared
+      // cache) and then the 100 ms fetch: poll instead of guessing a sleep
+      const deadline = Date.now() + 1000;
+      while (Date.now() < deadline && seamlessCache.peek(cacheKey)?.value !== 'fresh') {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(seamlessCache.peek(cacheKey)).toEqual(freshData);
     });
   });
 
@@ -273,12 +270,7 @@ describe('SeamlessCache', () => {
       const error = new Error('Network error');
       mockFetchFn.mockRejectedValue(error);
 
-      try {
-        await seamlessCache.get(cacheKey, mockFetchFn);
-        fail('Should have thrown an error');
-      } catch (err) {
-        expect(err).toBe(error);
-      }
+      await expect(seamlessCache.get(cacheKey, mockFetchFn)).rejects.toBe(error);
     });
 
     test('should keep existing cache on background update failure', async () => {

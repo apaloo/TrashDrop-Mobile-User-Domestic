@@ -21,4 +21,8 @@ module.exports = [
   { name: 'product:admin', color: 'c5def5', description: 'Admin portal' },
   { name: 'product:whatsapp', color: 'c5def5', description: 'WhatsApp booking' },
   { name: 'product:database', color: 'c5def5', description: 'Shared Supabase database' },
+  { name: 'protected-pricing', color: 'b60205', description: 'Touches owner-protected pricing or payouts: owner approval required' },
+  { name: 'database', color: '5319e7', description: 'Changes database migrations or functions' },
+  { name: 'docs', color: '0075ca', description: 'Documentation or handbook' },
+  { name: 'security-watch', color: 'b60205', description: 'Daily production security check' },
 ];

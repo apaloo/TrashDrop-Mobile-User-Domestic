@@ -24,11 +24,13 @@ The code is in `trashdrop/src/utils/monitoring.js` and does nothing until a DSN 
 3. Redeploy. Confirm that an event arrives: open the site, run
    `window.__trashdropSentryTest?.()` in the browser console, and check Sentry.
 
-## Carter app (Vite) and admin portal (CRA)
+## Carter app and admin portal (wired, off until configured)
 
-Copy `trashdrop/src/utils/monitoring.js` into each app:
+The same module is in both apps (carter PR #49, admin PR #108). After merging:
 
-- In the carter app, read `import.meta.env.VITE_SENTRY_DSN` instead of `process.env.REACT_APP_SENTRY_DSN`.
-- Call `initMonitoring()` first thing in `main.jsx` / `index.js`.
-- Call `captureError` from the existing `ErrorBoundary` (the carter app has a "Future: send to Sentry" comment at `src/components/ErrorBoundary.jsx`).
-- Run `npm install @sentry/react` in each app.
+| App | Sentry project | Netlify variables |
+|---|---|---|
+| Carter | `carter-app` | `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT=production` |
+| Admin | `admin-portal` | `REACT_APP_SENTRY_DSN`, `REACT_APP_SENTRY_ENVIRONMENT=production` |
+
+Redeploy each site and send a test event with `window.__trashdropSentryTest?.()`.

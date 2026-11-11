@@ -19,3 +19,10 @@
    MMDAs and partners.
 5. Monthly: copy the availability figure for each monitor into the CTO
    report (KPI: ≥99.5%).
+
+**Alongside this:** the production smoke check (`.github/workflows/production-smoke.yml`)
+runs every hour and 7 minutes after each household deploy. It checks more
+than "the page loads": routing, pre-rendered public pages, the 404 page,
+and that the WhatsApp and batch-lookup functions are deployed and
+configured. It opens a `[Smoke] Production check failing` issue instead of
+paging anyone, so it doesn't replace these monitors.

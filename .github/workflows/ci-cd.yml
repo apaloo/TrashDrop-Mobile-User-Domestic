@@ -50,12 +50,30 @@ jobs:
       run: |
         npx craco test --watchAll=false src/services/__tests__/digitalBinService.promotion.test.js
         node netlify/functions/__checks__/pricing-promo.js
+
+    # SECURITY DEFINER functions in new migrations: fixed search_path, and a
+    # caller check or no anon access (secure development policy, principle 8)
+    - name: Database migration checks
+      run: |
+        node scripts/ci/check-migrations.js --self-test
+        node scripts/ci/check-migrations.js
+
+    # Netlify function checks against stubbed clients (no network)
+    - name: Netlify function checks
+      run: |
+        node netlify/functions/__checks__/check-batch.js
+        node netlify/functions/__checks__/whatsapp-smoke.js
     
     # Every unit test suite except the ones listed in
     # scripts/ci/known-failing-tests.txt (a list that may only shrink).
     # Uses placeholder Supabase settings: tests never reach a real project.
     - name: Unit tests
       run: npm run test:ci
+
+    # Report only: the whole app and each file in scripts/ci/critical-files.txt
+    - name: Test coverage (report)
+      if: always()
+      run: node scripts/ci/coverage-summary.mjs
     
     - name: Build
       env:

@@ -84,7 +84,7 @@ describe('Staying signed in', () => {
     fireEvent.click(screen.getByText('check'));
 
     await waitFor(() => expect(supabase.auth.getSession).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByText('status: AUTHENTICATED')).toBeInTheDocument());
+    await screen.findByText('status: AUTHENTICATED');
     expect(screen.getByText('user: ama@example.com')).toBeInTheDocument();
     expect(localStorage.getItem(SUPABASE_KEY)).not.toBeNull();
     expect(localStorage.getItem('trashdrop_user')).not.toBeNull();
@@ -111,7 +111,7 @@ describe('Staying signed in', () => {
 
     fireEvent.click(screen.getByText('check'));
 
-    await waitFor(() => expect(screen.getByText('token: renewed-token')).toBeInTheDocument());
+    await screen.findByText('token: renewed-token');
     expect(screen.getByText('status: AUTHENTICATED')).toBeInTheDocument();
     expect(localStorage.getItem(SUPABASE_KEY)).not.toBeNull();
   });
@@ -123,7 +123,7 @@ describe('Staying signed in', () => {
 
     fireEvent.click(screen.getByText('check'));
 
-    await waitFor(() => expect(screen.getByText('status: UNAUTHENTICATED')).toBeInTheDocument());
+    await screen.findByText('status: UNAUTHENTICATED');
   });
 
   it('does not renew the session on its own timers (Supabase does that)', async () => {
@@ -162,7 +162,7 @@ describe('Signing out', () => {
     fireEvent.click(screen.getByText('sign out'));
 
     await waitFor(() => expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: 'local' }));
-    await waitFor(() => expect(screen.getByText('status: UNAUTHENTICATED')).toBeInTheDocument());
+    await screen.findByText('status: UNAUTHENTICATED');
   });
 
   it('signs out every device only when asked to', async () => {

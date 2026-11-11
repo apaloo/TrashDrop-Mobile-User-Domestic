@@ -22,9 +22,20 @@ This repository contains the TrashDrop mobile application, a progressive web app
 
 The production application is deployed at: [https://trashdrop-mobile.windsurf.build](https://trashdrop-mobile.windsurf.build)
 
+## Repository layout
+
+| Folder | What it is |
+|---|---|
+| `trashdrop/` | The household app (React PWA), its Netlify functions (WhatsApp booking) and the database migrations (`trashdrop/supabase/`) |
+| `engineering/` | The engineering handbook: policies, runbooks, registers, onboarding |
+| `docs/` | Product rules (`DIGITAL_BIN_PRICING.md`) and the archive of old notes |
+| `.github/` | CI, security checks, automation, templates |
+
+New engineers: start with [`engineering/onboarding.md`](engineering/onboarding.md).
+
 ## Development
 
-In the project directory, you can run:
+All commands run in `trashdrop/` (`cd trashdrop` first):
 
 ### `npm start`
 

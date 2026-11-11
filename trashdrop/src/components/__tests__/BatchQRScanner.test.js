@@ -5,6 +5,7 @@ import BatchQRScanner from '../BatchQRScanner.js';
 import { batchService } from '../../services/batchService.js';
 import { notificationService } from '../../services/notificationService.js';
 import { useAuth } from '../../context/AuthContext.js';
+import realTableInspector from '../../utils/realTableInspector.js';
 
 // Mock the services
 jest.mock('../../services/batchService.js');
@@ -20,7 +21,14 @@ jest.mock('../../utils/supabaseClient.js', () => ({
     },
   },
 }));
-jest.mock('react-qr-scanner', () => 
+// Only runs when a batch isn't found
+jest.mock('../../utils/realTableInspector.js', () => ({
+  __esModule: true,
+  default: { runFullDiagnosis: jest.fn() },
+}));
+
+// The scanner's camera view (QRReader wraps qr-scanner, which needs a real camera)
+jest.mock('../QRReader', () => 
 function MockQrScanner({ onScan, onError }) {
   return (
     <div data-testid="mock-qr-reader">
@@ -36,236 +44,105 @@ function MockQrScanner({ onScan, onError }) {
 );
 
 describe('BatchQRScanner', () => {
-  const mockUser = { id: 'user123' };
-  const mockBatchDetails = {
-    id: 'batch123',
-    batch_qr_code: 'BATCH-123',
-    user_id: 'user123',
-    status: 'active',
-    bags: [{ id: 'bag1' }, { id: 'bag2' }],
-    created_at: '2025-07-21T20:00:00Z'
+  const activated = {
+    batch_id: 'BATCH-123', status: 'used', activated: true, bags_added: 2, bag_count: 2,
+    created_at: '2026-07-21T20:00:00Z',
+  };
+  let bagEvents;
+  const onBags = (e) => bagEvents.push(e.detail);
+
+  const startAndScan = async (props = {}) => {
+    render(<BatchQRScanner {...props} />);
+    await act(async () => { fireEvent.click(screen.getByText('Start Scanning')); });
+    await act(async () => { fireEvent.click(screen.getByText('Simulate Scan')); });
   };
 
   beforeEach(() => {
-    // Reset all mocks
-    jest.clearAllMocks();
-    
-    // Mock useAuth hook
-    useAuth.mockReturnValue({ user: mockUser });
-
-    // Mock service responses
-    batchService.getBatchDetails.mockResolvedValue({
-      data: mockBatchDetails,
-      error: null
-    });
-    batchService.activateBatchForUserWithRetry = jest.fn().mockResolvedValue({ data: { activated: true }, error: null, attempts: 1 });
-    batchService.isBatchLocallyScanned = jest.fn().mockReturnValue(false);
-    batchService.enqueueBatchActivation = jest.fn().mockResolvedValue({ data: { queued: true }, error: null });
-
-    notificationService.createNotification.mockResolvedValue({
-      data: { id: 'notification1' },
-      error: null
-    });
+    useAuth.mockReturnValue({ user: { id: 'user123' } });
+    batchService.verifyBatchAndUpdateUser = jest.fn().mockResolvedValue({ data: activated, error: null });
+    realTableInspector.runFullDiagnosis.mockResolvedValue({ recommendations: [] });
+    bagEvents = [];
+    window.addEventListener('trashdrop:bags-updated', onBags);
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   });
 
-  it('renders scanner button when not scanning', async () => {
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
+  afterEach(() => {
+    window.removeEventListener('trashdrop:bags-updated', onBags);
+  });
+
+  it('renders the Start Scanning button when not scanning', () => {
+    render(<BatchQRScanner />);
     expect(screen.getByText('Start Scanning')).toBeInTheDocument();
   });
 
-  it('shows QR scanner when scanning is active', async () => {
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
+  it('shows the camera and a Stop button while scanning', async () => {
+    render(<BatchQRScanner />);
+    await act(async () => { fireEvent.click(screen.getByText('Start Scanning')); });
     expect(screen.getByTestId('mock-qr-reader')).toBeInTheDocument();
     expect(screen.getByText('Stop Scanning')).toBeInTheDocument();
   });
 
-  it('handles successful batch scan', async () => {
+  it('a fresh batch: shows the result, reports it and adds its bags', async () => {
     const onScanComplete = jest.fn();
-    await act(async () => {
-      render(<BatchQRScanner onScanComplete={onScanComplete} />);
-    });
+    await startAndScan({ onScanComplete });
 
-    // Start scanning
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
-
-    // Simulate QR scan
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Scan'));
-    });
-
-    // Wait for batch details to be displayed
-    await waitFor(() => {
-      expect(screen.getByText('Batch Details:')).toBeInTheDocument();
-      // Labels and values are split; assert both appear
-      expect(screen.getByText('Batch ID:')).toBeInTheDocument();
-      expect(screen.getByText('BATCH-123')).toBeInTheDocument();
-      expect(screen.getByText('Total Bags:')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
-
-    // Verify service calls
-    expect(batchService.getBatchDetails).toHaveBeenCalledWith('BATCH-123');
-    // Activation was attempted with retry wrapper
-    expect(batchService.activateBatchForUserWithRetry).toHaveBeenCalled();
-    expect(notificationService.createNotification).toHaveBeenCalledWith(
-      'user123',
-      'batch_scan',
-      expect.stringMatching(/Batch (Already Activated|Activated)/),
-      expect.any(String),
-      { batch_id: 'batch123' }
-    );
-    expect(onScanComplete).toHaveBeenCalledWith(mockBatchDetails);
+    const result = await screen.findByRole('region', { name: 'Batch scanned' });
+    expect(result).toHaveTextContent('Batch Scanned Successfully!');
+    expect(result).toHaveTextContent('BATCH-123');
+    expect(result).toHaveTextContent('Total bags2');
+    expect(batchService.verifyBatchAndUpdateUser).toHaveBeenCalledWith('BATCH-123', 'user123', expect.any(Object));
+    expect(onScanComplete).toHaveBeenCalledWith(activated);
+    // The dashboard and pickup form update their bag counts from this event
+    expect(bagEvents).toEqual([{ userId: 'user123', deltaBags: 2, source: 'batch-scan' }]);
   });
 
-  it('handles invalid batch QR code', async () => {
-    batchService.getBatchDetails.mockResolvedValueOnce({
-      data: null,
-      error: null
-    });
+  it('an already-activated batch is shown as such and adds no bags', async () => {
+    batchService.verifyBatchAndUpdateUser.mockResolvedValueOnce({ data: { ...activated, alreadyActivated: true }, error: null });
+    await startAndScan();
 
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
-    
-    // Start scanning
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
-
-    // Simulate QR scan
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Scan'));
-    });
-
-    // Wait for error message
-    await waitFor(() => {
-      expect(screen.getByText('Invalid batch code. Please check and try again.')).toBeInTheDocument();
-    });
+    const result = await screen.findByRole('region', { name: 'Batch already scanned' });
+    expect(result).toHaveTextContent('This batch was previously scanned and activated.');
+    expect(bagEvents).toEqual([]);
   });
 
-  it('handles batch belonging to different user', async () => {
-    const wrongUserBatch = {
-      ...mockBatchDetails,
-      user_id: 'differentUser'
-    };
+  it('a duplicate scan is refused', async () => {
+    batchService.verifyBatchAndUpdateUser.mockResolvedValueOnce({ data: null, error: { code: 'BATCH_DUPLICATE', message: 'dup' } });
+    await startAndScan();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Batch already scanned');
+    expect(bagEvents).toEqual([]);
+  });
 
-    batchService.getBatchDetails.mockResolvedValueOnce({
-      data: wrongUserBatch,
-      error: null
-    });
+  it('a batch that is not found says so', async () => {
+    batchService.verifyBatchAndUpdateUser.mockResolvedValueOnce({ data: null, error: { message: 'Batch not found' } });
+    await startAndScan();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Batch UUID not found in Supabase batches table: BATCH-123');
+    expect(realTableInspector.runFullDiagnosis).toHaveBeenCalledWith('user123', 'BATCH-123');
+  });
 
+  it('shows a service error', async () => {
+    batchService.verifyBatchAndUpdateUser.mockResolvedValueOnce({ data: null, error: { message: 'Service error' } });
+    await startAndScan();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Service error');
+    expect(screen.queryByRole('region')).toBeNull();
+  });
+
+  it('needs an internet connection to verify a batch', async () => {
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+    await startAndScan();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Internet connection required for batch verification');
+    expect(batchService.verifyBatchAndUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('asks to sign in again without a user', async () => {
+    useAuth.mockReturnValue({ user: null });
+    await startAndScan();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Missing user context. Please sign in again.');
+  });
+
+  it('shows camera errors', async () => {
     render(<BatchQRScanner />);
-    
-    // Start scanning
-    fireEvent.click(screen.getByText('Start Scanning'));
-
-    // Simulate QR scan
-    fireEvent.click(screen.getByText('Simulate Scan'));
-
-    // Wait for error message
-    await waitFor(() => {
-      expect(screen.getByText('This batch is not assigned to you')).toBeInTheDocument();
-    });
-  });
-
-  it('handles service error', async () => {
-    batchService.getBatchDetails.mockResolvedValueOnce({
-      data: null,
-      error: { message: 'Service error' }
-    });
-
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
-    
-    // Start scanning
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
-
-    // Simulate QR scan
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Scan'));
-    });
-
-    // Wait for error message
-    await waitFor(() => {
-      expect(screen.getByText('Service error')).toBeInTheDocument();
-    });
-  });
-
-  it('shows timeout error on activation failure', async () => {
-    // Make retry wrapper simulate a timeout error on first attempt then success
-    let call = 0;
-    batchService.activateBatchForUserWithRetry.mockImplementation(async (_id, _uid, opts) => {
-      call += 1;
-      if (opts && typeof opts.onAttempt === 'function') opts.onAttempt(call);
-      // Return a timeout error
-      return { data: null, error: { message: 'Request timed out' }, attempts: 1, timedOut: true };
-    });
-
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Scan'));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Network timeout while activating batch. Please try again.')).toBeInTheDocument();
-    });
-  });
-
-  it('queues activation when offline', async () => {
-    // Simulate offline
-    Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
-
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Scan'));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Batch Details:')).toBeInTheDocument();
-      expect(screen.getByText('queued (offline)')).toBeInTheDocument();
-    });
-
-    // Restore online state
-    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
-  });
-
-  it('handles camera access error', async () => {
-    await act(async () => {
-      render(<BatchQRScanner />);
-    });
-    
-    // Start scanning
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
-
-    // Simulate camera error via mock button
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Error'));
-    });
-
-    expect(screen.getByText(/Camera permission denied|Failed to access camera/)).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByText('Start Scanning')); });
+    await act(async () => { fireEvent.click(screen.getByText('Simulate Error')); });
+    expect(screen.getByRole('alert')).toHaveTextContent('permission denied');
   });
 });

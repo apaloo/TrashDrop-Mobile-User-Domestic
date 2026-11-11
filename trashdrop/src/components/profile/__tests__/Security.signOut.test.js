@@ -52,7 +52,7 @@ describe('Profile & Settings: signing out', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }));
 
-    await waitFor(() => expect(screen.getByText('sign-in page')).toBeInTheDocument());
+    await screen.findByText('sign-in page');
     expect(signOut).toHaveBeenCalledWith();
     // The remembered email is kept so signing back in is easier
     expect(localStorage.getItem('trashdrop_remembered_email')).toBe('ama@example.com');

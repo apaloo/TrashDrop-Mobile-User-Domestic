@@ -52,7 +52,7 @@
     "eject": "react-scripts eject",
     "whatsapp:upload-flow": "node scripts/upload-whatsapp-flow.js",
     "whatsapp:flow-status": "node scripts/upload-whatsapp-flow.js --status",
-    "lint": "eslint src --ext .js,.jsx --quiet --ignore-pattern '**/__tests__/**' --ignore-pattern '**/*.test.js'",
+    "lint": "eslint src --ext .js,.jsx --quiet",
     "test:ci": "node scripts/ci/run-tests.js"
   },
   "eslintConfig": {
