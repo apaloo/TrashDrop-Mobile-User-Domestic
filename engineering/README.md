@@ -64,7 +64,7 @@ the CTO and CEO.
 | Security checks | `.github/workflows/security.yml` | Secret scan on every pull request and push; full scan weekly; dependency audit report. |
 | Dependency updates | `.github/dependabot.yml` | Weekly update pull requests. |
 | Database migrations | `.github/workflows/supabase-migrations.yml` | Manual only: list, dry-run, apply; staging or production (production needs approval). |
-| Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Run once: creates labels and one issue per setup task, assigned for the team to complete. |
+| Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Manual. Creates labels and one issue per setup task; safe to re-run (skips existing issues), so run it again after adding a setup step. First run 2026-11-11. |
 | Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only) and the Supabase security advisor; opens a P1 issue on a regression, closes it when fixed. |
 | Production smoke check | `.github/workflows/production-smoke.yml` | Hourly and after each household deploy: the three live sites and their key functions answer as expected; one issue while anything fails. |
 | Database migration checks | `trashdrop/scripts/ci/check-migrations.js` (in CI) | New migrations: `SECURITY DEFINER` functions fix `search_path` and check the caller or revoke `anon`. |
