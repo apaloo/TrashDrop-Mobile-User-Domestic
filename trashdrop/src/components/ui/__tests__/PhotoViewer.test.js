@@ -10,7 +10,7 @@ const Harness = ({ photos, start = 0 }) => {
 };
 const photos = ['a.jpg', 'b.jpg', 'c.jpg'];
 const viewerImage = () => screen.getByRole('dialog').querySelector('img');
-const wait = (ms) => act(() => { jest.advanceTimersByTime(ms); });
+const advance = (ms) => act(() => { jest.advanceTimersByTime(ms); });
 
 describe('PhotoViewer', () => {
   beforeEach(() => jest.useFakeTimers());
@@ -32,32 +32,32 @@ describe('PhotoViewer', () => {
 
   it('plays as a slideshow every 4 seconds and loops', () => {
     render(<Harness photos={photos} />);
-    wait(3999);
+    advance(3999);
     expect(viewerImage()).toHaveAttribute('src', 'a.jpg');
-    wait(1);
+    advance(1);
     expect(viewerImage()).toHaveAttribute('src', 'b.jpg');
-    wait(4000);
-    wait(4000);
+    advance(4000);
+    advance(4000);
     expect(viewerImage()).toHaveAttribute('src', 'a.jpg');
   });
 
   it('pauses and plays with the button and the space bar', () => {
     render(<Harness photos={photos} />);
     fireEvent.click(screen.getByRole('button', { name: 'Pause slideshow' }));
-    wait(10000);
+    advance(10000);
     expect(viewerImage()).toHaveAttribute('src', 'a.jpg');
     fireEvent.keyDown(window, { key: ' ' });
-    wait(4000);
+    advance(4000);
     expect(viewerImage()).toHaveAttribute('src', 'b.jpg');
   });
 
   it('gives a photo the full 4 seconds after a manual move', () => {
     render(<Harness photos={photos} />);
-    wait(3000);
+    advance(3000);
     fireEvent.click(screen.getByRole('button', { name: 'Next photo' }));
-    wait(3000);
+    advance(3000);
     expect(viewerImage()).toHaveAttribute('src', 'b.jpg');
-    wait(1000);
+    advance(1000);
     expect(viewerImage()).toHaveAttribute('src', 'c.jpg');
   });
 

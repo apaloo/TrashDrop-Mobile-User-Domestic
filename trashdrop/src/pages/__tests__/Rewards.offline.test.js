@@ -75,7 +75,7 @@ describe('Rewards with no connection', () => {
     await act(async () => { window.dispatchEvent(new Event('online')); });
 
     expect(await screen.findByText('GH₵5 airtime')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
+    await screen.findByText('42');
     expect(await screen.findByText(/haven't redeemed/)).toBeInTheDocument();
   });
 

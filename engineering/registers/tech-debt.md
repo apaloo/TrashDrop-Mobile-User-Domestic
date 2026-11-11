@@ -8,7 +8,7 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | ID | Item | Repo | When | Notes |
 |---|---|---|---|---|
 | TD1 | ~~Fix the 8 known-failing test suites~~: done in #114; the list is empty | household | Done | Carter #53 and admin #111 do the same |
-| TD2 | Lint the test files too (92 jest-rule errors) | household | Now | Then drop the `--ignore-pattern`s in `npm run lint` |
+| TD2 | ~~Lint the test files too~~: done in #114. `npm run lint` covers tests; real-mistake rules are errors, six style-only Testing Library rules warn (42 warnings left: fix when you touch a test) | household | Done | `npx eslint src` lists the warnings |
 | TD3 | Move carter payout calculation fully server-side, with guard tests and a written spec like `DIGITAL_BIN_PRICING.md` | carter + DB | Now | Needs owner's written approval |
 | TD4 | ~~Remove the dead app copy at the household repository root (`/netlify`, `/cypress`, `/migrations`, `/temp_edits`, root `package.json`, about 40 root `*_FIX.md`, root `.sql` files)~~ | household | Done | Done 2026-11-11: root copy removed (108 duplicates deleted; notes, SQL and scripts archived in docs/archive/; 7 production-recorded migrations moved into trashdrop/supabase/migrations) |
 | TD5 | ~~Remove committed dev files: `localhost*.pem`, `dev-server.log`, `*.bak*`, `*.orig`, `.DS_Store`, `.netlify/state.json`~~ | household | Done | Done 2026-11-11: files removed, .gitignore covers them, .pem allowlist dropped from .gitleaks.toml |

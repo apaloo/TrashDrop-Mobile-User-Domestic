@@ -136,7 +136,7 @@ describe('NotificationList', () => {
     jest.useFakeTimers();
     try {
       render(<NotificationList />);
-      await waitFor(() => expect(screen.getByText('Pickup Complete')).toBeInTheDocument());
+      await screen.findByText('Pickup Complete');
 
       notificationService.getUserNotifications.mockResolvedValueOnce({
         data: [],
@@ -159,10 +159,10 @@ describe('NotificationList', () => {
       .mockResolvedValueOnce({ data: [], error: { message: 'network error' } });
 
     render(<NotificationList />);
-    await waitFor(() => expect(screen.getByText('Failed to load notifications')).toBeInTheDocument());
+    await screen.findByText('Failed to load notifications');
 
     window.dispatchEvent(new Event('online'));
-    await waitFor(() => expect(screen.getByText('Pickup Complete')).toBeInTheDocument());
+    await screen.findByText('Pickup Complete');
     expect(screen.queryByText('Failed to load notifications')).not.toBeInTheDocument();
   });
 
@@ -180,7 +180,7 @@ describe('NotificationList', () => {
 
   it('offline with notifications showing: no message (the app-wide pill says it)', async () => {
     render(<NotificationList />);
-    await waitFor(() => expect(screen.getByText('Pickup Complete')).toBeInTheDocument());
+    await screen.findByText('Pickup Complete');
 
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     try {

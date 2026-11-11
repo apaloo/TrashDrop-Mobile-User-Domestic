@@ -5,6 +5,9 @@ import { collectorService } from '../../services/collectorService.js';
 import { useAuth } from '../../context/AuthContext.js';
 import GeolocationService from '../../utils/geolocationService.js';
 
+// Import the component AFTER mocks are set up
+import CollectorMap from '../CollectorMap.js';
+
 // Mock the services and hooks
 jest.mock('../../services/collectorService.js');
 jest.mock('../../context/AuthContext.js');
@@ -40,9 +43,6 @@ jest.mock('leaflet', () => {
   Icon.Default = mockDefault;
   return { Icon };
 });
-
-// Import the component AFTER mocks are set up
-import CollectorMap from '../CollectorMap.js';
 
 describe('CollectorMap', () => {
   const mockUser = { id: 'user123', is_collector: false };

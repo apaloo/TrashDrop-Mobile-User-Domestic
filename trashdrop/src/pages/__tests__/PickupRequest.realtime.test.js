@@ -1,10 +1,10 @@
 import React from 'react';
-// Increase timeout for this test file
-jest.setTimeout(15000);
 import { render, screen, waitFor, waitForElementToBeRemoved, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import PickupRequest from '../PickupRequest.js';
+// Increase timeout for this test file
+jest.setTimeout(15000);
 
 // Mock react-leaflet heavy components
 jest.mock('react-leaflet', () => ({
