@@ -13,6 +13,7 @@ Run by GitHub Actions through `actions/github-script`; plain CommonJS, no depend
 | `branch-cleanup.js` | repo-health | Finds merged and 60-day-idle branches |
 | `release-notes.js` | `release-notes.yml` | GitHub Release per production deploy, listing the pull requests shipped |
 | `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production and the Supabase security advisor |
+| `production-smoke.mjs` + `production-smoke-config.json` | `production-smoke.yml` (hourly, and 7 minutes after each household deploy) | Each live site up, routed and with its key functions deployed; one issue while anything fails. `--self-test` checks the logic offline |
 
 All scripts are idempotent: they look for an existing issue with the same
 title (open or closed) before creating one. To change a recurring checklist,

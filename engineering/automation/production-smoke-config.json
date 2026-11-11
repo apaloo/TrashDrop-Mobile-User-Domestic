@@ -1,0 +1,22 @@
+{
+  "_comment": "What each live site must answer. Every check is a plain GET with no sign-in, the way a visitor arrives. 'status' is the expected HTTP status (redirects are not followed). 'contains' must appear in the body; 'header' must be present. Change a base URL here when a site moves (the household app moves to app.trashdrops.com with risk R13). Changing an expectation needs the CTO's review (CODEOWNERS).",
+  "sites": {
+    "household": "https://trashdrop-mobile.windsurf.build",
+    "collector": "https://collector.trashdrops.com",
+    "admin": "https://trashdrops.com"
+  },
+  "checks": [
+    { "id": "H01", "site": "household", "what": "Household app loads", "path": "/", "status": 200, "contains": "<title>TrashDrop" },
+    { "id": "H02", "site": "household", "what": "Household app routes (SPA fallback)", "path": "/dashboard", "status": 200, "contains": "<title>TrashDrop" },
+    { "id": "H03", "site": "household", "what": "WhatsApp webhook deployed (refuses a GET without the verify token)", "path": "/.netlify/functions/whatsapp-webhook", "status": 403, "contains": "Verification failed" },
+    { "id": "H04", "site": "household", "what": "Batch lookup deployed and configured (refuses a caller without sign-in). 500 means SUPABASE_SERVICE_ROLE is missing on Netlify", "path": "/.netlify/functions/check-batch?id=00000000-0000-4000-8000-000000000000", "status": 401 },
+    { "id": "C01", "site": "collector", "what": "Collector app loads", "path": "/", "status": 200, "contains": "<title>TrashDrop Carter" },
+    { "id": "C02", "site": "collector", "what": "Collector app routes (SPA fallback)", "path": "/login", "status": 200, "contains": "<title>TrashDrop Carter" },
+    { "id": "A01", "site": "admin", "what": "Website home page, HTTPS-only header", "path": "/", "status": 200, "contains": "TrashDrop", "header": "strict-transport-security" },
+    { "id": "A02", "site": "admin", "what": "Public pages are pre-rendered (real heading in the HTML)", "path": "/about/", "status": 200, "contains": "<h1" },
+    { "id": "A03", "site": "admin", "what": "Admin portal shell, kept out of search results", "path": "/login", "status": 200, "contains": "content=\"noindex\"" },
+    { "id": "A04", "site": "admin", "what": "Sitemap", "path": "/sitemap.xml", "status": 200, "contains": "<urlset" },
+    { "id": "A05", "site": "admin", "what": "Unknown pages return a real 404", "path": "/smoke-check-no-such-page/", "status": 404 },
+    { "id": "S01", "site": "supabase", "what": "Supabase Auth is up (public app key)", "path": "/auth/v1/health", "status": 200, "needs": ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY"] }
+  ]
+}
