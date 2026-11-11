@@ -17,7 +17,7 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD8 | Consolidate three service-worker files into one | household | Next | |
 | TD9 | One map stack (Leaflet + OSM), Google only where needed | carter, household | Next | Cost and complexity |
 | TD10 | Replace the hard-coded admin email list with a role table | admin + DB | Next | Adding an admin shouldn't need a migration |
-| TD11 | ~~Make `npm audit` blocking for critical runtime findings~~: none of the three apps has one (2026-11-11), so the "Dependency audit" check now fails on a critical runtime finding: household #114, admin and collector PRs. High findings stay report-only (TD32) | all | Done (in review) | Rule 6 of the vulnerability-management policy says what to do when it turns red |
+| TD11 | ~~Make `npm audit` blocking for critical runtime findings~~: none of the three apps has one (2026-11-11), so the "Dependency audit" check now fails on a critical runtime finding: household #114, admin #116, collector #58. High findings stay report-only (TD32) | all | Done (in review) | Rule 6 of the vulnerability-management policy says what to do when it turns red |
 | TD12 | Move CRA apps to Vite; Node 20 on every build | household, admin | Phase 4 | Also clears most of TD32 |
 | TD13 | Introduce TypeScript gradually (new files first) | all | Phase 4 | |
 | TD14 | Move the public website out of the admin repository | admin | Phase 4 | |
@@ -37,5 +37,5 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD26 | Lint backlogs: admin 46 → 0 (admin #114); carter 231 → 3 (carter #56). The 3 left are in protected payout files (`disposalService.js`, `paymentService.js`) and need the owner's approval; then both apps lint everything | carter | Next | |
 | TD27 | Rotate the Google Maps API key that was committed to the carter repository, and restrict it to the app domains | carter | Now | Owner action in Google Cloud; key removed from files in carter #46 |
 | TD28 | ~~Carter photo storage access and payment-function authentication~~: done 2026-11-11 (carter #47, #48) | carter, DB | Done | Details in the restricted incident file |
-| TD29 | ~~Admin build runs on Node 16 (end of life) on Netlify~~: `NODE_VERSION = "20"` in netlify.toml. The full build, including the prerender of all 30 public pages with the bundled Chromium, was run on Node 20 first | admin | Done (in review) | Admin PR (Node 20 and blocking audit) |
+| TD29 | ~~Admin build runs on Node 16 (end of life) on Netlify~~: `NODE_VERSION = "20"` in netlify.toml. The full build, including the prerender of all 30 public pages with the bundled Chromium, was run on Node 20 first | admin | Done (in review) | Admin #116 |
 | TD30 | ~~Delete the legacy `backend_webhooks/` Express server in the carter repository~~: removed in carter #57, with `.env.example` no longer listing TrendiPay secrets as `VITE_` variables | carter | Done (in review) | Callbacks go to the `trendipay-webhook` Edge Function |
