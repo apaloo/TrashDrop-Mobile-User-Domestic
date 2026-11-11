@@ -16,6 +16,6 @@
 | Google Identity | Sign in with Google | Household | Email, name | free | _to fill_ | _to fill_ | Email sign-in remains available |
 | Facebook Graph API / X API | Social feeds on website | Admin | No | free | _to fill_ | _to fill_ | Optional feature |
 | Google Workspace | Email, documents | Corporate | Staff data | per user | tech-admin@ | CEO, CTO | Google Takeout |
-| Bitwarden | Password manager | Corporate | Secrets | per user | tech-admin@ | CEO, CTO | Export (encrypted) |
+| Bitwarden | Password manager (organisation "TrashDrop", US cloud) | Corporate | Secrets | Free (2 users, 2 collections); Teams ≈ USD 4/user/month when a third person joins | Company mailbox → `tech-admin@` | Owner; CTO to add | Export (encrypted JSON) |
 | Sentry | Error tracking | all | Scrubbed error data | free → Team | tech-admin@ | CTO, Tech Lead | Remove SDK |
 | Better Stack | Uptime monitoring | all | No | free | tech-admin@ | CTO, Tech Lead | Recreate monitors elsewhere |

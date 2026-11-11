@@ -6,7 +6,7 @@ onboarding issue (the **Access request** form opens it).
 ## Day 1: accounts and reading
 
 - [ ] Company Google account with 2-step verification ([runbook 03](runbooks/setup/03-google-workspace.md))
-- [ ] Password manager invite accepted; you can see the *Staging secrets* collection
+- [ ] Password manager invite accepted; you can see the *Shared accounts and operations* collection
 - [ ] GitHub account with 2FA, added to the `engineers` team
 - [ ] Read: [Charter](charter.md), [Repository governance](policies/repository-governance.md),
       [Change and release](policies/change-and-release.md),
@@ -31,7 +31,7 @@ CYPRESS_INSTALL_BINARY=0 npm ci
 ```
 
 Create `trashdrop/.env.development.local` (git-ignored) with the values from
-*Staging secrets → Household app*:
+*Shared accounts and operations → Household app (test)*:
 
 ```
 REACT_APP_SUPABASE_URL=...

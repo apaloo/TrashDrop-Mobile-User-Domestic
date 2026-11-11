@@ -26,6 +26,6 @@
 
 ## Readiness
 
-- Contact sheet (staff, vendors, support numbers) in the password manager, *Operations* collection, reviewed quarterly.
+- Contact sheet (staff, vendors, support numbers) in the password manager, *Shared accounts and operations* collection, reviewed quarterly.
 - Backup restore tested monthly (governance-cadence issue).
 - One tabletop exercise per year: walk a scenario above through with Operations and Finance; record what was learned as actions.

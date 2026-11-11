@@ -9,7 +9,7 @@ This runbook creates staging and makes database changes repeatable.
 
 1. Supabase dashboard → the TrashDrop organisation → **New project** →
    name `trashdrop-staging`, same region as production, strong DB password
-   (store it in Bitwarden → Staging secrets).
+   (store it in Bitwarden → Shared accounts and operations).
 2. Settings → API: note the URL and publishable (anon) key.
 
 ## 2. Baseline the schema

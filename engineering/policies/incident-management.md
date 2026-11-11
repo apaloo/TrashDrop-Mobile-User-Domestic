@@ -45,5 +45,5 @@ owner and a date.
 ## Contacts and tools
 
 The on-call phone number, escalation phone numbers and vendor support contacts
-are kept in the password manager (collection *Operations*), not in this
+are kept in the password manager (collection *Shared accounts and operations*), not in this
 public file.

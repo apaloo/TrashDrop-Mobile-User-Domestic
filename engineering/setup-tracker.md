@@ -16,7 +16,7 @@ dashboard only they can open). **Team** = any engineer with access.
 | 01 | Company GitHub organisation; transfer the three active repositories; make them private; archive the three inactive ones | Owner action | [01](runbooks/setup/01-github-organisation.md) | ☐ |
 | 02 | GitHub Projects board "TrashDrop Engineering" with auto-add from all repositories | Team | [02](runbooks/setup/02-github-projects.md) | ☐ |
 | 03 | Google Workspace: company domain email, groups, MFA enforced | Owner action | [03](runbooks/setup/03-google-workspace.md) | ☐ |
-| 04 | Password manager (Bitwarden Teams) with shared collections per system | Owner action | [04](runbooks/setup/04-password-manager.md) | ☐ |
+| 04 | Password manager: Bitwarden organisation **created 2026-11-11 (Free plan)**; still to do: owner two-step login, two collections, second member, move secrets ([inventory](checklists/secrets-inventory.md)) | Owner action | [04](runbooks/setup/04-password-manager.md) | ☐ |
 | 08 | Branch protection, required checks, secret scanning, environments on every repository | Team (org admin) | [08](runbooks/setup/08-branch-protection-and-secrets.md) | ☐ |
 | 09 | Supabase legacy-key clean-up after rotation (new keys in use; legacy keys disabled 2026-11-11; exposure-period log review done) | Owner action | [09](runbooks/setup/09-supabase-legacy-keys.md) | ☑ |
 
