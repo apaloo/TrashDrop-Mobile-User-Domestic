@@ -1,4 +1,4 @@
--- Rollback for 20261111140000_close_anon_access_to_personal_data.sql.
+-- Rollback for 20261111134137_close_anon_access_to_personal_data.sql.
 -- Restores anonymous access exactly as it was. Only run this if a signed-out
 -- screen breaks, and then fix that screen instead of leaving this in place:
 -- it re-exposes users' emails and phone numbers.
