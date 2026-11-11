@@ -84,7 +84,7 @@ jobs:
         path: build
 
     - name: Deploy preview to Netlify
-      uses: nwtgck/actions-netlify@v3.0
+      uses: nwtgck/actions-netlify@v4.0
       with:
         publish-dir: 'build'
         production-deploy: false
@@ -108,7 +108,7 @@ jobs:
         path: build
     
     - name: Deploy to Netlify (production)
-      uses: nwtgck/actions-netlify@v3.0
+      uses: nwtgck/actions-netlify@v4.0
       with:
         publish-dir: 'build'
         production-deploy: true
