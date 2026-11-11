@@ -1,4 +1,6 @@
 module.exports = {
+  // This is the app's whole ESLint configuration; don't merge configs from parent folders.
+  root: true,
   extends: ['react-app', 'react-app/jest'],
   rules: {
     // Disable rules that are causing the most warnings

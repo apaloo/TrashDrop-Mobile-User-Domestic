@@ -28,3 +28,15 @@ yarn-error.log*
 
 # Local Netlify folder
 .netlify
+
+# Never commit (engineering/policies/repository-governance.md)
+*.pem
+*.log
+.DS_Store
+.netlify/
+*.bak
+*.bak[0-9]
+*.orig
+*.before_fix
+*.backup
+temp_edits/

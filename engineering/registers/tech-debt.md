@@ -10,9 +10,9 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD1 | Fix the 8 known-failing test suites | household | Now | `trashdrop/scripts/ci/known-failing-tests.txt` |
 | TD2 | Lint the test files too (92 jest-rule errors) | household | Now | Then drop the `--ignore-pattern`s in `npm run lint` |
 | TD3 | Move carter payout calculation fully server-side, with guard tests and a written spec like `DIGITAL_BIN_PRICING.md` | carter + DB | Now | Needs owner's written approval |
-| TD4 | Remove the dead app copy at the household repository root (`/netlify`, `/cypress`, `/migrations`, `/temp_edits`, root `package.json`, about 40 root `*_FIX.md`, root `.sql` files) | household | Now | Root `netlify.toml` must stay (`base = trashdrop`) |
-| TD5 | Remove committed dev files: `localhost*.pem`, `dev-server.log`, `*.bak*`, `*.orig`, `.DS_Store`, `.netlify/state.json` | household | Now | Then drop the `.pem` allowlist in `.gitleaks.toml` |
-| TD6 | Remove debug routes from production builds (`/schema-test`, `/toast-test`, `/network-test`) | household | Now | |
+| TD4 | ~~Remove the dead app copy at the household repository root (`/netlify`, `/cypress`, `/migrations`, `/temp_edits`, root `package.json`, about 40 root `*_FIX.md`, root `.sql` files)~~ | household | Done | Done 2026-11-11: root copy removed (108 duplicates deleted; notes, SQL and scripts archived in docs/archive/; 7 production-recorded migrations moved into trashdrop/supabase/migrations) |
+| TD5 | ~~Remove committed dev files: `localhost*.pem`, `dev-server.log`, `*.bak*`, `*.orig`, `.DS_Store`, `.netlify/state.json`~~ | household | Done | Done 2026-11-11: files removed, .gitignore covers them, .pem allowlist dropped from .gitleaks.toml |
+| TD6 | ~~Remove debug routes from production builds (`/schema-test`, `/toast-test`, `/network-test`)~~ | household | Done | Done 2026-11-11: routes exist only in development builds |
 | TD7 | Add caller authentication to `check-batch` | household | Now | Used by `batchService.js` |
 | TD8 | Consolidate three service-worker files into one | household | Next | |
 | TD9 | One map stack (Leaflet + OSM), Google only where needed | carter, household | Next | Cost and complexity |
@@ -21,7 +21,8 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD12 | Move CRA apps to Vite; Node 20 on every build | household, admin | Phase 4 | |
 | TD13 | Introduce TypeScript gradually (new files first) | all | Phase 4 | |
 | TD14 | Move the public website out of the admin repository | admin | Phase 4 | |
-| TD15 | Move large binaries (PSD, posters) out of git to Google Drive | admin | Next | 17.8 MB PSD served publicly |
+| TD15 | Move large binaries (PSD, posters) out of git to Google Drive | admin | Next | Unused PSD and PNG removed in admin #109; save the PSD to the shared drive |
+| TD31 | Compress the large site photos in the admin portal (`auth-bg.jpg` and `gradient-background.jpg` 6.4 MB each and identical, `cargo-bike.jpg` 5.6 MB) | admin | Next | Page-load speed on mobile data |
 | TD16 | Delete stale branches (26 in carter, 20+ in admin) | carter, admin | Now | The monthly branch clean-up issue lists them in the household repository; roll the cadence out to the other repositories with the other automation |
 | TD17 | Household card/bank payment screen is a placeholder | household | Product decision | Remove it or integrate MoMo properly |
 | TD18 | One owner for the shared schema; migrations consolidated | all | Now | ADR, runbook 05 §6 |
