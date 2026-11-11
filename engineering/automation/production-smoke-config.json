@@ -1,7 +1,7 @@
 {
-  "_comment": "What each live site must answer. Every check is a plain GET with no sign-in, the way a visitor arrives. 'status' is the expected HTTP status (redirects are not followed). 'contains' must appear in the body; 'header' must be present. Change a base URL here when a site moves (the household app moves to app.trashdrops.com with risk R13). Changing an expectation needs the CTO's review (CODEOWNERS).",
+  "_comment": "What each live site must answer. Every check is a plain GET with no sign-in, the way a visitor arrives. 'status' is the expected HTTP status (redirects are not followed). 'contains' must appear in the body; 'header' must be present. Change a base URL here when a site moves. Changing an expectation needs the CTO's review (CODEOWNERS).",
   "sites": {
-    "household": "https://trashdrop-mobile.windsurf.build",
+    "household": "https://app.trashdrops.com",
     "collector": "https://collector.trashdrops.com",
     "admin": "https://trashdrops.com"
   },

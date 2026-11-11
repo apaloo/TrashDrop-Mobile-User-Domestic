@@ -22,7 +22,7 @@ can stay brief.
 
 | Site | Serves | Public address | Notes |
 |---|---|---|---|
-| `trashdrop-mobile-przsu` | Household app | `trashdrop-mobile.windsurf.build` only | **No TrashDrop domain** (R13): add `app.trashdrops.com` |
+| `trashdrop-mobile-przsu` | Household app | `app.trashdrops.com` (since 2026-10-20; `netlify.toml` sends the old `*.netlify.app` address there) | Netlify still lists `trashdrop-mobile.windsurf.build` as this site's primary domain; that name no longer resolves and no traffic uses it. Tidy-up: make `app.trashdrops.com` the primary domain and remove the Windsurf one |
 | `trashdrop-mobile-collector` | Carter app | collector.trashdrops.com | |
 | `luxury-valkyrie-2ebd15` | Admin portal and public website | trashdrops.com | Node 16 build image |
 | `trashdrop-web-admin` | Old admin portal | trashdrop-web-admin.netlify.app | Last deployed July 2025: confirm unused, then delete (R15) |

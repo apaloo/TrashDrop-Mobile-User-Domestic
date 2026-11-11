@@ -22,7 +22,7 @@ module.exports = [
   step('07c', 'Monthly report for all three apps', '.github/workflows/governance-cadence.yml', ['owner-action'],
     ['ENGINEERING_REPORT_TOKEN secret added (fine-grained, read-only on the carter and admin repositories)', 'Governance cadence → monthly-report run shows a row per repository']),
   step('07d', 'Check the production smoke check', '.github/workflows/production-smoke.yml', [],
-    ['First scheduled run: every check passes (S01 needs the 07b variables)', 'When the household app moves to app.trashdrops.com, its URL is changed in production-smoke-config.json']),
+    ['First scheduled run: every check passes (S01 needs the 07b variables)', 'Site addresses are current in production-smoke-config.json (household: app.trashdrops.com)']),
   step('08', 'Branch protection, required checks and secret scanning on every repository', `${R}/08-branch-protection-and-secrets.md`, [],
     ['main ruleset active on all three repositories', 'Required checks: CI and secret scan', 'Dependabot alerts and security updates on']),
   step('09', 'Supabase legacy-key clean-up after rotation', `${R}/09-supabase-legacy-keys.md`, ['owner-action', 'product:database'],

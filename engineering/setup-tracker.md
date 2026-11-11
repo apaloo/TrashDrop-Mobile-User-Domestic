@@ -29,7 +29,7 @@ dashboard only they can open). **Team** = any engineer with access.
 | 07 | Uptime monitoring and alerting (Better Stack free tier) | Team | [07](runbooks/setup/07-uptime-monitoring.md) | ☐ |
 | 07b | Security watch: set repository variables `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_REF` (and the existing `SUPABASE_ACCESS_TOKEN` secret), then run it once | Team | `.github/workflows/security-watch.yml` | ☐ |
 | 07c | Monthly report for all three apps: add the `ENGINEERING_REPORT_TOKEN` secret (fine-grained, read-only: pull requests, actions, metadata on the carter and admin repositories) | Owner action | `.github/workflows/governance-cadence.yml` | ☐ |
-| 07d | Production smoke check: runs by itself (hourly and after each household deploy). Check the first scheduled run; when the household app moves to `app.trashdrops.com`, change its URL in `engineering/automation/production-smoke-config.json` | Team | `.github/workflows/production-smoke.yml` | ☐ |
+| 07d | Production smoke check: runs by itself (hourly and after each household deploy). Check the first scheduled run. Site addresses live in `engineering/automation/production-smoke-config.json` | Team | `.github/workflows/production-smoke.yml` | ☐ |
 | 10 | Copy CI, security checks, templates and CODEOWNERS to the carter and admin repositories (merged 2026-11-11: carter #46, admin #107) | Team | [08 §Rolling out](runbooks/setup/08-branch-protection-and-secrets.md#rolling-out-to-the-other-repositories) | ☑ |
 
 ## Phase 2: Clear the known backlog
