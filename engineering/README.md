@@ -17,7 +17,7 @@ into practice.
 | New to the team | [Onboarding guide](onboarding.md), [Charter](charter.md), [Repository governance](policies/repository-governance.md), [Change and release](policies/change-and-release.md), [Secure development](policies/secure-development.md) |
 | Setting up a tool or account | [Setup tracker](setup-tracker.md), which links each runbook |
 | Handling an outage | [Incident management](policies/incident-management.md) and the **Production incident** issue form |
-| Changing the database | [Change and release §Database changes](policies/change-and-release.md#database-changes) |
+| Changing the database | [Change and release §Database changes](policies/change-and-release.md#database-changes); for functions, the [database function review](runbooks/database-function-review.md) |
 | Asking for access | The **Access request** issue form ([Access control](policies/access-control.md)) |
 
 ## Contents
@@ -54,7 +54,7 @@ the CTO and CEO.
 
 **Templates:** [Architecture decision record](templates/adr.md) · [Post-incident review](templates/postmortem.md) · [Release checklist](templates/release-checklist.md)
 
-**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md)
+**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19)
 
 ## What is automated
 
@@ -66,6 +66,8 @@ the CTO and CEO.
 | Database migrations | `.github/workflows/supabase-migrations.yml` | Manual only: list, dry-run, apply; staging or production (production needs approval). |
 | Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Run once: creates labels and one issue per setup task, assigned for the team to complete. |
 | Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only) and the Supabase security advisor; opens a P1 issue on a regression, closes it when fixed. |
+| Production smoke check | `.github/workflows/production-smoke.yml` | Hourly and after each household deploy: the three live sites and their key functions answer as expected; one issue while anything fails. |
+| Database migration checks | `trashdrop/scripts/ci/check-migrations.js` (in CI) | New migrations: `SECURITY DEFINER` functions fix `search_path` and check the caller or revoke `anon`. |
 | Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, risk review and repository health across all three repositories; quarterly access review) and drafts the monthly CTO report from GitHub data. |
 | Release notes | `.github/workflows/release-notes.yml` | After each successful production deploy: a GitHub Release listing the pull requests shipped, grouped (protected pricing, database, security, fixes, features). |
 | Pull request labels | `.github/workflows/labeler.yml`, `.github/labeler.yml` | Labels from changed files: `protected-pricing` (owner approval needed), `database`, `product:whatsapp`, `ci`, `docs`, `dependencies`. |
