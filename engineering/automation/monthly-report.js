@@ -200,5 +200,6 @@ module.exports = async ({ github, context, core, getOctokit }, now = new Date())
   return { title: `[Report] Technology report: ${period.label}`, body: markdown };
 };
 module.exports.previousMonth = previousMonth;
+module.exports.reportRepos = reportRepos;
 module.exports.render = render;
 module.exports.priorityOf = priorityOf;

@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureLabels } = require('./bootstrap');
 const monthlyReport = require('./monthly-report');
-const branchCleanup = require('./branch-cleanup');
+const repoHealth = require('./repo-health');
 
 const TASKS = {
   'backup-restore-test': { every: 'month', title: (p) => `[Governance] Backup restore test: ${p}`, file: 'backup-restore-test.md', owner: 'DevOps engineer' },
@@ -44,12 +44,12 @@ module.exports = async ({ github, context, core, getOctokit }, { only = 'all', n
     if (issue) created.push(issue.number);
   }
 
-  if (only === 'all' || only === 'branch-cleanup') {
-    const found = await branchCleanup.findCandidates({ github, context }, now);
-    if (found.merged.length || found.stale.length) {
-      const issue = await openIfMissing({ github, context, core }, `[Governance] Branch clean-up: ${month}`, branchCleanup.render(found), ['governance']);
+  if (only === 'all' || only === 'repo-health') {
+    const health = await repoHealth({ github, context, getOctokit }, monthlyReport.reportRepos(context), now);
+    if (health.needsAction) {
+      const issue = await openIfMissing({ github, context, core }, `[Governance] Repository health: ${month}`, health.body, ['governance']);
       if (issue) created.push(issue.number);
-    } else core.info('No branches to clean up');
+    } else core.info('All repositories healthy');
   }
 
   if (only === 'all' || only === 'monthly-report') {

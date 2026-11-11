@@ -66,7 +66,7 @@ the CTO and CEO.
 | Database migrations | `.github/workflows/supabase-migrations.yml` | Manual only: list, dry-run, apply; staging or production (production needs approval). |
 | Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Run once: creates labels and one issue per setup task, assigned for the team to complete. |
 | Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only) and the Supabase security advisor; opens a P1 issue on a regression, closes it when fixed. |
-| Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, risk review and branch clean-up; quarterly access review) and drafts the monthly CTO report from GitHub data. |
+| Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, risk review and repository health across all three repositories; quarterly access review) and drafts the monthly CTO report from GitHub data. |
 | Release notes | `.github/workflows/release-notes.yml` | After each successful production deploy: a GitHub Release listing the pull requests shipped, grouped (protected pricing, database, security, fixes, features). |
 | Pull request labels | `.github/workflows/labeler.yml`, `.github/labeler.yml` | Labels from changed files: `protected-pricing` (owner approval needed), `database`, `product:whatsapp`, `ci`, `docs`, `dependencies`. |
 | Review routing | `.github/CODEOWNERS` | Protected files need the named owner's review. |

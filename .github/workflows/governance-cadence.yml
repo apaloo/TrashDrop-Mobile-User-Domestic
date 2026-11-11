@@ -3,6 +3,8 @@ name: Governance cadence
 # On the 1st of every month: opens the backup restore test and risk review
 # issues, drafts the monthly CTO report for the previous month, and (in
 # January, April, July, October) opens the quarterly access review.
+# Also monthly: repository health across all three repositories (standards in
+# place, known-failing tests, old pull requests, branches to delete).
 # Never opens the same issue twice. Policies: engineering/policies/.
 on:
   schedule:
@@ -12,7 +14,7 @@ on:
       only:
         description: Run one task only
         type: choice
-        options: [all, monthly-report, backup-restore-test, risk-review, access-review, branch-cleanup]
+        options: [all, monthly-report, backup-restore-test, risk-review, access-review, repo-health]
         default: all
 
 permissions:
