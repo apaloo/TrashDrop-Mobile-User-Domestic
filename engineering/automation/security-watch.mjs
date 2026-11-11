@@ -5,11 +5,18 @@
  *      no rows (see security-watch-config.json). A control probe must see data.
  *   2. Advisors (when SUPABASE_ACCESS_TOKEN is set): no new ERROR-level
  *      findings, and warning counts no higher than their ceilings.
+ *   3. Log scan (same token): no signed-out caller scanned the API in the
+ *      last 24 hours (many tables in one minute, or many missing tables).
+ *      Reports minutes and counts only, never IP addresses: the repository
+ *      is public.
  * Exits 1 on any failure. Prints a Markdown summary (GITHUB_STEP_SUMMARY)
  * and writes security-watch-result.json for the workflow's issue step.
  *
  * Env: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY (public), and optionally
- *      SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF for the advisors.
+ *      SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF for the advisors and
+ *      the log scan.
+ *
+ *   node engineering/automation/security-watch.mjs --self-test   logic only, no network
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,6 +54,44 @@ export function checkAdvisors(lints, advisorsConfig) {
   }
   const fixed = [...allowed].filter((k) => !seenAllowed.has(k));
   return { problems, fixed };
+}
+
+// One row per caller (IP) per minute: signed-out API requests, how many
+// tables or functions they touched, and how many asked for one that doesn't
+// exist (404). ClickHouse SQL for the Management API logs endpoint.
+export const SCAN_SQL = `select toStartOfMinute(timestamp) as minute,
+  log_attributes['request.headers.cf_connecting_ip'] as caller,
+  count() as requests,
+  uniq(regexpExtract(log_attributes['request.path'], '^(/rest/v1/(?:rpc/)?[^?/]*)')) as endpoints,
+  countIf(log_attributes['response.status_code'] = '404') as not_found
+from logs
+where source = 'edge_logs'
+  and log_attributes['request.path'] like '/rest/v1/%'
+  and coalesce(nullIf(log_attributes['request.sb.jwt.authorization.payload.role'], ''), 'anon') = 'anon'
+group by minute, caller
+having endpoints > 10 or not_found > 5
+order by minute`;
+
+// Rows from SCAN_SQL -> the minutes that look like a scan. Callers are
+// numbered, not named, so nothing identifying reaches the public summary.
+export function findScans(rows, cfg) {
+  const ids = new Map();
+  return (rows ?? [])
+    .filter((r) => Number(r.endpoints) > cfg.maxEndpointsPerMinute || Number(r.not_found) > cfg.maxNotFoundPerMinute)
+    .map((r) => {
+      if (!ids.has(r.caller)) ids.set(r.caller, ids.size + 1);
+      return { minute: String(r.minute), caller: ids.get(r.caller), requests: Number(r.requests), endpoints: Number(r.endpoints), notFound: Number(r.not_found) };
+    });
+}
+
+async function logScan(token, ref, cfg) {
+  const end = new Date(); const start = new Date(end.getTime() - cfg.hours * 3600e3);
+  const qs = new URLSearchParams({ sql: SCAN_SQL, iso_timestamp_start: start.toISOString(), iso_timestamp_end: end.toISOString() });
+  const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/analytics/endpoints/logs.all?${qs}`, { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) return { error: `HTTP ${res.status}` };
+  const body = await res.json();
+  if (body.error) return { error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error).slice(0, 200) };
+  return { scans: findScans(body.result, cfg) };
 }
 
 async function probe(base, key, p) {
@@ -101,6 +146,25 @@ async function main() {
     lines.push('', '**Advisors:** skipped (set SUPABASE_ACCESS_TOKEN and the SUPABASE_PROJECT_REF variable to enable).');
   }
 
+  const scanCfg = config.logScan;
+  if (token && ref) {
+    let r;
+    try { r = await logScan(token, ref, scanCfg); } catch (e) { r = { error: e.message }; }
+    if (r.error) {
+      lines.push('', `**Log scan:** could not be read (${r.error}); probes still ran.`);
+    } else if (!r.scans.length) {
+      lines.push('', `**Log scan:** ✅ no signed-out caller scanned the API in the last ${scanCfg.hours} hours.`);
+    } else {
+      lines.push('', `**Log scan:** ❌ ${r.scans.length} minute(s) of scanning by signed-out callers in the last ${scanCfg.hours} hours`, '',
+        '| Minute (UTC) | Caller | Requests | Tables or functions | Not found |', '|---|---|---|---|---|');
+      r.scans.forEach((x) => lines.push(`| ${x.minute} | #${x.caller} | ${x.requests} | ${x.endpoints} | ${x.notFound} |`));
+      const callers = new Set(r.scans.map((x) => x.caller)).size;
+      failures.push(`Log scan: ${callers} signed-out caller(s) scanned the API (${r.scans.map((x) => x.minute).join(', ')} UTC). If every probe above passed, nothing private was readable: P2, follow the runbook. Caller details are in the logs, not here.`);
+    }
+  } else {
+    lines.push('', '**Log scan:** skipped (needs the same token and project ref as the advisors).');
+  }
+
   const summary = lines.join('\n');
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
@@ -108,4 +172,31 @@ async function main() {
   process.exit(failures.length ? 1 : 0);
 }
 
-if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) main();
+function selfTest() {
+  const assert = (ok, what) => { if (!ok) { console.error(`self-test failed: ${what}`); process.exit(1); } };
+  assert(judge('denied', 401) && judge('empty', 200, []) && !judge('empty', 200, [{}]) && judge('data', 200, [{}]), 'judge');
+  assert(judge('denied-or-empty', 200, []) && !judge('denied', 200, []), 'judge denied-or-empty');
+  const adv = checkAdvisors([{ name: 'x', level: 'ERROR', findings: [{ metadata: { schema: 'public', name: 'a' } }] }, { name: 'w', level: 'WARN', count: 5 }],
+    { allowedErrors: ['x:public.a', 'x:public.gone'], ceilings: { w: 4 } });
+  assert(adv.problems.length === 1 && adv.problems[0].startsWith('w: 5') && adv.fixed[0] === 'x:public.gone', 'checkAdvisors');
+  const cfg = { maxEndpointsPerMinute: 40, maxNotFoundPerMinute: 25 };
+  // Shapes measured on 2026-11-11: busy real visitors, then one scan.
+  const rows = [
+    { minute: '2026-11-11 05:50:00', caller: 'a', requests: 24, endpoints: 15, not_found: 0 },
+    { minute: '2026-11-11 22:22:00', caller: 'b', requests: 1663, endpoints: 150, not_found: 137 },
+    { minute: '2026-11-11 22:23:00', caller: 'b', requests: 40, endpoints: 12, not_found: 30 },
+    { minute: '2026-11-11 23:00:00', caller: 'c', requests: 50, endpoints: 41, not_found: 0 },
+  ];
+  const s = findScans(rows, cfg);
+  assert(s.length === 3 && s.every((x) => x.minute !== '2026-11-11 05:50:00'), 'findScans picks scans only');
+  assert(s[0].caller === 1 && s[1].caller === 1 && s[2].caller === 2, 'findScans numbers callers');
+  assert(!JSON.stringify(s).includes('"b"'), 'findScans hides caller addresses');
+  assert(findScans(undefined, cfg).length === 0, 'findScans with no rows');
+  assert(config.logScan.maxEndpointsPerMinute > 15 && config.logScan.hours <= 24, 'logScan config (above normal traffic; API allows 24 h at most)');
+  assert(/having endpoints > 10/.test(SCAN_SQL) && 10 < config.logScan.maxEndpointsPerMinute && 5 < config.logScan.maxNotFoundPerMinute, 'SQL prefilter below the limits');
+  console.log(`self-test passed (${config.probes.length} probes configured)`);
+}
+
+if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
+  if (process.argv.includes('--self-test')) selfTest(); else main();
+}

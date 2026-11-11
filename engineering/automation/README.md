@@ -12,7 +12,7 @@ Run by GitHub Actions through `actions/github-script`; plain CommonJS, no depend
 | `repo-health.js` | cadence | Monthly, per repository: standard files present, `main` protected, private, known-failing tests, pull requests open 14+ days, branches to delete |
 | `branch-cleanup.js` | repo-health | Finds merged and 60-day-idle branches |
 | `release-notes.js` | `release-notes.yml` | GitHub Release per production deploy, listing the pull requests shipped |
-| `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production and the Supabase security advisor |
+| `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production, the Supabase security advisor, and a scan check on the last 24 hours of API logs (`--self-test` runs without network) |
 | `production-smoke.mjs` + `production-smoke-config.json` | `production-smoke.yml` (hourly, and 7 minutes after each household deploy) | Each live site up, routed and with its key functions deployed; one issue while anything fails. `--self-test` checks the logic offline |
 
 All scripts are idempotent: they look for an existing issue with the same

@@ -20,6 +20,12 @@
     { "id": "P17", "what": "staff dashboard figures without sign-in", "method": "POST", "path": "/rest/v1/rpc/fetch_dashboard_stats", "body": {}, "expect": "denied" },
     { "id": "C01", "what": "public dumping-report map (control)", "method": "GET", "path": "/rest/v1/public_illegal_dumping_reports?select=id&limit=1", "expect": "data" }
   ],
+  "logScan": {
+    "_comment": "Signed-out callers that touch many tables in one minute, or ask for many tables that don't exist, are scanning the API. Measured 2026-11-11: real signed-out visitors touched at most 21 tables or functions a minute and got no 'not found' answers; one scan touched 150 and got 137 not-found answers in a minute. Needs SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF. Raising a limit needs the CTO's review (CODEOWNERS).",
+    "hours": 24,
+    "maxEndpointsPerMinute": 40,
+    "maxNotFoundPerMinute": 25
+  },
   "advisors": {
     "_comment": "Known ERROR-level advisor findings, accepted until tech-debt TD19 fixes them. A new ERROR finding fails the watch; fixing one means deleting it here.",
     "allowedErrors": [
