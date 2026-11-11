@@ -3,7 +3,10 @@
 Every account, tool and control the department needs, in order. Running the
 **Engineering bootstrap** workflow (Actions → Engineering bootstrap → Run
 workflow) opens one GitHub issue per row, so progress is tracked on the
-GitHub Projects board. This file is the master list. When a step is done, tick
+GitHub Projects board. It first ran on 2026-11-11 (issues #91–#103). It is
+safe to run again: it skips issues that already exist (matched by title) and
+opens only new rows, so run it after adding a step here and in
+`automation/setup-issues.js`. This file is the master list. When a step is done, tick
 it here in the same pull request that records any new register entries.
 
 Legend: **Owner action** = needs the account owner (sign-up, payment, a
