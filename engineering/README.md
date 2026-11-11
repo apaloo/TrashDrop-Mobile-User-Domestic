@@ -54,7 +54,7 @@ the CTO and CEO.
 
 **Templates:** [Architecture decision record](templates/adr.md) · [Post-incident review](templates/postmortem.md) · [Release checklist](templates/release-checklist.md)
 
-**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19)
+**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19) · [A signed-out caller scanned the API](runbooks/api-scan-detected.md)
 
 ## What is automated
 
@@ -65,7 +65,7 @@ the CTO and CEO.
 | Dependency updates | `.github/dependabot.yml` | Weekly update pull requests. |
 | Database migrations | `.github/workflows/supabase-migrations.yml` | Manual only: list, dry-run, apply; staging or production (production needs approval). |
 | Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Manual. Creates labels and one issue per setup task; safe to re-run (skips existing issues), so run it again after adding a setup step. First run 2026-11-11. |
-| Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only) and the Supabase security advisor; opens a P1 issue on a regression, closes it when fixed. |
+| Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only), the Supabase security advisor, and the API logs for signed-out callers scanning the API; opens an issue on a regression (P1, or P2 for a scan that found nothing), closes it when fixed. |
 | Production smoke check | `.github/workflows/production-smoke.yml` | Hourly and after each household deploy: the three live sites and their key functions answer as expected; one issue while anything fails. |
 | Database migration checks | `trashdrop/scripts/ci/check-migrations.js` (in CI) | New migrations: `SECURITY DEFINER` functions fix `search_path` and check the caller or revoke `anon`. |
 | Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, risk review and repository health across all three repositories; quarterly access review) and drafts the monthly CTO report from GitHub data. |
