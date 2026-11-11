@@ -25,3 +25,8 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD16 | Delete stale branches (26 in carter, 20+ in admin) | carter, admin | Now | |
 | TD17 | Household card/bank payment screen is a placeholder | household | Product decision | Remove it or integrate MoMo properly |
 | TD18 | One owner for the shared schema; migrations consolidated | all | Now | ADR, runbook 05 §6 |
+| TD19 | Database security stage 2: restrict `get_user_*`, `user_stats_dashboard` and staff functions to owner/staff; set `security_invoker` on the 12 SECURITY DEFINER views; add caller checks to SECURITY DEFINER functions (about 79 had none on 2026-11-11); fix `search_path` on 150 functions | DB | Now | Supabase security advisor; test on staging |
+| TD20 | Database performance advisor: 59 RLS policies re-evaluating `auth.uid()` per row, 45 unindexed foreign keys, 43 overlapping permissive policies, 4 duplicate indexes, 17 tables without a primary key | DB | Next | Supabase performance advisor |
+| TD21 | Delete 9 leftover `*_backup_2026*` tables in `public` after confirming they are not needed | DB | Next | Backups belong in backups, not in the live schema |
+| TD22 | Turn on leaked-password protection (Auth settings) and upgrade Postgres (security patches available) | DB | Now | Owner action in the Supabase dashboard |
+| TD23 | Delete or pause the unused Supabase project "TrashDrop Admin WebPortal" (no sign-in since July 2025; its key was in git history) | DB | Now | Owner action; export first if the 11 accounts matter |
