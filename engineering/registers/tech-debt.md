@@ -22,7 +22,7 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD13 | Introduce TypeScript gradually (new files first) | all | Phase 4 | |
 | TD14 | Move the public website out of the admin repository | admin | Phase 4 | |
 | TD15 | Move large binaries (PSD, posters) out of git to Google Drive | admin | Next | Unused PSD and PNG removed in admin #109; save the PSD to the shared drive |
-| TD31 | Compress the large site photos in the admin portal (`auth-bg.jpg` and `gradient-background.jpg` 6.4 MB each and identical, `cargo-bike.jpg` 5.6 MB) | admin | Next | Page-load speed on mobile data |
+| TD31 | ~~Compress the large site photos~~: they turned out to be unused; 14 files (27 MB) removed in admin #115. The QR flyer template stays at full resolution | admin | Done (in review) | Deploy size, not page load |
 | TD32 | Remaining npm audit findings after the 2026-11-11 non-breaking fixes (production dependencies): household 13 high, admin 13 high, carter 1 high. Nearly all come from `react-scripts` (webpack-dev-server, svgo, postcss 7) and carter's `vite-plugin-pwa`; build-time only, not shipped to browsers | all | Next | Cleared by TD12 (move off Create React App) and a `vite-plugin-pwa` major upgrade; then do TD11 |
 | TD16 | Delete stale branches (26 in carter, 20+ in admin) | carter, admin | Now | The monthly branch clean-up issue lists them in the household repository; roll the cadence out to the other repositories with the other automation |
 | TD17 | Household card/bank payment screen is a placeholder | household | Product decision | Remove it or integrate MoMo properly |
