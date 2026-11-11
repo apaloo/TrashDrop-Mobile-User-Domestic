@@ -27,7 +27,8 @@
    same migration. Postgres lets everyone execute a new function by default,
    so a function that takes a user id and skips this works for anyone, signed
    in or not. Server-only functions are granted to `service_role` alone.
-   Checked by CI for migrations from 2026-11-11 on.
+   Checked by CI for migrations from 2026-11-11 on. Why, and the three
+   states a function can be in: [ADR-002](../decisions/ADR-002-database-function-access.md).
 
 ## Automated checks (all pull requests)
 

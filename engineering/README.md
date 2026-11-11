@@ -44,7 +44,7 @@ into practice.
 The [Technology strategy 2027–2029](technology-strategy.md) is a draft for
 the CTO and CEO.
 
-**Decisions:** [ADR-001 Database schema ownership](decisions/ADR-001-database-schema-ownership.md) (proposed)
+**Decisions:** [ADR-001 Database schema ownership](decisions/ADR-001-database-schema-ownership.md) (proposed) · [ADR-002 Who may call a database function](decisions/ADR-002-database-function-access.md) (accepted)
 
 **Registers.** These are living records. The team keeps them current, and the scheduled reviews check them.
 

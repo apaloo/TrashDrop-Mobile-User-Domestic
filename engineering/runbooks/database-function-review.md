@@ -2,7 +2,7 @@
 
 **Who:** an engineer with the Supabase MCP or SQL editor, plus the CTO for the
 go-ahead on production · **Time:** 30–60 minutes per group of functions ·
-**Tracks:** tech-debt TD19, secure development principle 8
+**Tracks:** tech-debt TD19, secure development principle 8 · **Decision:** [ADR-002](../decisions/ADR-002-database-function-access.md)
 
 Use this to work through the functions the security advisor still flags
 (`anon_security_definer_function_executable`), or any function you're
