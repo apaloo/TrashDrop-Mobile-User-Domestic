@@ -38,4 +38,4 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD27 | Rotate the Google Maps API key that was committed to the carter repository, and restrict it to the app domains | carter | Now | Owner action in Google Cloud; key removed from files in carter #46 |
 | TD28 | ~~Carter photo storage access and payment-function authentication~~: done 2026-11-11 (carter #47, #48) | carter, DB | Done | Details in the restricted incident file |
 | TD29 | Admin build runs on Node 16 (end of life) on Netlify; CI uses Node 20 | admin | Next | Set `NODE_VERSION = "20"` in netlify.toml after checking the pre-render step |
-| TD30 | Delete the legacy `backend_webhooks/` Express server in the carter repository (replaced by Edge Functions) | carter | Next | Excluded from lint |
+| TD30 | ~~Delete the legacy `backend_webhooks/` Express server in the carter repository~~: removed in carter #57, with `.env.example` no longer listing TrendiPay secrets as `VITE_` variables | carter | Done (in review) | Callbacks go to the `trendipay-webhook` Edge Function |
