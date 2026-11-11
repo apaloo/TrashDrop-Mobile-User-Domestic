@@ -15,6 +15,8 @@
     { "id": "P12", "what": "reward redemption without sign-in", "method": "POST", "path": "/rest/v1/rpc/redeem_reward", "body": { "p_user_id": "00000000-0000-4000-8000-000000000000", "p_reward_id": "00000000-0000-4000-8000-000000000000" }, "expect": "denied" },
     { "id": "P13", "what": "WhatsApp booking session without the server key", "method": "POST", "path": "/rest/v1/rpc/get_active_whatsapp_session", "body": { "p_phone": "000" }, "expect": "denied" },
     { "id": "P14", "what": "pickup creation without sign-in", "method": "POST", "path": "/rest/v1/rpc/create_pickup_request", "body": { "p_id": "smoke", "p_user_id": "00000000-0000-4000-8000-000000000000", "p_status": "pending", "p_bag_count": 1, "p_waste_type": "general", "p_special_instructions": "", "p_longitude": 0, "p_latitude": 0, "p_address": "" }, "expect": "denied" },
+    { "id": "P15", "what": "household dashboard by id without sign-in", "method": "POST", "path": "/rest/v1/rpc/get_dashboard_data_optimized", "body": { "user_id_param": "00000000-0000-4000-8000-000000000000", "activity_limit": 1 }, "expect": "denied" },
+    { "id": "P16", "what": "collector earnings by id without sign-in", "method": "POST", "path": "/rest/v1/rpc/get_collector_earnings_summary", "body": { "p_collector_id": "00000000-0000-4000-8000-000000000000" }, "expect": "denied" },
     { "id": "C01", "what": "public dumping-report map (control)", "method": "GET", "path": "/rest/v1/public_illegal_dumping_reports?select=id&limit=1", "expect": "data" }
   ],
   "advisors": {
@@ -37,7 +39,7 @@
     ],
     "_ceilings_comment": "Warning counts that may only go down. Lower a ceiling when the count drops.",
     "ceilings": {
-      "anon_security_definer_function_executable": 58
+      "anon_security_definer_function_executable": 48
     }
   }
 }
