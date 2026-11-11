@@ -20,6 +20,14 @@
 5. **No secrets in the browser bundle** (see [Access control](access-control.md)).
 6. **No test, debug or diagnostic pages in production builds.**
 7. **Personal data** follows [Data protection controls](data-protection-controls.md).
+8. **Database functions that run with their owner's rights** (`SECURITY
+   DEFINER`) fix their `search_path`, and either check who is calling
+   (`td_assert_self_or_staff(<user id>)` for "this account or staff",
+   `auth.uid()`, `td_can_manage_requests()`) or are revoked from `anon` in the
+   same migration. Postgres lets everyone execute a new function by default,
+   so a function that takes a user id and skips this works for anyone, signed
+   in or not. Server-only functions are granted to `service_role` alone.
+   Checked by CI for migrations from 2026-11-11 on.
 
 ## Automated checks (all pull requests)
 
@@ -28,9 +36,10 @@
 | Lint (application code) | ESLint | Yes |
 | Unit tests | Jest (`npm run test:ci`) | Yes |
 | Pricing guard tests | Jest + `pricing-promo.js` | Yes |
+| Database functions in new migrations (principle 8) | `scripts/ci/check-migrations.js` | Yes |
 | Build | CRA / craco | Yes |
 | Secrets in new commits | gitleaks | Yes |
-| Vulnerable dependencies | `npm audit` | Report only for now; blocking on critical runtime issues once the backlog is cleared |
+| Vulnerable dependencies | `npm audit` | Yes for critical findings in runtime dependencies; high and lower are reported |
 | Dependency updates | Dependabot | Opens pull requests weekly |
 
 Never weaken, skip or delete a check, or add a test to the known-failing
