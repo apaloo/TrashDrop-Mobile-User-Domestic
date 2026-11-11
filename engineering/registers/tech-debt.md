@@ -34,6 +34,6 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD25 | Carter app: React hooks called inside callbacks (`OSMNavigationMap.jsx`, `OfflineIndicator.jsx`) | carter | Now | Breaks the rules of hooks; can crash or misbehave |
 | TD26 | Lint backlogs: carter 250 errors, admin 46 (src). CI lints changed files only; bring both to 0, then lint everything | carter, admin | Next | Job summary shows the count on every run |
 | TD27 | Rotate the Google Maps API key that was committed to the carter repository, and restrict it to the app domains | carter | Now | Owner action in Google Cloud; key removed from files in carter #46 |
-| TD28 | ~~Carter photo storage access~~ (fixed 2026-11-11, carter #47). Payment-function authentication remains | carter, DB | Now | Details in the restricted incident file; do not describe in public issues |
+| TD28 | ~~Carter photo storage access and payment-function authentication~~: done 2026-11-11 (carter #47, #48) | carter, DB | Done | Details in the restricted incident file |
 | TD29 | Admin build runs on Node 16 (end of life) on Netlify; CI uses Node 20 | admin | Next | Set `NODE_VERSION = "20"` in netlify.toml after checking the pre-render step |
 | TD30 | Delete the legacy `backend_webhooks/` Express server in the carter repository (replaced by Edge Functions) | carter | Next | Excluded from lint |
