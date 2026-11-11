@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in the app doesn't work as it should.
+labels: [type:bug, needs-triage]
+body:
+  - type: dropdown
+    id: product
+    attributes:
+      label: Product
+      options: [Household app, Carter app, Admin portal, WhatsApp booking, Website, Not sure]
+    validations: { required: true }
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Workflow affected
+      options: [QR Bag (buy/scan/collect), Digital Bin (request/quote/track), Payments or payouts, Illegal dumping report, Sign-in or account, Notifications, Maps or GPS, Other]
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what should have happened?
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open …\n2. Tap …\n3. See …"
+    validations: { required: true }
+  - type: input
+    id: device
+    attributes:
+      label: Device, browser and app version
+      placeholder: "Tecno Spark 10, Chrome 131, installed PWA"
+  - type: dropdown
+    id: users
+    attributes:
+      label: How many users are affected?
+      options: [One user, Some users, All users, Unknown]
+  - type: markdown
+    attributes:
+      value: "**Do not paste** phone numbers, MoMo numbers, addresses or other personal data. Refer to the user by their account ID."

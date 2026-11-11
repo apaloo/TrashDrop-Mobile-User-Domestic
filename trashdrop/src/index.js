@@ -12,6 +12,10 @@ import * as mobileServiceWorker from "./mobileServiceWorker";
 import { initGlobalErrorHandlers } from "./utils/errorBoundary";
 import { isMobileDevice } from "./utils/mobileAuth";
 import { notifyUpdateReady, watchForMissingChunks } from "./utils/appUpdate";
+import { initMonitoring } from "./utils/monitoring";
+
+// Error monitoring first, so start-up errors are caught (no-op without REACT_APP_SENTRY_DSN)
+initMonitoring();
 
 // Initialize global error handlers early
 initGlobalErrorHandlers();

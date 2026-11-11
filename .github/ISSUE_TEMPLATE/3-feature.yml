@@ -1,0 +1,42 @@
+name: Feature or change request
+description: A new capability or a change to how something works.
+labels: [type:feature, needs-triage]
+body:
+  - type: input
+    id: owner
+    attributes:
+      label: Business owner
+      description: The person who will accept the change (Operations, Management, …).
+    validations: { required: true }
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Who has the problem, and what does it cost them today?
+    validations: { required: true }
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      value: "As a <household | carter | operations staff | MMDA officer>, I want … so that …"
+    validations: { required: true }
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: "- [ ] Given … when … then …\n- [ ] "
+    validations: { required: true }
+  - type: dropdown
+    id: products
+    attributes:
+      label: Products affected
+      multiple: true
+      options: [Household app, Carter app, Admin portal, WhatsApp booking, Website, Database]
+  - type: checkboxes
+    id: flags
+    attributes:
+      label: Flags
+      options:
+        - label: Changes prices, promotions or payouts (needs owner's written approval)
+        - label: Collects new personal data (needs Data Protection review)
+        - label: Needs a new third-party service (needs vendor review)

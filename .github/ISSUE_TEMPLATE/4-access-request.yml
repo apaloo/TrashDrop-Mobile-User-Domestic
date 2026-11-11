@@ -1,0 +1,42 @@
+name: Access request or removal
+description: Grant, change or remove someone's access to a company system.
+title: "[ACCESS] "
+labels: [type:access]
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Action
+      options: [Grant, Change, Remove (leaver or role change)]
+    validations: { required: true }
+  - type: input
+    id: person
+    attributes:
+      label: Person (name and work email)
+    validations: { required: true }
+  - type: dropdown
+    id: systems
+    attributes:
+      label: Systems
+      multiple: true
+      options: [GitHub, Supabase (staging), Supabase (production), Netlify, Google Workspace, Password manager, Sentry, Uptime monitor, Meta WhatsApp, TrendiPay, Google Cloud (Maps), Resend]
+    validations: { required: true }
+  - type: dropdown
+    id: level
+    attributes:
+      label: Access level
+      options: [Read only, Member/Developer, Admin (needs CTO approval)]
+    validations: { required: true }
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason (job need)
+    validations: { required: true }
+  - type: checkboxes
+    id: done
+    attributes:
+      label: Completed by IT/Support
+      options:
+        - label: Access changed in every system above
+        - label: MFA confirmed on the person's account
+        - label: Access register updated (engineering/registers/access-register.md)

@@ -17,6 +17,12 @@ module.exports = {
         node: true,
         browser: true
       }
+    },
+    {
+      // Service worker scripts run in the worker scope (self, clients).
+      files: ['src/serviceWorker.js', 'src/service-worker.js', 'public/sw.js'],
+      env: { serviceworker: true },
+      rules: { 'no-restricted-globals': 'off' }
     }
   ]
 };

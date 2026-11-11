@@ -1,34 +1,97 @@
-name: Supabase Database Migrations
+name: Database migrations
+
+# Applies trashdrop/supabase/migrations to a Supabase project. Runs only when
+# someone starts it by hand. Nothing touches the database on a push.
+#
+# Procedure: engineering/policies/change-and-release.md §Database changes
+# Setup:     engineering/runbooks/setup/05-supabase-staging.md
+#
+# Modes:
+#   list     Compare local migrations with the project's migration history.
+#            Safe; run it first.
+#   dry-run  Show which migrations `apply` would run, without running them.
+#   apply    Run the pending migrations.
+#
+# Targets are GitHub Environments named `staging` and `production`, each with
+# its own SUPABASE_PROJECT_ID and SUPABASE_DB_PASSWORD secrets. The
+# `production` environment must have required reviewers, so every production
+# run waits for a named approval.
+#
+# IMPORTANT, before the first `apply` on production: migrations so far were
+# applied by hand, so the project's migration history may not list them, and
+# `apply` would try to run them again. Run `list` first and record the
+# already-applied ones with `supabase migration repair --status applied
+# <version>` (see the runbook). Never `apply` while `list` shows drift you
+# can't explain.
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'supabase/migrations/**'  # supabase db push applies this directory
-  workflow_dispatch:     # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which database
+        type: choice
+        options: [staging, production]
+        default: staging
+      mode:
+        description: What to do
+        type: choice
+        options: [list, dry-run, apply]
+        default: list
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-migrations-${{ inputs.target }}
+  cancel-in-progress: false
 
 jobs:
-  apply-migrations:
+  migrate:
+    name: ${{ inputs.mode }} on ${{ inputs.target }}
     runs-on: ubuntu-latest
-    
+    environment: ${{ inputs.target }}
+    defaults:
+      run:
+        working-directory: trashdrop
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Supabase CLI
-      uses: supabase/setup-cli@v1
-      with:
-        version: latest
-    
-    - name: Link to Supabase project
-      env:
-        SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-        SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      run: |
-        supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
-    
-    - name: Apply migrations
-      env:
-        SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      run: |
-        supabase db push
+      - uses: actions/checkout@v4
+
+      - name: Refuse to run from a branch other than main
+        if: inputs.target == 'production' && github.ref != 'refs/heads/main'
+        working-directory: .
+        run: |
+          echo "::error::Production migrations run only from main (this run: ${{ github.ref }})."
+          exit 1
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: List local and remote migrations
+        run: supabase migration list --password "$SUPABASE_DB_PASSWORD" | tee migration-list.txt
+
+      - name: Dry run
+        if: inputs.mode == 'dry-run' || inputs.mode == 'apply'
+        run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Apply
+        if: inputs.mode == 'apply'
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ inputs.mode }} on ${{ inputs.target }} by @${{ github.actor }}"
+            echo "Commit: \`${{ github.sha }}\`"
+            echo '```'
+            cat migration-list.txt 2>/dev/null || echo "(no migration list)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

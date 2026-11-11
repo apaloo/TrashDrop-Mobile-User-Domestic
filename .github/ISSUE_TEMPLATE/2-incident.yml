@@ -1,0 +1,45 @@
+name: Production incident
+description: Something is broken in production now. Follow engineering/policies/incident-management.md.
+title: "[INCIDENT] "
+labels: [type:incident]
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: "P1 outage/payment failure/security (15 min), P2 major feature down (1 h), P3 workaround exists (4 business h), P4 minor (1 business day)"
+      options: [P1, P2, P3, P4]
+    validations: { required: true }
+  - type: input
+    id: started
+    attributes:
+      label: Started at (Africa/Accra time)
+      placeholder: "2026-11-11 14:05"
+    validations: { required: true }
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who can't do what? Which product and workflow?
+    validations: { required: true }
+  - type: input
+    id: commander
+    attributes:
+      label: Incident lead (one person)
+    validations: { required: true }
+  - type: textarea
+    id: timeline
+    attributes:
+      label: Timeline
+      description: Add a line for each action taken, with the time.
+      value: "- HH:MM detected by …\n"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before closing
+      options:
+        - label: Service restored and confirmed by a user-facing check
+        - label: Data checked for damage (payments, bag balances, job status)
+        - label: Customers/carters told, if they were affected
+        - label: Post-incident review written for P1/P2 (engineering/templates/postmortem.md)
+        - label: Data Protection Supervisor informed if personal data may have been exposed

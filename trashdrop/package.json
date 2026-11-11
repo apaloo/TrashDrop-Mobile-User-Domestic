@@ -10,6 +10,7 @@
     "@mui/material": "^5.15.0",
     "@mui/x-date-pickers": "^6.18.4",
     "@react-google-maps/api": "^2.20.7",
+    "@sentry/react": "8.55.0",
     "@supabase/supabase-js": "^2.38.0",
     "@testing-library/dom": "^9.3.3",
     "@testing-library/jest-dom": "^6.1.5",
@@ -50,7 +51,9 @@
     "dev:noop": "node -e \"setInterval(()=>{}, 1<<30)\"",
     "eject": "react-scripts eject",
     "whatsapp:upload-flow": "node scripts/upload-whatsapp-flow.js",
-    "whatsapp:flow-status": "node scripts/upload-whatsapp-flow.js --status"
+    "whatsapp:flow-status": "node scripts/upload-whatsapp-flow.js --status",
+    "lint": "eslint src --ext .js,.jsx --quiet --ignore-pattern '**/__tests__/**' --ignore-pattern '**/*.test.js'",
+    "test:ci": "node scripts/ci/run-tests.js"
   },
   "eslintConfig": {
     "extends": [
