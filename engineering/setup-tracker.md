@@ -27,13 +27,13 @@ dashboard only they can open). **Team** = any engineer with access.
 | 05 | Supabase staging project; schema baseline; migration history repaired on production | Owner action, then Team | [05](runbooks/setup/05-supabase-staging.md) | ☐ |
 | 06 | Sentry error tracking for the household, carter and admin apps | Owner action, then Team | [06](runbooks/setup/06-sentry.md) | ☐ |
 | 07 | Uptime monitoring and alerting (Better Stack free tier) | Team | [07](runbooks/setup/07-uptime-monitoring.md) | ☐ |
-| 10 | Copy CI, security checks, templates and CODEOWNERS to the carter and admin repositories | Team | [08 §Rolling out](runbooks/setup/08-branch-protection-and-secrets.md#rolling-out-to-the-other-repositories) | ☐ |
+| 10 | Copy CI, security checks, templates and CODEOWNERS to the carter and admin repositories (in review: carter #46, admin #107) | Team | [08 §Rolling out](runbooks/setup/08-branch-protection-and-secrets.md#rolling-out-to-the-other-repositories) | ☐ |
 
 ## Phase 2: Clear the known backlog
 
 | # | Step | Who | Where | Done |
 |---|---|---|---|---|
-| 11 | Fix the 8 known-failing test suites and delete them from the list | Team | `trashdrop/scripts/ci/known-failing-tests.txt` | ☐ |
+| 11 | Fix the known-failing test suites and delete them from each list (household 8, carter 4, admin 4) | Team | `scripts/ci/known-failing-tests.txt` in each repository | ☐ |
 | 12 | Work through the technical-debt register's "Now" items | Team | [tech-debt](registers/tech-debt.md) | ☐ |
 | 13 | Fill every register (products, infrastructure, vendors, access, IT assets) | Team | [registers](registers/) | ☐ |
 
