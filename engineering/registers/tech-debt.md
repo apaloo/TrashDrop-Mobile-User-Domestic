@@ -18,11 +18,12 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD9 | One map stack (Leaflet + OSM), Google only where needed | carter, household | Next | Cost and complexity |
 | TD10 | Replace the hard-coded admin email list with a role table | admin + DB | Next | Adding an admin shouldn't need a migration |
 | TD11 | Make `npm audit` blocking for critical runtime findings | all | Next | After Dependabot backlog |
-| TD12 | Move CRA apps to Vite; Node 20 on every build | household, admin | Phase 4 | |
+| TD12 | Move CRA apps to Vite; Node 20 on every build | household, admin | Phase 4 | Also clears most of TD32 |
 | TD13 | Introduce TypeScript gradually (new files first) | all | Phase 4 | |
 | TD14 | Move the public website out of the admin repository | admin | Phase 4 | |
 | TD15 | Move large binaries (PSD, posters) out of git to Google Drive | admin | Next | Unused PSD and PNG removed in admin #109; save the PSD to the shared drive |
 | TD31 | Compress the large site photos in the admin portal (`auth-bg.jpg` and `gradient-background.jpg` 6.4 MB each and identical, `cargo-bike.jpg` 5.6 MB) | admin | Next | Page-load speed on mobile data |
+| TD32 | Remaining npm audit findings after the 2026-11-11 non-breaking fixes (production dependencies): household 13 high, admin 13 high, carter 1 high. Nearly all come from `react-scripts` (webpack-dev-server, svgo, postcss 7) and carter's `vite-plugin-pwa`; build-time only, not shipped to browsers | all | Next | Cleared by TD12 (move off Create React App) and a `vite-plugin-pwa` major upgrade; then do TD11 |
 | TD16 | Delete stale branches (26 in carter, 20+ in admin) | carter, admin | Now | The monthly branch clean-up issue lists them in the household repository; roll the cadence out to the other repositories with the other automation |
 | TD17 | Household card/bank payment screen is a placeholder | household | Product decision | Remove it or integrate MoMo properly |
 | TD18 | One owner for the shared schema; migrations consolidated | all | Now | ADR, runbook 05 §6 |
