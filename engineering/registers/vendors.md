@@ -4,12 +4,13 @@
 
 | Vendor | Purpose | Products | Personal data shared | Plan / monthly cost (GHS) | Account owner | Admins (≥2) | Exit notes |
 |---|---|---|---|---|---|---|---|
-| Supabase | Database, auth, storage, functions | all | Yes: all user data | _to fill_ | _to fill_ | _to fill_ | `pg_dump` + storage export; Postgres-standard |
-| Netlify | Hosting, serverless functions | all | Request logs | _to fill_ | _to fill_ | _to fill_ | Static build + functions portable to Vercel/Cloudflare |
+| Supabase | Database, auth, storage, functions | all | Yes: all user data | **Pro** organisation: monthly amount from the billing page, owner to fill | owner (→ `tech-admin@`) | owner only: add CTO | `pg_dump` + storage export; Postgres-standard |
+| Netlify | Hosting, serverless functions | all | Request logs | **Pro** team: monthly amount from the billing page, owner to fill | owner (→ `tech-admin@`) | owner only: add CTO | Static build + functions portable to Vercel/Cloudflare |
 | GitHub | Code, CI, project management | all | No | Free → Team | _to fill_ | _to fill_ | git is portable |
 | Meta (WhatsApp Cloud API) | WhatsApp booking and notifications | Household | Yes: phone numbers, messages | per conversation | _to fill_ | _to fill_ | Number can be migrated to another provider (BSP) |
 | TrendiPay / BSL | MoMo collections and carter payouts | Carter | Yes: MoMo numbers, amounts | per transaction | _to fill_ | _to fill_ | Contract terms: _to fill_ |
 | Google Cloud (Maps Platform) | Maps, navigation | Carter, Household | Locations | usage-based | _to fill_ | _to fill_ | Leaflet + OpenStreetMap already used in parallel |
+| Arkesel | SMS sign-in codes (Supabase Auth Send SMS hook) | Carter | Yes: phone numbers | per SMS: owner to fill | _to fill_ | _to fill_ | Hook is ~60 lines (carter #54): any SMS API |
 | Resend | Transactional email | Admin | Emails, names | _to fill_ | _to fill_ | _to fill_ | Any SMTP provider |
 | OpenStreetMap Nominatim | Reverse geocoding (area names) | Admin, Household | Coordinates | free (usage policy limits) | n/a | n/a | Self-host or a paid geocoder at volume |
 | BigDataCloud | Reverse geocoding | Household | Coordinates | free tier | n/a | n/a | Consolidate with Nominatim |

@@ -15,8 +15,11 @@ tracked in the restricted CEO review and private security advisories.
 | R5 | Database changes applied by hand; schema can't be rebuilt | 4 | 4 | 16 | Baseline + migration-history repair; manual SQL banned outside P1 | Technical Lead | Open |
 | R6 | Payment and payout integrity | 3 | 5 | 15 | Server-side calculation (owner approval); reconciliation report; payout regression tests | Technical Lead | Open |
 | R7 | No error monitoring or alerting | 5 | 3 | 15 | Sentry (runbook 06), uptime (runbook 07) | DevOps | Mitigating |
-| R8 | Thin automated testing on carter and admin apps | 4 | 3 | 12 | Roll out CI (runbook 08 §Rolling out) | QA | Open |
+| R8 | Thin automated testing on carter and admin apps | 4 | 3 | 12 | CI in review for both (carter #46, admin #107); known-failing suites fixed (carter #53, admin #111) | QA | Mitigating |
 | R9 | Outdated build toolchain (CRA, Node 16 on admin) | 3 | 3 | 9 | Phase 4 upgrade to Vite and Node 20 | Technical Lead | Open |
 | R10 | Poor connectivity breaks field transactions | 3 | 4 | 12 | Offline queue and retries, idempotent server operations | Technical Lead | Open |
 | R11 | Vendor accounts tied to personal emails | 3 | 4 | 12 | Move to `tech-admin@` with ≥2 admins | CTO | Open |
 | R12 | Rising API costs (Maps, WhatsApp, SMS) | 3 | 3 | 9 | Monthly bill check; budget alerts | CTO | Open |
+| R13 | Household app's only public address is on a domain TrashDrop doesn't own (`trashdrop-mobile.windsurf.build`) | 3 | 4 | 12 | Add `app.trashdrops.com` in Netlify; keep the old address redirecting; update Supabase Auth Site URL and redirect URLs, and any printed links | Owner | Open |
+| R14 | Production code deployed outside git (Edge Functions deployed from a laptop; `send-sms-hook` was in no repository) | 4 | 3 | 12 | Source now in repositories (carter #54); deploy functions from CI only | Technical Lead | Mitigating |
+| R15 | Hosting team holds an unrelated site and a stale admin site (`trashdrop-web-admin`, last deployed July 2025) | 2 | 3 | 6 | Move the unrelated site out; confirm the old admin site is unused, then delete it | Owner | Open |
