@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { ensureLabels } = require('./bootstrap');
 const monthlyReport = require('./monthly-report');
+const branchCleanup = require('./branch-cleanup');
 
 const TASKS = {
   'backup-restore-test': { every: 'month', title: (p) => `[Governance] Backup restore test: ${p}`, file: 'backup-restore-test.md', owner: 'DevOps engineer' },
@@ -41,6 +42,14 @@ module.exports = async ({ github, context, core, getOctokit }, { only = 'all', n
     const body = `**Owner:** ${t.owner} · **Due:** within 10 working days\n\n${checklist}\n\nClose this issue with the result in a comment.`;
     const issue = await openIfMissing({ github, context, core }, t.title(label), body, ['governance']);
     if (issue) created.push(issue.number);
+  }
+
+  if (only === 'all' || only === 'branch-cleanup') {
+    const found = await branchCleanup.findCandidates({ github, context }, now);
+    if (found.merged.length || found.stale.length) {
+      const issue = await openIfMissing({ github, context, core }, `[Governance] Branch clean-up: ${month}`, branchCleanup.render(found), ['governance']);
+      if (issue) created.push(issue.number);
+    } else core.info('No branches to clean up');
   }
 
   if (only === 'all' || only === 'monthly-report') {

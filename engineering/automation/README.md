@@ -8,7 +8,10 @@ Run by GitHub Actions through `actions/github-script`; plain CommonJS, no depend
 | `setup-issues.js` | bootstrap | One issue per setup step. Keep in step with `../setup-tracker.md` |
 | `bootstrap.js` | `engineering-bootstrap.yml` (manual) | Creates/updates labels; opens setup issues not yet opened |
 | `cadence.js` | `governance-cadence.yml` (1st of month) | Opens recurring governance issues from `../checklists/` |
-| `monthly-report.js` | cadence | Drafts the monthly CTO report from pull requests, reviews, CI runs and issues |
+| `monthly-report.js` | cadence | Drafts the monthly CTO report from pull requests, reviews, CI runs and issues (all three repositories with `ENGINEERING_REPORT_TOKEN`) |
+| `branch-cleanup.js` | cadence | Lists merged and 60-day-idle branches for deletion |
+| `release-notes.js` | `release-notes.yml` | GitHub Release per production deploy, listing the pull requests shipped |
+| `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production and the Supabase security advisor |
 
 All scripts are idempotent: they look for an existing issue with the same
 title (open or closed) before creating one. To change a recurring checklist,

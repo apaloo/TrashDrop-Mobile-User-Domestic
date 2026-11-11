@@ -12,7 +12,7 @@ on:
       only:
         description: Run one task only
         type: choice
-        options: [all, monthly-report, backup-restore-test, risk-review, access-review]
+        options: [all, monthly-report, backup-restore-test, risk-review, access-review, branch-cleanup]
         default: all
 
 permissions:

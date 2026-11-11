@@ -22,7 +22,7 @@ Each item becomes an issue labelled `tech-debt` when someone picks it up.
 | TD13 | Introduce TypeScript gradually (new files first) | all | Phase 4 | |
 | TD14 | Move the public website out of the admin repository | admin | Phase 4 | |
 | TD15 | Move large binaries (PSD, posters) out of git to Google Drive | admin | Next | 17.8 MB PSD served publicly |
-| TD16 | Delete stale branches (26 in carter, 20+ in admin) | carter, admin | Now | |
+| TD16 | Delete stale branches (26 in carter, 20+ in admin) | carter, admin | Now | The monthly branch clean-up issue lists them in the household repository; roll the cadence out to the other repositories with the other automation |
 | TD17 | Household card/bank payment screen is a placeholder | household | Product decision | Remove it or integrate MoMo properly |
 | TD18 | One owner for the shared schema; migrations consolidated | all | Now | ADR, runbook 05 §6 |
 | TD19 | Database security stage 2: restrict `get_user_*`, `user_stats_dashboard` and staff functions to owner/staff; set `security_invoker` on the 12 SECURITY DEFINER views; add caller checks to SECURITY DEFINER functions (about 79 had none on 2026-11-11); fix `search_path` on 150 functions | DB | Now | Supabase security advisor; test on staging |
