@@ -14,3 +14,14 @@
 /trashdrop/src/services/__tests__/digitalBinService.promotion.test.js @apaloo
 /trashdrop/netlify/functions/__checks__/pricing-promo.js    @apaloo
 /.github/workflows/ci-cd.yml                                @apaloo
+
+# Engineering controls (engineering/policies/repository-governance.md).
+# @apaloo is the only reviewer today; replace with the team handle
+# (e.g. @trashdrop/tech-leads) once the GitHub organisation exists.
+/.github/                                                   @apaloo
+/.gitleaks.toml                                             @apaloo
+/trashdrop/scripts/ci/                                      @apaloo
+/trashdrop/.eslintrc.js                                     @apaloo
+/trashdrop/netlify/functions/                               @apaloo
+/trashdrop/supabase/migrations/                             @apaloo
+/engineering/policies/                                      @apaloo

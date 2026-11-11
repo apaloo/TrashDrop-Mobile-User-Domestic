@@ -10,9 +10,15 @@ Set these secrets in GitHub repository settings (Settings → Secrets → Action
 |-------------|-------------|--------|
 | `REACT_APP_SUPABASE_URL` | Supabase project URL | `.env.production` |
 | `REACT_APP_SUPABASE_ANON_KEY` | Supabase anonymous key | `.env.production` |
-| `SUPABASE_PROJECT_ID` | Supabase project ID (subdomain part of URL) | Extract from Supabase URL |
-| `SUPABASE_DB_PASSWORD` | Database password | Supabase dashboard |
-| `SUPABASE_ACCESS_TOKEN` | Access token | Supabase dashboard |
+| `SUPABASE_ACCESS_TOKEN` | Supabase personal access token (of the `tech-admin@` user) for the migrations workflow | Supabase dashboard |
+
+**Environment secrets** (Settings → Environments; one set in `staging`, one in `production`;
+see `engineering/runbooks/setup/05-supabase-staging.md`):
+
+| Secret Name | Description |
+|-------------|-------------|
+| `SUPABASE_PROJECT_ID` | Project ref of that environment's Supabase project |
+| `SUPABASE_DB_PASSWORD` | That project's database password |
 | `NETLIFY_AUTH_TOKEN` | Authentication token | Netlify account |
 | `NETLIFY_SITE_ID` | Site ID for deployment | Netlify dashboard |
 

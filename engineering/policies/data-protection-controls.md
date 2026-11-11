@@ -1,0 +1,38 @@
+# Data protection technical controls
+
+**Owner:** CTO, with the Data Protection Supervisor (DPS) · **Review:** yearly
+
+The DPS owns the privacy programme (lawful basis, notices, data-subject
+requests, breach reporting decisions). This document lists the technical
+controls the department operates for it, in line with Ghana's Data Protection
+Act, 2012 (Act 843).
+
+## Data classification
+
+| Class | Examples in TrashDrop | Controls |
+|---|---|---|
+| **Restricted** | MoMo / payment numbers, ID documents, exact home GPS, auth tokens | RLS to owner and named staff roles only; never in logs, analytics, error reports or AI prompts; encrypted at rest (Supabase default) |
+| **Confidential** | Names, phone numbers, emails, addresses, pickup history, carter earnings | RLS to owner and staff; masked in admin lists where possible |
+| **Internal** | Aggregated statistics, operational dashboards | Staff only |
+| **Public** | Published environmental reports, website content | No restriction |
+
+## Controls
+
+1. **Row-level security on every table**, reviewed whenever a table or role
+   changes. Staged RLS was completed on 10 Nov 2026. Re-verify quarterly with
+   the Supabase security advisor (Dashboard → Advisors → Security).
+2. **No personal data in non-production.** Staging uses synthetic or
+   anonymised data. Production dumps never go to laptops except during an
+   approved restore test.
+3. **Error tracking scrubs personal data.** Sentry is configured with
+   `sendDefaultPii: false`, and form values are not captured.
+4. **Retention.** Proposed defaults for DPS approval: location pings 90 days;
+   application logs 30 days; closed dumping-report photos 2 years; payment
+   records 7 years (tax). Implement as scheduled database jobs once approved.
+5. **Access to personal data is logged** (admin audit log) and reviewed in the
+   quarterly access review.
+6. **Privacy by design.** The feature request form asks whether new personal data is
+   collected; if so, the DPS reviews before build.
+7. **Breach handling** follows [Incident management](incident-management.md);
+   the DPS decides on notification to the Data Protection Commission and
+   affected people.

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/apaloo/TrashDrop-Mobile-User-Domestic/security/advisories/new
+    about: Report privately. Never describe a vulnerability in a public issue.

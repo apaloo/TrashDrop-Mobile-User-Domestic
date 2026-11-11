@@ -1,0 +1,33 @@
+name: Governance cadence
+
+# On the 1st of every month: opens the backup restore test and risk review
+# issues, drafts the monthly CTO report for the previous month, and (in
+# January, April, July, October) opens the quarterly access review.
+# Never opens the same issue twice. Policies: engineering/policies/.
+on:
+  schedule:
+    - cron: '17 6 1 * *' # 1st of the month, 06:17 UTC (06:17 Africa/Accra)
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Run one task only
+        type: choice
+        options: [all, monthly-report, backup-restore-test, risk-review, access-review]
+        default: all
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  cadence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run = require(`${process.env.GITHUB_WORKSPACE}/engineering/automation/cadence.js`);
+            await run({ github, context, core }, { only: '${{ inputs.only || 'all' }}' });

@@ -1,0 +1,23 @@
+name: Engineering bootstrap
+
+# Run once, by hand, after the handbook lands on main (and again any time:
+# it never duplicates). Creates the labels and one issue per setup step in
+# engineering/setup-tracker.md, for the team to work through on the
+# Projects board.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run = require(`${process.env.GITHUB_WORKSPACE}/engineering/automation/bootstrap.js`);
+            await run({ github, context, core });

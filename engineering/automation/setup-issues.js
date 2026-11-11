@@ -1,0 +1,32 @@
+// One issue per setup step. Keep in step with engineering/setup-tracker.md.
+const R = 'engineering/runbooks/setup';
+const step = (id, title, runbook, labels, doneWhen) => ({ id, title: `[Setup ${id}] ${title}`, runbook, labels, doneWhen });
+
+module.exports = [
+  step('01', 'Company GitHub organisation; private repositories; archive inactive ones', `${R}/01-github-organisation.md`, ['owner-action'],
+    ['The three active repositories are private and company-owned', 'Two owners exist and 2FA is required', 'Netlify deploys still run from main', 'Inactive repositories archived']),
+  step('02', 'GitHub Projects board "TrashDrop Engineering"', `${R}/02-github-projects.md`, [],
+    ['Board exists with Status, Priority, Product, Iteration fields', 'Auto-add workflow on for all three repositories', 'Sprint, Triage, Incidents, Governance and Setup views exist']),
+  step('03', 'Google Workspace with enforced 2-step verification and team groups', `${R}/03-google-workspace.md`, ['owner-action'],
+    ['Domain verified; SPF, DKIM, DMARC published', '2-step verification enforced', 'tech-admin@, alerts@, security@, support@ groups exist']),
+  step('04', 'Password manager with per-system collections', `${R}/04-password-manager.md`, ['owner-action'],
+    ['Organisation with two owners and enforced two-step login', 'All production secrets moved in; old copies deleted']),
+  step('05', 'Supabase staging project, schema baseline, migration history repaired', `${R}/05-supabase-staging.md`, ['owner-action', 'product:database'],
+    ['Staging project exists with synthetic data', 'supabase/baseline/schema.sql committed', '"Database migrations" list shows no drift on staging and production', 'GitHub environments staging and production configured; production needs approval', 'Schema owner recorded in an ADR']),
+  step('06', 'Sentry error tracking for all three apps', `${R}/06-sentry.md`, ['owner-action'],
+    ['Organisation with 2FA and data scrubbing', 'Household app sends events from production', 'Carter and admin apps wired', 'Alert rules email alerts@']),
+  step('07', 'Uptime monitoring and alerting', `${R}/07-uptime-monitoring.md`, [],
+    ['Monitors for the three sites, Supabase and the WhatsApp webhook', 'Alerts reach alerts@ and the on-call phone']),
+  step('08', 'Branch protection, required checks and secret scanning on every repository', `${R}/08-branch-protection-and-secrets.md`, [],
+    ['main ruleset active on all three repositories', 'Required checks: CI and secret scan', 'Dependabot alerts and security updates on']),
+  step('09', 'Supabase legacy-key clean-up after rotation', `${R}/09-supabase-legacy-keys.md`, ['owner-action', 'product:database'],
+    ['Every consumer uses current keys', 'Old secret keys deleted / legacy keys disabled', 'API logs checked for misuse during the exposure period']),
+  step('10', 'Roll out CI, security checks and templates to the carter and admin repositories', `${R}/08-branch-protection-and-secrets.md`, ['product:carter', 'product:admin'],
+    ['CI runs lint, tests and build on every pull request in both repositories', 'Security checks and Dependabot on', 'Templates and CODEOWNERS copied']),
+  step('11', 'Fix the 8 known-failing household test suites', 'trashdrop/scripts/ci/known-failing-tests.txt', ['tech-debt', 'product:household'],
+    ['known-failing-tests.txt lists no suites']),
+  step('12', 'Work through the "Now" items in the technical-debt register', 'engineering/registers/tech-debt.md', ['tech-debt'],
+    ['Each "Now" item has its own issue with an owner']),
+  step('13', 'Fill in every register', 'engineering/registers/', [],
+    ['Products, infrastructure, vendors, access and IT asset registers have no "_to fill_" left']),
+];
