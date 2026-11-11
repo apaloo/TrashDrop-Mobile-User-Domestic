@@ -18,7 +18,7 @@
     "@testing-library/user-event": "^14.5.1",
     "@types/file-saver": "^2.0.5",
     "date-fns": "^2.30.0",
-    "dotenv": "^16.3.1",
+    "dotenv": "^18.0.9",
     "file-saver": "^2.0.5",
     "formik": "^2.4.5",
     "idb": "^7.1.1",
