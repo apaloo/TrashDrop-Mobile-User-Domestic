@@ -487,9 +487,14 @@ export const batchService = {
             // Abortable fetch to avoid hanging connections
             const controller = new AbortController();
             const fetchTimeout = setTimeout(() => controller.abort('function_fetch_timeout'), 8000); // Reduced timeout
+            // check-batch only answers signed-in users
+            const { data: { session: fnSession } = {} } = await supabase.auth.getSession();
             const resp = await fetch(`${FUNCTIONS_BASE}/check-batch?${qs}`, {
               method: 'GET',
-              headers: { 'Accept': 'application/json' },
+              headers: {
+                'Accept': 'application/json',
+                ...(fnSession?.access_token ? { 'Authorization': `Bearer ${fnSession.access_token}` } : {}),
+              },
               signal: controller.signal,
             });
             clearTimeout(fetchTimeout);

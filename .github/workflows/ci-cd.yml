@@ -50,6 +50,12 @@ jobs:
       run: |
         npx craco test --watchAll=false src/services/__tests__/digitalBinService.promotion.test.js
         node netlify/functions/__checks__/pricing-promo.js
+
+    # Netlify function checks against stubbed clients (no network)
+    - name: Netlify function checks
+      run: |
+        node netlify/functions/__checks__/check-batch.js
+        node netlify/functions/__checks__/whatsapp-smoke.js
     
     # Every unit test suite except the ones listed in
     # scripts/ci/known-failing-tests.txt (a list that may only shrink).
