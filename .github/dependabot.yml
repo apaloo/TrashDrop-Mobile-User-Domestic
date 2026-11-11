@@ -1,0 +1,28 @@
+# Weekly dependency update pull requests. Each one runs the full CI.
+# Owner: Technical Lead. Policy: engineering/policies/secure-development.md
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /trashdrop
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Major upgrades of the build toolchain are planned work, not automatic.
+      - dependency-name: react-scripts
+        update-types: [version-update:semver-major]
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, ci]
