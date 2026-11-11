@@ -13,8 +13,9 @@
 ## Rules
 
 1. **Everything is code or recorded.** Database changes are migrations;
-   Edge Functions are deployed from the repository (never from a laptop
-   copy that differs); settings changed in a dashboard are written into the
+   Edge Functions are deployed by the **Deploy Edge Functions** workflow in
+   the carter and admin repositories (`list` first, then `deploy`, from
+   `main`, with approval), never from a laptop; settings changed in a dashboard are written into the
    [infrastructure register](../registers/infrastructure.md) the same day.
 2. **Company accounts.** Every provider account is owned by `tech-admin@`
    with at least two admins ([vendor management](vendor-management.md)).
