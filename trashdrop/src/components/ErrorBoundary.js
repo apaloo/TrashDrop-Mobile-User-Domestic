@@ -1,5 +1,6 @@
 import React from 'react';
 import { reloadForMissingChunk } from '../utils/appUpdate';
+import { captureError } from '../utils/monitoring';
 
 /**
  * Error boundary component to catch and display React errors
@@ -17,6 +18,8 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     // A lazy screen whose file a deploy removed: reload onto the new version
     if (reloadForMissingChunk(error)) return;
+
+    captureError(error, { componentStack: errorInfo?.componentStack, tags: { boundary: 'app' } });
 
     // Log error to console
     console.error('[ErrorBoundary] React error caught:', error);
