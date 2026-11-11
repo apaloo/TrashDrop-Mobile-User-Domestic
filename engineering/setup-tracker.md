@@ -35,7 +35,7 @@ dashboard only they can open). **Team** = any engineer with access.
 
 | # | Step | Who | Where | Done |
 |---|---|---|---|---|
-| 11 | Fix the known-failing test suites and delete them from each list (household 8, carter 4, admin 4; admin all 4 fixed in admin #111, carter all 4 in carter #53) | Team | `scripts/ci/known-failing-tests.txt` in each repository | ☐ |
+| 11 | Fix the known-failing test suites and delete them from each list (household 8, carter 4, admin 4; all fixed: household in this PR, admin #111, carter #53; lists are empty once those merge) | Team | `scripts/ci/known-failing-tests.txt` in each repository | ☐ |
 | 12 | Work through the technical-debt register's "Now" items | Team | [tech-debt](registers/tech-debt.md) | ☐ |
 | 13 | Fill every register (products, infrastructure, vendors, access, IT assets) | Team | [registers](registers/) | ☐ |
 

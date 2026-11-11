@@ -184,12 +184,13 @@ describe('SeamlessCache', () => {
       expect(endTime - startTime).toBeLessThan(50);
       expect(result).toEqual(staleData);
 
-      // Wait for background update
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Cache should be updated with fresh data
-      const cachedData = seamlessCache.peek(cacheKey);
-      expect(cachedData).toEqual(freshData);
+      // The background update waits backgroundUpdateDelay (150 ms on the shared
+      // cache) and then the 100 ms fetch: poll instead of guessing a sleep
+      const deadline = Date.now() + 1000;
+      while (Date.now() < deadline && seamlessCache.peek(cacheKey)?.value !== 'fresh') {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(seamlessCache.peek(cacheKey)).toEqual(freshData);
     });
   });
 

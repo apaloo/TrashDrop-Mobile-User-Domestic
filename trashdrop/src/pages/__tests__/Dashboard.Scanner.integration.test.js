@@ -6,124 +6,108 @@ import '@testing-library/jest-dom';
 import Dashboard from '../Dashboard.js';
 import BatchQRScanner from '../../components/BatchQRScanner.js';
 
-// Mock AuthContext to provide a user
-jest.mock('../../context/AuthContext.js', () => ({
-  useAuth: () => ({ user: { id: 'user123', email: 'test@example.com' }, status: 'SIGNED_IN', loading: false })
-}));
+// One user object, as the real context keeps it: a new object each render
+// re-runs every [user] effect and the page never settles
+jest.mock('../../context/AuthContext.js', () => {
+  const auth = { user: { id: 'user123', email: 'test@example.com' } };
+  return { useAuth: () => auth };
+});
 
-// Mock services used by Dashboard to avoid network
+// Mock services used by Dashboard to avoid network (plain functions: react-scripts
+// resets jest.fn() implementations before each test)
 jest.mock('../../services/index.js', () => ({
   userService: {
-    getUserStats: jest.fn().mockResolvedValue({ data: { points: 0, pickups: 0, reports: 0, batches: 0, totalBags: 0 }, error: null })
+    getUserStats: () => Promise.resolve({ data: { points: 0, pickups: 0, reports: 0, batches: 0, totalBags: 0 }, error: null })
   },
   activityService: {
-    getUserActivity: jest.fn().mockResolvedValue({ data: [], error: null })
+    getUserActivity: () => Promise.resolve({ data: [], error: null })
   },
   pickupService: {}
 }));
 
-// Mock batch service used by BatchQRScanner
-jest.mock('../../services/batchService.js', () => ({
-  __esModule: true,
-  batchService: {
-    verifyBatchAndUpdateUser: jest.fn().mockResolvedValue({
-      data: {
-        batch_id: 'BATCH-123',
-        bagsAdded: 4,
-        created_at: new Date().toISOString(),
-        bags: [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }, { id: 'b4' }]
-      },
-      error: null,
-    }),
-    // Provide no-op implementations for other methods possibly referenced
-    isBatchLocallyScanned: jest.fn().mockReturnValue(false),
-    enqueueBatchActivation: jest.fn().mockResolvedValue({ data: { queued: true }, error: null }),
-  }
-}));
+// Mock supabase client minimal
+jest.mock('../../utils/supabaseClient.js', () => require('../../test-utils/mockSupabaseClient.js'));
 
-// Mock notification service
-jest.mock('../../services/notificationService.js', () => ({
-  notificationService: {
-    createNotification: jest.fn().mockResolvedValue({ data: { id: 'n1' }, error: null })
-  }
-}));
-
-// Mock supabase client minimal for both Dashboard and Scanner
-jest.mock('../../utils/supabaseClient.js', () => ({
+// The dashboard loads through the seamless service: a user with no bags yet
+jest.mock('../../services/seamlessDashboardService.js', () => ({
   __esModule: true,
   default: {
-    auth: {
-      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
-    },
+    getUserStats: () => Promise.resolve({ points: 0, pickups: 0, reports: 0, batches: 0, totalBags: 0, available_bags: 0 }),
+    getRecentActivities: () => Promise.resolve([]),
+    getActivePickups: () => Promise.resolve([]),
+    subscribeToUpdates: () => ({}),
+    preloadDashboardData: () => Promise.resolve(),
+    forceRefresh: () => Promise.resolve(),
+    optimisticUpdateStats: () => {},
+    optimisticAddActivity: () => {},
   },
 }));
 
-// Mock realtime subscriptions to no-op so only the event drives the change
+// Mock realtime subscriptions to no-op
 jest.mock('../../utils/realtime.js', () => ({
-  subscribeToStatsUpdates: () => ({ unsubscribe: jest.fn() }),
+  subscribeToStatsUpdates: () => ({ unsubscribe: () => {} }),
   handleStatsUpdate: (tableType, payload, prev) => prev,
-  subscribeToDumpingReports: () => ({ unsubscribe: jest.fn() }),
+  subscribeToDumpingReports: () => ({ unsubscribe: () => {} }),
   handleDumpingReportUpdate: (payload, cb) => cb && cb()
 }));
 
-// Mock offline storage (support both default and named exports)
-jest.mock('../../utils/offlineStorage.js', () => {
-  const api = {
-    cacheUserStats: jest.fn(),
-    getCachedUserStats: jest.fn().mockResolvedValue(null),
-    cacheUserActivity: jest.fn(),
-    getCachedUserActivity: jest.fn().mockResolvedValue([]),
-    isOnline: () => false,
-  };
-  return {
-    __esModule: true,
-    default: api,
-    ...api,
-  };
-});
+// Mock offline storage
+jest.mock('../../utils/offlineStorage.js', () => ({
+  cacheUserStats: () => {},
+  getCachedUserStats: () => Promise.resolve(null),
+  cacheUserActivity: () => {},
+  getCachedUserActivity: () => Promise.resolve([]),
+  isOnline: () => false
+}));
 
-// Mock the QR scanner to provide a button we can click to simulate scan
-jest.mock('react-qr-scanner', () =>
-  function MockQrScanner({ onScan, onError }) {
+// Batch verification: this batch adds 4 bags
+jest.mock('../../services/batchService.js', () => ({
+  batchService: {
+    verifyBatchAndUpdateUser: () => Promise.resolve({
+      data: { batch_id: 'BATCH-123', status: 'used', activated: true, bags_added: 4, bag_count: 4 },
+      error: null,
+    }),
+  },
+}));
+jest.mock('../../services/notificationService.js', () => ({
+  notificationService: { createNotification: () => Promise.resolve({ data: null, error: null }) },
+}));
+
+// The scanner's camera view (QRReader wraps qr-scanner, which needs a real camera)
+jest.mock('../../components/QRReader', () =>
+  function MockQrReader({ onScan }) {
     return (
       <div data-testid="mock-qr-reader">
         <button onClick={() => onScan({ text: 'BATCH-123' })}>Simulate Scan</button>
-        <button onClick={() => onError && onError(new Error('permission denied'))}>Simulate Error</button>
       </div>
     );
   }
 );
 
-describe('Integration: Batch scan updates Dashboard bags via event', () => {
-  it('Dashboard reflects increased bags after BatchQRScanner dispatches event', async () => {
-    // Ensure online path is taken
+const qrBagsCount = () => screen.getByText(/^QR Bags?$/).previousElementSibling;
+
+describe('Integration: a batch scan updates the Dashboard', () => {
+  it('the Dashboard shows the scanned bags', async () => {
     Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
 
-    await act(async () => {
-      render(
-        <MemoryRouter>
-          <div>
-            <Dashboard />
-            <BatchQRScanner />
-          </div>
-        </MemoryRouter>
-      );
-    });
+    render(
+      <MemoryRouter>
+        <div>
+          <Dashboard />
+          <BatchQRScanner />
+        </div>
+      </MemoryRouter>
+    );
+    await screen.findByText('Your impact');
+    // The first load starts 100 ms after mount; the empty activity list shows it finished
+    await screen.findByText('No recent activities yet');
+    expect(qrBagsCount()).toHaveTextContent('0');
 
-    // Start scanning and simulate a scan
-    await act(async () => {
-      fireEvent.click(screen.getByText('Start Scanning'));
-    });
+    await act(async () => { fireEvent.click(screen.getByText('Start Scanning')); });
+    await act(async () => { fireEvent.click(screen.getByText('Simulate Scan')); });
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Simulate Scan'));
-    });
-
-    // The Dashboard listens for 'trashdrop:bags-updated' and should show 4 somewhere
-    await waitFor(() => {
-      expect(screen.getAllByText('4').length).toBeGreaterThan(0);
-    }, { timeout: 3000 });
+    // BatchQRScanner dispatches trashdrop:bags-updated; the Dashboard adds the bags
+    expect(await screen.findByText('Batch Scanned Successfully!')).toBeInTheDocument();
+    await waitFor(() => expect(qrBagsCount()).toHaveTextContent('4'));
   });
 });

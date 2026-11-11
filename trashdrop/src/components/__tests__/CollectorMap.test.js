@@ -156,11 +156,14 @@ describe('CollectorMap', () => {
 
     render(<CollectorMap />);
 
+    // Falls back to Accra and still looks for collectors there
     await waitFor(() => {
-      expect(
-        screen.getByText('Using approximate location. Location services may be disabled.')
-      ).toBeInTheDocument();
+      expect(collectorService.getNearbyCollectors).toHaveBeenCalledWith(
+        { lat: 5.6037, lng: -0.1870 },
+        5
+      );
     });
+    expect(screen.getByTestId('map-container')).toBeInTheDocument();
   });
 
   it('uses pickup location when provided', async () => {

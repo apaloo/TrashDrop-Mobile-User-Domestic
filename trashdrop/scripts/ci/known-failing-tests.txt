@@ -7,11 +7,3 @@
 #     approval in the pull request (CODEOWNERS enforces the review).
 #   - Never add the pricing guard tests here.
 #   - When you fix a suite, delete its line in the same pull request.
-src/utils/__tests__/seamlessCache.test.js
-src/pages/__tests__/PickupRequest.realtime.test.js
-src/pages/__tests__/PickupRequest.bagsEvent.test.js
-src/pages/__tests__/Dashboard.bagsEvent.test.js
-src/pages/__tests__/Dashboard.Scanner.integration.test.js
-src/App.test.js
-src/components/__tests__/BatchQRScanner.test.js
-src/components/__tests__/CollectorMap.test.js
