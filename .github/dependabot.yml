@@ -13,12 +13,9 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Major upgrades of the build toolchain are planned work, not automatic.
-      - dependency-name: react-scripts
-        update-types: [version-update:semver-major]
-      - dependency-name: react
-        update-types: [version-update:semver-major]
-      - dependency-name: react-dom
+      # Major upgrades change APIs and need planned work (a tech-debt item and
+      # its own PR), so Dependabot proposes only minor and patch updates.
+      - dependency-name: "*"
         update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
@@ -26,3 +23,6 @@ updates:
     schedule:
       interval: monthly
     labels: [dependencies, ci]
+    groups:
+      actions:
+        patterns: ["*"]
