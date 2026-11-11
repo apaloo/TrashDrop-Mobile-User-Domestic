@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [ main ]
 
+# A newer push to the same branch or pull request cancels the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: write # deploy-preview comments the preview link
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -19,15 +28,19 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: 20
         cache: 'npm'
         cache-dependency-path: trashdrop/package-lock.json
     
     - name: Install dependencies
+      env:
+        CYPRESS_INSTALL_BINARY: 0 # end-to-end tests don't run here
       run: npm ci
-      
-    - name: Run linting
-      run: npm run lint || echo "No linting configured"
+
+    # Errors fail the build. Test files are not linted yet (see
+    # engineering/registers/tech-debt.md).
+    - name: Lint
+      run: npm run lint
 
     # Accepted TrashDrop Digital Bin Pricing (docs/DIGITAL_BIN_PRICING.md).
     # These must pass; don't weaken or skip them to make a change pass.
@@ -38,12 +51,11 @@ jobs:
         npx craco test --watchAll=false src/services/__tests__/digitalBinService.promotion.test.js
         node netlify/functions/__checks__/pricing-promo.js
     
-    # - name: Run tests
-    #   run: npm test -- --watchAll=false
-    #   env:
-    #     CI: true
-    #     REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
-    #     REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+    # Every unit test suite except the ones listed in
+    # scripts/ci/known-failing-tests.txt (a list that may only shrink).
+    # Uses placeholder Supabase settings: tests never reach a real project.
+    - name: Unit tests
+      run: npm run test:ci
     
     - name: Build
       env:
