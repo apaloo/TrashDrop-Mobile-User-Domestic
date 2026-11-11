@@ -7,7 +7,8 @@
 | Level | Where it runs | Required for |
 |---|---|---|
 | Unit tests (Jest) | CI on every pull request | All code changes. New logic needs new tests. |
-| Lint | CI (changed files) | All JavaScript changes |
+| Lint | CI (all of `src`; collector: changed files until its last 3 errors, in protected payout files, are approved) | All JavaScript changes |
+| Test coverage | CI job summary, report only: the whole app and each file in `scripts/ci/critical-files.txt` | Information. New logic in a critical file comes with tests that raise its figure |
 | Guard tests for protected rules | CI | Never skipped: household pricing (`digitalBinService.promotion.test.js`, `pricing-promo.js`), carter payouts (`promotionalPayout.test.js`), admin fee checks (`pickupRequestUtils.test.js`) |
 | Edge Function handler tests | CI (admin) | Changes to those functions |
 | Manual regression on staging | QA, using the [release checklist](../templates/release-checklist.md) | Critical-workflow changes |
@@ -32,6 +33,9 @@
 
 - Critical-workflow regression coverage: the share of release-checklist
   items covered by automated tests (target: rising each quarter).
+- Line coverage of the critical files, from the "Test coverage" section of
+  the latest CI run on `main` in each repository (target: rising each month;
+  none at 0%).
 - Defects found before production compared with after (production defect
   leakage).
 - Known-failing suites remaining (target: 0).
@@ -42,4 +46,4 @@
 |---|---|
 | 2 | Fix known-failing suites; tests for every bug fixed |
 | 3 | End-to-end tests for QR Bag, Digital Bin, payments and dumping reports against staging; tests for database rules (RLS) in `supabase/tests` |
-| 4 | Coverage reporting in CI; device testing on low-end Android |
+| 4 | Coverage thresholds on the critical files (reporting started 2026-11-11); device testing on low-end Android |

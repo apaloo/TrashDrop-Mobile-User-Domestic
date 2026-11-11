@@ -36,7 +36,10 @@ const escape = (p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const craco = path.join(root, 'node_modules', '.bin', 'craco');
 
 console.log(`Running all suites except ${known.length} known-failing ones…`);
-const main = spawnSync(craco, ['test', '--watchAll=false', '--testPathIgnorePatterns', ...known.map(escape)], {
+// Coverage of all of src (the react-scripts default), reported by
+// scripts/ci/coverage-summary.mjs. Report only: never fails the build.
+const coverage = ['--coverage', '--coverageReporters=json-summary', '--coverageReporters=text-summary'];
+const main = spawnSync(craco, ['test', '--watchAll=false', ...coverage, '--testPathIgnorePatterns', ...known.map(escape)], {
   cwd: root, env, stdio: 'inherit',
 });
 

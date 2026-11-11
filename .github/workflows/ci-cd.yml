@@ -62,6 +62,11 @@ jobs:
     # Uses placeholder Supabase settings: tests never reach a real project.
     - name: Unit tests
       run: npm run test:ci
+
+    # Report only: the whole app and each file in scripts/ci/critical-files.txt
+    - name: Test coverage (report)
+      if: always()
+      run: node scripts/ci/coverage-summary.mjs
     
     - name: Build
       env:
