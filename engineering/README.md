@@ -14,7 +14,7 @@ into practice.
 
 | If you are… | Read |
 |---|---|
-| New to the team | [Charter](charter.md), [Repository governance](policies/repository-governance.md), [Change and release](policies/change-and-release.md), [Secure development](policies/secure-development.md) |
+| New to the team | [Onboarding guide](onboarding.md), [Charter](charter.md), [Repository governance](policies/repository-governance.md), [Change and release](policies/change-and-release.md), [Secure development](policies/secure-development.md) |
 | Setting up a tool or account | [Setup tracker](setup-tracker.md), which links each runbook |
 | Handling an outage | [Incident management](policies/incident-management.md) and the **Production incident** issue form |
 | Changing the database | [Change and release §Database changes](policies/change-and-release.md#database-changes) |
@@ -33,9 +33,16 @@ into practice.
 7. [Vendor and third-party management](policies/vendor-management.md)
 8. [Repository governance](policies/repository-governance.md)
 
-These are the eight priority documents from programme §7. The other twelve
-(Technology Strategy, IT Asset Management, Business Continuity Plan and so on)
-follow in Phases 3–5. They are tracked in the [setup tracker](setup-tracker.md#governance-documents).
+9. [QA and testing](policies/qa-and-testing.md)
+10. [Vulnerability management](policies/vulnerability-management.md)
+11. [Cloud and infrastructure management](policies/cloud-and-infrastructure.md)
+12. [IT assets and corporate IT support](policies/it-assets-and-support.md)
+
+1–8 are the priority documents from programme §7; 9–12 follow them. The
+rest (Technology Strategy, Information Security Policy, Business Continuity
+Plan) are tracked in the [setup tracker](setup-tracker.md#governance-documents).
+
+**Decisions:** [ADR-001 Database schema ownership](decisions/ADR-001-database-schema-ownership.md) (proposed)
 
 **Registers.** These are living records. The team keeps them current, and the scheduled reviews check them.
 
