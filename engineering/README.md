@@ -37,10 +37,12 @@ into practice.
 10. [Vulnerability management](policies/vulnerability-management.md)
 11. [Cloud and infrastructure management](policies/cloud-and-infrastructure.md)
 12. [IT assets and corporate IT support](policies/it-assets-and-support.md)
+13. [Information security](policies/information-security.md) (draft, for management approval)
+14. [Business continuity](policies/business-continuity.md) (draft, for management approval)
 
-1–8 are the priority documents from programme §7; 9–12 follow them. The
-rest (Technology Strategy, Information Security Policy, Business Continuity
-Plan) are tracked in the [setup tracker](setup-tracker.md#governance-documents).
+1–8 are the priority documents from programme §7; 9–14 complete the list.
+The [Technology strategy 2027–2029](technology-strategy.md) is a draft for
+the CTO and CEO.
 
 **Decisions:** [ADR-001 Database schema ownership](decisions/ADR-001-database-schema-ownership.md) (proposed)
 
@@ -63,6 +65,7 @@ Plan) are tracked in the [setup tracker](setup-tracker.md#governance-documents).
 | Dependency updates | `.github/dependabot.yml` | Weekly update pull requests. |
 | Database migrations | `.github/workflows/supabase-migrations.yml` | Manual only: list, dry-run, apply; staging or production (production needs approval). |
 | Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Run once: creates labels and one issue per setup task, assigned for the team to complete. |
+| Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only) and the Supabase security advisor; opens a P1 issue on a regression, closes it when fixed. |
 | Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, monthly risk review, quarterly access review) and drafts the monthly CTO report from GitHub data. |
 | Review routing | `.github/CODEOWNERS` | Protected files need the named owner's review. |
 | Intake | `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | Bug, incident, feature and access forms; pull request checklist. |

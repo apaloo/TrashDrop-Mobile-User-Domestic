@@ -27,7 +27,7 @@ async function openIfMissing({ github, context, core }, title, body, labels) {
   return data;
 }
 
-module.exports = async ({ github, context, core }, { only = 'all', now = new Date() } = {}) => {
+module.exports = async ({ github, context, core, getOctokit }, { only = 'all', now = new Date() } = {}) => {
   await ensureLabels({ github, context, core });
   const { month, quarter, isQuarterStart } = periodLabels(now);
   const base = path.join(process.env.GITHUB_WORKSPACE || process.cwd(), 'engineering', 'checklists');
@@ -44,7 +44,7 @@ module.exports = async ({ github, context, core }, { only = 'all', now = new Dat
   }
 
   if (only === 'all' || only === 'monthly-report') {
-    const report = await monthlyReport({ github, context, core }, now);
+    const report = await monthlyReport({ github, context, core, getOctokit }, now);
     const issue = await openIfMissing({ github, context, core }, report.title, report.body, ['report:monthly', 'governance']);
     if (issue) created.push(issue.number);
   }

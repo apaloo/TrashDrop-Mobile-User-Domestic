@@ -1,0 +1,39 @@
+{
+  "_comment": "Expected answers for a signed-out caller using the public app key. 'denied' = HTTP 401/403/404; 'empty' = HTTP 200 with no rows; 'data' = HTTP 200 with rows (control: proves the probes reach the API). Changing an expectation needs the CTO's review (CODEOWNERS).",
+  "probes": [
+    { "id": "P01", "what": "user statistics view (emails, names)", "method": "GET", "path": "/rest/v1/user_stats_dashboard?select=user_id&limit=1", "expect": "denied" },
+    { "id": "P02", "what": "email lookup function", "method": "POST", "path": "/rest/v1/rpc/get_user_emails", "body": { "user_ids": [] }, "expect": "denied" },
+    { "id": "P03", "what": "contact lookup function", "method": "POST", "path": "/rest/v1/rpc/get_user_contacts", "body": {}, "expect": "denied" },
+    { "id": "P04", "what": "staff dumping-report merge", "method": "POST", "path": "/rest/v1/rpc/merge_dumping_reports", "body": { "p_primary_report_id": "00000000-0000-0000-0000-000000000000", "p_duplicate_report_ids": [], "p_merged_by": "00000000-0000-0000-0000-000000000000" }, "expect": "denied" },
+    { "id": "P05", "what": "carter photo storage listing", "method": "POST", "path": "/storage/v1/object/list/collector-photos", "body": { "prefix": "collector-documents", "limit": 1 }, "expect": "denied-or-empty" },
+    { "id": "P06", "what": "payment records", "method": "GET", "path": "/rest/v1/bin_payments?select=id&limit=1", "expect": "denied-or-empty" },
+    { "id": "P07", "what": "household profiles", "method": "GET", "path": "/rest/v1/profiles?select=id&limit=1", "expect": "denied-or-empty" },
+    { "id": "P08", "what": "carter profiles", "method": "GET", "path": "/rest/v1/collector_profiles?select=id&limit=1", "expect": "denied-or-empty" },
+    { "id": "P09", "what": "withdrawals", "method": "GET", "path": "/rest/v1/withdrawals?select=id&limit=1", "expect": "denied-or-empty" },
+    { "id": "P10", "what": "payment proxy: collection without sign-in", "method": "POST", "path": "/functions/v1/trendipay-proxy", "body": { "action": "initiate-collection", "terminalId": "T1", "payload": {} }, "expect": "denied" },
+    { "id": "C01", "what": "public dumping-report map (control)", "method": "GET", "path": "/rest/v1/public_illegal_dumping_reports?select=id&limit=1", "expect": "data" }
+  ],
+  "advisors": {
+    "_comment": "Known ERROR-level advisor findings, accepted until tech-debt TD19 fixes them. A new ERROR finding fails the watch; fixing one means deleting it here.",
+    "allowedErrors": [
+      "auth_users_exposed:public.user_stats_dashboard",
+      "rls_disabled_in_public:public.spatial_ref_sys",
+      "security_definer_view:public.admin_bag_batches",
+      "security_definer_view:public.admin_bag_events",
+      "security_definer_view:public.admin_bag_items",
+      "security_definer_view:public.admin_bag_scans",
+      "security_definer_view:public.collector_assignments_view",
+      "security_definer_view:public.dumping_duplicate_monitoring",
+      "security_definer_view:public.public_illegal_dumping_reports",
+      "security_definer_view:public.unified_pickup_status",
+      "security_definer_view:public.urgent_digital_bins",
+      "security_definer_view:public.user_dumping_activity",
+      "security_definer_view:public.user_recent_activity",
+      "security_definer_view:public.user_stats_dashboard"
+    ],
+    "_ceilings_comment": "Warning counts that may only go down. Lower a ceiling when the count drops.",
+    "ceilings": {
+      "anon_security_definer_function_executable": 75
+    }
+  }
+}

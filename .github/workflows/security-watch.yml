@@ -1,0 +1,81 @@
+name: Security watch
+
+# Every day: checks production the way an outsider would (public app key
+# only) and, with a Supabase access token, checks the security advisor for
+# new findings. Opens one issue when something regresses and closes it when
+# everything passes again. Expectations: engineering/automation/security-watch-config.json
+#
+# Setup (Settings → Secrets and variables → Actions):
+#   variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY (public by design),
+#              SUPABASE_PROJECT_REF (optional, for the advisors)
+#   secret:    SUPABASE_ACCESS_TOKEN (optional, already used by Database migrations)
+on:
+  schedule:
+    - cron: '41 5 * * *' # 05:41 UTC (Africa/Accra) daily
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'engineering/automation/security-watch*'
+      - '.github/workflows/security-watch.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check production
+        id: watch
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node engineering/automation/security-watch.mjs
+
+      # Pull requests only check that the script runs; issues come from the
+      # scheduled and manual runs.
+      - name: Open or close the tracking issue
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          OUTCOME: ${{ steps.watch.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const title = '[Security watch] Production check failing';
+            const { owner, repo } = context.repo;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'security-watch', per_page: 100 }))
+              .find((i) => i.title === title);
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            let failures = [];
+            try { failures = JSON.parse(fs.readFileSync('security-watch-result.json', 'utf8')).failures; } catch {}
+            if (process.env.OUTCOME === 'success') {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `All checks pass again: ${runUrl}` });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            try { await github.rest.issues.createLabel({ owner, repo, name: 'security-watch', color: 'b60205', description: 'Daily production security check' }); } catch {}
+            const body = [
+              `The daily security watch failed: ${runUrl}`,
+              '',
+              failures.length ? failures.map((f) => `- ${f}`).join('\n') : '- The check could not run (see the run log).',
+              '',
+              'Treat a failed probe as a **P1 incident** (engineering/policies/incident-management.md): something that should be private may be readable.',
+            ].join('\n');
+            if (open) await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title, body, labels: ['security-watch', 'type:incident', 'P1'] });
+
+      - name: Fail the run when the check failed
+        if: steps.watch.outcome != 'success'
+        run: exit 1
