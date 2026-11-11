@@ -1,5 +1,7 @@
 # 09 · Supabase key clean-up after rotation
 
+> **Status (2026-11-11): done for production.** New publishable and secret keys are in use by every app and server component, and the legacy JWT keys are **disabled**. Requests with the old `anon`/`service_role` keys are rejected. To roll back: Settings → API Keys → *Re-enable JWT-based API keys*. Use it only to get a broken app running again, and switch that app to the new keys straight away. The access review for the exposure period is recorded in the restricted incident file, not in this public repository.
+
 **Who:** owner (Supabase organisation owner) · **Time:** 30 minutes plus testing
 
 The production keys exposed in git history have been rotated. This runbook

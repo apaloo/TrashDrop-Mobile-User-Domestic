@@ -18,7 +18,7 @@ dashboard only they can open). **Team** = any engineer with access.
 | 03 | Google Workspace: company domain email, groups, MFA enforced | Owner action | [03](runbooks/setup/03-google-workspace.md) | ☐ |
 | 04 | Password manager (Bitwarden Teams) with shared collections per system | Owner action | [04](runbooks/setup/04-password-manager.md) | ☐ |
 | 08 | Branch protection, required checks, secret scanning, environments on every repository | Team (org admin) | [08](runbooks/setup/08-branch-protection-and-secrets.md) | ☐ |
-| 09 | Supabase legacy-key clean-up after rotation (keys rotated 2026-11; exposure-period API log review in progress) | Owner action | [09](runbooks/setup/09-supabase-legacy-keys.md) | ☐ |
+| 09 | Supabase legacy-key clean-up after rotation (new keys in use; legacy keys disabled 2026-11-11; exposure-period log review done) | Owner action | [09](runbooks/setup/09-supabase-legacy-keys.md) | ☑ |
 
 ## Phase 2: Environments and visibility (weeks 2–4)
 

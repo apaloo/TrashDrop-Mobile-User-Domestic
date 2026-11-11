@@ -8,7 +8,7 @@ can stay brief.
 
 | Component | Provider | Environment | Account owner (email) | Used by | Secrets stored in | Last key rotation | Backup | Notes |
 |---|---|---|---|---|---|---|---|---|
-| Postgres, Auth, Storage, Realtime, Edge Functions | Supabase | production | _to fill_ | all apps | Bitwarden / Production | 2026-11 | Supabase daily; see backup policy | Shared by three apps |
+| Postgres, Auth, Storage, Realtime, Edge Functions | Supabase | production | _to fill_ | all apps | Bitwarden / Production | 2026-11 (new `sb_publishable_`/`sb_secret_` keys; legacy JWT keys disabled 2026-11-11) | Supabase daily; see backup policy | Shared by three apps |
 | Postgres (staging) | Supabase | staging | _to fill_ | previews, testing | Bitwarden / Staging | n/a | none needed | Runbook 05 |
 | Household site + functions | Netlify | production + previews | _to fill_ | households | Netlify env vars | _to fill_ | git | `base = trashdrop` |
 | Carter site | Netlify | production | _to fill_ | carters | Netlify env vars | _to fill_ | git | |
