@@ -33,7 +33,7 @@
     "react-leaflet": "^4.2.1",
     "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^7.18.5",
-    "uuid": "^8.3.2",
+    "uuid": "^11.1.1",
     "web-vitals": "^2.1.4",
     "workbox-background-sync": "^7.4.1",
     "workbox-cacheable-response": "^7.4.1",

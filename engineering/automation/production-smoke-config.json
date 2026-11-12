@@ -12,6 +12,7 @@
     { "id": "H04", "site": "household", "what": "Batch lookup deployed and configured (refuses a caller without sign-in). 500 means SUPABASE_SERVICE_ROLE is missing on Netlify", "path": "/.netlify/functions/check-batch?id=00000000-0000-4000-8000-000000000000", "status": 401 },
     { "id": "H05", "site": "household", "what": "Household app can't be framed by another site (security headers)", "path": "/", "status": 200, "header": "x-frame-options" },
     { "id": "H06", "site": "household", "what": "Household app HTTPS-only header", "path": "/login", "status": 200, "header": "strict-transport-security" },
+    { "id": "H07", "site": "household", "what": "CSP report collector deployed (refuses a GET; TD57 reads its log on 2026-11-26)", "path": "/.netlify/functions/csp-report", "status": 405 },
     { "id": "C01", "site": "collector", "what": "Collector app loads", "path": "/", "status": 200, "contains": "<title>TrashDrop Carter" },
     { "id": "C02", "site": "collector", "what": "Collector app routes (SPA fallback)", "path": "/login", "status": 200, "contains": "<title>TrashDrop Carter" },
     { "id": "A01", "site": "admin", "what": "Website home page, HTTPS-only header", "path": "/", "status": 200, "contains": "TrashDrop", "header": "strict-transport-security" },
