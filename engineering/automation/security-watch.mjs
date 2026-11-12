@@ -23,6 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { queryLogs } from './supabase-logs.mjs';
+import { applyPublicDefaults, publicDefaults } from './supabase-public.mjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const config = JSON.parse(fs.readFileSync(path.join(here, 'security-watch-config.json'), 'utf8'));
@@ -326,6 +327,7 @@ async function probe(base, key, p) {
 }
 
 async function main() {
+  applyPublicDefaults(); // public values from supabase-public.json when the variables are unset
   const base = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
   const key = process.env.SUPABASE_PUBLISHABLE_KEY || '';
   if (!base || !key) {
@@ -549,6 +551,15 @@ function selfTest() {
   assert(judgeMoneyWrites(0, { reviewed: ['a'] }).ok && !judgeMoneyWrites(1, { reviewed: [] }).ok && !judgeMoneyWrites(undefined, { reviewed: [] }).ok, 'judgeMoneyWrites');
   assert(/^with money_tables as/.test(moneyWritesSql(['x'])) && /count\(\*\)::int as unreviewed/.test(moneyWritesSql(['x'])) && moneyWritesSql(["o'x"]).includes("'o''x'"), 'moneyWritesSql counts, quotes names');
   assert(Array.isArray(config.moneyWrites?.reviewed) && config.moneyWrites.reviewed.length > 0, 'moneyWrites config');
+  // Public defaults (supabase-public.json): fill only what is unset, never on pull requests
+  const unset = { GITHUB_EVENT_NAME: 'schedule', SUPABASE_URL: 'https://set.example' };
+  const applied = applyPublicDefaults(unset);
+  assert(unset.SUPABASE_URL === 'https://set.example', 'a set variable wins over the default');
+  assert(applied.includes('SUPABASE_PUBLISHABLE_KEY') && /^sb_publishable_/.test(unset.SUPABASE_PUBLISHABLE_KEY), 'default publishable key filled in');
+  assert(/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(applyPublicDefaults({}) && publicDefaults().SUPABASE_URL), 'default URL is a Supabase project');
+  const onPullRequest = { GITHUB_EVENT_NAME: 'pull_request' };
+  assert(applyPublicDefaults(onPullRequest).length === 0 && !onPullRequest.SUPABASE_URL, 'no production defaults on pull requests');
+
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 

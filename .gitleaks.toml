@@ -17,7 +17,13 @@ entropy = 4.0
 keywords = ["eaa"]
 
 [allowlist]
-description = "Known-safe files"
+description = "Known-safe files and values"
+# Supabase publishable keys are public by design: every app bundle ships one,
+# and row-level security decides what they can reach. Secret keys
+# (sb_secret_...) and service role JWTs are still caught.
+regexes = [
+  '''^sb_publishable_[A-Za-z0-9_-]+$''',
+]
 paths = [
   # Lockfiles contain integrity hashes, not secrets.
   '''(^|/)package-lock\.json$''',

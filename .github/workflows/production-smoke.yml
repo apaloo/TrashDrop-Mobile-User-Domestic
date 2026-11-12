@@ -10,8 +10,8 @@ name: Production smoke check
 # the on-call person (setup step 07). This catches a deploy that is up but
 # broken, and covers the gap until step 07 is done.
 #
-# Optional repository variables for check S01 (the same as the security
-# watch): SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY.
+# Check S01 uses SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY: repository
+# variables if set, else engineering/automation/supabase-public.json.
 on:
   schedule:
     - cron: '23 * * * *' # hourly, at :23

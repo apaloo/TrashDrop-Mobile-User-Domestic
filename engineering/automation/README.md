@@ -13,6 +13,7 @@ Run by GitHub Actions through `actions/github-script`; plain CommonJS, no depend
 | `branch-cleanup.js` | repo-health | Finds merged and 60-day-idle branches |
 | `release-notes.js` | `release-notes.yml` | GitHub Release per production deploy, listing the pull requests shipped |
 | `error-watch.mjs` + `error-watch-config.json` | `error-watch.yml` (daily) | Database errors in the last 24 hours by type; flags new or growing ones (`--self-test` runs without network) |
+| `supabase-public.mjs` + `supabase-public.json` | every watch | The production project's public settings (URL, project ref, publishable key), used when the repository variables are unset; never on pull requests, never for secrets |
 | `supabase-logs.mjs` | security watch, error watch | Reads production logs through the Supabase Management API |
 | `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production, the Supabase security advisor, a scan check on the last 24 hours of API logs, protected-object fingerprints, the migration ledger, caller checks skipped when signed out, and money or points writes (`--self-test` runs without network) |
 | `schema-snapshot.mjs` | `schema-snapshot.yml` (Mondays, and on demand) | Writes the live production schema into `trashdrop/supabase/schema/`, one file per table, function and view, and opens a pull request when it changed (TD18, ADR-001). Refuses to write a definition that looks like it holds a secret (`--self-test` runs without network) |

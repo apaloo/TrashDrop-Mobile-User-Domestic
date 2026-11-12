@@ -19,6 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { queryLogs } from './supabase-logs.mjs';
+import { applyPublicDefaults } from './supabase-public.mjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const config = JSON.parse(fs.readFileSync(path.join(here, 'error-watch-config.json'), 'utf8'));
@@ -63,6 +64,7 @@ export function judgeErrors(rows, cfg, today = new Date().toISOString().slice(0,
 }
 
 async function main() {
+  applyPublicDefaults(); // public values from supabase-public.json when the variables are unset
   const token = process.env.SUPABASE_ACCESS_TOKEN; const ref = process.env.SUPABASE_PROJECT_REF;
   if (!token || !ref) {
     const msg = 'Error watch not configured: set the SUPABASE_ACCESS_TOKEN secret and the SUPABASE_PROJECT_REF variable (setup step 07b).';

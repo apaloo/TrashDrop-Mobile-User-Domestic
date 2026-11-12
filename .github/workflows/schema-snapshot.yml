@@ -6,7 +6,8 @@ name: Schema snapshot
 # touch the script only run its self-test.
 #
 # Setup (Settings → Secrets and variables → Actions): the same as the
-# security watch: variable SUPABASE_PROJECT_REF, secret SUPABASE_ACCESS_TOKEN.
+# security watch: secret SUPABASE_ACCESS_TOKEN (SUPABASE_PROJECT_REF is
+# optional; default in engineering/automation/supabase-public.json).
 # Opening the pull request needs Settings → Actions → General → "Allow GitHub
 # Actions to create and approve pull requests"; without it the snapshot is
 # kept as the run's artifact.

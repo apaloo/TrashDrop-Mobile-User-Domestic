@@ -1,0 +1,6 @@
+{
+  "_comment": "The production Supabase project's public settings: every visitor's browser already receives them in the app bundle. The scheduled watches use them when the repository variables of the same name are not set, so they run before setup step 07b is finished. Never put a secret here: the Management API token stays in the SUPABASE_ACCESS_TOKEN secret. Update when the publishable key is rotated (engineering/runbooks/secret-in-git-history.md).",
+  "SUPABASE_URL": "https://tfdedlqdsajjdjkerkli.supabase.co",
+  "SUPABASE_PROJECT_REF": "tfdedlqdsajjdjkerkli",
+  "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_Jn1AMgxT5vxwT2pUvBUJ-Q_-GJ79NfH"
+}
