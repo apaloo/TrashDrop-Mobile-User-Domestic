@@ -1,11 +1,4 @@
 {
   "_comment": "Database calls that already fail and are tracked, so CI flags only new ones (scripts/ci/check-rpc-calls.mjs). Each needs its register item in engineering/registers/tech-debt.md. Delete an entry when it is fixed; CI fails while a fixed entry is still listed.",
-  "problems": [
-    {
-      "file": "src/services/paymentService.js",
-      "function": "set_default_payment_method",
-      "ref": "TD17",
-      "why": "The card/bank payment screen (/payment-methods, no menu link) is a placeholder; its 'set as default' calls a function that doesn't exist. Product decision: remove the screen or build it properly."
-    }
-  ]
+  "problems": []
 }
