@@ -8,6 +8,7 @@ import { rememberedSignIn } from '../utils/rememberMe.js';
 import { CONNECTION_MESSAGES } from '../utils/connectionProblem.js';
 import { suggestEmailFix } from '../utils/emailTypo.js';
 import SignInHelpSheet from '../components/ui/SignInHelpSheet.js';
+import { returnPathFrom } from '../utils/returnPath.js';
 
 /**
  * Login page component
@@ -83,10 +84,12 @@ const Login = () => {
       });
       
       if (result?.success) {
-        console.log('[Login] Sign in successful, navigating to dashboard...');
+        // Back to the page the sign-in interrupted (for example an unsent
+        // dumping report), otherwise the dashboard
+        const returnTo = returnPathFrom(location) || '/dashboard';
         // Add a slight delay to ensure state updates propagate
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate(returnTo);
         }, 100);
       } else {
         console.error('[Login] Sign in failed:', result?.error);

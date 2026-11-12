@@ -85,6 +85,29 @@ const mapEstimatedVolumeToSize = (estimatedVolume) => {
   }
 };
 
+export const SESSION_EXPIRED_MESSAGE =
+  'Your sign-in has ended. Sign in again to send this report: it and its photos are kept on this phone.';
+
+/**
+ * True only when Supabase says there is no session: it renews an expired one
+ * first and drops it when the server refuses the renewal. A lookup that fails
+ * (no connection) is not treated as signed out.
+ */
+const sessionEnded = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    return !error && !data?.session;
+  } catch {
+    return false;
+  }
+};
+
+const sessionExpiredError = () => {
+  const err = new Error(SESSION_EXPIRED_MESSAGE);
+  err.code = 'SESSION_EXPIRED';
+  return err;
+};
+
 export const dumpingService = {
   /**
    * Create a new illegal dumping report
@@ -179,10 +202,16 @@ export const dumpingService = {
       }
       console.log('[DumpingService] Using location:', location);
       
+      // A sign-in that has ended makes every photo upload fail as signed out;
+      // say so instead of blaming the connection (TD44)
+      if (await sessionEnded()) throw sessionExpiredError();
+
       // Upload every camera photo to Supabase Storage. Device-only blob:/data:
       // URLs are never saved: they can't be opened from any other device.
       const { urls: photoUrls, failed: failedPhotos } = await prepareReportPhotos(reportData.photos, userId);
       if (failedPhotos > 0) {
+        // The sign-in can also end while the photos upload
+        if (await sessionEnded()) throw sessionExpiredError();
         const err = new Error(`${failedPhotos} photo${failedPhotos > 1 ? 's' : ''} could not be uploaded. Check your connection and try again.`);
         err.code = 'PHOTO_UPLOAD_FAILED';
         throw err;
