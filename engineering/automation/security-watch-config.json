@@ -205,8 +205,8 @@
       "anon_security_definer_function_executable": 35
     }
   },
-  "_writePolicies_comment": "Row-level security write policies (INSERT, UPDATE, DELETE or ALL) that apply to every row (USING/WITH CHECK true) or to signed-out visitors (anon). Policies made in the dashboard never pass the migration check, so the live database is counted daily. Only the count is published (the repository is public); list them with the query in engineering/runbooks/database-function-review.md. Policies for service_role alone are not counted (that key bypasses row-level security anyway). maxOpen is the baseline of 2026-11-12 (9, none on a money path; tracked as TD50); lower it as they are fixed, never raise it without the CTO.",
+  "_writePolicies_comment": "Row-level security write policies (INSERT, UPDATE, DELETE or ALL) that apply to every row (USING/WITH CHECK true) or to signed-out visitors (anon). Policies made in the dashboard never pass the migration check, so the live database is counted daily. Only the count is published (the repository is public); list them with the query in engineering/runbooks/database-function-review.md. Policies for service_role alone are not counted (that key bypasses row-level security anyway). maxOpen was 9 on 2026-11-12 and is 0 since TD50 closed them the same day; never raise it without the CTO.",
   "writePolicies": {
-    "maxOpen": 9
+    "maxOpen": 0
   }
 }

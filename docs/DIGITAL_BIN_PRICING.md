@@ -61,8 +61,8 @@ What a cash-out may pay (approved 2026-11-12, "with caution"; migration
 - A disposed bin pays out at most its stored payout, however many payment
   records it has (part A).
 - Unchanged: the collector marks cash as received, and can confirm a MoMo
-  payment the gateway hasn't confirmed yet ("Client has paid"). Whether that
-  confirmation should stay is the owner's decision.
+  payment the gateway hasn't confirmed yet ("Client has paid"). The owner
+  decided on 2026-11-12 to keep this confirmation.
 
 ### Cancelling
 Cancelling a promotional bin gives the promotion back. A bin counts as
