@@ -131,6 +131,25 @@ export function judgeUnchecked(row, cfg) {
   return { ok, line: `${ok ? '✅' : '❌'} ${w} that write (baseline ${cfg.maxWriters}), ${r} that read personal data (baseline ${cfg.maxPersonalReads})` };
 }
 
+// Tables, views and materialized views a signed-out caller can read past
+// row-level security (tables without it, materialized views, views that run
+// as their owner) that hold personal columns. Count only.
+export const PERSONAL_EXPOSURE_SQL = `select count(*)::int as exposed
+from pg_class c join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+where has_table_privilege('anon', c.oid, 'select')
+  and ((c.relkind = 'r' and not c.relrowsecurity) or c.relkind = 'm'
+       or (c.relkind = 'v' and not coalesce(c.reloptions::text[] && array['security_invoker=true', 'security_invoker=on'], false)))
+  and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+              and a.attname ~* '^(email|phone|phone_number|first_name|last_name|client_momo|momo_number|address)$')`;
+
+export function judgePersonalExposure(count, cfg) {
+  const n = Number(count);
+  if (!Number.isFinite(n)) return { ok: false, line: 'could not be counted' };
+  return n <= cfg.maxExposed
+    ? { ok: true, line: `✅ ${n} (baseline ${cfg.maxExposed})` }
+    : { ok: false, line: `❌ ${n}, baseline ${cfg.maxExposed}: signed-out callers can read personal data past row-level security` };
+}
+
 // Protected business rules (CLAUDE.md: pricing, points, collector payouts)
 // live in database objects that the dashboard can change without a pull
 // request. Each one is fingerprinted (md5 of its definition and grants) and
@@ -268,6 +287,16 @@ async function main() {
 
   if (token && ref) {
     try {
+      const r = judgePersonalExposure((await query(token, ref, PERSONAL_EXPOSURE_SQL))?.[0]?.exposed, config.personalExposure);
+      lines.push('', `**Personal data open to signed-out callers:** ${r.line}`);
+      if (!r.ok) failures.push(`Personal data: ${r.line.replace(/^❌ /, '')}. List them privately (engineering/runbooks/database-function-review.md) and revoke or add row-level security.`);
+    } catch (e) {
+      lines.push('', `**Personal data open to signed-out callers:** could not be read (${e.message}).`);
+    }
+  }
+
+  if (token && ref) {
+    try {
       const r = judgeUnchecked((await query(token, ref, UNCHECKED_FUNCTIONS_SQL))?.[0], config.uncheckedFunctions);
       lines.push('', `**Functions without a caller check:** ${r.line}`);
       if (!r.ok) failures.push(`Functions without a caller check: ${r.line.replace(/^❌ /, '')}. A signed-in user can run them for anyone. List them privately (engineering/runbooks/database-function-review.md) and add a check or make them server-only.`);
@@ -343,6 +372,9 @@ function selfTest() {
   assert(judgeWritePolicies(2, { maxOpen: 2 }).ok && !judgeWritePolicies(3, { maxOpen: 2 }).ok && !judgeWritePolicies(undefined, { maxOpen: 2 }).ok, 'judgeWritePolicies');
   assert(/^select count\(\*\)::int as open\s*$/.test(OPEN_WRITE_POLICIES_SQL.split('from')[0]), 'write policy check selects a count, not names');
   assert(Number.isInteger(config.writePolicies?.maxOpen), 'writePolicies config');
+  assert(judgePersonalExposure(0, { maxExposed: 0 }).ok && !judgePersonalExposure(1, { maxExposed: 0 }).ok && !judgePersonalExposure(undefined, { maxExposed: 0 }).ok, 'judgePersonalExposure');
+  assert(/^select count\(\*\)::int as exposed\s*$/.test(PERSONAL_EXPOSURE_SQL.split('from')[0]), 'personal exposure check selects a count, not names');
+  assert(Number.isInteger(config.personalExposure?.maxExposed), 'personalExposure config');
   const ucfg = { maxWriters: 0, maxPersonalReads: 2 };
   assert(judgeUnchecked({ writers: 0, personal_reads: 2 }, ucfg).ok && !judgeUnchecked({ writers: 1, personal_reads: 0 }, ucfg).ok
     && !judgeUnchecked({ writers: 0, personal_reads: 3 }, ucfg).ok && !judgeUnchecked(undefined, ucfg).ok, 'judgeUnchecked');

@@ -183,6 +183,13 @@
       "expect": "denied-or-empty"
     },
     {
+      "id": "P20",
+      "what": "old user statistics copy (emails, names)",
+      "method": "GET",
+      "path": "/rest/v1/user_stats_aggregated?select=user_id&limit=1",
+      "expect": "denied"
+    },
+    {
       "id": "C01",
       "what": "public dumping-report map (control)",
       "method": "GET",
@@ -256,5 +263,9 @@
   "uncheckedFunctions": {
     "maxWriters": 0,
     "maxPersonalReads": 2
+  },
+  "_personalExposure_comment": "Tables without row-level security, materialized views and views that run as their owner, readable by signed-out callers, that hold personal columns (email, phone, names, MoMo numbers, addresses). 0 since 2026-11-12 (20261112124531 closed user_stats_aggregated). Count only; never raise without the CTO.",
+  "personalExposure": {
+    "maxExposed": 0
   }
 }
