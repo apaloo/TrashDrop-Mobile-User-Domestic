@@ -160,7 +160,7 @@ const PROTECTED_FUNCTIONS = [
   ['points', 'td_redeem_reward'], ['points', 'td_guard_request_write'], ['points', 'td_guard_profile_columns'], ['points', 'get_dashboard_data_optimized'],
   ['points', 'td_guard_dumping_insert'],
   ['payouts', 'td_guard_bin_payment'], ['payouts', 'td_withdrawable_items'], ['payouts', 'td_keep_booked_payout'],
-  ['payouts', 'td_record_bin_acceptance'], ['payouts', 'td_bin_collector_share'],
+  ['payouts', 'td_record_bin_acceptance'], ['payouts', 'td_bin_collector_share'], ['payouts', 'td_guard_cleanup_fee'],
 ];
 const PROTECTED_TRIGGERS = [
   ['pricing', 'digital_bins', 'digital_bins_set_price'], ['pricing', 'digital_bins', 'digital_bins_protect_price'],
@@ -168,7 +168,7 @@ const PROTECTED_TRIGGERS = [
   ['points', 'pickup_requests', 'aa_td_guard_write'], ['points', 'profiles', 'td_guard_profile_columns'],
   ['points', 'illegal_dumping_mobile', 'aa_td_guard_insert'],
   ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'], ['payouts', 'digital_bins', 'ab_td_keep_booked_payout'],
-  ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'],
+  ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'], ['payouts', 'illegal_dumping_mobile', 'ab_td_guard_cleanup_fee'],
 ];
 const values = (rows) => rows.map((r) => `(${r.map((v) => `'${v}'`).join(',')})`).join(',');
 export const PROTECTED_DEFINITIONS_SQL = `with fns(rule, name) as (values ${values(PROTECTED_FUNCTIONS)}),

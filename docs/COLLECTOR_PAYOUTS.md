@@ -57,6 +57,21 @@ difference (`platform_subsidy`). See the pricing specification.
   for cash payments are part D.
 - Cash-outs list their items on the server (`withdrawal_items`); the app
   can't add its own.
+
+### Illegal dumping cleanups
+
+- The collector earns the cleanup fee, or by default GH₵5–20 by size, ×1.5 when
+  severity is high; volunteer groups earn nothing (`td_cleanup_payment`).
+- **Only an admin or an MMDA (authority) account sets a cleanup fee**
+  (`dumping.fee`; enforced by `td_guard_cleanup_fee`). Managers assign
+  without a fee.
+- **Who pays** is stamped when the cleanup is assigned
+  (`illegal_dumping_mobile.fee_paid_by`): `mmda` when an MMDA account or its
+  team assigns it, otherwise `trashdrop`.
+- A disposed cleanup TrashDrop pays is cashable (`td_withdrawable_items`,
+  part C). A cleanup an MMDA assigned is paid by the MMDA to the team
+  directly; TrashDrop only records it and it is never cashable here, until
+  MMDA-funded accounts exist. The collector app shows it separately.
 - What the collector is shown at disposal (owner's decisions, 2026-11-12):
   a client MoMo payment still pending (or initiated) shows the expected payout
   marked "pending until the client's MoMo payment is confirmed"; a failed one
@@ -105,6 +120,7 @@ bring the default back to the owner.
 | 2026-11-12 | Collectors keep "Client has paid — Confirm" for MoMo payments |
 | 2026-11-12 | Cash-outs count only MoMo payments confirmed by the gateway or an admin; a collector's own confirmation doesn't (TD53, `20261112154512`) |
 | 2026-11-12 | At disposal: pending MoMo shows the expected payout marked pending; failed shows GH₵0 "payment failed"; no payment record shows GH₵0 |
+| 2026-11-12 | Cleanup fees are set only by an admin or the MMDA; cleanups an MMDA assigns are paid by the MMDA and only recorded on TrashDrop, until MMDA-funded accounts exist (admin `20261118_mmda_paid_cleanups.sql`, applied as `20261112170602`) |
 
 ## Where it lives
 
