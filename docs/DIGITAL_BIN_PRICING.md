@@ -42,6 +42,9 @@ urgent = 80 + 24 + 1 = **GHS 105**.
 - Urgent bookings always pay the standard price and don't use a promotion.
 - Accounts without a `promotional_usage` row (created before the signup
   trigger) get no promotions.
+- The sign-up trigger (`create_promotional_usage_on_signup`) fixes its
+  `search_path` (approved 2026-11-12, migration `20261112123921`); what it does
+  is unchanged.
 
 Example (240 L schedule 22 / 40): 240 L × 2 bags = customer **GHS 44**,
 collector **GHS 80**, TrashDrop **GHS 36**.
