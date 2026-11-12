@@ -57,7 +57,7 @@
 | Pricing guard tests | Jest + `pricing-promo.js` | Yes |
 | Database functions and write policies in new migrations (principles 8 and 10) | `scripts/ci/check-migrations.js` | Yes |
 | Database calls match real functions (principle 9), all three apps | `scripts/ci/check-rpc-calls.mjs` | Yes; tracked failures in `rpc-known-problems.json` |
-| Build | CRA / craco | Yes |
+| Build | Vite (all three apps) | Yes |
 | Secrets in new commits | gitleaks | Yes |
 | Vulnerable dependencies | `npm audit` | Yes for critical findings in runtime dependencies; high and lower are reported |
 | Dependency updates | Dependabot | Opens pull requests weekly |

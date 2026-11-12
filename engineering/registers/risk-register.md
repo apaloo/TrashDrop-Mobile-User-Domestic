@@ -16,7 +16,7 @@ tracked in the restricted CEO review and private security advisories.
 | R6 | Payment and payout integrity | 3 | 5 | 15 | Server-side calculation (owner approval); reconciliation report; payout regression tests | Technical Lead | Open |
 | R7 | No error monitoring or alerting | 5 | 3 | 15 | Sentry (runbook 06), uptime (runbook 07) | DevOps | Mitigating |
 | R8 | Thin automated testing on carter and admin apps | 4 | 3 | 12 | CI in review for both (carter #46, admin #107); known-failing suites fixed (carter #53, admin #111) | QA | Mitigating |
-| R9 | Outdated build toolchain (CRA, Node 16 on admin) | 3 | 3 | 9 | Phase 4 upgrade to Vite and Node 20 | Technical Lead | Open |
+| R9 | Outdated build toolchain (CRA, Node 16 on admin) | 1 | 3 | 3 | All three apps build with Vite 6 on Node 20 (TD12, 2026-11-12) | Technical Lead | Closed |
 | R10 | Poor connectivity breaks field transactions | 3 | 4 | 12 | Offline queue and retries, idempotent server operations | Technical Lead | Open |
 | R11 | Vendor accounts tied to personal emails | 3 | 4 | 12 | Move to `tech-admin@` with ≥2 admins | CTO | Open |
 | R12 | Rising API costs (Maps, WhatsApp, SMS) | 3 | 3 | 9 | Monthly bill check; budget alerts | CTO | Open |

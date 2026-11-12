@@ -35,67 +35,27 @@ New engineers: start with [`engineering/onboarding.md`](engineering/onboarding.m
 
 ## Development
 
-All commands run in `trashdrop/` (`cd trashdrop` first):
+All commands run in `trashdrop/` (`cd trashdrop` first).
 
-### `npm start`
+Built with [Vite](https://vite.dev) (`vite.config.mjs`); it moved from Create
+React App and craco in November 2026 (TD12). The code keeps Create React App's
+conventions: `process.env.REACT_APP_*` variables, JSX in `.js` files, output
+in `build/`.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Every `REACT_APP_*` variable ships to every visitor's browser. Never put a
+secret in one: the build refuses to run if one holds a Supabase service role
+or secret key, a private key, or has SECRET, SERVICE_ROLE, PRIVATE_KEY,
+PASSWORD or BEARER in its name (`scripts/env-guard.cjs`).
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+| Command | What it does |
+|---|---|
+| `npm start` | Development server at http://localhost:3000 (`PORT=3010 npm start` for `netlify dev`). Requests to `/.netlify/functions/` go to `netlify functions:serve` on port 9999. |
+| `npm test` | Jest in watch mode (`jest.config.js`, the same set-up Create React App used). |
+| `npm run test:ci` | Every suite once, as CI runs it. |
+| `npm run lint` | ESLint (`react-app` rules). |
+| `npm run build` | Production build in `build/`: hashed files in `build/static/`, and the offline service worker `build/service-worker.js` built from `src/service-worker.js` with the precache list injected (TD8). |
+| `npm run preview` | Serves `build/` locally. |
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The pricing guard tests run in CI on every pull request:
+`npx jest --ci src/services/__tests__/digitalBinService.promotion.test.js` and
+`node netlify/functions/__checks__/pricing-promo.js`.

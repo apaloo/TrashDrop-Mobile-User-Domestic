@@ -48,7 +48,7 @@ jobs:
       env:
         CI: true
       run: |
-        npx craco test --watchAll=false src/services/__tests__/digitalBinService.promotion.test.js
+        npx jest --ci src/services/__tests__/digitalBinService.promotion.test.js
         node netlify/functions/__checks__/pricing-promo.js
 
     # SECURITY DEFINER functions in new migrations: fixed search_path, and a

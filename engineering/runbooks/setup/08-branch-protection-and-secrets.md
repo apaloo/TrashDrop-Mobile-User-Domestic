@@ -32,9 +32,9 @@ required reviews. On GitHub Free they only work on public repositories.
 
 The household repository holds the reference set. Copy it into the carter and admin repositories, adapting each item as follows:
 
-| File | Carter app (Vite, Jest) | Admin portal (CRA) |
+| File | Carter app (Vite, Jest) | Admin portal (Vite since November 2026) |
 |---|---|---|
-| `.github/workflows/ci-cd.yml` | Working directory `.`; `npm ci`; `npx eslint src`; `npx jest --ci`; `npm run build`. Netlify builds the site itself, so drop the deploy jobs | Working directory `.`; `npm ci --legacy-peer-deps`; `CI=true npx react-scripts test --watchAll=false`; `npm run build`. Drop the deploy jobs. |
+| `.github/workflows/ci-cd.yml` | Working directory `.`; `npm ci`; `npx eslint src`; `npx jest --ci`; `npm run build`. Netlify builds the site itself, so drop the deploy jobs | Working directory `.`; `npm ci --legacy-peer-deps`; `npm run test:ci`; `npm run build`. Drop the deploy jobs. |
 | `.github/workflows/security.yml`, `.gitleaks.toml`, `.github/dependabot.yml` | Copy; change the npm directory to `/` | Copy; change the npm directory to `/` |
 | `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/` | Copy unchanged | Copy unchanged |
 | `.github/CODEOWNERS` | Add the payout and withdrawal files and `supabase/functions/` | Add `supabase/migrations/` and the pricing-check migration |

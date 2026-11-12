@@ -42,13 +42,13 @@
 [dev]
   # Netlify Dev UI port
   port = 8889
-  # Proxy to an already running CRA dev server
+  # Proxy to an already running Vite dev server (PORT=3010 npm start)
   targetPort = 3010
   # Directory for Netlify Functions
   functions = "netlify/functions"
-  # Disable framework auto-detection to avoid auto-starting CRA
+  # Disable framework auto-detection to avoid auto-starting the dev server
   framework = "#custom"
   # Do not auto open browser
   autoLaunch = false
-  # No-op command; CRA is already running on targetPort
+  # No-op command; the Vite dev server (npm start) is already running on targetPort
   command = "npm run dev:noop"

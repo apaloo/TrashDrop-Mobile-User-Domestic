@@ -44,7 +44,7 @@ REACT_APP_SUPABASE_ANON_KEY=sb_publishable_...
 | Run over HTTPS (camera/QR on a phone) | `node generate-cert.js`, then `npm run start:https`. The certificates are generated locally and never committed |
 | Unit tests, as CI runs them | `npm run test:ci` |
 | Lint | `npm run lint` |
-| Pricing guard tests | `npx craco test --watchAll=false src/services/__tests__/digitalBinService.promotion.test.js` |
+| Pricing guard tests | `npx jest --ci src/services/__tests__/digitalBinService.promotion.test.js` |
 
 ### Carter app: `TrashDrop-Mobile-Collector-Driver`
 
