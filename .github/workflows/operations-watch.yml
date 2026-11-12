@@ -1,0 +1,102 @@
+name: Operations watch
+
+# Every Monday: pickups, digital bins and dumping reports that have waited
+# longer than their limit (engineering/automation/operations-watch-config.json).
+# Keeps one issue up to date for operations, with the change since last week,
+# and closes it when every queue is within its limit. A backlog doesn't fail
+# the run: it is reported, not a broken build.
+#
+# Setup: the SUPABASE_ACCESS_TOKEN secret (setup step 07b). Until it is set,
+# the run passes with a warning.
+on:
+  schedule:
+    - cron: '47 6 * * 1' # Mondays 06:47 UTC (Africa/Accra), start of the week
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'engineering/automation/operations-watch*'
+      - '.github/workflows/operations-watch.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TITLE: '[Operations] Work waiting too long'
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Self-test
+        run: node engineering/automation/operations-watch.mjs --self-test
+
+      # Last week's counts, kept in the open issue, for the "since last week" column
+      - name: Read last week's counts
+        id: previous
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', labels: 'operations-watch', per_page: 100 });
+            const last = issues.filter((i) => i.title === process.env.TITLE).sort((a, b) => b.number - a.number)[0];
+            const m = last?.body?.match(/<!-- counts: (\{.*?\}) -->/);
+            core.setOutput('counts', m ? m[1] : '{}');
+
+      - name: Check production
+        id: watch
+        env:
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PREVIOUS_COUNTS: ${{ steps.previous.outputs.counts }}
+        run: |
+          set +e
+          node engineering/automation/operations-watch.mjs; status=$?
+          if [ $status -eq 2 ] && grep -q 'not configured' operations-watch-result.json 2>/dev/null; then
+            echo "::warning::Operations watch not configured: add the SUPABASE_ACCESS_TOKEN secret (setup step 07b)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit $status
+
+      - name: Update the operations issue
+        if: github.event_name != 'pull_request' && steps.watch.outputs.skip != 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const result = JSON.parse(fs.readFileSync('operations-watch-result.json', 'utf8'));
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'operations-watch', per_page: 100 }))
+              .find((i) => i.title === process.env.TITLE);
+            const body = [
+              `Work that has waited longer than its limit, as of ${new Date().toISOString().slice(0, 10)} (${runUrl}).`,
+              '',
+              result.table,
+              '',
+              'Find the items on the admin site (pickups and bins: request queues; dumping: reports). Limits: `engineering/automation/operations-watch-config.json`, owned by Operations. Counts only: this repository is public.',
+              '',
+              `<!-- counts: ${JSON.stringify(result.counts)} -->`,
+            ].join('\n');
+            if (!result.total) {
+              if (open) {
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, body });
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `Every queue is within its limit: ${runUrl}` });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            try { await github.rest.issues.createLabel({ owner, repo, name: 'operations-watch', color: 'fbca04', description: 'Weekly check of work waiting too long' }); } catch {}
+            if (open) {
+              await github.rest.issues.update({ owner, repo, issue_number: open.number, body });
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `${result.total} item(s) past their limit this week; table updated: ${runUrl}` });
+            } else {
+              await github.rest.issues.create({ owner, repo, title: process.env.TITLE, body, labels: ['operations-watch'] });
+            }

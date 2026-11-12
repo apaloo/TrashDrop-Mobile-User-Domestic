@@ -1,0 +1,17 @@
+{
+  "_comment": "Work that waits too long, checked every Monday by operations-watch.mjs. A queue counts the items in the listed statuses that have waited longer than olderThanHours, measured from when they were created (ageFrom 'created': nobody has picked them up) or from their last change (ageFrom 'lastChange': work in progress that stopped moving). Operations owns these limits: change one in a pull request when the service promise changes. Statuses must exist in the table's status check (production, 2026-11-12).",
+  "queues": [
+    { "id": "pickup-unassigned", "what": "Pickup requests waiting for a collector", "table": "pickup_requests", "statuses": ["pending", "available"], "ageFrom": "created", "olderThanHours": 48 },
+    { "id": "pickup-stalled", "what": "Pickups started but not finished", "table": "pickup_requests", "statuses": ["accepted", "en_route", "arrived", "collecting", "completed"], "ageFrom": "lastChange", "olderThanHours": 24 },
+    { "id": "bin-unassigned", "what": "Digital bins waiting for a collector", "table": "digital_bins", "statuses": ["pending", "available"], "ageFrom": "created", "olderThanHours": 48 },
+    { "id": "bin-stalled", "what": "Digital bins started but not disposed", "table": "digital_bins", "statuses": ["accepted", "en_route", "arrived", "collecting", "completed"], "ageFrom": "lastChange", "olderThanHours": 24 },
+    { "id": "dumping-unverified", "what": "Illegal dumping reports not yet verified", "table": "illegal_dumping_mobile", "statuses": ["pending"], "ageFrom": "created", "olderThanHours": 168 },
+    { "id": "dumping-awaiting-cleanup", "what": "Verified dumping reports without a finished cleanup", "table": "illegal_dumping_mobile", "statuses": ["verified"], "ageFrom": "lastChange", "olderThanHours": 336 },
+    { "id": "dumping-cleanup-stalled", "what": "Dumping cleanups in progress, untouched", "table": "illegal_dumping_mobile", "statuses": ["in_progress"], "ageFrom": "lastChange", "olderThanHours": 336 }
+  ],
+  "allowed": {
+    "pickup_requests": ["pending", "available", "accepted", "en_route", "arrived", "collecting", "completed", "disposed", "cancelled", "canceled", "expired"],
+    "digital_bins": ["pending", "available", "accepted", "en_route", "arrived", "collecting", "completed", "disposed", "cancelled", "canceled", "expired"],
+    "illegal_dumping_mobile": ["pending", "verified", "in_progress", "completed", "disposed", "cancelled"]
+  }
+}
