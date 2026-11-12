@@ -16,6 +16,7 @@ on:
   pull_request:
     paths:
       - 'engineering/automation/security-watch*'
+      - 'engineering/automation/supabase-logs.mjs'
       - '.github/workflows/security-watch.yml'
 
 permissions:

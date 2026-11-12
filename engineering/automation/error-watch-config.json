@@ -1,0 +1,28 @@
+{
+  "_comment": "Daily error watch: database errors in the last 24 hours, grouped by type (quoted values, ids and numbers removed, so nothing personal is published). A type seen at least 'minCount' times opens one issue. Limits were set from production on 2026-11-12. Changing a limit or adding a known error needs the CTO's review (CODEOWNERS).",
+  "hours": 24,
+  "minCount": 5,
+  "_codeLimits_comment": "Code and database out of step is a bug at any count, so these flag from the first one: 42703 missing column, 42883 missing function, 42804 wrong type, 42725 ambiguous operator (all seen on 2026-11-11/12, each a real bug). Higher limits for codes ordinary traffic produces: 42501 permission denied (expired sign-ins, signed-out visitors; about 20 a day), 42P01 missing table (API scanners; the security watch's log scan covers those), 57014 cancelled query.",
+  "codeLimits": { "42703": 1, "42883": 1, "42804": 1, "42725": 1, "42501": 100, "42P01": 300, "57014": 50 },
+  "_ignorePrefixes_comment": "Rolled-back tests on production (database function review runbook) end with RAISE EXCEPTION; start their message with one of these so they are never counted.",
+  "ignorePrefixes": ["ROLLED BACK", "TEST RESULT"],
+  "_known_comment": "Accepted error types, each with the register item that explains it and the date it stops being accepted. 'max' is the most a day may show before it is flagged anyway.",
+  "known": [
+    {
+      "match": "insert or update on table \"…\" violates foreign key constraint \"…\"",
+      "code": "23503",
+      "ref": "TD45",
+      "why": "Collector sessions never save; kept as it is by the owner's decision on online status (2026-11-12)",
+      "max": 100,
+      "until": "2027-05-12"
+    },
+    {
+      "match": "invalid column for filter user_id",
+      "code": "P0001",
+      "ref": "TD43",
+      "why": "Fixed in household #123; builds opened before 2026-11-12 00:41 UTC (deploy-preview-88) keep logging it until they are reloaded",
+      "max": 4000,
+      "until": "2026-11-19"
+    }
+  ]
+}

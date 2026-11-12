@@ -110,7 +110,9 @@ revoking from `PUBLIC` alone leaves Supabase's direct grant to `anon`.
 ### 4. Test on production, rolled back
 
 Run the same statements inside one `DO` block that ends with
-`RAISE EXCEPTION`, so nothing is kept, and report what you need to see:
+`RAISE EXCEPTION`, so nothing is kept, and report what you need to see.
+Start the message with `ROLLED BACK` so the daily error watch doesn't count
+your test:
 
 ```sql
 DO $t$

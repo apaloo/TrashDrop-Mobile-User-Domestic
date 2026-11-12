@@ -20,6 +20,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { queryLogs } from './supabase-logs.mjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const config = JSON.parse(fs.readFileSync(path.join(here, 'security-watch-config.json'), 'utf8'));
@@ -85,13 +86,8 @@ export function findScans(rows, cfg) {
 }
 
 async function logScan(token, ref, cfg) {
-  const end = new Date(); const start = new Date(end.getTime() - cfg.hours * 3600e3);
-  const qs = new URLSearchParams({ sql: SCAN_SQL, iso_timestamp_start: start.toISOString(), iso_timestamp_end: end.toISOString() });
-  const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/analytics/endpoints/logs.all?${qs}`, { headers: { authorization: `Bearer ${token}` } });
-  if (!res.ok) return { error: `HTTP ${res.status}` };
-  const body = await res.json();
-  if (body.error) return { error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error).slice(0, 200) };
-  return { scans: findScans(body.result, cfg) };
+  const r = await queryLogs(token, ref, SCAN_SQL, cfg.hours);
+  return r.error ? { error: r.error } : { scans: findScans(r.rows, cfg) };
 }
 
 async function probe(base, key, p) {
