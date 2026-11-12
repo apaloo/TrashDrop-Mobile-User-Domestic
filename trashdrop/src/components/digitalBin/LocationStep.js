@@ -368,7 +368,7 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       // Try 1: Nominatim (OpenStreetMap)
       try {
         const nominatimResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@trashdrop.app`,
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@trashdrops.com`,
           { headers: { 'Accept': 'application/json' } }
         );
         

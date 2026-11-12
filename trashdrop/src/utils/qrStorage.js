@@ -13,7 +13,7 @@ const generateQRCodeData = async (binId, locationId) => {
     binId,
     locationId,
     timestamp: Date.now(),
-    url: `https://trashdrop.app/bin/${binId}`,
+    url: `https://app.trashdrops.com/bin/${binId}`,
     expires: Date.now() + (DEFAULT_EXPIRATION * 1000)
   };
   
@@ -72,7 +72,7 @@ export const storeQRCode = async (binId, qrCodeUrl = null, options = {}) => {
         binId,
         locationId,
         qrCodeUrl,
-        url: `https://trashdrop.app/bin/${binId}`,
+        url: `https://app.trashdrops.com/bin/${binId}`,
         timestamp: Date.now(),
         expires: Date.now() + (DEFAULT_EXPIRATION * 1000),
         dataString: qrCodeUrl

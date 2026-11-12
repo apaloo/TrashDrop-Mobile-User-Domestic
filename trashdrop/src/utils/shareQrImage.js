@@ -14,11 +14,11 @@ export const qrShareText = (bin) => [
 
 /**
  * The QR image as a PNG data URL: the image the card already shows, else one
- * drawn from the bin's QR link (https://trashdrop.app/bin/<id>), else null.
+ * drawn from the bin's QR link (https://app.trashdrops.com/bin/<id>), else null.
  */
 export const qrImageDataUrl = async (bin) => {
   if (bin?.qrImage && String(bin.qrImage).startsWith('data:image/')) return bin.qrImage;
-  const link = bin?.qr_code_url || (bin?.id ? `https://trashdrop.app/bin/${bin.id}` : null);
+  const link = bin?.qr_code_url || (bin?.id ? `https://app.trashdrops.com/bin/${bin.id}` : null);
   if (!link) return null;
   return QRCode.toDataURL(link, { width: 512, margin: 2, errorCorrectionLevel: 'M' });
 };

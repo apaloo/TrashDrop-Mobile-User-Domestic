@@ -854,7 +854,7 @@ function DigitalBin() {
       // URL is correct at insert time; a trigger enforces the same value server
       // side for every other writer.
       const binId = crypto.randomUUID();
-      const qrCodeUrl = `https://trashdrop.app/bin/${binId}`;
+      const qrCodeUrl = `https://app.trashdrops.com/bin/${binId}`;
 
       // Every request is a single collection (repeats come from reminders), so
       // it stays open for a week from its collection date, not from today
