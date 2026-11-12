@@ -277,6 +277,34 @@ export function judgeSkippedCheck(count, cfg) {
     : { ok: false, line: `❌ ${count} elevated function(s) anyone can call skip their caller check when signed out (at most ${cfg.max})` };
 }
 
+// Money and points writes (Phase 13, from the TD54 audit): tables with money or
+// points columns that signed-in users can write. Each one in the reviewed list
+// was checked (a guard trigger keeps amounts on the server, or no balance
+// reads it); any other table is new and must be reviewed before it ships.
+export function moneyWritesSql(reviewed) {
+  const list = reviewed.map((t) => `'${String(t).replace(/'/g, "''")}'`).join(',');
+  return `with money_tables as (
+  select distinct c.oid, c.relname
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+  join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+  where c.relkind = 'r'
+    and a.attname ~* '(fee|price|amount|payout|earning|points|balance|share|subsidy|bill|cost|tip|reward|bonus|cashback|commission|wallet|credit)'
+    and a.attname !~* '(_at$|_id$|_ids$|currency|_type$|description|name|note|status)'
+)
+select count(*)::int as unreviewed from money_tables m
+where m.relname not in (${list})
+  and (has_table_privilege('authenticated', m.oid, 'INSERT') or has_table_privilege('authenticated', m.oid, 'UPDATE'))
+  and exists (select 1 from pg_policy p where p.polrelid = m.oid and p.polcmd in ('a','w','*')
+              and ('{0}'::oid[] && p.polroles or exists (select 1 from pg_roles r where r.oid = any(p.polroles) and r.rolname in ('authenticated','public'))))`;
+}
+
+export function judgeMoneyWrites(count, cfg) {
+  if (!Number.isInteger(count)) return { ok: false, line: 'could not be read' };
+  return count === 0
+    ? { ok: true, line: `✅ no unreviewed table with money or points columns is writable by signed-in users (${cfg.reviewed.length} reviewed)` }
+    : { ok: false, line: `❌ ${count} table(s) with money or points columns are writable by signed-in users and not reviewed` };
+}
+
 async function query(token, ref, sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -424,6 +452,16 @@ async function main() {
     }
   }
 
+  if (token && ref) {
+    try {
+      const r = judgeMoneyWrites((await query(token, ref, moneyWritesSql(config.moneyWrites.reviewed)))?.[0]?.unreviewed, config.moneyWrites);
+      lines.push('', `**Money and points writes:** ${r.line}`);
+      if (!r.ok) failures.push(`Money and points writes: ${r.line.replace(/^❌ /, '')}. List them privately (engineering/runbooks/database-function-review.md), check that the server sets the amounts (secure-development principle 1), then add them to moneyWrites.reviewed with the owner's approval.`);
+    } catch (e) {
+      lines.push('', `**Money and points writes:** could not be read (${e.message}).`);
+    }
+  }
+
   const scanCfg = config.logScan;
   if (token && ref) {
     let r;
@@ -508,6 +546,9 @@ function selfTest() {
   assert(judgeSkippedCheck(0, { max: 0 }).ok && !judgeSkippedCheck(1, { max: 0 }).ok && !judgeSkippedCheck(undefined, { max: 0 }).ok, 'judgeSkippedCheck');
   assert(/^select count\(\*\)::int as skipped /.test(SKIPPED_CHECK_SQL) && /prosecdef/.test(SKIPPED_CHECK_SQL) && /'anon'/.test(SKIPPED_CHECK_SQL), 'skipped-check SQL counts, not names');
   assert(Number.isInteger(config.skippedCallerCheck?.max), 'skippedCallerCheck config');
+  assert(judgeMoneyWrites(0, { reviewed: ['a'] }).ok && !judgeMoneyWrites(1, { reviewed: [] }).ok && !judgeMoneyWrites(undefined, { reviewed: [] }).ok, 'judgeMoneyWrites');
+  assert(/^with money_tables as/.test(moneyWritesSql(['x'])) && /count\(\*\)::int as unreviewed/.test(moneyWritesSql(['x'])) && moneyWritesSql(["o'x"]).includes("'o''x'"), 'moneyWritesSql counts, quotes names');
+  assert(Array.isArray(config.moneyWrites?.reviewed) && config.moneyWrites.reviewed.length > 0, 'moneyWrites config');
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 

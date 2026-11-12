@@ -197,6 +197,10 @@
       "expect": "data"
     }
   ],
+  "moneyWrites": {
+    "_comment": "Phase 13 / TD54 (2026-11-12): tables with money or points columns that signed-in users can write, each reviewed: guarded by the server (bags, batches, bin_payments, collector_profiles, digital_bins, illegal_dumping_mobile, pickup_requests, profiles) or not read by any balance or payout (bag_orders, dumping_reports, reward_redemptions, user_activity; withdrawals need server-written items that add up). Adding a table here needs the owner's approval.",
+    "reviewed": ["bag_orders", "bags", "batches", "bin_payments", "collector_profiles", "digital_bins", "dumping_reports", "illegal_dumping_mobile", "pickup_requests", "profiles", "reward_redemptions", "user_activity", "withdrawals"]
+  },
   "skippedCallerCheck": {
     "_comment": "Elevated (SECURITY DEFINER) functions anyone can call whose caller check runs only when someone is signed in. 0 since 20261112165513 (validate_cashout).",
     "max": 0
