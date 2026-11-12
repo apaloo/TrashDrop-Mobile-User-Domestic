@@ -237,5 +237,10 @@
       "function td_bin_collector_share": "c5b196c147d1f34a365552e604fef1b8",
       "trigger digital_bins.ac_td_record_bin_acceptance": "91eebb2ec4b7eebc6447233b3078602e"
     }
+  },
+  "_uncheckedFunctions_comment": "Database functions that run with their owner's rights, can be run by any signed-in user and show no check of who is calling: those that write and take an id, and those that read personal data (auth.users, phone numbers). Baseline 2026-11-12 after TD19 round 3 (20261112122021): 0 writers; 2 readers, both deliberate yes/no answers (the sign-up phone check, is_active_collector). Only counts are published; never raise a baseline without the CTO.",
+  "uncheckedFunctions": {
+    "maxWriters": 0,
+    "maxPersonalReads": 2
   }
 }
