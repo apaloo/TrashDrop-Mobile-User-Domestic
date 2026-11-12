@@ -38,7 +38,9 @@ changed by the server or staff (`td_guard_profile_columns`).
 
 - A reward is redeemed only through `td_redeem_reward`. The server takes the
   reward's `points_cost`, checks the balance, and records the redemption as
-  pending. The app never sends a cost or a balance.
+  pending. The app never sends a cost or a balance. Nobody can insert a
+  redemption directly, and a redemption always spends a positive number of
+  points (`rewards_redemption_points_positive`).
 - Every redemption that isn't rejected is subtracted. A rejected redemption
   gives its points back.
 - Staff send or reject redemptions (`admin_set_redemption_status`, admin site).
@@ -57,13 +59,15 @@ dumping report points − points spent.
 | 2026-11-12 | A cancelled digital bin earns no points (one account: 360 → 315) |
 | 2026-11-12 | Two older pickup requests that carried 125 and 126 points, written by an earlier app version, reset to 5 (balances 1,190 → 1,070 and 326 → 205; none went below 0) |
 | 2026-11-12 | Redemptions go through `td_redeem_reward` (the server checks cost and balance) |
+| 2026-11-12 | Points can't be created by inserting rows: redemptions only through `td_redeem_reward`, always positive; a household's new dumping report always starts as pending, and verification (which earns its points) is set only by the team (`20261112162540`). Neither had been used: every redemption was positive and no report had been created already verified |
 
 ## Where this lives
 
 - Database: `user_stats_dashboard`, `td_redeem_reward`,
   `td_guard_request_write`, `td_guard_profile_columns`,
-  `get_dashboard_data_optimized` (migrations `20261112095056`,
-  `20261112110640`, `20261112110931`).
+  `td_guard_dumping_insert`, `get_dashboard_data_optimized`, and the access
+  rules on `rewards_redemption` (migrations `20261112095056`,
+  `20261112110640`, `20261112110931`, `20261112162540`).
 - Household app: `src/services/userService.js` (`getUserStats`),
   `src/utils/reportPoints.js`, `src/pages/Rewards.js`.
 - Tests: `userService.stats.test.js`, `Rewards.redeem.test.js`.

@@ -158,6 +158,7 @@ const PROTECTED_FUNCTIONS = [
   ['pricing', 'td_price_digital_bin'], ['pricing', 'td_set_digital_bin_price'], ['pricing', 'td_protect_digital_bin_price'],
   ['pricing', 'td_refund_promotion_on_cancel'], ['pricing', 'increment_promotional_usage'],
   ['points', 'td_redeem_reward'], ['points', 'td_guard_request_write'], ['points', 'td_guard_profile_columns'], ['points', 'get_dashboard_data_optimized'],
+  ['points', 'td_guard_dumping_insert'],
   ['payouts', 'td_guard_bin_payment'], ['payouts', 'td_withdrawable_items'], ['payouts', 'td_keep_booked_payout'],
   ['payouts', 'td_record_bin_acceptance'], ['payouts', 'td_bin_collector_share'],
 ];
@@ -165,6 +166,7 @@ const PROTECTED_TRIGGERS = [
   ['pricing', 'digital_bins', 'digital_bins_set_price'], ['pricing', 'digital_bins', 'digital_bins_protect_price'],
   ['pricing', 'digital_bins', 'digital_bins_refund_promotion'],
   ['points', 'pickup_requests', 'aa_td_guard_write'], ['points', 'profiles', 'td_guard_profile_columns'],
+  ['points', 'illegal_dumping_mobile', 'aa_td_guard_insert'],
   ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'], ['payouts', 'digital_bins', 'ab_td_keep_booked_payout'],
   ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'],
 ];
@@ -187,6 +189,11 @@ select 'pricing', 'policies promotional_usage',
   (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
           || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.promotional_usage')))
      from pg_policy p where p.polrelid = to_regclass('public.promotional_usage'))
+union all
+select 'points', 'policies rewards_redemption',
+  (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
+          || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.rewards_redemption')))
+     from pg_policy p where p.polrelid = to_regclass('public.rewards_redemption'))
 order by 1, 2`;
 
 export function judgeProtected(rows, expected) {
@@ -456,7 +463,7 @@ function selfTest() {
   assert(judgeProtected(undefined, exp).length === 2, 'judgeProtected: nothing read means everything missing');
   const recorded = Object.keys(config.protectedDefinitions?.objects || {});
   const listed = [...PROTECTED_FUNCTIONS.map(([, n]) => `function ${n}`), ...PROTECTED_TRIGGERS.map(([, t, n]) => `trigger ${t}.${n}`),
-    'view user_stats_dashboard', 'policies promotional_usage'];
+    'view user_stats_dashboard', 'policies promotional_usage', 'policies rewards_redemption'];
   assert(listed.length === recorded.length && listed.every((o) => recorded.includes(o)), 'every protected object has a recorded fingerprint');
   assert(Object.values(config.protectedDefinitions.objects).every((h) => /^[0-9a-f]{32}$/.test(h)), 'fingerprints are md5');
   const cap = { revisitRows: 100000, revisitMb: 2048 };
