@@ -676,15 +676,8 @@ export const batchService = {
       bagCount = functionResult.bag_count || bagCount;
       try { await offlineStorageAPI.cacheBatch(batch); await offlineStorageAPI.cacheBags(batch.id, bagsList); } catch (_) {}
 
-
-      // Ensure user_stats is recalculated — the RPC's internal stats update
-      // may silently fail (EXCEPTION WHEN OTHERS), so call refresh explicitly
-      try {
-        const { data: refreshResult } = await supabase.rpc('refresh_all_user_stats');
-        console.log('[BatchService] user_stats refreshed after activation:', refreshResult);
-      } catch (refreshErr) {
-        console.warn('[BatchService] refresh_all_user_stats failed (non-fatal):', refreshErr?.message);
-      }
+      // activate_batch_for_user updates this user's own stats (TD48, migration
+      // 20261112104437); refresh_all_user_stats is server-only.
       console.log('[BatchService] Batch activated successfully via RPC.');
       // Note: UI event dispatch (trashdrop:bags-updated) is handled by BatchQRScanner component
       return { data: { activated: true, bags_added: bagCount, bag_count: bagCount, bags: bagsList, batch_id: batch.id }, error: null };
