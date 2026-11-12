@@ -5,6 +5,17 @@ title = "TrashDrop secret scanning"
 [extend]
 useDefault = true
 
+# gitleaks' own Facebook rule only knows app tokens. Meta user, page and
+# WhatsApp access tokens start with EAA; the boundaries keep base64 image data
+# from matching. Found a committed token on 2026-11-12 that the defaults missed.
+[[rules]]
+id = "meta-access-token"
+description = "Meta (Facebook, Instagram, WhatsApp) access token"
+regex = '''(?:^|[^A-Za-z0-9+/])(EAA[A-Za-z0-9]{90,})(?:[^A-Za-z0-9+/=]|$)'''
+secretGroup = 1
+entropy = 4.0
+keywords = ["eaa"]
+
 [allowlist]
 description = "Known-safe files"
 paths = [

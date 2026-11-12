@@ -53,9 +53,8 @@ jobs:
           if [ "$before" = "0000000000000000000000000000000000000000" ]; then range="-1"; else range="$before..${{ github.sha }}"; fi
           gitleaks git --no-banner --redact --verbose --config .gitleaks.toml --log-opts="$range"
 
-      # Weekly and manual: every file as it is now. History is not scanned
-      # here: old, already-rotated keys stay in history until it is rewritten
-      # (engineering/runbooks/setup/09-supabase-legacy-keys.md).
+      # Weekly and manual: every file as it is now. Every commit of all three
+      # repositories is scanned by history-secret-scan.yml.
       - name: Scan current files
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: gitleaks dir . --no-banner --redact --verbose --config .gitleaks.toml
