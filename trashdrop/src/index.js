@@ -8,9 +8,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import performanceTracker from "./utils/performanceTracker";
 import reportWebVitals from "./reportWebVitals";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
-import * as mobileServiceWorker from "./mobileServiceWorker";
 import { initGlobalErrorHandlers } from "./utils/errorBoundary";
-import { isMobileDevice } from "./utils/mobileAuth";
 import { notifyUpdateReady, watchForMissingChunks } from "./utils/appUpdate";
 import { initMonitoring } from "./utils/monitoring";
 
@@ -47,27 +45,14 @@ function logAppDebug(message, data) {
 // Track initial React render
 logAppDebug("React initialization starting");
 
-// Initialize the app - REGISTER service worker
-// Use mobile-specific service worker for mobile devices
-if (isMobileDevice()) {
-  console.log("[PWA] Mobile device detected, using mobile-specific service worker");
-  mobileServiceWorker.register({
-    // A new version has downloaded: UpdateBanner offers to switch to it
-    onUpdate: notifyUpdateReady,
-    onSuccess: registration => {
-      console.log("[PWA] Content is cached for offline use");
-    }
-  });
-} else {
-  console.log("[PWA] Desktop device detected, using standard service worker");
-  serviceWorkerRegistration.register({
-    // A new version has downloaded: UpdateBanner offers to switch to it
-    onUpdate: notifyUpdateReady,
-    onSuccess: registration => {
-      console.log("[PWA] Content is cached for offline use");
-    }
-  });
-}
+// One service worker for every device: /service-worker.js, built from
+// src/service-worker.js (TD8). A new version shows UpdateBanner.
+serviceWorkerRegistration.register({
+  onUpdate: notifyUpdateReady,
+  onSuccess: () => {
+    console.log("[PWA] Content is cached for offline use");
+  }
+});
 
 // Using the ErrorBoundary component imported from ./components/ErrorBoundary
 
