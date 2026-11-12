@@ -7,7 +7,6 @@ src/services/promotionalService.js
 src/services/gpsPricingService.js
 src/utils/costCalculator.js
 src/components/digitalBin/ReviewStep.js
-src/services/paymentService.js
 src/services/pickupService.js
 src/services/batchService.js
 src/context/AuthContext.js

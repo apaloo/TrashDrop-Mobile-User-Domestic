@@ -21,7 +21,6 @@ import SchemaTest from './pages/SchemaTest.js';
 import CollectionForm from './pages/CollectionForm.js';
 import CollectionQRCode from './pages/CollectionQRCode.js';
 import Profile from './pages/Profile.js';
-import PaymentMethods from './pages/PaymentMethods.js';
 import Notifications from './pages/Notifications.js';
 import CollectorTracking from './pages/CollectorTracking.js';
 import ToastTest from './pages/ToastTest.js';
@@ -226,11 +225,6 @@ const AppContent = () => {
           <Route path="/profile" element={
             <PrivateRoute>
               <Profile />
-            </PrivateRoute>
-          } />
-          <Route path="/payment-methods" element={
-            <PrivateRoute>
-              <PaymentMethods />
             </PrivateRoute>
           } />
           <Route path="/notifications" element={
