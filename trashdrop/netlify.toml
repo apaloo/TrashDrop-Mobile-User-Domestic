@@ -8,6 +8,22 @@
   to = "/index.html"
   status = 200
 
+# Security headers on every response (2026-11-12; the site had none).
+# HTTPS only; never inside another site's frame (clickjacking); no MIME
+# sniffing; no full URLs leaked to other sites; only the browser features the
+# app uses (camera for QR codes, location, share sheet). A full Content
+# Security Policy is TD57: report-only first, the app loads maps and tiles
+# from several hosts.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Content-Security-Policy = "upgrade-insecure-requests; frame-ancestors 'none'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), geolocation=(self), web-share=(self), microphone=(), payment=(), usb=()"
+
 # Cache control for static assets
 [[headers]]
   for = "/static/*"
