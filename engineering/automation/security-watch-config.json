@@ -197,6 +197,10 @@
       "expect": "data"
     }
   ],
+  "skippedCallerCheck": {
+    "_comment": "Elevated (SECURITY DEFINER) functions anyone can call whose caller check runs only when someone is signed in. 0 since 20261112165513 (validate_cashout).",
+    "max": 0
+  },
   "migrationLedger": {
     "_comment": "TD18 / ADR-001: every migration production has recorded must have its file in one of these folders. On 2026-11-12 all 55 did. Files applied by hand in the SQL editor before 2026-11-11 are not in production's history and are not checked here.",
     "repos": [
@@ -266,8 +270,10 @@
       "function td_guard_dumping_insert": "e19379ce7d43a7c191fedc46d7b8743b",
       "trigger illegal_dumping_mobile.aa_td_guard_insert": "e1c4fe1b64755d73d4c8f0c8d8ef5f4f",
       "policies rewards_redemption": "3df5fa8b6ef3c732f62efbb5fa2d5b31",
+      "function td_guard_cleanup_fee": "99350dd003721cdfce2ae0f0d4d6adb3",
+      "trigger illegal_dumping_mobile.ab_td_guard_cleanup_fee": "d465969499e5a3ed41d2b6570869cbcc",
       "function td_guard_bin_payment": "9703c154445c44d28227434b41c99aa1",
-      "function td_withdrawable_items": "1d81c1edea1b59fda8d7ba7daa3537f0",
+      "function td_withdrawable_items": "d309aa0a04c55deebd4b2a6ba6b202ec",
       "trigger bin_payments.aa_td_guard_bin_payment": "55754cbd67d29ef21d6439ddf090a352",
       "function td_keep_booked_payout": "6029c304ce5babdc1e31959f54f1d8a0",
       "trigger digital_bins.ab_td_keep_booked_payout": "9aa965d5d076ef0ebffc0c7475daad01",

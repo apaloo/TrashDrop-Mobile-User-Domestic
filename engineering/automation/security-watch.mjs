@@ -160,7 +160,7 @@ const PROTECTED_FUNCTIONS = [
   ['points', 'td_redeem_reward'], ['points', 'td_guard_request_write'], ['points', 'td_guard_profile_columns'], ['points', 'get_dashboard_data_optimized'],
   ['points', 'td_guard_dumping_insert'],
   ['payouts', 'td_guard_bin_payment'], ['payouts', 'td_withdrawable_items'], ['payouts', 'td_keep_booked_payout'],
-  ['payouts', 'td_record_bin_acceptance'], ['payouts', 'td_bin_collector_share'],
+  ['payouts', 'td_record_bin_acceptance'], ['payouts', 'td_bin_collector_share'], ['payouts', 'td_guard_cleanup_fee'],
 ];
 const PROTECTED_TRIGGERS = [
   ['pricing', 'digital_bins', 'digital_bins_set_price'], ['pricing', 'digital_bins', 'digital_bins_protect_price'],
@@ -168,7 +168,7 @@ const PROTECTED_TRIGGERS = [
   ['points', 'pickup_requests', 'aa_td_guard_write'], ['points', 'profiles', 'td_guard_profile_columns'],
   ['points', 'illegal_dumping_mobile', 'aa_td_guard_insert'],
   ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'], ['payouts', 'digital_bins', 'ab_td_keep_booked_payout'],
-  ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'],
+  ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'], ['payouts', 'illegal_dumping_mobile', 'ab_td_guard_cleanup_fee'],
 ];
 const values = (rows) => rows.map((r) => `(${r.map((v) => `'${v}'`).join(',')})`).join(',');
 export const PROTECTED_DEFINITIONS_SQL = `with fns(rule, name) as (values ${values(PROTECTED_FUNCTIONS)}),
@@ -258,6 +258,23 @@ async function listMigrationFiles(repos) {
     (await res.json()).forEach((f) => { if (f.name.endsWith('.sql')) files.push(f.name); });
   }
   return files;
+}
+
+// Elevated functions anyone can call whose caller check runs only when
+// someone is signed in ("auth.uid() IS NOT NULL AND ..."): a signed-out call
+// skips it. validate_cashout returned any collector's balance this way
+// (fixed 20261112165513). Yes/no helpers such as td_is_staff are fine.
+export const SKIPPED_CHECK_SQL = `select count(*)::int as skipped from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.prokind = 'f' and p.prosecdef
+  and has_function_privilege('anon', p.oid, 'execute')
+  and p.prorettype <> 'boolean'::regtype
+  and p.prosrc ~* 'auth\\.uid\\(\\)\\s+is\\s+not\\s+null\\s+and'`;
+
+export function judgeSkippedCheck(count, cfg) {
+  if (!Number.isInteger(count)) return { ok: false, line: 'could not be read' };
+  return count <= cfg.max
+    ? { ok: true, line: `✅ ${count} elevated function(s) anyone can call skip their caller check when signed out (at most ${cfg.max})` }
+    : { ok: false, line: `❌ ${count} elevated function(s) anyone can call skip their caller check when signed out (at most ${cfg.max})` };
 }
 
 async function query(token, ref, sql) {
@@ -397,6 +414,16 @@ async function main() {
     }
   }
 
+  if (token && ref) {
+    try {
+      const r = judgeSkippedCheck((await query(token, ref, SKIPPED_CHECK_SQL))?.[0]?.skipped, config.skippedCallerCheck);
+      lines.push('', `**Caller checks skipped when signed out:** ${r.line}`);
+      if (!r.ok) failures.push(`Caller checks: ${r.line.replace(/^❌ /, '')}. List them privately (engineering/runbooks/database-function-review.md) and revoke signed-out access or check the caller every time.`);
+    } catch (e) {
+      lines.push('', `**Caller checks skipped when signed out:** could not be read (${e.message}).`);
+    }
+  }
+
   const scanCfg = config.logScan;
   if (token && ref) {
     let r;
@@ -478,6 +505,9 @@ function selfTest() {
   assert(!lmiss.ok && lmiss.missing[0] === '20261201000000 something_new', 'judgeLedger: missing file');
   assert(!judgeLedger(undefined, lfiles, lcfg).ok && !judgeLedger([], [], lcfg).ok, 'judgeLedger: nothing read');
   assert(Array.isArray(config.migrationLedger?.repos) && config.migrationLedger.repos.length === 3 && Number.isInteger(config.migrationLedger.maxMissing), 'migrationLedger config');
+  assert(judgeSkippedCheck(0, { max: 0 }).ok && !judgeSkippedCheck(1, { max: 0 }).ok && !judgeSkippedCheck(undefined, { max: 0 }).ok, 'judgeSkippedCheck');
+  assert(/^select count\(\*\)::int as skipped /.test(SKIPPED_CHECK_SQL) && /prosecdef/.test(SKIPPED_CHECK_SQL) && /'anon'/.test(SKIPPED_CHECK_SQL), 'skipped-check SQL counts, not names');
+  assert(Number.isInteger(config.skippedCallerCheck?.max), 'skippedCallerCheck config');
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 
