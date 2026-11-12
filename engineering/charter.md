@@ -38,7 +38,12 @@ Some rules are accepted by the owner and live in production. They change only
 with the owner's written approval in the pull request:
 
 - Digital bin pricing and promotions (`docs/DIGITAL_BIN_PRICING.md`, `CLAUDE.md`).
+- Points: how they are earned, spent and counted (`docs/POINTS.md`, `CLAUDE.md`; protected 2026-11-12).
 - Carter payouts and withdrawals, to be documented the same way (tech-debt register).
+
+The security watch checks the database objects behind these rules every day
+and fails if one changes without a recorded approval
+([protected rules runbook](runbooks/protected-rules.md)).
 
 ## Reporting
 

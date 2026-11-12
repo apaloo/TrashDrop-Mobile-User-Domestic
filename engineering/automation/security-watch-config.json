@@ -208,5 +208,29 @@
   "_writePolicies_comment": "Row-level security write policies (INSERT, UPDATE, DELETE or ALL) that apply to every row (USING/WITH CHECK true) or to signed-out visitors (anon). Policies made in the dashboard never pass the migration check, so the live database is counted daily. Only the count is published (the repository is public); list them with the query in engineering/runbooks/database-function-review.md. Policies for service_role alone are not counted (that key bypasses row-level security anyway). maxOpen was 9 on 2026-11-12 and is 0 since TD50 closed them the same day; never raise it without the CTO.",
   "writePolicies": {
     "maxOpen": 0
+  },
+  "_protectedDefinitions_comment": "Fingerprints (md5 of definition and grants) of the database objects that hold the owner's protected rules: digital bin pricing (docs/DIGITAL_BIN_PRICING.md), points (docs/POINTS.md) and collector payout caps. Recorded 2026-11-12. A difference fails the watch: either someone changed a protected rule outside an approved pull request, or an approved change forgot to record its new fingerprint. Update a value only in the pull request that carries the owner's written approval (engineering/runbooks/protected-rules.md).",
+  "protectedDefinitions": {
+    "objects": {
+      "function increment_promotional_usage": "e8e2845fccdc47de8ca62b5fb29d0cb9",
+      "function td_price_digital_bin": "232bf9f53de86b6cc9cc829009ccf88b",
+      "function td_protect_digital_bin_price": "452ce633d33a92bd2a888922a7e397c4",
+      "function td_refund_promotion_on_cancel": "61f61a8d606946cf50fdf58a96f5443e",
+      "function td_set_digital_bin_price": "8708fbd1ec78792f3575a749af6cffb6",
+      "policies promotional_usage": "3f1ed6089cb36140ab02bcf2b9f8649f",
+      "trigger digital_bins.digital_bins_protect_price": "fee44dc61bab0b96a7233f4ec26aed2d",
+      "trigger digital_bins.digital_bins_refund_promotion": "d4c85764b4edb1e6fc5be8a7b4550b85",
+      "trigger digital_bins.digital_bins_set_price": "1866818a7fd5ba6fa8caaf9321154827",
+      "function get_dashboard_data_optimized": "3209b97a7271bc365099c20cbefffd84",
+      "function td_guard_profile_columns": "cffd0a300068f35db2780da1f205cc4f",
+      "function td_guard_request_write": "916674594870b3e67d8eddaf3c7ed0ed",
+      "function td_redeem_reward": "d94fc9dc88da56a37eb0c2eba484acc6",
+      "trigger pickup_requests.aa_td_guard_write": "834d27d20f8a914a84782ba74429c73f",
+      "trigger profiles.td_guard_profile_columns": "23b436452cb8f639ffed0edd3b259398",
+      "view user_stats_dashboard": "379de5b10f072e53296ecbcfe4114d22",
+      "function td_guard_bin_payment": "2f117e5635034ff264e55e4d0e65ab44",
+      "function td_withdrawable_items": "406d7f50ef7c2d9ec95109f47e5ebfd5",
+      "trigger bin_payments.aa_td_guard_bin_payment": "55754cbd67d29ef21d6439ddf090a352"
+    }
   }
 }

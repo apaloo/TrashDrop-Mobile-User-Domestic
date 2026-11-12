@@ -15,6 +15,16 @@
 /trashdrop/netlify/functions/__checks__/pricing-promo.js    @apaloo
 /.github/workflows/ci-cd.yml                                @apaloo
 
+# Accepted TrashDrop Points (docs/POINTS.md, protected 2026-11-12):
+# changes need the owner's review.
+/docs/POINTS.md                                             @apaloo
+/trashdrop/src/services/userService.js                      @apaloo
+/trashdrop/src/utils/reportPoints.js                        @apaloo
+/trashdrop/src/pages/Rewards.js                             @apaloo
+/trashdrop/src/services/__tests__/userService.stats.test.js @apaloo
+/trashdrop/src/pages/__tests__/Rewards.redeem.test.js       @apaloo
+/engineering/runbooks/protected-rules.md                    @apaloo
+
 # Engineering controls (engineering/policies/repository-governance.md).
 # @apaloo is the only reviewer today; replace with the team handle
 # (e.g. @trashdrop/tech-leads) once the GitHub organisation exists.

@@ -1,7 +1,7 @@
 name: Label pull requests
 
 # Adds labels from the files a pull request changes (.github/labeler.yml).
-# A protected-pricing label means the owner's written approval is required
+# A protected-pricing or protected-points label means the owner's written approval is required
 # (CLAUDE.md).
 on:
   pull_request:
