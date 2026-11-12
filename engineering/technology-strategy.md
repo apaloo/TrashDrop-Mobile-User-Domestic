@@ -13,7 +13,8 @@
   and governance automation.
 - Gaps: one shared production database with no staging; database
   permissions still too broad for signed-in users (TD19); much of the knowledge sits with one person; build
-  tools near end of life (Create React App, Node 16 on the admin build); no
+  tools near end of life (Create React App, Node 16 on the admin build;
+  replaced by Vite and Node 20 in November 2026, TD12); no
   end-to-end tests.
 
 ## Principles

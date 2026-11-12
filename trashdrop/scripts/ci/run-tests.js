@@ -33,20 +33,20 @@ const env = {
 };
 
 const escape = (p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const craco = path.join(root, 'node_modules', '.bin', 'craco');
+const jest = path.join(root, 'node_modules', '.bin', 'jest');
 
 console.log(`Running all suites except ${known.length} known-failing ones…`);
-// Coverage of all of src (the react-scripts default), reported by
+// Coverage of all of src (jest.config.js collectCoverageFrom), reported by
 // scripts/ci/coverage-summary.mjs. Report only: never fails the build.
 const coverage = ['--coverage', '--coverageReporters=json-summary', '--coverageReporters=text-summary'];
-const main = spawnSync(craco, ['test', '--watchAll=false', ...coverage, '--testPathIgnorePatterns', ...known.map(escape)], {
+const main = spawnSync(jest, ['--ci', ...coverage, '--testPathIgnorePatterns', ...known.map(escape)], {
   cwd: root, env, stdio: 'inherit',
 });
 
 if (known.length) {
   console.log('\nChecking known-failing suites (information only)…');
   const out = path.join(root, '.known-failing-results.json');
-  spawnSync(craco, ['test', '--watchAll=false', '--json', `--outputFile=${out}`, ...known.map(escape)], {
+  spawnSync(jest, ['--ci', '--json', `--outputFile=${out}`, ...known.map(escape)], {
     cwd: root, env, stdio: 'ignore',
   });
   try {
