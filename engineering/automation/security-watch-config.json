@@ -169,6 +169,20 @@
       "expect": "denied"
     },
     {
+      "id": "P18",
+      "what": "urgent bins with home addresses",
+      "method": "GET",
+      "path": "/rest/v1/urgent_digital_bins?select=id&limit=1",
+      "expect": "denied"
+    },
+    {
+      "id": "P19",
+      "what": "collector cleanup jobs",
+      "method": "GET",
+      "path": "/rest/v1/collector_assignments_view?select=id&limit=1",
+      "expect": "denied-or-empty"
+    },
+    {
       "id": "C01",
       "what": "public dumping-report map (control)",
       "method": "GET",
