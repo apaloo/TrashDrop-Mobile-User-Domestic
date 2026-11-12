@@ -197,6 +197,10 @@
       "expect": "data"
     }
   ],
+  "skippedCallerCheck": {
+    "_comment": "Elevated (SECURITY DEFINER) functions anyone can call whose caller check runs only when someone is signed in. 0 since 20261112165513 (validate_cashout).",
+    "max": 0
+  },
   "migrationLedger": {
     "_comment": "TD18 / ADR-001: every migration production has recorded must have its file in one of these folders. On 2026-11-12 all 55 did. Files applied by hand in the SQL editor before 2026-11-11 are not in production's history and are not checked here.",
     "repos": [
