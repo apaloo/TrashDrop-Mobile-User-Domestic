@@ -38,6 +38,8 @@ Deploy from git only (R14). Source of truth:
 | `send-sms-hook` | carter `supabase/functions/` (added in carter #54; was in no repository) | Standard Webhooks signature from Supabase Auth; SMS via Arkesel |
 | `pickup-email-alerts`, `access-decision-emails`, `facebook-feed` | admin `supabase/functions/` | |
 
+**Checked 2026-11-12:** the deployed code of all 8 functions matches `main` (shared files included), and each `verify_jwt` matches `supabase/config.toml`. Only difference: a code comment in `send-sms-hook` still shows an example phone number that the repository has replaced with a placeholder; it goes with the next deploy from `main`. Every deploy so far was made by hand (three from a developer laptop); the **Deploy Edge Functions** workflows in the admin and carter repositories have never run, because their `production` environment and secrets aren't set up yet (merge-plan issue #115). Until then, check a function against `main` before and after any manual deploy.
+
 ## Environment variables by app (names only)
 
 | App | Browser (public) | Server (secret) |
