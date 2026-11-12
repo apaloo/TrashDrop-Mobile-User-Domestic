@@ -199,7 +199,21 @@
   ],
   "moneyWrites": {
     "_comment": "Phase 13 / TD54 (2026-11-12): tables with money or points columns that signed-in users can write, each reviewed: guarded by the server (bags, batches, bin_payments, collector_profiles, digital_bins, illegal_dumping_mobile, pickup_requests, profiles) or not read by any balance or payout (bag_orders, dumping_reports, reward_redemptions, user_activity; withdrawals need server-written items that add up). Adding a table here needs the owner's approval.",
-    "reviewed": ["bag_orders", "bags", "batches", "bin_payments", "collector_profiles", "digital_bins", "dumping_reports", "illegal_dumping_mobile", "pickup_requests", "profiles", "reward_redemptions", "user_activity", "withdrawals"]
+    "reviewed": [
+      "bag_orders",
+      "bags",
+      "batches",
+      "bin_payments",
+      "collector_profiles",
+      "digital_bins",
+      "dumping_reports",
+      "illegal_dumping_mobile",
+      "pickup_requests",
+      "profiles",
+      "reward_redemptions",
+      "user_activity",
+      "withdrawals"
+    ]
   },
   "skippedCallerCheck": {
     "_comment": "Elevated (SECURITY DEFINER) functions anyone can call whose caller check runs only when someone is signed in. 0 since 20261112165513 (validate_cashout).",
@@ -208,9 +222,18 @@
   "migrationLedger": {
     "_comment": "TD18 / ADR-001: every migration production has recorded must have its file in one of these folders. On 2026-11-12 all 55 did. Files applied by hand in the SQL editor before 2026-11-11 are not in production's history and are not checked here.",
     "repos": [
-      { "repo": "apaloo/TrashDrop-Mobile-User-Domestic", "path": "trashdrop/supabase/migrations" },
-      { "repo": "apaloo/TrashDrop-Mobile-Collector-Driver", "path": "supabase/migrations" },
-      { "repo": "apaloo/TrashDrop_Management_webApp_admins", "path": "supabase/migrations" }
+      {
+        "repo": "apaloo/TrashDrop-Mobile-User-Domestic",
+        "path": "trashdrop/supabase/migrations"
+      },
+      {
+        "repo": "apaloo/TrashDrop-Mobile-Collector-Driver",
+        "path": "supabase/migrations"
+      },
+      {
+        "repo": "apaloo/TrashDrop_Management_webApp_admins",
+        "path": "supabase/migrations"
+      }
     ],
     "maxMissing": 0
   },
@@ -294,5 +317,9 @@
   "_personalExposure_comment": "Tables without row-level security, materialized views and views that run as their owner, readable by signed-out callers, that hold personal columns (email, phone, names, MoMo numbers, addresses). 0 since 2026-11-12 (20261112124531 closed user_stats_aggregated). Count only; never raise without the CTO.",
   "personalExposure": {
     "maxExposed": 0
+  },
+  "ownedDomains": {
+    "_comment": "TD58: bin QR links not on app.trashdrops.com, accounts able to sign in with an email on an unowned TrashDrop domain, functions naming one. 0 since 20261112231231.",
+    "max": 0
   }
 }

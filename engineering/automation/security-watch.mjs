@@ -278,6 +278,27 @@ export function judgeSkippedCheck(count, cfg) {
     : { ok: false, line: `❌ ${count} elevated function(s) anyone can call skip their caller check when signed out (at most ${cfg.max})` };
 }
 
+// Owned domains (TD58): trashdrop.app belongs to someone else, yet bin QR
+// links, a guest account's email and database functions used it. Counts
+// only: QR links not on app.trashdrops.com, accounts that can sign in with an
+// email on an unowned TrashDrop domain, functions naming one in a URL or an
+// email address (settings such as trashdrop.skip_coverage are not domains).
+export const OWNED_DOMAINS_SQL = `select
+  (select count(*)::int from public.digital_bins
+    where qr_code_url is not null and qr_code_url !~ '^https://app\\.trashdrops\\.com/bin/') as bins,
+  (select count(*)::int from auth.users
+    where email ~* '@([a-z0-9-]+\\.)*trashdrops?\\.[a-z]{2,}$' and email !~* '@([a-z0-9-]+\\.)*trashdrops\\.com$'
+      and banned_until is distinct from 'infinity') as accounts,
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public'
+    where p.prokind in ('f', 'p') and p.prosrc ~* '(https?://|@)([a-z0-9-]+\\.)*trashdrop\\.[a-z]{2,}') as functions`;
+
+export function judgeOwnedDomains(row, cfg) {
+  if (!row || ![row.bins, row.accounts, row.functions].every(Number.isInteger)) return { ok: false, line: 'could not be read' };
+  const total = row.bins + row.accounts + row.functions;
+  const detail = `${row.bins} bin QR link(s) off app.trashdrops.com, ${row.accounts} account(s) able to sign in on an unowned TrashDrop domain, ${row.functions} function(s) naming one`;
+  return total <= cfg.max ? { ok: true, line: `✅ ${detail}` } : { ok: false, line: `❌ ${detail}` };
+}
+
 // Money and points writes (Phase 13, from the TD54 audit): tables with money or
 // points columns that signed-in users can write. Each one in the reviewed list
 // was checked (a guard trigger keeps amounts on the server, or no balance
@@ -456,6 +477,16 @@ async function main() {
 
   if (token && ref) {
     try {
+      const r = judgeOwnedDomains((await query(token, ref, OWNED_DOMAINS_SQL))?.[0], config.ownedDomains);
+      lines.push('', `**Owned domains:** ${r.line}`);
+      if (!r.ok) failures.push(`Owned domains: ${r.line.replace(/^❌ /, '')}. trashdrop.app is someone else's (TD58): move links and emails to trashdrops.com.`);
+    } catch (e) {
+      lines.push('', `**Owned domains:** could not be read (${e.message}).`);
+    }
+  }
+
+  if (token && ref) {
+    try {
       const r = judgeMoneyWrites((await query(token, ref, moneyWritesSql(config.moneyWrites.reviewed)))?.[0]?.unreviewed, config.moneyWrites);
       lines.push('', `**Money and points writes:** ${r.line}`);
       if (!r.ok) failures.push(`Money and points writes: ${r.line.replace(/^❌ /, '')}. List them privately (engineering/runbooks/database-function-review.md), check that the server sets the amounts (secure-development principle 1), then add them to moneyWrites.reviewed with the owner's approval.`);
@@ -548,6 +579,11 @@ function selfTest() {
   assert(judgeSkippedCheck(0, { max: 0 }).ok && !judgeSkippedCheck(1, { max: 0 }).ok && !judgeSkippedCheck(undefined, { max: 0 }).ok, 'judgeSkippedCheck');
   assert(/^select count\(\*\)::int as skipped /.test(SKIPPED_CHECK_SQL) && /prosecdef/.test(SKIPPED_CHECK_SQL) && /'anon'/.test(SKIPPED_CHECK_SQL), 'skipped-check SQL counts, not names');
   assert(Number.isInteger(config.skippedCallerCheck?.max), 'skippedCallerCheck config');
+  assert(judgeOwnedDomains({ bins: 0, accounts: 0, functions: 0 }, { max: 0 }).ok, 'owned domains: clean');
+  assert(!judgeOwnedDomains({ bins: 28, accounts: 1, functions: 4 }, { max: 0 }).ok, 'owned domains: 2026-11-12 state fails');
+  assert(!judgeOwnedDomains(undefined, { max: 0 }).ok && !judgeOwnedDomains({ bins: 0 }, { max: 0 }).ok, 'owned domains: unreadable fails');
+  assert(/count\(\*\)::int/.test(OWNED_DOMAINS_SQL) && !/select email|select qr_code_url/i.test(OWNED_DOMAINS_SQL), 'owned-domains SQL counts, not names');
+  assert(Number.isInteger(config.ownedDomains?.max), 'ownedDomains config');
   assert(judgeMoneyWrites(0, { reviewed: ['a'] }).ok && !judgeMoneyWrites(1, { reviewed: [] }).ok && !judgeMoneyWrites(undefined, { reviewed: [] }).ok, 'judgeMoneyWrites');
   assert(/^with money_tables as/.test(moneyWritesSql(['x'])) && /count\(\*\)::int as unreviewed/.test(moneyWritesSql(['x'])) && moneyWritesSql(["o'x"]).includes("'o''x'"), 'moneyWritesSql counts, quotes names');
   assert(Array.isArray(config.moneyWrites?.reviewed) && config.moneyWrites.reviewed.length > 0, 'moneyWrites config');
