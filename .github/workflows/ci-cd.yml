@@ -78,6 +78,7 @@ jobs:
     - name: Netlify function checks
       run: |
         node netlify/functions/__checks__/check-batch.js
+        node netlify/functions/__checks__/csp-report.js
         node netlify/functions/__checks__/whatsapp-smoke.js
     
     # Every unit test suite except the ones listed in
