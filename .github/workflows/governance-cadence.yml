@@ -16,6 +16,11 @@ on:
         type: choice
         options: [all, monthly-report, backup-restore-test, risk-review, access-review, repo-health]
         default: all
+  pull_request:
+    paths:
+      - 'engineering/automation/repo-health*'
+      - 'engineering/automation/branch-cleanup.js'
+      - '.github/workflows/governance-cadence.yml'
 
 permissions:
   contents: read
@@ -24,7 +29,19 @@ permissions:
   actions: read
 
 jobs:
+  # Pull requests: the offline tests only
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - run: node engineering/automation/repo-health.test.cjs
+
   cadence:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -34,6 +51,9 @@ jobs:
           # other repositories need ENGINEERING_REPORT_TOKEN: a fine-grained
           # token with read-only access to pull requests, actions and
           # metadata on those repositories. Without it, only this one is reported.
+          # Repository health also reads Dependabot alerts and secret scanning,
+          # which need "Administration: read" on all three repositories;
+          # without it those rows show "?".
           REPORT_REPOS: >-
             apaloo/TrashDrop-Mobile-User-Domestic:ci-cd.yml,
             apaloo/TrashDrop-Mobile-Collector-Driver:ci.yml,
