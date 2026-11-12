@@ -1,4 +1,4 @@
--- Rollback for migrations/20261112090000_drop_dead_functions_and_count_tables.sql
+-- Rollback for migrations/20261112091839_drop_dead_functions_and_count_tables.sql
 -- Definitions exported from production with pg_get_functiondef on
 -- 2026-11-12, before the drop. Run only if something turns out to need them.
 --
