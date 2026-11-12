@@ -57,6 +57,11 @@ difference (`platform_subsidy`). See the pricing specification.
   for cash payments are part D.
 - Cash-outs list their items on the server (`withdrawal_items`); the app
   can't add its own.
+- What the collector is shown at disposal (owner's decisions, 2026-11-12):
+  a bin whose client MoMo payment is still pending shows the expected payout
+  marked "pending until the client's MoMo payment is confirmed"; a bin with no
+  readable payment record shows GH₵0. Only confirmed payments are
+  withdrawable.
 
 ## Who works it out
 
