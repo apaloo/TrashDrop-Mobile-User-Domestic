@@ -29,6 +29,14 @@
    in or not. Server-only functions are granted to `service_role` alone.
    Checked by CI for migrations from 2026-11-11 on. Why, and the three
    states a function can be in: [ADR-002](../decisions/ADR-002-database-function-access.md).
+9. **App code calls only database functions that exist, with their real
+   parameter names.** Unit tests mock the database, so a call to a missing
+   function or with a misspelt parameter passes every test and fails in
+   production, often behind a fallback that hides it (TD37, TD38). CI checks
+   every `supabase.rpc()` call in all three apps against a snapshot of
+   production's functions plus the repository's own migrations. When you
+   create a function in production outside a migration in the same pull
+   request, refresh the snapshot (`check-rpc-calls.mjs --refresh`).
 
 ## Automated checks (all pull requests)
 
@@ -38,6 +46,7 @@
 | Unit tests | Jest (`npm run test:ci`) | Yes |
 | Pricing guard tests | Jest + `pricing-promo.js` | Yes |
 | Database functions in new migrations (principle 8) | `scripts/ci/check-migrations.js` | Yes |
+| Database calls match real functions (principle 9), all three apps | `scripts/ci/check-rpc-calls.mjs` | Yes; tracked failures in `rpc-known-problems.json` |
 | Build | CRA / craco | Yes |
 | Secrets in new commits | gitleaks | Yes |
 | Vulnerable dependencies | `npm audit` | Yes for critical findings in runtime dependencies; high and lower are reported |

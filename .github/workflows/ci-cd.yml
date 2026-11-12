@@ -58,6 +58,14 @@ jobs:
         node scripts/ci/check-migrations.js --self-test
         node scripts/ci/check-migrations.js
 
+    # Every supabase.rpc() call must name a database function that exists,
+    # with parameter names it takes (production snapshot plus this
+    # repository's migrations). Unit tests mock the database, so they can't.
+    - name: Database call check
+      run: |
+        node scripts/ci/check-rpc-calls.mjs --self-test
+        node scripts/ci/check-rpc-calls.mjs
+
     # Netlify function checks against stubbed clients (no network)
     - name: Netlify function checks
       run: |
