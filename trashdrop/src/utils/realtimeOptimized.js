@@ -110,28 +110,11 @@ export class RealtimeManager {
         console.log('[RealtimeManager] 🗑️ Digital bin updated:', payload);
         this.handleDigitalBinUpdate(payload, onActivityUpdate);
       })
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'alerts',
-        filter: `user_id=eq.${userId}`
-      }, (payload) => {
-        if (!this.mountedRef?.current) return;
-        
-        console.log('[RealtimeManager] 🔔 New notification received:', payload);
-        this.handleNotificationUpdate(payload, onActivityUpdate);
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'alerts',
-        filter: `user_id=eq.${userId}`
-      }, (payload) => {
-        if (!this.mountedRef?.current) return;
-        
-        console.log('[RealtimeManager] 🔔 Notification updated:', payload);
-        this.handleNotificationUpdate(payload, onActivityUpdate);
-      })
+      // No notification bindings here: the Dashboard's own notifications
+      // subscription keeps the unread count. Every filter on this channel must
+      // name a real column: Realtime refuses the whole channel otherwise (it
+      // used to filter `alerts`, which has no user_id, so nothing on this
+      // channel arrived and it reconnected every 3 seconds).
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('[RealtimeManager] ✅ Optimized subscription active');
@@ -286,29 +269,6 @@ export class RealtimeManager {
     // Refresh stats
     if (onActivityUpdate?.refreshStats) {
       onActivityUpdate.refreshStats();
-    }
-  }
-
-  /**
-   * Handle notification updates
-   * @param {Object} payload - Supabase payload
-   * @param {Function} onActivityUpdate - Activity update callback
-   */
-  handleNotificationUpdate(payload, onActivityUpdate) {
-    const { new: newAlert, old: oldAlert } = payload;
-    
-    if (payload.eventType === 'INSERT') {
-      // New notification
-      if (onActivityUpdate?.updateNotificationCount) {
-        onActivityUpdate.updateNotificationCount(1);
-      }
-    } else if (payload.eventType === 'UPDATE') {
-      // Notification read/unread
-      if (newAlert?.status === 'read' && oldAlert?.status === 'unread') {
-        if (onActivityUpdate?.updateNotificationCount) {
-          onActivityUpdate.updateNotificationCount(-1);
-        }
-      }
     }
   }
 

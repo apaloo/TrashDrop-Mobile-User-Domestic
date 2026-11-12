@@ -608,9 +608,6 @@ const Dashboard = () => {
               'Your collector'
           });
         }
-      },
-      updateNotificationCount: (delta) => {
-        setUnreadNotifications(prev => Math.max(0, prev + delta));
       }
     };
 
@@ -650,7 +647,8 @@ const Dashboard = () => {
 
     fetchUnreadCount();
 
-    // Subscribe to real-time notification updates
+    // Subscribe to real-time notification updates (the household's own rows in
+    // `notifications`, as in NavBar; `alerts` is the admin portal's table)
     const notificationSubscription = supabase
       .channel(`dashboard_notifications_${user.id}`)
       .on(
@@ -658,11 +656,11 @@ const Dashboard = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'alerts',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          setUnreadNotifications(prev => prev + 1);
+        (payload) => {
+          if (!payload.new?.read) setUnreadNotifications(prev => prev + 1);
         }
       )
       .on(
@@ -670,13 +668,12 @@ const Dashboard = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'alerts',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          if (payload.new.status === 'read' && payload.old.status === 'unread') {
-            setUnreadNotifications(prev => Math.max(0, prev - 1));
-          }
+        () => {
+          // Marked read: UPDATE payloads don't carry the old row, so recount
+          fetchUnreadCount();
         }
       )
       .subscribe();
