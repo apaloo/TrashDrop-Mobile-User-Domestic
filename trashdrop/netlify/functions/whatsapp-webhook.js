@@ -21,6 +21,7 @@ const crypto = require('crypto');
 const { getServiceClient } = require('./utils/supabase-admin');
 const { getConfig, extractMessage, markAsRead } = require('./utils/whatsapp-api');
 const { processMessage, STATES } = require('./utils/conversation-engine');
+const { maskPhone } = require('./utils/mask-phone');
 
 /**
  * Meta signs every webhook POST with HMAC-SHA256 over the exact raw body.
@@ -121,11 +122,12 @@ exports.handler = async (event) => {
     }
 
     const phone = message.from;
-    console.log(`[WhatsApp Webhook] Message from ${phone}: type=${message.type}, text="${message.text || ''}"`)
+    // What people write (names, addresses) stays out of the logs: length only.
+    console.log(`[WhatsApp Webhook] Message from ${maskPhone(phone)}: type=${message.type}, text length=${(message.text || '').length}`);
 
     // Rate limit check
     if (isRateLimited(phone)) {
-      console.warn(`[WhatsApp Webhook] Rate limited: ${phone}`);
+      console.warn(`[WhatsApp Webhook] Rate limited: ${maskPhone(phone)}`);
       return { statusCode: 200, body: 'OK' };
     }
 
