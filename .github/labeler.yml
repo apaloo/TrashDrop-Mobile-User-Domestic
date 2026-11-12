@@ -5,6 +5,7 @@ protected-pricing:
   - changed-files:
       - any-glob-to-any-file:
           - docs/DIGITAL_BIN_PRICING.md
+          - docs/COLLECTOR_PAYOUTS.md
           - trashdrop/supabase/migrations/20261024*
           - trashdrop/src/services/digitalBinService.js
           - trashdrop/src/services/promotionalService.js

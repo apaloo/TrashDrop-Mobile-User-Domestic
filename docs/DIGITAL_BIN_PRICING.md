@@ -20,7 +20,9 @@ only to show it before booking.
   location** (`get_covering_pricing_zone`, column `price_<size>l`) × bags.
 - +30% of the base if the pickup is **urgent**.
 - + **GHS 1** request fee.
-- Collector payout at booking = base + urgent.
+- Collector payout at booking = base + urgent. This is the ceiling: the
+  collector earns a distance-based share of it
+  ([`COLLECTOR_PAYOUTS.md`](COLLECTOR_PAYOUTS.md)).
 - There is no default price. A location outside every zone, or a size the zone
   doesn't price, is refused (`TDC01` / `TDC02`).
 
@@ -73,9 +75,12 @@ cancelled when its status is cancelled, or it is inactive and not completed
 - Customers can only **read** their own `promotional_usage` row.
 - The customer who booked a bin can't change its fee, size, bags, urgency,
   promotion fields or payouts afterwards.
-- Collectors record their final payout at disposal (collector app,
-  `disposalService`): standard bins by the SOP v4.5.6 split, promotional bins
-  at the payout stored with the bin.
+- The collector can't change a bin's fee, size, bags, urgency, promotion
+  fields or payouts either (`td_keep_booked_payout`, collector app migration
+  `20261112113921`, approved 2026-11-12). The payout stored at booking is the
+  most the collector can be paid for the bin; what they earn from it is in
+  [`COLLECTOR_PAYOUTS.md`](COLLECTOR_PAYOUTS.md) (owner's decision 2026-11-12:
+  85–92% of the base by travel distance, plus 75% of the urgent surcharge).
 
 ## Where it lives
 

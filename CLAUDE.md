@@ -40,9 +40,17 @@ When a change is approved, update `docs/POINTS.md`, the tests
 migration) in the same pull request. The app never writes or works out a
 balance the server doesn't.
 
+## Protected: TrashDrop Collector Payouts
+What a collector earns from a digital bin and how it is paid out are specified
+in `docs/COLLECTOR_PAYOUTS.md` (accepted by the owner 2026-11-12). The code
+lives in the collector repository, whose `CLAUDE.md` protects it; the
+specification here changes only with the owner's written approval in the pull
+request, like the pricing and points rules.
+
 ## Protected database objects are watched
-The daily security watch fingerprints the database objects behind both
-protected rules (and the collector payout caps) and fails if one changes.
+The daily security watch fingerprints the database objects behind the
+protected rules (pricing, points and collector payouts) and fails if one
+changes.
 After an approved change, record the new fingerprints in
 `engineering/automation/security-watch-config.json` in the same pull request
 (`engineering/runbooks/protected-rules.md`). Never update a fingerprint just to

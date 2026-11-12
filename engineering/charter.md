@@ -39,7 +39,7 @@ with the owner's written approval in the pull request:
 
 - Digital bin pricing and promotions (`docs/DIGITAL_BIN_PRICING.md`, `CLAUDE.md`).
 - Points: how they are earned, spent and counted (`docs/POINTS.md`, `CLAUDE.md`; protected 2026-11-12).
-- Carter payouts and withdrawals, to be documented the same way (tech-debt register).
+- Collector payouts and cash-outs (`docs/COLLECTOR_PAYOUTS.md`; accepted 2026-11-12). The database works the payout out itself next (TD3).
 
 The security watch checks the database objects behind these rules every day
 and fails if one changes without a recorded approval
