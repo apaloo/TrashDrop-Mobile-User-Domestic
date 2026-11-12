@@ -6,9 +6,11 @@ name: Security watch
 # everything passes again. Expectations: engineering/automation/security-watch-config.json
 #
 # Setup (Settings → Secrets and variables → Actions):
-#   variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY (public by design),
-#              SUPABASE_PROJECT_REF (optional, for the advisors)
-#   secret:    SUPABASE_ACCESS_TOKEN (optional, already used by Database migrations)
+#   secret:    SUPABASE_ACCESS_TOKEN, for everything beyond the outsider's
+#              probes (advisors, policies, protected rules, log scan).
+#   variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_PROJECT_REF are
+#              optional: unset, the public production values in
+#              engineering/automation/supabase-public.json are used.
 on:
   schedule:
     - cron: '41 5 * * *' # 05:41 UTC (Africa/Accra) daily

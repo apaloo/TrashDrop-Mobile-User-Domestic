@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
+import { applyPublicDefaults } from './supabase-public.mjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const config = JSON.parse(fs.readFileSync(path.join(here, 'production-smoke-config.json'), 'utf8'));
@@ -118,6 +119,7 @@ async function selfTest() {
 }
 
 async function main() {
+  applyPublicDefaults(); // public values from supabase-public.json when the variables are unset
   if (process.argv.includes('--self-test')) return selfTest();
   const results = await runChecks(config.checks, process.env);
   const { markdown, failures } = report(results);

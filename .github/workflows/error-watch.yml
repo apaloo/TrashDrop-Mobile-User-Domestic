@@ -7,7 +7,7 @@ name: Error watch
 #
 # Setup (setup step 07b, shared with the security watch):
 #   secret:   SUPABASE_ACCESS_TOKEN
-#   variable: SUPABASE_PROJECT_REF
+#   variable: SUPABASE_PROJECT_REF (optional; default in supabase-public.json)
 on:
   schedule:
     - cron: '53 5 * * *' # 05:53 UTC (Africa/Accra) daily, after the security watch

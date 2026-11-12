@@ -15,6 +15,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { applyPublicDefaults } from './supabase-public.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const OUT = path.join(here, '..', '..', 'trashdrop', 'supabase', 'schema');
@@ -161,6 +162,7 @@ async function query(token, ref, sql) {
 }
 
 async function main() {
+  applyPublicDefaults(); // public values from supabase-public.json when the variables are unset
   const token = process.env.SUPABASE_ACCESS_TOKEN; const ref = process.env.SUPABASE_PROJECT_REF;
   if (!token || !ref) { console.error('Set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF.'); process.exit(2); }
   const rows = {};
