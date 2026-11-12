@@ -11,7 +11,7 @@ tracked in the restricted CEO review and private security advisories.
 | R1 | Knowledge held by one developer; no peer review | 4 | 5 | 20 | Knowledge-transfer sessions; mandatory review; this handbook | CTO | Open |
 | R2 | Source code public and in a personal account | 5 | 4 | 20 | Runbook 01: company organisation, private repositories | Owner | Open |
 | R3 | Exposed credentials in git history | 2 | 5 | 10 | New keys issued and legacy JWT keys disabled (2026-11-11); secret scanning in CI; incident follow-up with the DPS | Owner / CTO | Mitigated; incident follow-up open |
-| R4 | One production database for three apps; no staging | 4 | 4 | 16 | Runbook 05; staged migrations; schema owner named | DevOps | Open |
+| R4 | One production database for three apps; no staging. Every Netlify deploy preview of all three apps uses production too, so an old preview left open keeps running old code against live data (2026-11-12: a household preview from 2026-11-08 made about 3,600 requests in under two hours and kept logging a bug fixed in household #123) | 4 | 4 | 16 | Runbook 05; staged migrations; schema owner named. Once staging exists, point previews at it (Netlify deploy-preview context). Until then, close preview tabs after testing | DevOps | Open |
 | R5 | Database changes applied by hand; schema can't be rebuilt | 4 | 4 | 16 | Baseline + migration-history repair; manual SQL banned outside P1 | Technical Lead | Open |
 | R6 | Payment and payout integrity | 3 | 5 | 15 | Server-side calculation (owner approval); reconciliation report; payout regression tests | Technical Lead | Open |
 | R7 | No error monitoring or alerting | 5 | 3 | 15 | Sentry (runbook 06), uptime (runbook 07) | DevOps | Mitigating |
