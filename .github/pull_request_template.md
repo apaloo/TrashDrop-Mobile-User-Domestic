@@ -13,7 +13,7 @@
 ## Risk
 
 - [ ] Touches a **critical workflow**: QR Bag, Digital Bin, payments/payouts, sign-in, illegal dumping
-- [ ] Touches **protected pricing** (see CLAUDE.md): owner's written approval is in this PR
+- [ ] Touches **protected pricing or points** (see CLAUDE.md): owner's written approval is in this PR, and changed database fingerprints are recorded
 - [ ] Changes **who can see or change data** (RLS, RPC permissions, roles)
 - [ ] Adds or changes a **secret, API key or third-party service** (vendor register updated)
 

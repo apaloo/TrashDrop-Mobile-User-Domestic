@@ -1,9 +1,14 @@
-# TrashDrop Points
+# TrashDrop Points (accepted)
 
-**Status:** the rules in production on 2026-11-12, including the owner's
-decisions of that day. Points buy airtime, data and vouchers, so treat a change
-here like a price change: agree it with the owner first, then change the
-database, this document and the tests together.
+**Status:** accepted by the owner and live in production (rules as of
+2026-11-12, including the owner's decisions of that day).
+**Protected** since 2026-11-12: points buy airtime, data and vouchers, so these
+rules, and the code and database objects that implement them, change only with
+the owner's written approval in the pull request (`CLAUDE.md`). If a change is
+approved, update this document, the tests, the database (a new migration) and
+the recorded fingerprints in the same change
+([protected rules runbook](../engineering/runbooks/protected-rules.md)). The
+daily security watch fails if a points object changes without that.
 
 ## Who decides
 

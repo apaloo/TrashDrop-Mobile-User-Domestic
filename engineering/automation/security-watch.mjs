@@ -110,6 +110,66 @@ export function judgeWritePolicies(count, cfg) {
     : { ok: false, line: `❌ ${n} open, baseline ${cfg.maxOpen}: a write rule now lets every signed-in user, or signed-out visitors, change rows` };
 }
 
+// Protected business rules (CLAUDE.md: pricing, points, collector payouts)
+// live in database objects that the dashboard can change without a pull
+// request. Each one is fingerprinted (md5 of its definition and grants) and
+// compared with the fingerprints recorded when the owner approved it.
+const PROTECTED_FUNCTIONS = [
+  ['pricing', 'td_price_digital_bin'], ['pricing', 'td_set_digital_bin_price'], ['pricing', 'td_protect_digital_bin_price'],
+  ['pricing', 'td_refund_promotion_on_cancel'], ['pricing', 'increment_promotional_usage'],
+  ['points', 'td_redeem_reward'], ['points', 'td_guard_request_write'], ['points', 'td_guard_profile_columns'], ['points', 'get_dashboard_data_optimized'],
+  ['payouts', 'td_guard_bin_payment'], ['payouts', 'td_withdrawable_items'],
+];
+const PROTECTED_TRIGGERS = [
+  ['pricing', 'digital_bins', 'digital_bins_set_price'], ['pricing', 'digital_bins', 'digital_bins_protect_price'],
+  ['pricing', 'digital_bins', 'digital_bins_refund_promotion'],
+  ['points', 'pickup_requests', 'aa_td_guard_write'], ['points', 'profiles', 'td_guard_profile_columns'],
+  ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'],
+];
+const values = (rows) => rows.map((r) => `(${r.map((v) => `'${v}'`).join(',')})`).join(',');
+export const PROTECTED_DEFINITIONS_SQL = `with fns(rule, name) as (values ${values(PROTECTED_FUNCTIONS)}),
+trg(rule, tbl, name) as (values ${values(PROTECTED_TRIGGERS)})
+select f.rule, 'function ' || f.name as object,
+  (select md5(string_agg(pg_get_functiondef(p.oid) || coalesce(array_to_string(p.proacl, ','), ''), '|' order by p.oid::regprocedure::text))
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public' where p.proname = f.name) as hash
+from fns f
+union all
+select t.rule, 'trigger ' || t.tbl || '.' || t.name,
+  (select md5(pg_get_triggerdef(g.oid) || g.tgenabled::text) from pg_trigger g where g.tgrelid = to_regclass('public.' || t.tbl) and g.tgname = t.name)
+from trg t
+union all
+select 'points', 'view user_stats_dashboard',
+  (select md5(pg_get_viewdef(c.oid) || coalesce(array_to_string(c.relacl, ','), '')) from pg_class c where c.oid = to_regclass('public.user_stats_dashboard'))
+union all
+select 'pricing', 'policies promotional_usage',
+  (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
+          || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.promotional_usage')))
+     from pg_policy p where p.polrelid = to_regclass('public.promotional_usage'))
+order by 1, 2`;
+
+export function judgeProtected(rows, expected) {
+  const live = Object.fromEntries((rows || []).map((r) => [r.object, r]));
+  const problems = [];
+  for (const [object, hash] of Object.entries(expected)) {
+    const row = live[object];
+    if (!row || !row.hash) problems.push(`${object} is missing`);
+    else if (row.hash !== hash) problems.push(`${object} (${row.rule}) has changed`);
+  }
+  for (const object of Object.keys(live)) {
+    if (!(object in expected)) problems.push(`${object} has no recorded fingerprint`);
+  }
+  return problems;
+}
+
+async function query(token, ref, sql) {
+  const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ query: sql }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 async function probe(base, key, p) {
   const res = await fetch(base + p.path, {
     method: p.method,
@@ -183,6 +243,22 @@ async function main() {
     lines.push('', '**Write policies:** skipped (needs the same token and project ref as the advisors).');
   }
 
+  if (token && ref) {
+    try {
+      const problems = judgeProtected(await query(token, ref, PROTECTED_DEFINITIONS_SQL), config.protectedDefinitions.objects);
+      const n = Object.keys(config.protectedDefinitions.objects).length;
+      lines.push('', `**Protected rules:** ${problems.length ? `❌ ${problems.length} of ${n} database objects differ from what the owner approved` : `✅ all ${n} database objects match what the owner approved`}`);
+      problems.forEach((p) => {
+        lines.push(`- ${p}`);
+        failures.push(`Protected rules: ${p}. Changed without an approved pull request? Compare it with its migration and restore it; if the owner approved it, record the new fingerprint (engineering/runbooks/protected-rules.md).`);
+      });
+    } catch (e) {
+      lines.push('', `**Protected rules:** could not be read (${e.message}).`);
+    }
+  } else {
+    lines.push('', '**Protected rules:** skipped (needs the same token and project ref as the advisors).');
+  }
+
   const scanCfg = config.logScan;
   if (token && ref) {
     let r;
@@ -234,9 +310,27 @@ function selfTest() {
   assert(judgeWritePolicies(2, { maxOpen: 2 }).ok && !judgeWritePolicies(3, { maxOpen: 2 }).ok && !judgeWritePolicies(undefined, { maxOpen: 2 }).ok, 'judgeWritePolicies');
   assert(/^select count\(\*\)::int as open\s*$/.test(OPEN_WRITE_POLICIES_SQL.split('from')[0]), 'write policy check selects a count, not names');
   assert(Number.isInteger(config.writePolicies?.maxOpen), 'writePolicies config');
+  const exp = { 'function a': 'h1', 'view b': 'h2' };
+  assert(judgeProtected([{ rule: 'x', object: 'function a', hash: 'h1' }, { rule: 'x', object: 'view b', hash: 'h2' }], exp).length === 0, 'judgeProtected: unchanged');
+  const pr = judgeProtected([{ rule: 'x', object: 'function a', hash: 'zz' }, { rule: 'x', object: 'view b', hash: null }, { rule: 'x', object: 'trigger c', hash: 'h3' }], exp);
+  assert(pr.length === 3 && /changed/.test(pr[0]) && /missing/.test(pr[1]) && /no recorded/.test(pr[2]), 'judgeProtected: changed, missing, unrecorded');
+  assert(judgeProtected(undefined, exp).length === 2, 'judgeProtected: nothing read means everything missing');
+  const recorded = Object.keys(config.protectedDefinitions?.objects || {});
+  const listed = [...PROTECTED_FUNCTIONS.map(([, n]) => `function ${n}`), ...PROTECTED_TRIGGERS.map(([, t, n]) => `trigger ${t}.${n}`),
+    'view user_stats_dashboard', 'policies promotional_usage'];
+  assert(listed.length === recorded.length && listed.every((o) => recorded.includes(o)), 'every protected object has a recorded fingerprint');
+  assert(Object.values(config.protectedDefinitions.objects).every((h) => /^[0-9a-f]{32}$/.test(h)), 'fingerprints are md5');
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
-  if (process.argv.includes('--self-test')) selfTest(); else main();
+  if (process.argv.includes('--self-test')) selfTest();
+  else if (process.argv.includes('--protected-fingerprints')) {
+    // After an approved change: print the live fingerprints to record in the config
+    const token = process.env.SUPABASE_ACCESS_TOKEN; const ref = process.env.SUPABASE_PROJECT_REF;
+    if (!token || !ref) { console.error('Set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF.'); process.exit(2); }
+    query(token, ref, PROTECTED_DEFINITIONS_SQL)
+      .then((rows) => console.log(JSON.stringify(Object.fromEntries(rows.map((r) => [r.object, r.hash])), null, 2)))
+      .catch((e) => { console.error(e.message); process.exit(1); });
+  } else main();
 }
