@@ -28,7 +28,7 @@ The production application is deployed at: [https://trashdrop-mobile.windsurf.bu
 |---|---|
 | `trashdrop/` | The household app (React PWA), its Netlify functions (WhatsApp booking) and the database migrations (`trashdrop/supabase/`) |
 | `engineering/` | The engineering handbook: policies, runbooks, registers, onboarding |
-| `docs/` | Product rules (`DIGITAL_BIN_PRICING.md`) and the archive of old notes |
+| `docs/` | Product rules (`DIGITAL_BIN_PRICING.md`, `POINTS.md`, `COLLECTOR_PAYOUTS.md`) and the archive of old notes |
 | `.github/` | CI, security checks, automation, templates |
 
 New engineers: start with [`engineering/onboarding.md`](engineering/onboarding.md).

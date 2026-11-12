@@ -25,4 +25,5 @@ module.exports = [
   { name: 'database', color: '5319e7', description: 'Changes database migrations or functions' },
   { name: 'docs', color: '0075ca', description: 'Documentation or handbook' },
   { name: 'security-watch', color: 'b60205', description: 'Daily production security check' },
+  { name: 'error-watch', color: 'd93f0b', description: 'Daily production database error check' },
 ];

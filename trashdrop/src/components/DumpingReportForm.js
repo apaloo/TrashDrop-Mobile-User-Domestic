@@ -13,6 +13,7 @@ import PhotoViewer from './ui/PhotoViewer.js';
 import { describeLocationProblem, readLocationPermission } from '../utils/locationProblem.js';
 import { LocationRequiredModal } from './ui/LocationRequired.js';
 import { card, errorNote, primaryButton, secondaryButton, sectionTitle, tonalButton, warningNote } from './ui/styles.js';
+import { clearReportDraft, hasDraftContent, loadReportDraft, saveReportDraft } from '../utils/reportDraft.js';
 import '../utils/leafletDefaultIcon.js';
 
 // Choices on the form: [value, icon, label(, hint)]
@@ -181,6 +182,13 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const watchIdRef = useRef(null);
   const bestAccuracyRef = useRef(Infinity);
   const [submissionSuccess, setSubmissionSuccess] = useState(null); // Summary of the submitted report
+  // The sign-in ended before the report was sent: the draft is kept on this
+  // phone and the resident is asked to sign in again (TD44)
+  const [signInEnded, setSignInEnded] = useState(false);
+  // An unsent report from earlier was put back on the form
+  const [restoredDraft, setRestoredDraft] = useState(false);
+  const draftLoadedRef = useRef(false);
+  const draftSavedRef = useRef(false);
 
   // Default to Accra, Ghana coordinates so map can render immediately
   const [mapPosition, setMapPosition] = useState([5.614736, -0.208811]);
@@ -409,6 +417,73 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     }
   }, [handleGeolocationFallback, stopGpsWatch]);
 
+  // Put back an unsent report kept on this phone (sign-in ended, app closed)
+  useEffect(() => {
+    if (!user?.id || draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    loadReportDraft(user.id).then((draft) => {
+      if (!draft) return;
+      const photos = draft.photos.slice(0, 6).map((p) => ({ id: p.id, blob: p.blob, url: URL.createObjectURL(p.blob) }));
+      if (!hasDraftContent(draft.form, photos)) return;
+      const coords = draft.form.coordinates;
+      if (coords && typeof coords.latitude === 'number' && typeof coords.longitude === 'number') {
+        // The saved spot is where the dumping is; GPS doesn't move it
+        stopGpsWatch();
+        setIsLocating(false);
+        setGpsAccuracy(null);
+        setLocationProblem(null);
+        setMapPosition([coords.latitude, coords.longitude]);
+      }
+      setCapturedPhotos(photos);
+      setFormData((prev) => ({
+        ...prev,
+        ...draft.form,
+        coordinates: coords || prev.coordinates,
+        photos: photos.map((p) => p.url),
+      }));
+      draftSavedRef.current = true;
+      setRestoredDraft(true);
+    });
+  }, [user?.id, stopGpsWatch]);
+
+  // Keep the report on this phone while it is being filled in
+  useEffect(() => {
+    if (!user?.id || submissionSuccess) return undefined;
+    if (!hasDraftContent(formData, capturedPhotos)) {
+      if (draftSavedRef.current) {
+        draftSavedRef.current = false;
+        clearReportDraft(user.id);
+      }
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      draftSavedRef.current = true;
+      saveReportDraft(user.id, formData, capturedPhotos);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [user?.id, formData, capturedPhotos, submissionSuccess]);
+
+  const startOver = () => {
+    if (user?.id) clearReportDraft(user.id);
+    draftSavedRef.current = false;
+    setRestoredDraft(false);
+    setCapturedPhotos([]);
+    setFormData({
+      location: '',
+      coordinates: null,
+      description: '',
+      waste_type: '',
+      severity: 'medium',
+      estimated_volume: '',
+      hazardous_materials: false,
+      accessibility_notes: '',
+      cleanup_priority: 'normal',
+      photos: [],
+      contact_consent: false
+    });
+    handleUseMyLocation(false);
+  };
+
   // Started from a tap, so Android Chrome can show its "Turn on location?"
   // dialog when the phone's location is off. Then keep watching for a better fix.
   const requestLocationFromTap = () => {
@@ -609,9 +684,10 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     
-    // Check if user is authenticated
+    // Signed out (the sign-in ended): the draft is already kept on this phone
     if (!user?.id) {
-      setError('You must be logged in to submit a report.');
+      setError(null);
+      setSignInEnded(true);
       return;
     }
     
@@ -646,6 +722,7 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
     stopGpsWatch();
     setLoading(true);
     setError(null);
+    setSignInEnded(false);
     setWaitingForConnection(false);
 
     try {
@@ -708,6 +785,10 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         contact_consent: false
       });
       setCapturedPhotos([]);
+      // Sent: the copy kept on this phone is no longer needed
+      clearReportDraft(user.id);
+      draftSavedRef.current = false;
+      setRestoredDraft(false);
       // Locate afresh for a next report
       handleUseMyLocation(false);
 
@@ -720,7 +801,12 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
       }
 
     } catch (err) {
-      if (isOffline()) {
+      if (err.code === 'SESSION_EXPIRED') {
+        // Make sure the newest version is kept before the resident signs in again
+        await saveReportDraft(user.id, formData, capturedPhotos);
+        draftSavedRef.current = true;
+        setSignInEnded(true);
+      } else if (isOffline()) {
         // The connection dropped while sending: wait for it instead of failing
         setWaitingForConnection(true);
       } else {
@@ -754,6 +840,18 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
         title="Report Illegal Dumping"
         subtitle="Help keep our community clean. Your report goes to the local authorities for cleanup."
       />
+
+      {restoredDraft && !submissionSuccess && (
+        <div role="status" className={`${warningNote} px-4 py-3 text-[15px] flex items-start justify-between gap-3`}>
+          <p>
+            <span className="font-semibold">Your unsent report is back.</span>{' '}
+            Check it and submit when you're ready.
+          </p>
+          <button type="button" onClick={startOver} className="text-sm font-semibold underline shrink-0">
+            Start over
+          </button>
+        </div>
+      )}
 
       {/* Location is required: block the form until the phone's location is on */}
       {locationProblem && !formData?.coordinates && ['device-off', 'blocked'].includes(locationProblem.kind) && !submissionSuccess && (
@@ -1046,6 +1144,19 @@ const DumpingReportForm = ({ onSuccess, onDone }) => {
             Your report and photos are kept on this screen. They'll be sent automatically when
             your connection is back - keep this page open.
           </p>
+        </div>
+      )}
+
+      {signInEnded && !error && (
+        <div role="alert" className={`${warningNote} px-4 py-3 text-[15px]`}>
+          <p className="font-semibold">Your sign-in has ended</p>
+          <p className="mt-1">
+            Sign in again to send this report. It and its photos are kept on this phone and will be
+            here when you come back.
+          </p>
+          <a href="/login?next=%2Freport" className={`${primaryButton} w-full h-[48px] mt-3 inline-flex items-center justify-center`}>
+            Sign in again
+          </a>
         </div>
       )}
 

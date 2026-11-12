@@ -498,30 +498,6 @@ export const onboardingService = {
   },
 
   /**
-   * Process QR code scan
-   * Uses RPC function to activate batch and update user stats
-   */
-  async processQRScan(userId, qrCode) {
-    try {
-      console.log('[Onboarding] processQRScan called:', { userId, qrCode });
-      
-      const { data, error } = await supabase
-        .rpc('process_qr_scan', { user_uuid: userId, qr: qrCode });
-      
-      if (error) {
-        console.error('[Onboarding] Error processing QR scan:', error);
-        throw error;
-      }
-      
-      console.log('[Onboarding] QR scan processed successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('[Onboarding] Error processing QR scan:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Create onboarding pickup request
    * Uses RPC function to create pickup request in pickup_requests table
    */

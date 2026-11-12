@@ -13,13 +13,19 @@ issue ─► branch ─► pull request ─► CI green ─► review ─► mer
    together.
 2. **Branch from `main`**: `feat/…`, `fix/…`, `chore/…`, `db/…`.
 3. **Open a pull request** and complete its template.
-4. **CI must be green.** No one merges over a red check.
+4. **CI must be green before you merge.** No one merges over a red or
+   unfinished check. This is the only gate: Netlify publishes every push to
+   `main` to production within about a minute, without waiting for CI (and
+   every pull request to its preview). Until branch protection is on (setup
+   step 08), nothing enforces it but this rule.
 5. **One approving review from someone other than the author.** Protected
    files also need their CODEOWNER. Until a second engineer joins, the CTO or
    the retained specialist reviews; the author merging their own unreviewed
    change is not allowed.
-6. **Merge** (squash). The household app deploys to production automatically
-   from `main`.
+6. **Merge** (squash). All three apps deploy to production automatically
+   from `main` (Netlify builds them). The production smoke check runs about
+   7 minutes after each household push, whatever CI concluded, and the
+   release notes flag a commit whose CI failed.
 7. **Check production** within 30 minutes: open the changed screen and watch
    Sentry for new errors.
 

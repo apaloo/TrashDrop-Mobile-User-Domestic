@@ -1,6 +1,7 @@
-// Creates a GitHub Release for each successful production deploy from main,
-// listing the pull requests it shipped since the previous release. Run by
-// .github/workflows/release-notes.yml after the CI/CD workflow succeeds.
+// Creates a GitHub Release for each push to main (Netlify deploys every push
+// itself, whatever CI says), listing the pull requests it shipped since the
+// previous release. Run by .github/workflows/release-notes.yml when the CI/CD
+// workflow finishes; a commit whose CI failed is flagged at the top.
 // Idempotent: a commit that already has a release is skipped.
 
 const GROUPS = [
@@ -23,8 +24,9 @@ function groupOf(pr) {
   return 'Other changes';
 }
 
-function render(prs, { runUrl, sha, previousTag }) {
+function render(prs, { runUrl, sha, previousTag, ciConclusion = 'success' }) {
   const lines = [`Deployed to production from \`${sha.slice(0, 7)}\`${runUrl ? ` ([CI run](${runUrl}))` : ''}.`, ''];
+  if (ciConclusion !== 'success') lines.unshift(`> **CI on this commit: ${ciConclusion}.** Netlify deployed it anyway; check production and roll back if needed (change-and-release policy, Rollback).`, '');
   if (!prs.length) {
     lines.push(previousTag ? `No merged pull requests since ${previousTag} (direct commits only).` : 'First tracked release.');
     return lines.join('\n');
@@ -42,7 +44,7 @@ function render(prs, { runUrl, sha, previousTag }) {
   return lines.join('\n').trim();
 }
 
-module.exports = async ({ github, context, core }, { sha, runUrl, now = new Date() }) => {
+module.exports = async ({ github, context, core }, { sha, runUrl, ciConclusion = 'success', now = new Date() }) => {
   const { owner, repo } = context.repo;
   const releases = (await github.rest.repos.listReleases({ owner, repo, per_page: 30 })).data
     .filter((r) => r.tag_name.startsWith('release-'));
@@ -63,7 +65,7 @@ module.exports = async ({ github, context, core }, { sha, runUrl, now = new Date
   }
 
   const tag = tagFor(now);
-  const body = render(prs, { runUrl, sha, previousTag: previous?.tag_name });
+  const body = render(prs, { runUrl, sha, ciConclusion, previousTag: previous?.tag_name });
   const { data } = await github.rest.repos.createRelease({
     owner, repo, tag_name: tag, target_commitish: sha,
     name: `Production ${tag.replace('release-', '')} (${prs.length} change${prs.length === 1 ? '' : 's'})`,

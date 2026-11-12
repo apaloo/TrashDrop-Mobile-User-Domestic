@@ -1,7 +1,9 @@
 name: Release notes
 
-# After every successful production deploy from main, record a GitHub
-# Release listing the pull requests it shipped. This is the deploy log for
+# After every push to main, record a GitHub Release listing the pull requests
+# it shipped. Netlify publishes every push to main itself, within about a
+# minute and whatever CI says, so this runs whatever CI concluded and flags a
+# failed run at the top. This is the deploy log for
 # traceability (engineering/policies/change-and-release.md) and the
 # "what changed" list for Operations.
 on:
@@ -16,15 +18,16 @@ permissions:
 
 jobs:
   release:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/github-script@v7
+      - uses: actions/checkout@v7
+      - uses: actions/github-script@v9
         with:
           script: |
             const run = require(`${process.env.GITHUB_WORKSPACE}/engineering/automation/release-notes.js`);
             await run({ github, context, core }, {
               sha: context.payload.workflow_run.head_sha,
               runUrl: context.payload.workflow_run.html_url,
+              ciConclusion: context.payload.workflow_run.conclusion,
             });

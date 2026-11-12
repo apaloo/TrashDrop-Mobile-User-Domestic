@@ -3,7 +3,10 @@
 Every account, tool and control the department needs, in order. Running the
 **Engineering bootstrap** workflow (Actions → Engineering bootstrap → Run
 workflow) opens one GitHub issue per row, so progress is tracked on the
-GitHub Projects board. This file is the master list. When a step is done, tick
+GitHub Projects board. It first ran on 2026-11-11 (issues #91–#103). It is
+safe to run again: it skips issues that already exist (matched by title) and
+opens only new rows, so run it after adding a step here and in
+`automation/setup-issues.js`. This file is the master list. When a step is done, tick
 it here in the same pull request that records any new register entries.
 
 Legend: **Owner action** = needs the account owner (sign-up, payment, a
@@ -29,14 +32,14 @@ dashboard only they can open). **Team** = any engineer with access.
 | 07 | Uptime monitoring and alerting (Better Stack free tier) | Team | [07](runbooks/setup/07-uptime-monitoring.md) | ☐ |
 | 07b | Security watch: set repository variables `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_REF` (and the existing `SUPABASE_ACCESS_TOKEN` secret), then run it once | Team | `.github/workflows/security-watch.yml` | ☐ |
 | 07c | Monthly report for all three apps: add the `ENGINEERING_REPORT_TOKEN` secret (fine-grained, read-only: pull requests, actions, metadata on the carter and admin repositories) | Owner action | `.github/workflows/governance-cadence.yml` | ☐ |
-| 07d | Production smoke check: runs by itself (hourly and after each household deploy). Check the first scheduled run; when the household app moves to `app.trashdrops.com`, change its URL in `engineering/automation/production-smoke-config.json` | Team | `.github/workflows/production-smoke.yml` | ☐ |
+| 07d | Production smoke check: runs by itself (hourly and after each household deploy). Check the first scheduled run. Site addresses live in `engineering/automation/production-smoke-config.json` | Team | `.github/workflows/production-smoke.yml` | ☐ |
 | 10 | Copy CI, security checks, templates and CODEOWNERS to the carter and admin repositories (merged 2026-11-11: carter #46, admin #107) | Team | [08 §Rolling out](runbooks/setup/08-branch-protection-and-secrets.md#rolling-out-to-the-other-repositories) | ☑ |
 
 ## Phase 2: Clear the known backlog
 
 | # | Step | Who | Where | Done |
 |---|---|---|---|---|
-| 11 | Fix the known-failing test suites and delete them from each list (household 8, carter 4, admin 4; all fixed: household in this PR, admin #111, carter #53; lists are empty once those merge) | Team | `scripts/ci/known-failing-tests.txt` in each repository | ☐ |
+| 11 | Fix the known-failing test suites and delete them from each list: done 2026-11-11. All three lists are empty (household #114, admin #111, carter #53) | Team | `scripts/ci/known-failing-tests.txt` in each repository | ☑ |
 | 12 | Work through the technical-debt register's "Now" items | Team | [tech-debt](registers/tech-debt.md) | ☐ |
 | 13 | Fill every register (products, infrastructure, vendors, access, IT assets). Infrastructure filled from the live accounts 2026-11-11; vendors need costs and account owners from the owner | Team | [registers](registers/) | ☐ |
 

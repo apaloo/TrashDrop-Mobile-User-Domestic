@@ -1,25 +1,230 @@
 {
   "_comment": "Expected answers for a signed-out caller using the public app key. 'denied' = HTTP 401/403/404; 'empty' = HTTP 200 with no rows; 'data' = HTTP 200 with rows (control: proves the probes reach the API). Changing an expectation needs the CTO's review (CODEOWNERS).",
   "probes": [
-    { "id": "P01", "what": "user statistics view (emails, names)", "method": "GET", "path": "/rest/v1/user_stats_dashboard?select=user_id&limit=1", "expect": "denied" },
-    { "id": "P02", "what": "email lookup function", "method": "POST", "path": "/rest/v1/rpc/get_user_emails", "body": { "user_ids": [] }, "expect": "denied" },
-    { "id": "P03", "what": "contact lookup function", "method": "POST", "path": "/rest/v1/rpc/get_user_contacts", "body": {}, "expect": "denied" },
-    { "id": "P04", "what": "staff dumping-report merge", "method": "POST", "path": "/rest/v1/rpc/merge_dumping_reports", "body": { "p_primary_report_id": "00000000-0000-0000-0000-000000000000", "p_duplicate_report_ids": [], "p_merged_by": "00000000-0000-0000-0000-000000000000" }, "expect": "denied" },
-    { "id": "P05", "what": "carter photo storage listing", "method": "POST", "path": "/storage/v1/object/list/collector-photos", "body": { "prefix": "collector-documents", "limit": 1 }, "expect": "denied-or-empty" },
-    { "id": "P06", "what": "payment records", "method": "GET", "path": "/rest/v1/bin_payments?select=id&limit=1", "expect": "denied-or-empty" },
-    { "id": "P07", "what": "household profiles", "method": "GET", "path": "/rest/v1/profiles?select=id&limit=1", "expect": "denied-or-empty" },
-    { "id": "P08", "what": "carter profiles", "method": "GET", "path": "/rest/v1/collector_profiles?select=id&limit=1", "expect": "denied-or-empty" },
-    { "id": "P09", "what": "withdrawals", "method": "GET", "path": "/rest/v1/withdrawals?select=id&limit=1", "expect": "denied-or-empty" },
-    { "id": "P10", "what": "payment proxy: collection without sign-in", "method": "POST", "path": "/functions/v1/trendipay-proxy", "body": { "action": "initiate-collection", "terminalId": "T1", "payload": {} }, "expect": "denied" },
-    { "id": "P11", "what": "batch activation without sign-in", "method": "POST", "path": "/rest/v1/rpc/activate_batch_for_user", "body": { "p_batch_id": "00000000-0000-4000-8000-000000000000", "p_user_id": "00000000-0000-4000-8000-000000000000" }, "expect": "denied" },
-    { "id": "P12", "what": "reward redemption without sign-in", "method": "POST", "path": "/rest/v1/rpc/redeem_reward", "body": { "p_user_id": "00000000-0000-4000-8000-000000000000", "p_reward_id": "00000000-0000-4000-8000-000000000000" }, "expect": "denied" },
-    { "id": "P13", "what": "WhatsApp booking session without the server key", "method": "POST", "path": "/rest/v1/rpc/get_active_whatsapp_session", "body": { "p_phone": "000" }, "expect": "denied" },
-    { "id": "P14", "what": "pickup creation without sign-in", "method": "POST", "path": "/rest/v1/rpc/create_pickup_request", "body": { "p_id": "smoke", "p_user_id": "00000000-0000-4000-8000-000000000000", "p_status": "pending", "p_bag_count": 1, "p_waste_type": "general", "p_special_instructions": "", "p_longitude": 0, "p_latitude": 0, "p_address": "" }, "expect": "denied" },
-    { "id": "P15", "what": "household dashboard by id without sign-in", "method": "POST", "path": "/rest/v1/rpc/get_dashboard_data_optimized", "body": { "user_id_param": "00000000-0000-4000-8000-000000000000", "activity_limit": 1 }, "expect": "denied" },
-    { "id": "P16", "what": "collector earnings by id without sign-in", "method": "POST", "path": "/rest/v1/rpc/get_collector_earnings_summary", "body": { "p_collector_id": "00000000-0000-4000-8000-000000000000" }, "expect": "denied" },
-    { "id": "P17", "what": "staff dashboard figures without sign-in", "method": "POST", "path": "/rest/v1/rpc/fetch_dashboard_stats", "body": {}, "expect": "denied" },
-    { "id": "C01", "what": "public dumping-report map (control)", "method": "GET", "path": "/rest/v1/public_illegal_dumping_reports?select=id&limit=1", "expect": "data" }
+    {
+      "id": "P01",
+      "what": "user statistics view (emails, names)",
+      "method": "GET",
+      "path": "/rest/v1/user_stats_dashboard?select=user_id&limit=1",
+      "expect": "denied"
+    },
+    {
+      "id": "P02",
+      "what": "email lookup function",
+      "method": "POST",
+      "path": "/rest/v1/rpc/get_user_emails",
+      "body": {
+        "user_ids": []
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P03",
+      "what": "contact lookup function",
+      "method": "POST",
+      "path": "/rest/v1/rpc/get_user_contacts",
+      "body": {},
+      "expect": "denied"
+    },
+    {
+      "id": "P04",
+      "what": "staff dumping-report merge",
+      "method": "POST",
+      "path": "/rest/v1/rpc/merge_dumping_reports",
+      "body": {
+        "p_primary_report_id": "00000000-0000-0000-0000-000000000000",
+        "p_duplicate_report_ids": [],
+        "p_merged_by": "00000000-0000-0000-0000-000000000000"
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P05",
+      "what": "carter photo storage listing",
+      "method": "POST",
+      "path": "/storage/v1/object/list/collector-photos",
+      "body": {
+        "prefix": "collector-documents",
+        "limit": 1
+      },
+      "expect": "denied-or-empty"
+    },
+    {
+      "id": "P06",
+      "what": "payment records",
+      "method": "GET",
+      "path": "/rest/v1/bin_payments?select=id&limit=1",
+      "expect": "denied-or-empty"
+    },
+    {
+      "id": "P07",
+      "what": "household profiles",
+      "method": "GET",
+      "path": "/rest/v1/profiles?select=id&limit=1",
+      "expect": "denied-or-empty"
+    },
+    {
+      "id": "P08",
+      "what": "carter profiles",
+      "method": "GET",
+      "path": "/rest/v1/collector_profiles?select=id&limit=1",
+      "expect": "denied-or-empty"
+    },
+    {
+      "id": "P09",
+      "what": "withdrawals",
+      "method": "GET",
+      "path": "/rest/v1/withdrawals?select=id&limit=1",
+      "expect": "denied-or-empty"
+    },
+    {
+      "id": "P10",
+      "what": "payment proxy: collection without sign-in",
+      "method": "POST",
+      "path": "/functions/v1/trendipay-proxy",
+      "body": {
+        "action": "initiate-collection",
+        "terminalId": "T1",
+        "payload": {}
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P11",
+      "what": "batch activation without sign-in",
+      "method": "POST",
+      "path": "/rest/v1/rpc/activate_batch_for_user",
+      "body": {
+        "p_batch_id": "00000000-0000-4000-8000-000000000000",
+        "p_user_id": "00000000-0000-4000-8000-000000000000"
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P12",
+      "what": "reward redemption without sign-in",
+      "method": "POST",
+      "path": "/rest/v1/rpc/redeem_reward",
+      "body": {
+        "p_user_id": "00000000-0000-4000-8000-000000000000",
+        "p_reward_id": "00000000-0000-4000-8000-000000000000"
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P13",
+      "what": "WhatsApp booking session without the server key",
+      "method": "POST",
+      "path": "/rest/v1/rpc/get_active_whatsapp_session",
+      "body": {
+        "p_phone": "000"
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P14",
+      "what": "pickup creation without sign-in",
+      "method": "POST",
+      "path": "/rest/v1/rpc/create_pickup_request",
+      "body": {
+        "p_id": "smoke",
+        "p_user_id": "00000000-0000-4000-8000-000000000000",
+        "p_status": "pending",
+        "p_bag_count": 1,
+        "p_waste_type": "general",
+        "p_special_instructions": "",
+        "p_longitude": 0,
+        "p_latitude": 0,
+        "p_address": ""
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P15",
+      "what": "household dashboard by id without sign-in",
+      "method": "POST",
+      "path": "/rest/v1/rpc/get_dashboard_data_optimized",
+      "body": {
+        "user_id_param": "00000000-0000-4000-8000-000000000000",
+        "activity_limit": 1
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P16",
+      "what": "collector earnings by id without sign-in",
+      "method": "POST",
+      "path": "/rest/v1/rpc/get_collector_earnings_summary",
+      "body": {
+        "p_collector_id": "00000000-0000-4000-8000-000000000000"
+      },
+      "expect": "denied"
+    },
+    {
+      "id": "P17",
+      "what": "staff dashboard figures without sign-in",
+      "method": "POST",
+      "path": "/rest/v1/rpc/fetch_dashboard_stats",
+      "body": {},
+      "expect": "denied"
+    },
+    {
+      "id": "P18",
+      "what": "urgent bins with home addresses",
+      "method": "GET",
+      "path": "/rest/v1/urgent_digital_bins?select=id&limit=1",
+      "expect": "denied"
+    },
+    {
+      "id": "P19",
+      "what": "collector cleanup jobs",
+      "method": "GET",
+      "path": "/rest/v1/collector_assignments_view?select=id&limit=1",
+      "expect": "denied-or-empty"
+    },
+    {
+      "id": "P20",
+      "what": "old user statistics copy (emails, names)",
+      "method": "GET",
+      "path": "/rest/v1/user_stats_aggregated?select=user_id&limit=1",
+      "expect": "denied"
+    },
+    {
+      "id": "C01",
+      "what": "public dumping-report map (control)",
+      "method": "GET",
+      "path": "/rest/v1/public_illegal_dumping_reports?select=id&limit=1",
+      "expect": "data"
+    }
   ],
+  "moneyWrites": {
+    "_comment": "Phase 13 / TD54 (2026-11-12): tables with money or points columns that signed-in users can write, each reviewed: guarded by the server (bags, batches, bin_payments, collector_profiles, digital_bins, illegal_dumping_mobile, pickup_requests, profiles) or not read by any balance or payout (bag_orders, dumping_reports, reward_redemptions, user_activity; withdrawals need server-written items that add up). Adding a table here needs the owner's approval.",
+    "reviewed": ["bag_orders", "bags", "batches", "bin_payments", "collector_profiles", "digital_bins", "dumping_reports", "illegal_dumping_mobile", "pickup_requests", "profiles", "reward_redemptions", "user_activity", "withdrawals"]
+  },
+  "skippedCallerCheck": {
+    "_comment": "Elevated (SECURITY DEFINER) functions anyone can call whose caller check runs only when someone is signed in. 0 since 20261112165513 (validate_cashout).",
+    "max": 0
+  },
+  "migrationLedger": {
+    "_comment": "TD18 / ADR-001: every migration production has recorded must have its file in one of these folders. On 2026-11-12 all 55 did. Files applied by hand in the SQL editor before 2026-11-11 are not in production's history and are not checked here.",
+    "repos": [
+      { "repo": "apaloo/TrashDrop-Mobile-User-Domestic", "path": "trashdrop/supabase/migrations" },
+      { "repo": "apaloo/TrashDrop-Mobile-Collector-Driver", "path": "supabase/migrations" },
+      { "repo": "apaloo/TrashDrop_Management_webApp_admins", "path": "supabase/migrations" }
+    ],
+    "maxMissing": 0
+  },
+  "capacity": {
+    "_comment": "TD20: database performance work (indexes, policy rewrites) waits until a table or the database is this big. Reported daily, never fails. On 2026-11-12 the largest table had about 1,100 rows and digital_bins 28.",
+    "revisitRows": 10000,
+    "revisitMb": 2048
+  },
+  "logScan": {
+    "_comment": "Signed-out callers that touch many tables in one minute, or ask for many tables that don't exist, are scanning the API. Measured 2026-11-11: real signed-out visitors touched at most 21 tables or functions a minute and got no 'not found' answers; one scan touched 150 and got 137 not-found answers in a minute. Needs SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF. Raising a limit needs the CTO's review (CODEOWNERS).",
+    "hours": 24,
+    "maxEndpointsPerMinute": 40,
+    "maxNotFoundPerMinute": 25
+  },
   "advisors": {
     "_comment": "Known ERROR-level advisor findings, accepted until tech-debt TD19 fixes them. A new ERROR finding fails the watch; fixing one means deleting it here.",
     "allowedErrors": [
@@ -42,5 +247,52 @@
     "ceilings": {
       "anon_security_definer_function_executable": 35
     }
+  },
+  "_writePolicies_comment": "Row-level security write policies (INSERT, UPDATE, DELETE or ALL) that apply to every row (USING/WITH CHECK true) or to signed-out visitors (anon). Policies made in the dashboard never pass the migration check, so the live database is counted daily. Only the count is published (the repository is public); list them with the query in engineering/runbooks/database-function-review.md. Policies for service_role alone are not counted (that key bypasses row-level security anyway). maxOpen was 9 on 2026-11-12 and is 0 since TD50 closed them the same day; never raise it without the CTO.",
+  "writePolicies": {
+    "maxOpen": 0
+  },
+  "_protectedDefinitions_comment": "Fingerprints (md5 of definition and grants) of the database objects that hold the owner's protected rules: digital bin pricing (docs/DIGITAL_BIN_PRICING.md), points (docs/POINTS.md) and collector payouts (docs/COLLECTOR_PAYOUTS.md). Recorded 2026-11-12 ; 24 objects after td_keep_booked_payout (20261112113921) and the server-side collector share (20261112120016), both owner approved the same day. A difference fails the watch: either someone changed a protected rule outside an approved pull request, or an approved change forgot to record its new fingerprint. Update a value only in the pull request that carries the owner's written approval (engineering/runbooks/protected-rules.md).",
+  "protectedDefinitions": {
+    "objects": {
+      "function increment_promotional_usage": "e8e2845fccdc47de8ca62b5fb29d0cb9",
+      "function td_price_digital_bin": "232bf9f53de86b6cc9cc829009ccf88b",
+      "function td_protect_digital_bin_price": "452ce633d33a92bd2a888922a7e397c4",
+      "function td_refund_promotion_on_cancel": "61f61a8d606946cf50fdf58a96f5443e",
+      "function td_set_digital_bin_price": "8708fbd1ec78792f3575a749af6cffb6",
+      "policies promotional_usage": "3f1ed6089cb36140ab02bcf2b9f8649f",
+      "trigger digital_bins.digital_bins_protect_price": "fee44dc61bab0b96a7233f4ec26aed2d",
+      "trigger digital_bins.digital_bins_refund_promotion": "d4c85764b4edb1e6fc5be8a7b4550b85",
+      "trigger digital_bins.digital_bins_set_price": "1866818a7fd5ba6fa8caaf9321154827",
+      "function get_dashboard_data_optimized": "3209b97a7271bc365099c20cbefffd84",
+      "function td_guard_profile_columns": "cffd0a300068f35db2780da1f205cc4f",
+      "function td_guard_request_write": "916674594870b3e67d8eddaf3c7ed0ed",
+      "function td_redeem_reward": "d94fc9dc88da56a37eb0c2eba484acc6",
+      "trigger pickup_requests.aa_td_guard_write": "834d27d20f8a914a84782ba74429c73f",
+      "trigger profiles.td_guard_profile_columns": "23b436452cb8f639ffed0edd3b259398",
+      "view user_stats_dashboard": "379de5b10f072e53296ecbcfe4114d22",
+      "function td_guard_dumping_insert": "e19379ce7d43a7c191fedc46d7b8743b",
+      "trigger illegal_dumping_mobile.aa_td_guard_insert": "e1c4fe1b64755d73d4c8f0c8d8ef5f4f",
+      "policies rewards_redemption": "3df5fa8b6ef3c732f62efbb5fa2d5b31",
+      "function td_guard_cleanup_fee": "99350dd003721cdfce2ae0f0d4d6adb3",
+      "trigger illegal_dumping_mobile.ab_td_guard_cleanup_fee": "d465969499e5a3ed41d2b6570869cbcc",
+      "function td_guard_bin_payment": "9703c154445c44d28227434b41c99aa1",
+      "function td_withdrawable_items": "d309aa0a04c55deebd4b2a6ba6b202ec",
+      "trigger bin_payments.aa_td_guard_bin_payment": "55754cbd67d29ef21d6439ddf090a352",
+      "function td_keep_booked_payout": "6029c304ce5babdc1e31959f54f1d8a0",
+      "trigger digital_bins.ab_td_keep_booked_payout": "9aa965d5d076ef0ebffc0c7475daad01",
+      "function td_record_bin_acceptance": "098b5af1060115a4333e8deb2793e798",
+      "function td_bin_collector_share": "c5b196c147d1f34a365552e604fef1b8",
+      "trigger digital_bins.ac_td_record_bin_acceptance": "91eebb2ec4b7eebc6447233b3078602e"
+    }
+  },
+  "_uncheckedFunctions_comment": "Database functions that run with their owner's rights, can be run by any signed-in user and show no check of who is calling: those that write and take an id, and those that read personal data (auth.users, phone numbers). Baseline 2026-11-12 after TD19 round 3 (20261112122021): 0 writers; 2 readers, both deliberate yes/no answers (the sign-up phone check, is_active_collector). Only counts are published; never raise a baseline without the CTO.",
+  "uncheckedFunctions": {
+    "maxWriters": 0,
+    "maxPersonalReads": 2
+  },
+  "_personalExposure_comment": "Tables without row-level security, materialized views and views that run as their owner, readable by signed-out callers, that hold personal columns (email, phone, names, MoMo numbers, addresses). 0 since 2026-11-12 (20261112124531 closed user_stats_aggregated). Count only; never raise without the CTO.",
+  "personalExposure": {
+    "maxExposed": 0
   }
 }

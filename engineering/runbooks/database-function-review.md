@@ -110,7 +110,9 @@ revoking from `PUBLIC` alone leaves Supabase's direct grant to `anon`.
 ### 4. Test on production, rolled back
 
 Run the same statements inside one `DO` block that ends with
-`RAISE EXCEPTION`, so nothing is kept, and report what you need to see:
+`RAISE EXCEPTION`, so nothing is kept, and report what you need to see.
+Start the message with `ROLLED BACK` so the daily error watch doesn't count
+your test:
 
 ```sql
 DO $t$
@@ -157,3 +159,80 @@ them; don't fix them in the same change.
 - What was exposed, from when to when, and any evidence of use (edge logs
   keep 24 hours: role and user per call) goes to the restricted incident
   file, not the repository.
+
+## Write policies open to every row
+
+The daily security watch counts row-level security write policies (INSERT,
+UPDATE, DELETE or ALL) that apply to every row or to signed-out visitors,
+and fails when the count rises above `writePolicies.maxOpen` in
+`engineering/automation/security-watch-config.json`. It publishes the count
+only. To see which ones (Supabase SQL editor or MCP; keep the result out of
+GitHub, the repository is public):
+
+```sql
+select c.relname as table_name, p.polname, p.polcmd,
+       array(select rolname from pg_roles where oid = any(p.polroles)) as roles,
+       pg_get_expr(p.polqual, p.polrelid) as using_rule,
+       pg_get_expr(p.polwithcheck, p.polrelid) as check_rule
+from pg_policy p
+join pg_class c on c.oid = p.polrelid
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and p.polcmd in ('a', 'w', 'd', '*')
+  and p.polroles <> array[(select oid from pg_roles where rolname = 'service_role')]
+  and (coalesce(pg_get_expr(p.polqual, p.polrelid), '') = 'true'
+    or coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') = 'true'
+    or exists (select 1 from pg_roles r where r.oid = any(p.polroles) and r.rolname = 'anon'))
+order by 1, 2;
+```
+
+For each one: find who writes to the table (all three repositories and the
+Edge and Netlify functions), restrict the policy to the owner, the assigned
+collector or staff, or move the write into a SECURITY DEFINER function. Test
+it rolled back as a signed-in user (step 4), apply it with the CTO's
+go-ahead, then lower `maxOpen`.
+
+
+## Functions a signed-in user can run without a caller check
+
+The security watch counts these daily (`uncheckedFunctions` in
+`security-watch-config.json`; baseline 0 that write, 2 that read personal
+data, 2026-11-12). When the count rises, list them here, privately (SQL editor,
+never in an issue or pull request until fixed):
+
+```sql
+select p.proname, pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public'
+where p.prosecdef and p.prorettype <> 'trigger'::regtype
+  and has_function_privilege('authenticated', p.oid, 'execute')
+  and not (p.prosrc ~* 'auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_staff|td_can_manage_requests|td_is_staff|td_is_active_collector|td_my_collector|can_do\(|td_my_team|td_area_report_for')
+  and ((pg_get_function_identity_arguments(p.oid) ~* 'uuid|_id' and p.prosrc ~* '\m(insert\s+into|update\s+\w|delete\s+from)')
+       or p.prosrc ~* 'auth\.users|\mphone\M')
+order by 1;
+```
+
+Then, for each one: find its callers in all three apps and in the API logs
+(`/rest/v1/rpc/<name>` in the edge logs). Unused: make it server-only
+(`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated; GRANT ... TO
+service_role`). Used: add a check of who is calling (`td_assert_self_or_staff`,
+`td_can_manage_requests()`, `can_do('<capability>')`), test it rolled back as a
+household user, a collector and staff, and apply it in a migration.
+
+## Personal data open to signed-out callers
+
+The security watch counts these daily (`personalExposure`, baseline 0 since
+2026-11-12). When the count rises, list them privately:
+
+```sql
+select c.relname, c.relkind
+from pg_class c join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+where has_table_privilege('anon', c.oid, 'select')
+  and ((c.relkind = 'r' and not c.relrowsecurity) or c.relkind = 'm'
+       or (c.relkind = 'v' and not coalesce(c.reloptions::text[] && array['security_invoker=true', 'security_invoker=on'], false)))
+  and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+              and a.attname ~* '^(email|phone|phone_number|first_name|last_name|client_momo|momo_number|address)$');
+```
+
+Then revoke `SELECT` from `anon` (and `authenticated` if the app doesn't need
+it), switch on row-level security for a table, or make a view run as the
+caller (`security_invoker`), after checking its readers in all three apps and
+the API logs.

@@ -32,6 +32,7 @@
 const { getServiceClient } = require('./utils/supabase-admin');
 const { sendTextMessage } = require('./utils/whatsapp-api');
 const { APP_URL } = require('./utils/app-url');
+const { maskPhone } = require('./utils/mask-phone');
 
 function getSupabaseClient() {
   return getServiceClient('[WhatsApp Notify]');
@@ -174,7 +175,7 @@ exports.handler = async (event) => {
     });
 
     await sendTextMessage(waPhone, messageText);
-    console.log(`[WhatsApp Notify] Sent ${newStatus} notification to ${waPhone}`);
+    console.log(`[WhatsApp Notify] Sent ${newStatus} notification to ${maskPhone(waPhone)}`);
 
     return { statusCode: 200, body: 'Notification sent' };
 

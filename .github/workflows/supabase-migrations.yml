@@ -58,7 +58,7 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Refuse to run from a branch other than main
         if: inputs.target == 'production' && github.ref != 'refs/heads/main'
@@ -67,7 +67,7 @@ jobs:
           echo "::error::Production migrations run only from main (this run: ${{ github.ref }})."
           exit 1
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 

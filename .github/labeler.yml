@@ -5,6 +5,7 @@ protected-pricing:
   - changed-files:
       - any-glob-to-any-file:
           - docs/DIGITAL_BIN_PRICING.md
+          - docs/COLLECTOR_PAYOUTS.md
           - trashdrop/supabase/migrations/20261024*
           - trashdrop/src/services/digitalBinService.js
           - trashdrop/src/services/promotionalService.js
@@ -14,6 +15,16 @@ protected-pricing:
           - trashdrop/netlify/functions/utils/pricing.js
           - trashdrop/src/services/__tests__/digitalBinService.promotion.test.js
           - trashdrop/netlify/functions/__checks__/pricing-promo.js
+
+protected-points:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/POINTS.md
+          - trashdrop/src/services/userService.js
+          - trashdrop/src/utils/reportPoints.js
+          - trashdrop/src/pages/Rewards.js
+          - trashdrop/src/services/__tests__/userService.stats.test.js
+          - trashdrop/src/pages/__tests__/Rewards.redeem.test.js
 
 database:
   - changed-files:

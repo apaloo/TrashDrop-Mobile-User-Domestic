@@ -166,7 +166,7 @@ ${m.unreviewed.length ? `\nMerged without independent approval: ${m.unreviewed.m
 - Open dependency-update pull requests: ${m.openDeps}
 
 ## 5. QR Bag and Digital Bin workflow performance (§10.4)
-${TODO}: scan success rate, Digital Bin request success rate, payout reconciliation differences (from the database).
+${TODO}: scan success rate, Digital Bin request success rate. Collector payouts: run \`trashdrop/supabase/diagnostics/collector_payout_check.sql\` (every check ok; share of taken bins with the distance unknown, paid the 87% default, see docs/COLLECTOR_PAYOUTS.md).
 
 ## 6. Security and privacy
 ${TODO}: secret-scan findings, Dependabot critical/high alerts, access changes, any personal-data incident.

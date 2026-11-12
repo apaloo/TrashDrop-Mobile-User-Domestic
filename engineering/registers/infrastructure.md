@@ -22,7 +22,7 @@ can stay brief.
 
 | Site | Serves | Public address | Notes |
 |---|---|---|---|
-| `trashdrop-mobile-przsu` | Household app | `trashdrop-mobile.windsurf.build` only | **No TrashDrop domain** (R13): add `app.trashdrops.com` |
+| `trashdrop-mobile-przsu` | Household app | `app.trashdrops.com` (since 2026-10-20; `netlify.toml` sends the old `*.netlify.app` address there) | Netlify still lists `trashdrop-mobile.windsurf.build` as this site's primary domain; that name no longer resolves and no traffic uses it. Tidy-up: make `app.trashdrops.com` the primary domain and remove the Windsurf one |
 | `trashdrop-mobile-collector` | Carter app | collector.trashdrops.com | |
 | `luxury-valkyrie-2ebd15` | Admin portal and public website | trashdrops.com | Node 16 build image |
 | `trashdrop-web-admin` | Old admin portal | trashdrop-web-admin.netlify.app | Last deployed July 2025: confirm unused, then delete (R15) |
@@ -37,6 +37,8 @@ Deploy from git only (R14). Source of truth:
 | `trendipay-collection`, `trendipay-disbursement`, `trendipay-proxy`, `trendipay-webhook` | carter `supabase/functions/` | Signed-in user or TrendiPay HMAC (carter #48) |
 | `send-sms-hook` | carter `supabase/functions/` (added in carter #54; was in no repository) | Standard Webhooks signature from Supabase Auth; SMS via Arkesel |
 | `pickup-email-alerts`, `access-decision-emails`, `facebook-feed` | admin `supabase/functions/` | |
+
+**Checked 2026-11-12:** the deployed code of all 8 functions matches `main` (shared files included), and each `verify_jwt` matches `supabase/config.toml`. Only difference: a code comment in `send-sms-hook` still shows an example phone number that the repository has replaced with a placeholder; it goes with the next deploy from `main`. Every deploy so far was made by hand (three from a developer laptop); the **Deploy Edge Functions** workflows in the admin and carter repositories have never run, because their `production` environment and secrets aren't set up yet (merge-plan issue #115). Until then, check a function against `main` before and after any manual deploy.
 
 ## Environment variables by app (names only)
 

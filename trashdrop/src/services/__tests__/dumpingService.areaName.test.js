@@ -1,7 +1,10 @@
 import { areaFromAddress, dumpingService } from '../dumpingService.js';
 import supabase from '../../utils/supabaseClient.js';
 
-jest.mock('../../utils/supabaseClient.js', () => ({ __esModule: true, default: { from: jest.fn() } }));
+jest.mock('../../utils/supabaseClient.js', () => ({
+  __esModule: true,
+  default: { from: jest.fn(), auth: { getSession: jest.fn(() => Promise.resolve({ data: { session: { user: { id: 'u1' } } }, error: null })) } },
+}));
 jest.mock('../toastService.js', () => ({ toastService: { success: jest.fn(), error: jest.fn() } }));
 jest.mock('../syncService.js', () => ({ __esModule: true, default: {} }));
 jest.mock('../photoUploadService.js', () => ({

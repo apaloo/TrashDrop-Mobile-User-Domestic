@@ -32,37 +32,39 @@ export const userService = {
         bagsResult,
         batchesResult,
         redemptionsResult,
-        scansResult,
+        balanceResult,
       ] = await Promise.all([
         settle(supabase.from('profiles').select('id, points, level, email, first_name, last_name').eq('id', userId).maybeSingle()),
         settle(supabase.from('user_stats').select('*').eq('user_id', userId).maybeSingle()),
         // Requests the user made (user_id), not ones they collect
-        settle(supabase.from('pickup_requests').select('id, points_earned', { count: 'exact' }).eq('user_id', userId)),
-        settle(supabase.from('digital_bins').select('id', { count: 'exact' }).eq('user_id', userId)),
+        settle(supabase.from('pickup_requests').select('id, points_earned, status').eq('user_id', userId)),
+        settle(supabase.from('digital_bins').select('id, status').eq('user_id', userId)),
         settle(supabase.from('illegal_dumping_mobile').select('id, severity, status, created_at', { count: 'exact' }).eq('reported_by', userId)),
         settle(supabase.from('bag_inventory').select('id', { count: 'exact' }).eq('user_id', userId)),
         settle(supabase.from('batches').select('bag_count, created_by').eq('created_by', userId)),
         settle(supabase.from('rewards_redemption').select('points_spent, status', { count: 'exact' }).eq('user_id', userId)),
-        settle(supabase.from('user_activity').select('id, points_impact', { count: 'exact' }).eq('user_id', userId).eq('activity_type', 'qr_scan')),
+        // The balance the server checks when a reward is redeemed (docs/POINTS.md)
+        settle(supabase.from('user_stats_dashboard').select('total_points, total_pickups').eq('user_id', userId).maybeSingle()),
       ]);
 
       if (profileResult.error && profileResult.error.code !== 'PGRST116') { // PGRST116 = no rows returned
         console.error('[UserService] Error fetching profile:', profileResult.error);
         throw profileResult.error;
       }
-      [statsResult, pickupsResult, binsResult, reportsResult, bagsResult, batchesResult, redemptionsResult, scansResult]
+      [statsResult, pickupsResult, binsResult, reportsResult, bagsResult, batchesResult, redemptionsResult, balanceResult]
         .forEach((r) => { if (r.error && r.error.code !== 'PGRST116') console.warn('[UserService] Stats lookup failed:', r.error.message || r.error); });
 
       const profileData = profileResult.data;
       const statsData = statsResult.data;
       const rows = (r) => (Array.isArray(r.data) ? r.data : []);
 
-      // Points from pickup requests (single source of truth for pickups)
-      const totalPointsFromPickups = rows(pickupsResult).reduce((sum, pickup) => sum + (pickup.points_earned || 0), 0);
-      // Digital bins earn 15 points each, and count as pickups for display
-      const digitalBinCount = binsResult.count || 0;
-      const totalPointsFromDigitalBins = rows(binsResult).length * 15;
-      const pickupCount = (pickupsResult.count || 0) + digitalBinCount;
+      // Cancelled or rejected pickups and bins earn nothing and aren't counted
+      const counts = (item) => !['cancelled', 'canceled', 'rejected'].includes(String(item?.status || '').toLowerCase());
+      const pickups = rows(pickupsResult).filter(counts);
+      const bins = rows(binsResult).filter(counts);
+      const totalPointsFromPickups = pickups.reduce((sum, pickup) => sum + (pickup.points_earned || 0), 0);
+      // Digital bins earn 15 points each, and count as pickups
+      const totalPointsFromDigitalBins = bins.length * 15;
       // high=20, medium=15, low=10, once the report is verified (utils/reportPoints)
       const totalPointsFromReports = rows(reportsResult).reduce((sum, report) => sum + reportPoints(report), 0);
       const reportCount = reportsResult.count;
@@ -74,17 +76,20 @@ export const userService = {
       const totalPointsSpent = rows(redemptionsResult)
         .filter(redemption => redemption.status !== 'rejected')
         .reduce((sum, redemption) => sum + (redemption.points_spent || 0), 0);
-      // QR scans earn 5 points each unless the row says otherwise
-      const totalPointsFromScans = rows(scansResult).reduce((sum, scan) => sum + (scan.points_impact || 5), 0);
 
-      // Total points from all sources (earned - spent)
-      const totalPoints = totalPointsFromPickups + totalPointsFromDigitalBins + totalPointsFromReports + totalPointsFromScans - totalPointsSpent;
+      // The server's balance is the one a redemption is checked against, so
+      // show it. If it can't be read, work it out with the same rules.
+      const server = balanceResult.data;
+      const totalPoints = typeof server?.total_points === 'number'
+        ? server.total_points
+        : (profileData?.points || 0) + totalPointsFromPickups + totalPointsFromDigitalBins + totalPointsFromReports - totalPointsSpent;
+      const pickupCount = typeof server?.total_pickups === 'number' ? server.total_pickups : pickups.length + bins.length;
 
       console.log('[UserService] User stats:', {
         pickups: totalPointsFromPickups,
         digitalBins: totalPointsFromDigitalBins,
         reports: totalPointsFromReports,
-        qrScans: totalPointsFromScans,
+        fromServer: typeof server?.total_points === 'number',
         spent: totalPointsSpent,
         total: totalPoints,
         batches: batchesCount,

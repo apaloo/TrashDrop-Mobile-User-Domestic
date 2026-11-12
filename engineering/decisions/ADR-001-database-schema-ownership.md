@@ -1,6 +1,6 @@
 # ADR-001: Who owns the shared database schema
 
-**Status:** Proposed (for the CTO's decision) · **Date:** 2026-11-11
+**Status:** Accepted by the owner on 2026-11-12 (option A) · **Proposed:** 2026-11-11
 
 ## Context
 
@@ -15,6 +15,23 @@ All three repositories contain migrations that change it:
 - No repository can rebuild the database from scratch, and there is no
   staging copy to test a change against the other two apps.
 
+### Update 2026-11-12
+
+- Production's history now records 55 migrations, every one with its file in
+  one of the three repositories. The daily security watch checks this
+  (*Migration ledger*) and fails if a recorded migration has no file.
+- 78 older files (admin 38, household 20, carter 20) were applied by hand and
+  are not in production's history; nothing proves production matches them.
+  The protected rules (pricing, points, payouts) are fingerprinted daily, so
+  drift there is caught; elsewhere it is not.
+- 8 functions are defined in more than one repository's migrations
+  (`td_is_staff`, `td_staff_users`, `td_audit_actor`, `td_alert_notify`,
+  `td_guard_request_write`, `protect_collector_admin_fields`,
+  `update_collector_location`, `update_updated_at_column`). Production is
+  the latest applied version; the files no longer show which one that is.
+- Without this decision, migrations on 2026-11-12 were recorded in all three
+  repositories (each next to the app that needed it).
+
 ## Options
 
 | Option | For | Against |
@@ -23,9 +40,9 @@ All three repositories contain migrations that change it:
 | B. Each repository owns named tables and functions | Changes stay next to the app that needs them | Ownership of shared tables (`profiles`, `pickup_requests`, `digital_bins`, `bin_payments`) is unclear; history stays split |
 | C. Keep as is | No work | Drift continues; a migration from one app can break another unseen |
 
-## Decision (proposed)
+## Decision
 
-**Option A.**
+**Option A** (accepted 2026-11-12).
 
 - **Until the new repository exists**, all new migrations go into
   `trashdrop/supabase/migrations/` in the household repository. It already
@@ -35,6 +52,12 @@ All three repositories contain migrations that change it:
   requests that need a schema change link a household-repository pull
   request.
 - Edge Functions stay with the app that calls them.
+- **One exception until the platform repository exists:** `td_capability_roles`
+  (who may do what on the admin site) stays in the admin repository's
+  migrations, because the admin site's permission test compares it with
+  `src/lib/permissions.js` in the same repository.
+- The daily security watch checks that every migration production has
+  recorded has its file (*Migration ledger*), whichever repository holds it.
 
 ## Consequences
 

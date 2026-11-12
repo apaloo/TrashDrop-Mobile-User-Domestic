@@ -11,6 +11,12 @@
  *      td_is_*, td_my_role) or be revoked from anon in the same file
  *      (REVOKE ... ON FUNCTION <name> ... FROM ... anon).
  *
+ * Write policies (secure development policy, principle 10): a row-level
+ * security policy for INSERT, UPDATE, DELETE or ALL must say whose rows it
+ * is for. "USING (true)" or "WITH CHECK (true)" lets every signed-in user
+ * write every row; that is how bags, batches and scans were open until
+ * 2026-11-12. Write policies for anon (signed-out visitors) are refused too.
+ *
  * Migrations before FIRST_CHECKED were written before this rule and are
  * tracked in the tech-debt register (TD19), not here.
  *
@@ -49,9 +55,41 @@ function functionsIn(sql) {
   return out;
 }
 
+/** CREATE POLICY statements: name, table, command (all when not given), roles, using, check */
+function policiesIn(sql) {
+  const out = [];
+  const clean = sql.replace(/--[^\n]*/g, '');
+  const re = /create\s+policy\s+("[^"]+"|[\w.]+)\s+on\s+([\w."]+)([^;]*);/gi;
+  let m;
+  while ((m = re.exec(clean))) {
+    const rest = m[3];
+    const cmd = (/\bfor\s+(all|select|insert|update|delete)\b/i.exec(rest)?.[1] || 'all').toLowerCase();
+    const roles = (/\bto\s+([\w\s,"]+?)(?=\s+using\b|\s+with\s+check\b|$)/i.exec(rest)?.[1] || 'public')
+      .split(',').map((r) => r.trim().replace(/"/g, '').toLowerCase()).filter(Boolean);
+    out.push({
+      name: m[1].replace(/"/g, ''),
+      table: m[2].replace(/"/g, '').replace(/^public\./i, ''),
+      cmd,
+      roles,
+      openUsing: /\busing\s*\(\s*true\s*\)/i.test(rest),
+      openCheck: /\bwith\s+check\s*\(\s*true\s*\)/i.test(rest),
+    });
+  }
+  return out;
+}
+
 /** Problems with one migration's SQL, as readable strings */
 function problemsIn(sql) {
   const problems = [];
+  for (const p of policiesIn(sql)) {
+    if (p.cmd === 'select') continue;
+    if (p.openUsing || p.openCheck) {
+      problems.push(`policy "${p.name}" on ${p.table}: ${p.cmd.toUpperCase()} for every row (true); say whose rows it is for (principle 10)`);
+    }
+    if (p.roles.includes('anon')) {
+      problems.push(`policy "${p.name}" on ${p.table}: ${p.cmd.toUpperCase()} for signed-out visitors (anon) (principle 10)`);
+    }
+  }
   for (const fn of functionsIn(sql)) {
     if (!/security\s+definer/i.test(fn.header)) continue;
     if (!/set\s+search_path/i.test(fn.header)) {
@@ -87,6 +125,15 @@ function selfTest() {
   assert.deepStrictEqual(problemsIn(open + ' REVOKE ALL ON FUNCTION public.k(uuid) FROM PUBLIC, anon;'), []);
   // A revoke for another function doesn't count
   assert.strictEqual(problemsIn(open + ' REVOKE ALL ON FUNCTION public.kk(uuid) FROM anon;').length, 1);
+  // Write policies (principle 10)
+  const own = `create policy own_rows on public.bags for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());`;
+  assert.deepStrictEqual(problemsIn(own), []);
+  assert.deepStrictEqual(problemsIn(`create policy "read all" on public.bags for select to authenticated using (true);`), []);
+  assert.match(problemsIn(`create policy "Enable update for authenticated users" on public.bags for update to authenticated using (true) with check (true);`)[0], /UPDATE for every row/);
+  assert.match(problemsIn(`CREATE POLICY ins ON bags FOR INSERT TO authenticated WITH CHECK ( true );`)[0], /INSERT for every row/);
+  assert.match(problemsIn(`create policy everything on bags using (true);`)[0], /ALL for every row/);
+  assert.match(problemsIn(`create policy guest_write on bags for insert to anon with check (auth.uid() is null);`)[0], /signed-out visitors/);
+  assert.deepStrictEqual(problemsIn(`-- create policy old on bags for all using (true);\nselect 1;`), []);
   console.log('self-test passed');
 }
 
@@ -104,10 +151,10 @@ function main() {
     }
   }
   console.log(failed
-    ? `${failed} problem(s) in ${files.length} migration(s) checked. See engineering/policies/secure-development.md, principle 8.`
+    ? `${failed} problem(s) in ${files.length} migration(s) checked. See engineering/policies/secure-development.md, principles 8 and 10.`
     : `${files.length} migration(s) checked (from ${FIRST_CHECKED}): no problems.`);
   process.exit(failed ? 1 : 0);
 }
 
 if (require.main === module) main();
-module.exports = { problemsIn, functionsIn, FIRST_CHECKED };
+module.exports = { problemsIn, functionsIn, policiesIn, FIRST_CHECKED };

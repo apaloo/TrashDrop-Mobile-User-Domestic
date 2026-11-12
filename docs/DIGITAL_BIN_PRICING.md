@@ -20,7 +20,9 @@ only to show it before booking.
   location** (`get_covering_pricing_zone`, column `price_<size>l`) × bags.
 - +30% of the base if the pickup is **urgent**.
 - + **GHS 1** request fee.
-- Collector payout at booking = base + urgent.
+- Collector payout at booking = base + urgent. This is the ceiling: the
+  collector earns a distance-based share of it
+  ([`COLLECTOR_PAYOUTS.md`](COLLECTOR_PAYOUTS.md)).
 - There is no default price. A location outside every zone, or a size the zone
   doesn't price, is refused (`TDC01` / `TDC02`).
 
@@ -40,6 +42,9 @@ urgent = 80 + 24 + 1 = **GHS 105**.
 - Urgent bookings always pay the standard price and don't use a promotion.
 - Accounts without a `promotional_usage` row (created before the signup
   trigger) get no promotions.
+- The sign-up trigger (`create_promotional_usage_on_signup`) fixes its
+  `search_path` (approved 2026-11-12, migration `20261112123921`); what it does
+  is unchanged.
 
 Example (240 L schedule 22 / 40): 240 L × 2 bags = customer **GHS 44**,
 collector **GHS 80**, TrashDrop **GHS 36**.
@@ -51,6 +56,19 @@ How the collector gets the promotional payout (approved 2026-10-24):
   (`bin_payments.platform_subsidy`) is paid when the collector cashes out
   (collector app, `td_withdrawable_items` part D).
 
+What a cash-out may pay (approved 2026-11-12, "with caution"; migration
+`20261112100533` in the collector app):
+- A collector's payment record (`bin_payments`) is only for a bin they
+  collected, and is never worth more than the payout stored with the bin when
+  it was booked; a promotional top-up never more than the active schedule
+  for the bin size. Once written, its amounts don't change, and a confirmed
+  payment keeps its status.
+- A disposed bin pays out at most its stored payout, however many payment
+  records it has (part A).
+- Unchanged: the collector marks cash as received, and can confirm a MoMo
+  payment the gateway hasn't confirmed yet ("Client has paid"). The owner
+  decided on 2026-11-12 to keep this confirmation.
+
 ### Cancelling
 Cancelling a promotional bin gives the promotion back. A bin counts as
 cancelled when its status is cancelled, or it is inactive and not completed
@@ -60,9 +78,12 @@ cancelled when its status is cancelled, or it is inactive and not completed
 - Customers can only **read** their own `promotional_usage` row.
 - The customer who booked a bin can't change its fee, size, bags, urgency,
   promotion fields or payouts afterwards.
-- Collectors record their final payout at disposal (collector app,
-  `disposalService`): standard bins by the SOP v4.5.6 split, promotional bins
-  at the payout stored with the bin.
+- The collector can't change a bin's fee, size, bags, urgency, promotion
+  fields or payouts either (`td_keep_booked_payout`, collector app migration
+  `20261112113921`, approved 2026-11-12). The payout stored at booking is the
+  most the collector can be paid for the bin; what they earn from it is in
+  [`COLLECTOR_PAYOUTS.md`](COLLECTOR_PAYOUTS.md) (owner's decision 2026-11-12:
+  85–92% of the base by travel distance, plus 75% of the urgent surcharge).
 
 ## Where it lives
 
@@ -77,7 +98,7 @@ cancelled when its status is cancelled, or it is inactive and not completed
 Approved 2026-11-02: the Review & Submit step (`ReviewStep.js`) was restyled in
 the app's dashboard look. Only its layout and colours changed; the prices it
 shows, how they are fetched, the promotional rules and submission are as before.
-| Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js`, `src/services/earningsService.js` (Earnings page), `supabase/migrations/20261109_promo_cash_subsidy_withdrawable.sql` (cash-outs) |
+| Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js`, `src/services/earningsService.js` (Earnings page), `supabase/migrations/20261109_promo_cash_subsidy_withdrawable.sql` and `20261112100533_bin_payments_guard_and_capped_cashout.sql` (cash-outs) |
 | Admin checks | admin site | `src/utils/pickupRequestUtils.js` (`feeBreakdown`), `supabase/migrations/20261107_fee_mismatch_pricing.sql` (alert rule 9) |
 
 ## Tests that guard it

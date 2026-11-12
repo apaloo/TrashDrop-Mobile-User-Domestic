@@ -2,7 +2,7 @@ name: Security watch
 
 # Every day: checks production the way an outsider would (public app key
 # only) and, with a Supabase access token, checks the security advisor for
-# new findings. Opens one issue when something regresses and closes it when
+# new findings and the API logs for signed-out callers scanning the API. Opens one issue when something regresses and closes it when
 # everything passes again. Expectations: engineering/automation/security-watch-config.json
 #
 # Setup (Settings → Secrets and variables → Actions):
@@ -16,6 +16,7 @@ on:
   pull_request:
     paths:
       - 'engineering/automation/security-watch*'
+      - 'engineering/automation/supabase-logs.mjs'
       - '.github/workflows/security-watch.yml'
 
 permissions:
@@ -26,10 +27,13 @@ jobs:
   watch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
+
+      - name: Self-test
+        run: node engineering/automation/security-watch.mjs --self-test
 
       - name: Check production
         id: watch
@@ -39,13 +43,15 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Lists the migration folders of the three repositories (migration ledger)
+          GITHUB_TOKEN: ${{ github.token }}
         run: node engineering/automation/security-watch.mjs
 
       # Pull requests only check that the script runs; issues come from the
       # scheduled and manual runs.
       - name: Open or close the tracking issue
         if: github.event_name != 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           OUTCOME: ${{ steps.watch.outcome }}
         with:
@@ -72,9 +78,20 @@ jobs:
               failures.length ? failures.map((f) => `- ${f}`).join('\n') : '- The check could not run (see the run log).',
               '',
               'Treat a failed probe as a **P1 incident** (engineering/policies/incident-management.md): something that should be private may be readable.',
+              'A log scan with every probe passing is **P2**: someone looked, and nothing private was readable. Follow engineering/runbooks/api-scan-detected.md.',
             ].join('\n');
-            if (open) await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body });
-            else await github.rest.issues.create({ owner, repo, title, body, labels: ['security-watch', 'type:incident', 'P1'] });
+            // Not configured yet is a setup task, not an incident. Only a log
+            // scan (every probe passed) is P2; anything else is P1.
+            const notConfigured = failures.length > 0 && failures.every((f) => f.startsWith('Security watch not configured'));
+            const scanOnly = failures.length > 0 && failures.every((f) => f.startsWith('Log scan:'));
+            const labels = notConfigured ? ['security-watch', 'setup'] : ['security-watch', 'type:incident', scanOnly ? 'P2' : 'P1'];
+            const text = notConfigured ? [`The daily security watch can't run yet: ${runUrl}`, '', ...failures.map((f) => `- ${f}`), '', 'Setup step 07b in engineering/setup-tracker.md. This issue closes on the first run that passes.'].join('\n') : body;
+            if (open) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: text });
+              if (!notConfigured && !scanOnly) await github.rest.issues.addLabels({ owner, repo, issue_number: open.number, labels: ['type:incident', 'P1'] });
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body: text, labels });
+            }
 
       - name: Fail the run when the check failed
         if: steps.watch.outcome != 'success'
