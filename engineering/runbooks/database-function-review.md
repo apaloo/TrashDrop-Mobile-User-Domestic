@@ -216,3 +216,23 @@ Then, for each one: find its callers in all three apps and in the API logs
 service_role`). Used: add a check of who is calling (`td_assert_self_or_staff`,
 `td_can_manage_requests()`, `can_do('<capability>')`), test it rolled back as a
 household user, a collector and staff, and apply it in a migration.
+
+## Personal data open to signed-out callers
+
+The security watch counts these daily (`personalExposure`, baseline 0 since
+2026-11-12). When the count rises, list them privately:
+
+```sql
+select c.relname, c.relkind
+from pg_class c join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+where has_table_privilege('anon', c.oid, 'select')
+  and ((c.relkind = 'r' and not c.relrowsecurity) or c.relkind = 'm'
+       or (c.relkind = 'v' and not coalesce(c.reloptions::text[] && array['security_invoker=true', 'security_invoker=on'], false)))
+  and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+              and a.attname ~* '^(email|phone|phone_number|first_name|last_name|client_momo|momo_number|address)$');
+```
+
+Then revoke `SELECT` from `anon` (and `authenticated` if the app doesn't need
+it), switch on row-level security for a table, or make a view run as the
+caller (`security_invoker`), after checking its readers in all three apps and
+the API logs.
