@@ -209,7 +209,7 @@
   "writePolicies": {
     "maxOpen": 0
   },
-  "_protectedDefinitions_comment": "Fingerprints (md5 of definition and grants) of the database objects that hold the owner's protected rules: digital bin pricing (docs/DIGITAL_BIN_PRICING.md), points (docs/POINTS.md) and collector payout caps. Recorded 2026-11-12. A difference fails the watch: either someone changed a protected rule outside an approved pull request, or an approved change forgot to record its new fingerprint. Update a value only in the pull request that carries the owner's written approval (engineering/runbooks/protected-rules.md).",
+  "_protectedDefinitions_comment": "Fingerprints (md5 of definition and grants) of the database objects that hold the owner's protected rules: digital bin pricing (docs/DIGITAL_BIN_PRICING.md), points (docs/POINTS.md) and collector payouts (docs/COLLECTOR_PAYOUTS.md). Recorded 2026-11-12 (21 objects after td_keep_booked_payout, owner approved the same day). A difference fails the watch: either someone changed a protected rule outside an approved pull request, or an approved change forgot to record its new fingerprint. Update a value only in the pull request that carries the owner's written approval (engineering/runbooks/protected-rules.md).",
   "protectedDefinitions": {
     "objects": {
       "function increment_promotional_usage": "e8e2845fccdc47de8ca62b5fb29d0cb9",
@@ -230,7 +230,9 @@
       "view user_stats_dashboard": "379de5b10f072e53296ecbcfe4114d22",
       "function td_guard_bin_payment": "2f117e5635034ff264e55e4d0e65ab44",
       "function td_withdrawable_items": "406d7f50ef7c2d9ec95109f47e5ebfd5",
-      "trigger bin_payments.aa_td_guard_bin_payment": "55754cbd67d29ef21d6439ddf090a352"
+      "trigger bin_payments.aa_td_guard_bin_payment": "55754cbd67d29ef21d6439ddf090a352",
+      "function td_keep_booked_payout": "6029c304ce5babdc1e31959f54f1d8a0",
+      "trigger digital_bins.ab_td_keep_booked_payout": "9aa965d5d076ef0ebffc0c7475daad01"
     }
   }
 }
