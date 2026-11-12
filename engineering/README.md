@@ -54,22 +54,29 @@ the CTO and CEO.
 
 **Templates:** [Architecture decision record](templates/adr.md) · [Post-incident review](templates/postmortem.md) · [Release checklist](templates/release-checklist.md)
 
-**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19) · [A signed-out caller scanned the API](runbooks/api-scan-detected.md) · [Production database errors](runbooks/production-errors.md) · [Protected rules](runbooks/protected-rules.md)
+**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19) · [A signed-out caller scanned the API](runbooks/api-scan-detected.md) · [Production database errors](runbooks/production-errors.md) · [Protected rules](runbooks/protected-rules.md) · [A secret in git history](runbooks/secret-in-git-history.md)
 
 ## What is automated
 
 | Automation | Where | What it does |
 |---|---|---|
 | CI | `.github/workflows/ci-cd.yml` | Every pull request: lint, unit tests, pricing guard tests, build, preview deploy. Main: production deploy. |
-| Security checks | `.github/workflows/security.yml` | Secret scan on every pull request and push; full scan weekly; dependency audit report. |
+| Security checks | `.github/workflows/security.yml` | Secret scan on every pull request and push (gitleaks, with a Meta token rule); current files weekly; dependency audit (fails on a critical runtime finding). Same in all three repositories. |
+| History secret scan | `.github/workflows/history-secret-scan.yml` | Tuesdays: every commit of all three repositories. Reviewed findings are kept as one-way hashes only; fails on a new one and reports secrets still waiting to be revoked. |
 | Dependency updates | `.github/dependabot.yml` | Weekly update pull requests. |
 | Database migrations | `.github/workflows/supabase-migrations.yml` | Manual only: list, dry-run, apply; staging or production (production needs approval). |
 | Department bootstrap | `.github/workflows/engineering-bootstrap.yml` | Manual. Creates labels and one issue per setup task; safe to re-run (skips existing issues), so run it again after adding a setup step. First run 2026-11-11. |
-| Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only), the Supabase security advisor, and the API logs for signed-out callers scanning the API; opens an issue on a regression (P1, or P2 for a scan that found nothing), closes it when fixed. |
+| Security watch | `.github/workflows/security-watch.yml` | Daily: checks production as an outsider would (public key only; runs without setup, `supabase-public.json`). With `SUPABASE_ACCESS_TOKEN`: the Supabase security advisor, write policies, personal-data exposure, protected-rule fingerprints, the migration ledger, money and points writes, owned domains in the database, and the API logs for signed-out scans. Opens an issue on a regression (P1, or P2 for a scan that found nothing), closes it when fixed. |
 | Error watch | `.github/workflows/error-watch.yml` | Daily: database errors in production over the last 24 hours, grouped by type; opens a P2 issue for a new or growing type, closes it when none are left. |
-| Production smoke check | `.github/workflows/production-smoke.yml` | Hourly and after each household deploy: the three live sites and their key functions answer as expected; one issue while anything fails. |
+| Production smoke check | `.github/workflows/production-smoke.yml` | Hourly and after each household deploy: the three live sites and their key functions answer as expected, security headers are present, the CSP report collector is deployed; one issue while anything fails. |
+| Operations watch | `.github/workflows/operations-watch.yml` | Mondays: pickups, digital bins and dumping reports waiting longer than their limit (counts only); keeps one issue for operations with the change since last week. Never fails the build. |
+| Schema snapshot | `.github/workflows/schema-snapshot.yml` | Mondays: the live production schema written to `trashdrop/supabase/schema/`; a pull request when it changed. |
 | Database migration checks | `trashdrop/scripts/ci/check-migrations.js` (in CI) | New migrations: `SECURITY DEFINER` functions fix `search_path` and check the caller or revoke `anon`. |
-| Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, risk review and repository health across all three repositories; quarterly access review) and drafts the monthly CTO report from GitHub data. |
+| Runtime dependency check | `scripts/ci/check-runtime-deps.cjs` (CI, all three repositories) | Every package the shipped code imports is in `dependencies`, so the dependency audit covers it and no update can remove it. |
+| Owned domains check | `scripts/ci/check-domains.cjs` (CI, all three repositories) | Shipped code and new migrations name only TrashDrop domains we own (`trashdrops.com`); `trashdrop.app` is someone else's (TD58). |
+| Build secret guard | `scripts/env-guard.cjs` (household and admin builds) | The build refuses to publish a server secret in a `REACT_APP_` variable. |
+| Security headers and CSP | `netlify.toml` (all three sites), `trashdrop/netlify/functions/csp-report.js` | HTTPS-only, no framing, nosniff, referrer and permissions policies; Content Security Policy reports collected (hosts only) until enforced (TD57). |
+| Governance cadence | `.github/workflows/governance-cadence.yml` | Opens the recurring review issues (monthly backup test, risk review and repository health across all three repositories: standards, secret scanning, Dependabot alerts and activity; quarterly access review) and drafts the monthly CTO report from GitHub data. |
 | Release notes | `.github/workflows/release-notes.yml` | After each successful production deploy: a GitHub Release listing the pull requests shipped, grouped (protected pricing, database, security, fixes, features). |
 | Pull request labels | `.github/workflows/labeler.yml`, `.github/labeler.yml` | Labels from changed files: `protected-pricing` (owner approval needed), `database`, `product:whatsapp`, `ci`, `docs`, `dependencies`. |
 | Review routing | `.github/CODEOWNERS` | Protected files need the named owner's review. |
