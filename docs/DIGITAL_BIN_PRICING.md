@@ -51,6 +51,19 @@ How the collector gets the promotional payout (approved 2026-10-24):
   (`bin_payments.platform_subsidy`) is paid when the collector cashes out
   (collector app, `td_withdrawable_items` part D).
 
+What a cash-out may pay (approved 2026-11-12, "with caution"; migration
+`20261112100533` in the collector app):
+- A collector's payment record (`bin_payments`) is only for a bin they
+  collected, and is never worth more than the payout stored with the bin when
+  it was booked; a promotional top-up never more than the active schedule
+  for the bin size. Once written, its amounts don't change, and a confirmed
+  payment keeps its status.
+- A disposed bin pays out at most its stored payout, however many payment
+  records it has (part A).
+- Unchanged: the collector marks cash as received, and can confirm a MoMo
+  payment the gateway hasn't confirmed yet ("Client has paid"). Whether that
+  confirmation should stay is the owner's decision.
+
 ### Cancelling
 Cancelling a promotional bin gives the promotion back. A bin counts as
 cancelled when its status is cancelled, or it is inactive and not completed
@@ -77,7 +90,7 @@ cancelled when its status is cancelled, or it is inactive and not completed
 Approved 2026-11-02: the Review & Submit step (`ReviewStep.js`) was restyled in
 the app's dashboard look. Only its layout and colours changed; the prices it
 shows, how they are fetched, the promotional rules and submission are as before.
-| Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js`, `src/services/earningsService.js` (Earnings page), `supabase/migrations/20261109_promo_cash_subsidy_withdrawable.sql` (cash-outs) |
+| Collector payout | collector app | `src/utils/paymentCalculations.js` (`promotionalPayout`), `src/services/disposalService.js`, `src/services/paymentService.js`, `src/services/earningsService.js` (Earnings page), `supabase/migrations/20261109_promo_cash_subsidy_withdrawable.sql` and `20261112100533_bin_payments_guard_and_capped_cashout.sql` (cash-outs) |
 | Admin checks | admin site | `src/utils/pickupRequestUtils.js` (`feeBreakdown`), `supabase/migrations/20261107_fee_mismatch_pricing.sql` (alert rule 9) |
 
 ## Tests that guard it
