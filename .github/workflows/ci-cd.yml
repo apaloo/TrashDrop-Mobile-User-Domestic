@@ -83,55 +83,10 @@ jobs:
         ESLINT_NO_DEV_ERRORS: true # Ignore ESLint warnings
       run: npm run build
     
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v7
-      with:
-        name: build-files
-        path: trashdrop/build/
 
-  deploy-preview:
-    needs: build-and-test
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v8
-      with:
-        name: build-files
-        path: build
-
-    - name: Deploy preview to Netlify
-      uses: nwtgck/actions-netlify@v4.0
-      with:
-        publish-dir: 'build'
-        production-deploy: false
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        deploy-message: "Deploy preview for PR #${{ github.event.pull_request.number }}"
-        alias: pr-${{ github.event.pull_request.number }}
-      env:
-        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-  
-  deploy-production:
-    needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v8
-      with:
-        name: build-files
-        path: build
-    
-    - name: Deploy to Netlify (production)
-      uses: nwtgck/actions-netlify@v4.0
-      with:
-        publish-dir: 'build'
-        production-deploy: true
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        deploy-message: "Deploy ${{ github.sha }} from GitHub Actions"
-      env:
-        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+  # No deploy jobs here: Netlify builds and publishes the site itself from
+  # every push to main (production) and every pull request (preview), within
+  # about a minute and without waiting for this workflow. CI is a gate only
+  # before merge (change-and-release policy, rule 4; branch protection, setup
+  # step 08). The old deploy jobs had no Netlify credentials and published
+  # nothing while reporting success.

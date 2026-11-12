@@ -36,7 +36,8 @@ concurrency:
 jobs:
   smoke:
     # After CI, only for pushes to main that passed (that is when Netlify deploys)
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    # After every push to main, whatever CI concluded: Netlify deploys it either way
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
