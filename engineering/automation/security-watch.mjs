@@ -203,6 +203,23 @@ export function judgeProtected(rows, expected) {
   return problems;
 }
 
+// Capacity (TD20): the performance advisor's findings (unindexed foreign keys,
+// per-row auth.uid() in policies) cost nothing while tables are small. Reported
+// every day, never a failure: when a threshold is crossed, schedule TD20.
+const CAPACITY_SQL = `
+select (select relname from pg_stat_user_tables where schemaname = 'public' order by n_live_tup desc limit 1) as largest_table,
+       (select n_live_tup::bigint from pg_stat_user_tables where schemaname = 'public' order by n_live_tup desc limit 1) as largest_rows,
+       pg_database_size(current_database())::bigint as db_bytes`;
+
+export function judgeCapacity(row, cfg) {
+  if (!row || row.largest_rows == null) return { line: 'could not be read', due: false };
+  const mb = Math.round(Number(row.db_bytes) / 1048576);
+  const rows = Number(row.largest_rows);
+  const due = rows >= cfg.revisitRows || mb >= cfg.revisitMb;
+  const what = `largest table ${row.largest_table} ≈ ${rows.toLocaleString('en-GB')} rows, database ${mb} MB`;
+  return { due, line: due ? `⚠️ ${what}: past the TD20 threshold (${cfg.revisitRows.toLocaleString('en-GB')} rows or ${cfg.revisitMb} MB), schedule the database performance work` : `✅ ${what} (TD20 waits until ${cfg.revisitRows.toLocaleString('en-GB')} rows or ${cfg.revisitMb} MB)` };
+}
+
 async function query(token, ref, sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -321,6 +338,15 @@ async function main() {
     lines.push('', '**Protected rules:** skipped (needs the same token and project ref as the advisors).');
   }
 
+  if (token && ref) {
+    try {
+      const r = judgeCapacity((await query(token, ref, CAPACITY_SQL))?.[0], config.capacity);
+      lines.push('', `**Capacity (information, never fails):** ${r.line}`);
+    } catch (e) {
+      lines.push('', `**Capacity:** could not be read (${e.message}).`);
+    }
+  }
+
   const scanCfg = config.logScan;
   if (token && ref) {
     let r;
@@ -390,6 +416,11 @@ function selfTest() {
     'view user_stats_dashboard', 'policies promotional_usage'];
   assert(listed.length === recorded.length && listed.every((o) => recorded.includes(o)), 'every protected object has a recorded fingerprint');
   assert(Object.values(config.protectedDefinitions.objects).every((h) => /^[0-9a-f]{32}$/.test(h)), 'fingerprints are md5');
+  const cap = { revisitRows: 100000, revisitMb: 2048 };
+  assert(!judgeCapacity({ largest_table: 'logs', largest_rows: 1081, db_bytes: 50 * 1048576 }, cap).due, 'judgeCapacity: small');
+  assert(judgeCapacity({ largest_table: 'logs', largest_rows: 100000, db_bytes: 1 }, cap).due && judgeCapacity({ largest_table: 'x', largest_rows: 1, db_bytes: 2048 * 1048576 }, cap).due, 'judgeCapacity: thresholds');
+  assert(!judgeCapacity(undefined, cap).due && /could not/.test(judgeCapacity(undefined, cap).line), 'judgeCapacity: nothing read');
+  assert(Number.isInteger(config.capacity?.revisitRows) && Number.isInteger(config.capacity?.revisitMb), 'capacity config');
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 
