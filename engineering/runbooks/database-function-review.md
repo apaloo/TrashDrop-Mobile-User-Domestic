@@ -159,3 +159,35 @@ them; don't fix them in the same change.
 - What was exposed, from when to when, and any evidence of use (edge logs
   keep 24 hours: role and user per call) goes to the restricted incident
   file, not the repository.
+
+## Write policies open to every row
+
+The daily security watch counts row-level security write policies (INSERT,
+UPDATE, DELETE or ALL) that apply to every row or to signed-out visitors,
+and fails when the count rises above `writePolicies.maxOpen` in
+`engineering/automation/security-watch-config.json`. It publishes the count
+only. To see which ones (Supabase SQL editor or MCP; keep the result out of
+GitHub, the repository is public):
+
+```sql
+select c.relname as table_name, p.polname, p.polcmd,
+       array(select rolname from pg_roles where oid = any(p.polroles)) as roles,
+       pg_get_expr(p.polqual, p.polrelid) as using_rule,
+       pg_get_expr(p.polwithcheck, p.polrelid) as check_rule
+from pg_policy p
+join pg_class c on c.oid = p.polrelid
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and p.polcmd in ('a', 'w', 'd', '*')
+  and p.polroles <> array[(select oid from pg_roles where rolname = 'service_role')]
+  and (coalesce(pg_get_expr(p.polqual, p.polrelid), '') = 'true'
+    or coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') = 'true'
+    or exists (select 1 from pg_roles r where r.oid = any(p.polroles) and r.rolname = 'anon'))
+order by 1, 2;
+```
+
+For each one: find who writes to the table (all three repositories and the
+Edge and Netlify functions), restrict the policy to the owner, the assigned
+collector or staff, or move the write into a SECURITY DEFINER function. Test
+it rolled back as a signed-in user (step 4), apply it with the CTO's
+go-ahead, then lower `maxOpen`.
+
