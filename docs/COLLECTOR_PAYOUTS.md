@@ -62,9 +62,15 @@ difference (`platform_subsidy`). See the pricing specification.
   marked "pending until the client's MoMo payment is confirmed"; a failed one
   shows GH₵0 and "payment failed"; a bin with no readable payment record shows
   GH₵0. This is what is shown, not what is paid.
-- A cash-out counts every MoMo payment that has **not failed**, including ones
-  still pending (`td_withdrawable_items`, part A). Whether it should wait for
-  confirmation is open with the owner (TD53).
+- A cash-out counts a MoMo/e-Cash payment only once it is **confirmed by the
+  payment gateway or an admin** (`td_withdrawable_items` part A,
+  `bin_payments.confirmed_by`; owner's decision 2026-11-12, TD53). The
+  database records who confirmed each payment; nobody can set it. A
+  collector's own "Client has paid — Confirm" marks the payment confirmed in
+  the app but doesn't make it cashable. The gateway's result always counts:
+  the webhook and the server's own status check (`trendipay-proxy`) update
+  payments the collector confirmed, and can fail them. Collectors can't
+  change a failed or confirmed payment.
 
 ## Who works it out
 
@@ -97,6 +103,8 @@ bring the default back to the owner.
 | 2026-11-12 | The payout rule is the distance-based split above, not the whole booked payout; the database will work it out (TD3) |
 | 2026-11-12 | The database works out the distance and the share (`20261112120016`); unknown distance pays 87% |
 | 2026-11-12 | Collectors keep "Client has paid — Confirm" for MoMo payments |
+| 2026-11-12 | Cash-outs count only MoMo payments confirmed by the gateway or an admin; a collector's own confirmation doesn't (TD53, `20261112154512`) |
+| 2026-11-12 | At disposal: pending MoMo shows the expected payout marked pending; failed shows GH₵0 "payment failed"; no payment record shows GH₵0 |
 
 ## Where it lives
 
