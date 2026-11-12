@@ -41,8 +41,8 @@ describe('sharing a digital bin QR code', () => {
 
   it('draws the QR from the bin link when the card has no image yet', async () => {
     QRCode.toDataURL.mockResolvedValue('data:image/png;base64,drawn');
-    await expect(qrImageDataUrl({ id: 'abc', qr_code_url: 'https://trashdrop.app/bin/abc' })).resolves.toBe('data:image/png;base64,drawn');
-    expect(QRCode.toDataURL).toHaveBeenCalledWith('https://trashdrop.app/bin/abc', expect.any(Object));
+    await expect(qrImageDataUrl({ id: 'abc', qr_code_url: 'https://app.trashdrops.com/bin/abc' })).resolves.toBe('data:image/png;base64,drawn');
+    expect(QRCode.toDataURL).toHaveBeenCalledWith('https://app.trashdrops.com/bin/abc', expect.any(Object));
   });
 
   it('reports unavailable only when there is nothing to draw', async () => {

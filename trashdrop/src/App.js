@@ -252,6 +252,9 @@ const AppContent = () => {
             } />
           )}
           <Route path="/store" element={<Navigate to="/rewards" replace />} />
+          {/* A bin's QR code (https://app.trashdrops.com/bin/<id>) opened with a
+              phone camera instead of the collector app: show the bins page */}
+          <Route path="/bin/:binId" element={<Navigate to="/digital-bin" replace />} />
         </Route>
         
         {/* 404 route */}

@@ -100,7 +100,7 @@ require.cache[sbPath] = { id: sbPath, filename: sbPath, loaded: true, exports: {
       eq: () => q, or: () => q,
       in: () => q, order: () => q, limit: () => q,
       single: async () => t === 'digital_bins'
-        ? { data: { qr_code_url: 'https://trashdrop.app/bin/bin-1' }, error: null }
+        ? { data: { qr_code_url: 'https://app.trashdrops.com/bin/bin-1' }, error: null }
         : t === 'promotional_usage' ? { data: null, error: { message: 'none' } }
         : { data: { id: 'wa1', user_id: null }, error: null },
       then: (r) => r({ data: null, error: null }) }; return q; },

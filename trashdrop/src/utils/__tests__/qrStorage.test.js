@@ -53,7 +53,7 @@ describe('QR Code Storage Tests', () => {
         locationId: mockLocationId
       });
 
-      expect(result.url).toBe(`https://trashdrop.app/bin/${mockBinId}`);
+      expect(result.url).toBe(`https://app.trashdrops.com/bin/${mockBinId}`);
       expect(result.url).not.toContain(mockLocationId);
     });
 

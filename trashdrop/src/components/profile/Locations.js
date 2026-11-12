@@ -281,7 +281,7 @@ const Locations = () => {
             const tryNominatim = async () => {
               try {
                 const headers = {
-                  'User-Agent': 'TrashDrop/1.0 (trashdrop.app)',
+                  'User-Agent': 'TrashDrop/1.0 (app.trashdrops.com)',
                   'Accept-Language': 'en'
                 };
                 const primaryUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
