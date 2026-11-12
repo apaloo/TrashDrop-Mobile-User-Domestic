@@ -38,6 +38,15 @@
    create a function in production outside a migration in the same pull
    request, refresh the snapshot (`check-rpc-calls.mjs --refresh`).
 
+10. **Write rules say whose rows they are for.** A row-level security policy
+    for INSERT, UPDATE, DELETE or ALL never uses `USING (true)` or
+    `WITH CHECK (true)`, and never applies to `anon`: that lets every
+    signed-in user (or everyone) change every row. Name the owner
+    (`user_id = auth.uid()`), the assigned collector, or staff
+    (`td_is_staff()`), or write through a SECURITY DEFINER function. Checked
+    in new migrations by CI, and on the live database daily by the security
+    watch (policies made in the dashboard skip migrations).
+
 ## Automated checks (all pull requests)
 
 | Check | Tool | Blocking |
@@ -45,7 +54,7 @@
 | Lint (application code) | ESLint | Yes |
 | Unit tests | Jest (`npm run test:ci`) | Yes |
 | Pricing guard tests | Jest + `pricing-promo.js` | Yes |
-| Database functions in new migrations (principle 8) | `scripts/ci/check-migrations.js` | Yes |
+| Database functions and write policies in new migrations (principles 8 and 10) | `scripts/ci/check-migrations.js` | Yes |
 | Database calls match real functions (principle 9), all three apps | `scripts/ci/check-rpc-calls.mjs` | Yes; tracked failures in `rpc-known-problems.json` |
 | Build | CRA / craco | Yes |
 | Secrets in new commits | gitleaks | Yes |

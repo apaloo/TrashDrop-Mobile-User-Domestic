@@ -5,7 +5,9 @@
  *      no rows (see security-watch-config.json). A control probe must see data.
  *   2. Advisors (when SUPABASE_ACCESS_TOKEN is set): no new ERROR-level
  *      findings, and warning counts no higher than their ceilings.
- *   3. Log scan (same token): no signed-out caller scanned the API in the
+ *   3. Write policies (same token): no more row-level security write rules
+ *      open to every row or to signed-out visitors than the baseline.
+ *   4. Log scan (same token): no signed-out caller scanned the API in the
  *      last 24 hours (many tables in one minute, or many missing tables).
  *      Reports minutes and counts only, never IP addresses: the repository
  *      is public.
@@ -90,6 +92,24 @@ async function logScan(token, ref, cfg) {
   return r.error ? { error: r.error } : { scans: findScans(r.rows, cfg) };
 }
 
+// Write policies open to every row or to signed-out visitors (secure
+// development principle 10). Counts only: names stay out of the public summary.
+export const OPEN_WRITE_POLICIES_SQL = `select count(*)::int as open
+from pg_policy p join pg_class c on c.oid = p.polrelid join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and p.polcmd in ('a', 'w', 'd', '*')
+  and p.polroles <> array[(select oid from pg_roles where rolname = 'service_role')]
+  and (coalesce(pg_get_expr(p.polqual, p.polrelid), '') = 'true'
+    or coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') = 'true'
+    or exists (select 1 from pg_roles r where r.oid = any(p.polroles) and r.rolname = 'anon'))`;
+
+export function judgeWritePolicies(count, cfg) {
+  const n = Number(count);
+  if (!Number.isFinite(n)) return { ok: false, line: 'could not be counted' };
+  return n <= cfg.maxOpen
+    ? { ok: true, line: `✅ ${n} open (baseline ${cfg.maxOpen})` }
+    : { ok: false, line: `❌ ${n} open, baseline ${cfg.maxOpen}: a write rule now lets every signed-in user, or signed-out visitors, change rows` };
+}
+
 async function probe(base, key, p) {
   const res = await fetch(base + p.path, {
     method: p.method,
@@ -142,6 +162,27 @@ async function main() {
     lines.push('', '**Advisors:** skipped (set SUPABASE_ACCESS_TOKEN and the SUPABASE_PROJECT_REF variable to enable).');
   }
 
+  if (token && ref) {
+    try {
+      const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ query: OPEN_WRITE_POLICIES_SQL }),
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        const r = judgeWritePolicies(rows?.[0]?.open, config.writePolicies);
+        lines.push('', `**Write policies:** ${r.line}`);
+        if (!r.ok) failures.push(`Write policies: ${r.line.replace(/^❌ /, '')}. List them privately (engineering/runbooks/database-function-review.md) and fix in a migration.`);
+      } else {
+        lines.push('', `**Write policies:** could not be read (HTTP ${res.status}); probes still ran.`);
+      }
+    } catch (e) {
+      lines.push('', `**Write policies:** could not be read (${e.message}).`);
+    }
+  } else {
+    lines.push('', '**Write policies:** skipped (needs the same token and project ref as the advisors).');
+  }
+
   const scanCfg = config.logScan;
   if (token && ref) {
     let r;
@@ -190,6 +231,9 @@ function selfTest() {
   assert(findScans(undefined, cfg).length === 0, 'findScans with no rows');
   assert(config.logScan.maxEndpointsPerMinute > 15 && config.logScan.hours <= 24, 'logScan config (above normal traffic; API allows 24 h at most)');
   assert(/having endpoints > 10/.test(SCAN_SQL) && 10 < config.logScan.maxEndpointsPerMinute && 5 < config.logScan.maxNotFoundPerMinute, 'SQL prefilter below the limits');
+  assert(judgeWritePolicies(2, { maxOpen: 2 }).ok && !judgeWritePolicies(3, { maxOpen: 2 }).ok && !judgeWritePolicies(undefined, { maxOpen: 2 }).ok, 'judgeWritePolicies');
+  assert(/^select count\(\*\)::int as open\s*$/.test(OPEN_WRITE_POLICIES_SQL.split('from')[0]), 'write policy check selects a count, not names');
+  assert(Number.isInteger(config.writePolicies?.maxOpen), 'writePolicies config');
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 
