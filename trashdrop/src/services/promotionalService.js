@@ -23,11 +23,16 @@ export const checkPromotionalEligibility = async (userId) => {
       .from('promotional_usage')
       .select('is_eligible, used_count, max_requests')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle(); // no row is normal, not a 406 in the logs (owner-approved 2026-11-12)
 
     if (error) {
-      // No row found means the user was created before the trigger existed
       console.warn('[PromoService] Eligibility check failed:', error.message);
+      return { isEligible: false, usedCount: 0, maxRequests: 0 };
+    }
+
+    // No row: the account was created before the sign-up trigger, so no
+    // promotions (docs/DIGITAL_BIN_PRICING.md). Same answer as a failed read.
+    if (!data) {
       return { isEligible: false, usedCount: 0, maxRequests: 0 };
     }
 

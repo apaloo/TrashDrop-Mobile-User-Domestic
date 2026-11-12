@@ -41,7 +41,9 @@ urgent = 80 + 24 + 1 = **GHS 105**.
   bookings can't both take the last one. App and WhatsApp bookings count alike.
 - Urgent bookings always pay the standard price and don't use a promotion.
 - Accounts without a `promotional_usage` row (created before the signup
-  trigger) get no promotions.
+  trigger) get no promotions. The app reads the row with `maybeSingle()`, so
+  "no row" is a normal answer, not an error in the logs (approved 2026-11-12;
+  same result as before: not eligible, nothing to show).
 - The sign-up trigger (`create_promotional_usage_on_signup`) fixes its
   `search_path` (approved 2026-11-12, migration `20261112123921`); what it does
   is unchanged.
