@@ -76,6 +76,12 @@ describe('verifyBatchAndUpdateUser', () => {
     expect(res.attempts).toBe(1);
   });
 
+  it("leaves the user's stats to the database (no refresh of everyone's totals)", async () => {
+    await batchService.verifyBatchAndUpdateUser('BATCH-7F3K2', USER, once);
+
+    expect(rpcCalls().map(([fn]) => fn)).not.toContain('refresh_all_user_stats');
+  });
+
   it('reads the code out of a scanned link', async () => {
     await batchService.verifyBatchAndUpdateUser(`https://trashdrops.com/scan?batch=${BATCH_ID}`, USER, once);
     expect(mockCalls).toContainEqual(['batches', 'eq', 'id', BATCH_ID]);
