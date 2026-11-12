@@ -8,7 +8,8 @@
    changes are computed and checked in the database (RLS, triggers, RPCs) or in
    server functions. The app may show a preview, but never the figure that is
    charged or paid. Digital bin pricing already works this way
-   (`docs/DIGITAL_BIN_PRICING.md`); carter payouts must follow.
+   (`docs/DIGITAL_BIN_PRICING.md`), and so do points (`docs/POINTS.md`);
+   carter payouts must follow.
 2. **Every table has row-level security on**, with policies that name who may
    read and write. A new table without RLS fails review.
 3. **Every server endpoint checks who is calling.** Netlify and Edge Functions
