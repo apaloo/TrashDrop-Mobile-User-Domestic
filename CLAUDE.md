@@ -47,6 +47,15 @@ lives in the collector repository, whose `CLAUDE.md` protects it; the
 specification here changes only with the owner's written approval in the pull
 request, like the pricing and points rules.
 
+## Database changes go in this repository
+Decided by the owner on 2026-11-12 (ADR-001,
+`engineering/decisions/ADR-001-database-schema-ownership.md`): every new
+database migration, for any of the three apps, goes in
+`trashdrop/supabase/migrations/`, named with the version it was applied under.
+The collector and admin repositories no longer add migrations; a pull request
+there that needs a schema change links one here. The one exception is
+`td_capability_roles`, which stays with the admin site's permissions.
+
 ## Protected database objects are watched
 The daily security watch fingerprints the database objects behind the
 protected rules (pricing, points and collector payouts) and fails if one

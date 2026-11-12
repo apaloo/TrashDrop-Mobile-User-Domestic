@@ -1,6 +1,6 @@
 # ADR-001: Who owns the shared database schema
 
-**Status:** Proposed (for the CTO's decision) · **Date:** 2026-11-11
+**Status:** Accepted by the owner on 2026-11-12 (option A) · **Proposed:** 2026-11-11
 
 ## Context
 
@@ -40,9 +40,9 @@ All three repositories contain migrations that change it:
 | B. Each repository owns named tables and functions | Changes stay next to the app that needs them | Ownership of shared tables (`profiles`, `pickup_requests`, `digital_bins`, `bin_payments`) is unclear; history stays split |
 | C. Keep as is | No work | Drift continues; a migration from one app can break another unseen |
 
-## Decision (proposed)
+## Decision
 
-**Option A.**
+**Option A** (accepted 2026-11-12).
 
 - **Until the new repository exists**, all new migrations go into
   `trashdrop/supabase/migrations/` in the household repository. It already
@@ -52,6 +52,12 @@ All three repositories contain migrations that change it:
   requests that need a schema change link a household-repository pull
   request.
 - Edge Functions stay with the app that calls them.
+- **One exception until the platform repository exists:** `td_capability_roles`
+  (who may do what on the admin site) stays in the admin repository's
+  migrations, because the admin site's permission test compares it with
+  `src/lib/permissions.js` in the same repository.
+- The daily security watch checks that every migration production has
+  recorded has its file (*Migration ledger*), whichever repository holds it.
 
 ## Consequences
 
