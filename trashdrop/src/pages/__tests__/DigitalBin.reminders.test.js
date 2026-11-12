@@ -5,8 +5,11 @@ import { MemoryRouter } from 'react-router-dom';
 import DigitalBin from '../DigitalBin.js';
 import { answerReminder, createReminderPlan } from '../../services/binReminderService.js';
 
+// One auth object, as the real AuthContext keeps user in state: a new user
+// object on every render re-runs the page's [user] effects without end.
+const mockAuth = { user: { id: 'u1' }, session: { expires_at: 4102444800 }, isLoading: false };
 jest.mock('../../context/AuthContext.js', () => ({
-  useAuth: () => ({ user: { id: 'u1' }, session: { expires_at: 4102444800 }, isLoading: false })
+  useAuth: () => mockAuth
 }));
 
 // Every insert into digital_bins is recorded and answered with bin-1
