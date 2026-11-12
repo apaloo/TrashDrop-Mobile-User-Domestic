@@ -191,3 +191,28 @@ collector or staff, or move the write into a SECURITY DEFINER function. Test
 it rolled back as a signed-in user (step 4), apply it with the CTO's
 go-ahead, then lower `maxOpen`.
 
+
+## Functions a signed-in user can run without a caller check
+
+The security watch counts these daily (`uncheckedFunctions` in
+`security-watch-config.json`; baseline 0 that write, 2 that read personal
+data, 2026-11-12). When the count rises, list them here, privately (SQL editor,
+never in an issue or pull request until fixed):
+
+```sql
+select p.proname, pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public'
+where p.prosecdef and p.prorettype <> 'trigger'::regtype
+  and has_function_privilege('authenticated', p.oid, 'execute')
+  and not (p.prosrc ~* 'auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_staff|td_can_manage_requests|td_is_staff|td_is_active_collector|td_my_collector|can_do\(|td_my_team|td_area_report_for')
+  and ((pg_get_function_identity_arguments(p.oid) ~* 'uuid|_id' and p.prosrc ~* '\m(insert\s+into|update\s+\w|delete\s+from)')
+       or p.prosrc ~* 'auth\.users|\mphone\M')
+order by 1;
+```
+
+Then, for each one: find its callers in all three apps and in the API logs
+(`/rest/v1/rpc/<name>` in the edge logs). Unused: make it server-only
+(`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated; GRANT ... TO
+service_role`). Used: add a check of who is calling (`td_assert_self_or_staff`,
+`td_can_manage_requests()`, `can_do('<capability>')`), test it rolled back as a
+household user, a collector and staff, and apply it in a migration.

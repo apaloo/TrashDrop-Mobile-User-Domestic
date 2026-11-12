@@ -110,6 +110,27 @@ export function judgeWritePolicies(count, cfg) {
     : { ok: false, line: `❌ ${n} open, baseline ${cfg.maxOpen}: a write rule now lets every signed-in user, or signed-out visitors, change rows` };
 }
 
+// Functions that run with their owner's rights, can be run by any signed-in
+// user, and show no check of who is calling (secure development principle 8):
+// those that write and take an id, and those that read personal data. Counts
+// only; list them with the query in engineering/runbooks/database-function-review.md.
+const CALLER_CHECKS = String.raw`auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_staff|td_can_manage_requests|td_is_staff|td_is_active_collector|td_my_collector|can_do\(|td_my_team|td_area_report_for`;
+export const UNCHECKED_FUNCTIONS_SQL = `select
+  count(*) filter (where pg_get_function_identity_arguments(p.oid) ~* 'uuid|_id'
+                     and p.prosrc ~* '\\m(insert\\s+into|update\\s+\\w|delete\\s+from)')::int as writers,
+  count(*) filter (where p.prosrc ~* 'auth\\.users|\\mphone\\M')::int as personal_reads
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public'
+where p.prosecdef and p.prorettype <> 'trigger'::regtype
+  and has_function_privilege('authenticated', p.oid, 'execute')
+  and not (p.prosrc ~* '${CALLER_CHECKS}')`;
+
+export function judgeUnchecked(row, cfg) {
+  const w = Number(row?.writers); const r = Number(row?.personal_reads);
+  if (!Number.isFinite(w) || !Number.isFinite(r)) return { ok: false, line: 'could not be counted' };
+  const ok = w <= cfg.maxWriters && r <= cfg.maxPersonalReads;
+  return { ok, line: `${ok ? '✅' : '❌'} ${w} that write (baseline ${cfg.maxWriters}), ${r} that read personal data (baseline ${cfg.maxPersonalReads})` };
+}
+
 // Protected business rules (CLAUDE.md: pricing, points, collector payouts)
 // live in database objects that the dashboard can change without a pull
 // request. Each one is fingerprinted (md5 of its definition and grants) and
@@ -247,6 +268,16 @@ async function main() {
 
   if (token && ref) {
     try {
+      const r = judgeUnchecked((await query(token, ref, UNCHECKED_FUNCTIONS_SQL))?.[0], config.uncheckedFunctions);
+      lines.push('', `**Functions without a caller check:** ${r.line}`);
+      if (!r.ok) failures.push(`Functions without a caller check: ${r.line.replace(/^❌ /, '')}. A signed-in user can run them for anyone. List them privately (engineering/runbooks/database-function-review.md) and add a check or make them server-only.`);
+    } catch (e) {
+      lines.push('', `**Functions without a caller check:** could not be read (${e.message}).`);
+    }
+  }
+
+  if (token && ref) {
+    try {
       const problems = judgeProtected(await query(token, ref, PROTECTED_DEFINITIONS_SQL), config.protectedDefinitions.objects);
       const n = Object.keys(config.protectedDefinitions.objects).length;
       lines.push('', `**Protected rules:** ${problems.length ? `❌ ${problems.length} of ${n} database objects differ from what the owner approved` : `✅ all ${n} database objects match what the owner approved`}`);
@@ -312,6 +343,11 @@ function selfTest() {
   assert(judgeWritePolicies(2, { maxOpen: 2 }).ok && !judgeWritePolicies(3, { maxOpen: 2 }).ok && !judgeWritePolicies(undefined, { maxOpen: 2 }).ok, 'judgeWritePolicies');
   assert(/^select count\(\*\)::int as open\s*$/.test(OPEN_WRITE_POLICIES_SQL.split('from')[0]), 'write policy check selects a count, not names');
   assert(Number.isInteger(config.writePolicies?.maxOpen), 'writePolicies config');
+  const ucfg = { maxWriters: 0, maxPersonalReads: 2 };
+  assert(judgeUnchecked({ writers: 0, personal_reads: 2 }, ucfg).ok && !judgeUnchecked({ writers: 1, personal_reads: 0 }, ucfg).ok
+    && !judgeUnchecked({ writers: 0, personal_reads: 3 }, ucfg).ok && !judgeUnchecked(undefined, ucfg).ok, 'judgeUnchecked');
+  assert(/^select\s+count\(\*\)/.test(UNCHECKED_FUNCTIONS_SQL) && !/proname\s*(,|as)/.test(UNCHECKED_FUNCTIONS_SQL.split('from pg_proc')[0]), 'unchecked-function check selects counts, not names');
+  assert(Number.isInteger(config.uncheckedFunctions?.maxWriters) && Number.isInteger(config.uncheckedFunctions?.maxPersonalReads), 'uncheckedFunctions config');
   const exp = { 'function a': 'h1', 'view b': 'h2' };
   assert(judgeProtected([{ rule: 'x', object: 'function a', hash: 'h1' }, { rule: 'x', object: 'view b', hash: 'h2' }], exp).length === 0, 'judgeProtected: unchanged');
   const pr = judgeProtected([{ rule: 'x', object: 'function a', hash: 'zz' }, { rule: 'x', object: 'view b', hash: null }, { rule: 'x', object: 'trigger c', hash: 'h3' }], exp);
