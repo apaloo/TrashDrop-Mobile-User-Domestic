@@ -14,7 +14,8 @@ Run by GitHub Actions through `actions/github-script`; plain CommonJS, no depend
 | `release-notes.js` | `release-notes.yml` | GitHub Release per production deploy, listing the pull requests shipped |
 | `error-watch.mjs` + `error-watch-config.json` | `error-watch.yml` (daily) | Database errors in the last 24 hours by type; flags new or growing ones (`--self-test` runs without network) |
 | `supabase-logs.mjs` | security watch, error watch | Reads production logs through the Supabase Management API |
-| `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production, the Supabase security advisor, and a scan check on the last 24 hours of API logs (`--self-test` runs without network) |
+| `security-watch.mjs` + `security-watch-config.json` | `security-watch.yml` (daily) | Outsider's-view probes of production, the Supabase security advisor, a scan check on the last 24 hours of API logs, protected-object fingerprints, the migration ledger, caller checks skipped when signed out, and money or points writes (`--self-test` runs without network) |
+| `schema-snapshot.mjs` | `schema-snapshot.yml` (Mondays, and on demand) | Writes the live production schema into `trashdrop/supabase/schema/`, one file per table, function and view, and opens a pull request when it changed (TD18, ADR-001). Refuses to write a definition that looks like it holds a secret (`--self-test` runs without network) |
 | `production-smoke.mjs` + `production-smoke-config.json` | `production-smoke.yml` (hourly, and 7 minutes after each household deploy) | Each live site up, routed and with its key functions deployed; one issue while anything fails. `--self-test` checks the logic offline |
 
 All scripts are idempotent: they look for an existing issue with the same
