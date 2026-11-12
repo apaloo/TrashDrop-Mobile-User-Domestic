@@ -40,6 +40,7 @@ Who can see or change data inside the product (households, carters, staff,
 MMDA officers) is enforced by Postgres row-level security and `SECURITY
 DEFINER` functions. It is never enforced by hiding buttons in the app. Any change to
 these rules follows [Change and release](change-and-release.md) and needs the
-Technical Lead's review. Adding a staff admin must not require a code change;
-replacing the hard-coded admin email list is on the
-[technical-debt register](../registers/tech-debt.md).
+Technical Lead's review. Admins are the accounts in the `staff_admins` table,
+added and removed by an admin on the admin site's Account approvals page
+(every change in Logs; the last admin can't be removed). No code or database
+change is needed to add one, and no app keeps its own list of admins.
