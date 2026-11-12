@@ -220,6 +220,39 @@ export function judgeCapacity(row, cfg) {
   return { due, line: due ? `⚠️ ${what}: past the TD20 threshold (${cfg.revisitRows.toLocaleString('en-GB')} rows or ${cfg.revisitMb} MB), schedule the database performance work` : `✅ ${what} (TD20 waits until ${cfg.revisitRows.toLocaleString('en-GB')} rows or ${cfg.revisitMb} MB)` };
 }
 
+// Migration ledger (TD18): every migration production has recorded must have
+// its file in one of the three repositories, so nothing applied is lost. A
+// file matches by its version prefix or by the migration's name (the admin
+// repository names files by date and name).
+export const MIGRATION_LEDGER_SQL = `select version, coalesce(name, '') as name from supabase_migrations.schema_migrations order by version`;
+
+export function judgeLedger(rows, files, cfg) {
+  if (!Array.isArray(rows) || !Array.isArray(files) || files.length === 0) {
+    return { ok: false, missing: [], line: 'could not be read' };
+  }
+  const missing = rows.filter((r) => !files.some((f) => f.startsWith(String(r.version)) || (r.name && f.includes(r.name))))
+    .map((r) => `${r.version} ${r.name}`.trim());
+  const ok = missing.length <= cfg.maxMissing;
+  return {
+    ok, missing,
+    line: ok
+      ? `✅ all ${rows.length} migrations production recorded have their file (${files.length} files in ${cfg.repos.length} repositories)`
+      : `❌ ${missing.length} migration(s) applied to production have no file in any repository: ${missing.join(', ')}`,
+  };
+}
+
+async function listMigrationFiles(repos) {
+  const headers = { accept: 'application/vnd.github+json', 'user-agent': 'trashdrop-security-watch' };
+  if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const files = [];
+  for (const { repo, path: dir } of repos) {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${dir}?ref=main`, { headers });
+    if (!res.ok) throw new Error(`${repo}: HTTP ${res.status}`);
+    (await res.json()).forEach((f) => { if (f.name.endsWith('.sql')) files.push(f.name); });
+  }
+  return files;
+}
+
 async function query(token, ref, sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -347,6 +380,16 @@ async function main() {
     }
   }
 
+  if (token && ref) {
+    try {
+      const r = judgeLedger(await query(token, ref, MIGRATION_LEDGER_SQL), await listMigrationFiles(config.migrationLedger.repos), config.migrationLedger);
+      lines.push('', `**Migration ledger:** ${r.line}`);
+      if (!r.ok) failures.push(`Migration ledger: ${r.missing.length} migration(s) applied to production have no file in any repository (${r.missing.join(', ')}). Add each file under its applied version (ADR-001).`);
+    } catch (e) {
+      lines.push('', `**Migration ledger:** could not be read (${e.message}).`);
+    }
+  }
+
   const scanCfg = config.logScan;
   if (token && ref) {
     let r;
@@ -421,6 +464,13 @@ function selfTest() {
   assert(judgeCapacity({ largest_table: 'logs', largest_rows: 100000, db_bytes: 1 }, cap).due && judgeCapacity({ largest_table: 'x', largest_rows: 1, db_bytes: 2048 * 1048576 }, cap).due, 'judgeCapacity: thresholds');
   assert(!judgeCapacity(undefined, cap).due && /could not/.test(judgeCapacity(undefined, cap).line), 'judgeCapacity: nothing read');
   assert(Number.isInteger(config.capacity?.revisitRows) && Number.isInteger(config.capacity?.revisitMb), 'capacity config');
+  const lcfg = { repos: [{}, {}], maxMissing: 0 };
+  const lfiles = ['20261112154512_td53_confirmed_only_cashout.sql', '20261117_admin_confirm_bin_payments.sql'];
+  assert(judgeLedger([{ version: '20261112154512', name: 'td53_confirmed_only_cashout' }, { version: '20261112160018', name: 'admin_confirm_bin_payments' }], lfiles, lcfg).ok, 'judgeLedger: by version and by name');
+  const lmiss = judgeLedger([{ version: '20261201000000', name: 'something_new' }], lfiles, lcfg);
+  assert(!lmiss.ok && lmiss.missing[0] === '20261201000000 something_new', 'judgeLedger: missing file');
+  assert(!judgeLedger(undefined, lfiles, lcfg).ok && !judgeLedger([], [], lcfg).ok, 'judgeLedger: nothing read');
+  assert(Array.isArray(config.migrationLedger?.repos) && config.migrationLedger.repos.length === 3 && Number.isInteger(config.migrationLedger.maxMissing), 'migrationLedger config');
   console.log(`self-test passed (${config.probes.length} probes configured)`);
 }
 
