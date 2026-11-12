@@ -2,6 +2,10 @@
   publish = "build"
   command = "CI=false npm run build"
 
+[build.environment]
+  # Node 22 LTS (supported to April 2027); Node 20 reached end of life in April 2026
+  NODE_VERSION = "22"
+
 # Redirect rule to support client-side routing for the SPA
 [[redirects]]
   from = "/*"

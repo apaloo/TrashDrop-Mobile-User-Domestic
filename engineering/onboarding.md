@@ -16,7 +16,7 @@ onboarding issue (the **Access request** form opens it).
 
 ## Day 2: run the three apps locally
 
-You need Node 20 (`nvm install 20`) and Git.
+You need Node 22 (`nvm install`, which reads `.nvmrc`) and Git.
 
 > **There is no staging database yet** (setup step 05). Until there is, a
 > local app talks to **production**. Use only the test accounts from the

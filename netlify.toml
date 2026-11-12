@@ -3,6 +3,10 @@
   publish = "build"
   command = "CI=false npm run build"
 
+[build.environment]
+  # Node 22 LTS (supported to April 2027); Node 20 reached end of life in April 2026
+  NODE_VERSION = "22"
+
 # The app moved to app.trashdrops.com: send the old Netlify address there.
 # Only the old host matches, so app.trashdrops.com and deploy previews are untouched.
 [[redirects]]
