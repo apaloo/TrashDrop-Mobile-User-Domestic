@@ -58,18 +58,26 @@ difference (`platform_subsidy`). See the pricing specification.
 - Cash-outs list their items on the server (`withdrawal_items`); the app
   can't add its own.
 
-## Where it is worked out today, and where it is going
+## Who works it out
 
-| Step | Today | Decided direction (TD3) |
-|---|---|---|
-| Booked payout (ceiling) | Database at booking | Unchanged |
-| Travel distance | Collector app, from the phone's location when the collector accepts | Database, from the collector's last reported location and the bin's location |
-| Collector's share | Collector app when the payment is recorded (`computeBinPaymentShares`), capped by the database at the booked payout | Database, when the bin is disposed |
-| Cash-out | Database | Unchanged |
+The database, at every step (since 2026-11-12, TD3):
 
-Until the database works out the share itself, the cap at the booked payout is
-what protects TrashDrop: a wrong distance can move a collector's share between
-85% and 92% of the base, never above the booked payout.
+| Step | How |
+|---|---|
+| Booked payout (ceiling) | Priced when the bin is booked (`td_price_digital_bin`) |
+| Travel distance | Recorded when a collector takes the bin (`td_record_bin_acceptance`): straight-line distance from the collector's reported position to the bin, if that position is **under 15 minutes old**. Otherwise unknown, which pays **87%** (owner's decision 2026-11-12, to revisit with data). Collectors can't set it |
+| Collector's share | Set when the payment is recorded (`td_bin_collector_share`, applied by `td_guard_bin_payment`), from what the client paid, never above the bin's fee or the booked payout. The app's own figures are ignored |
+| Cash-out | `td_withdrawable_items` |
+
+The collector app still works the share out to show it before the payment is
+recorded (`computeBinPaymentShares`); it reads the distance from the bin, so it
+shows the same figure.
+
+**Watch the 87% default.** A bin within 2 km earns 85%, an unknown distance
+87%, so turning location off pays slightly more on nearby bins. The monthly
+report shows how often the distance is unknown
+(`trashdrop/supabase/diagnostics/collector_payout_check.sql`); if it is often,
+bring the default back to the owner.
 
 ## Decisions
 
@@ -79,14 +87,18 @@ what protects TrashDrop: a wrong distance can move a collector's share between
 | 2026-11-12 | Payment records and cash-outs capped at the booked payout (approved "with caution") |
 | 2026-11-12 | Collectors can't change a bin's booked price or payout |
 | 2026-11-12 | The payout rule is the distance-based split above, not the whole booked payout; the database will work it out (TD3) |
+| 2026-11-12 | The database works out the distance and the share (`20261112120016`); unknown distance pays 87% |
 | 2026-11-12 | Collectors keep "Client has paid — Confirm" for MoMo payments |
 
 ## Where it lives
 
 - Database (collector repository `supabase/migrations/`):
   `td_keep_booked_payout` and its trigger (`20261112113921`),
-  `td_guard_bin_payment` and its trigger, `td_withdrawable_items`
-  (`20261112100533`).
+  `td_record_bin_acceptance` and its trigger, `td_bin_collector_share`,
+  `td_guard_bin_payment` (`20261112120016`) and its trigger,
+  `td_withdrawable_items` (`20261112100533`).
+- Check (read-only, monthly report): household
+  `trashdrop/supabase/diagnostics/collector_payout_check.sql`.
 - Collector app: `src/utils/paymentCalculations.js`
   (`getDeadheadShare`, `computeBinPaymentShares`, `promotionalPayout`,
   `computePromotionalShares`), `src/services/paymentService.js`,
