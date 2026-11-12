@@ -349,22 +349,20 @@ const Rewards = () => {
       // Generate a unique redemption code
       const redemptionCode = `REWARD-${reward.id}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
-      // Insert redemption record in Supabase
-      const { data: redemptionData, error: redemptionError } = await supabase
-        .from('rewards_redemption')
-        .insert([
-          {
-            user_id: user.id,
-            reward_id: reward.id,
-            points_spent: reward.pointsCost,
-            status: 'pending',
-            // Where staff send airtime or data
-            ...(delivery ? { phone_number: delivery.phone, network: delivery.network } : {})
-          }
-        ])
-        .select();
-      
-      if (redemptionError) throw redemptionError;
+      // The server checks the reward's cost and the balance, then records the
+      // request (td_redeem_reward); the points spent are the database's, not ours
+      const { data: redemptionData, error: redemptionError } = await supabase.rpc('td_redeem_reward', {
+        p_reward_id: reward.id,
+        // Where staff send airtime or data
+        p_phone: delivery?.phone || null,
+        p_network: delivery?.network || null,
+      });
+
+      if (redemptionError) {
+        const err = new Error(redemptionError.message);
+        err.fromServer = true;
+        throw err;
+      }
       
       console.log('[Rewards] Successfully recorded reward redemption:', redemptionData);
       
@@ -384,8 +382,9 @@ const Rewards = () => {
         }
       ]);
       
-      // Update local state and show it under My Redemptions
-      setUserPoints(prev => prev - reward.pointsCost);
+      // Update local state and show it under My Redemptions (the server's balance)
+      const balanceAfter = Number(redemptionData?.balance_after);
+      setUserPoints(prev => (Number.isFinite(balanceAfter) ? balanceAfter : prev - reward.pointsCost));
       fetchRecentRedemptions();
       
       // Show success message
@@ -400,7 +399,8 @@ const Rewards = () => {
       });
     } catch (error) {
       console.error('Error redeeming reward:', error);
-      setErrorMessage('Failed to redeem reward. Please try again.');
+      // The server's own reason ("Not enough points for this reward") when it refused
+      setErrorMessage(error?.fromServer && error.message ? error.message : 'Failed to redeem reward. Please try again.');
     } finally {
       setIsRedeeming(false);
     }
