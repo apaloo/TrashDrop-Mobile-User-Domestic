@@ -136,5 +136,9 @@ bring the default back to the owner.
   `computePromotionalShares`), `src/services/paymentService.js`,
   `src/services/disposalService.js`, `src/services/earningsService.js`.
 - Tests (collector app): `src/utils/__tests__/promotionalPayout.test.js`,
-  `src/services/__tests__/earningsPromotional.test.js`.
+  `src/services/__tests__/earningsPromotional.test.js`,
+  `src/services/__tests__/earningsLoyaltyTier.test.js` (the Earnings page's
+  loyalty tier: Silver when there is no row for the month; read with
+  `maybeSingle()` so "no row" is not an error in the logs, approved
+  2026-11-12; nothing it shows changed).
 - The daily security watch fingerprints the database objects above.

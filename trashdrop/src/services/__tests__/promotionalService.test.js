@@ -15,6 +15,7 @@ jest.mock('../../utils/supabaseClient.js', () => {
       eq: (col, val) => { mockCalls.push(['eq', col, val]); return q; },
       order: (col, opts) => { mockCalls.push(['order', col, opts]); return Promise.resolve(mockResult(table)); },
       single: () => Promise.resolve(mockResult(table)),
+      maybeSingle: () => { mockCalls.push(['maybeSingle', table]); return Promise.resolve(mockResult(table)); },
     };
     return q;
   };
@@ -47,6 +48,13 @@ describe('checkPromotionalEligibility', () => {
   it('treats a missing row or a failed read as not eligible', async () => {
     mockResult = () => ({ data: null, error: { message: 'no rows' } });
     expect(await checkPromotionalEligibility('u1')).toEqual({ isEligible: false, usedCount: 0, maxRequests: 0 });
+  });
+
+  it('treats no row (an account from before the sign-up trigger) as not eligible, with no promotions to show', async () => {
+    mockResult = () => ({ data: null, error: null });
+    expect(await checkPromotionalEligibility('u1')).toEqual({ isEligible: false, usedCount: 0, maxRequests: 0 });
+    // asked for at most one row, so "no row" is not an error (no 406 in the logs)
+    expect(mockCalls).toContainEqual(['maybeSingle', 'promotional_usage']);
   });
 });
 
