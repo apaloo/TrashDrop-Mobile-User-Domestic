@@ -7,7 +7,7 @@
 |---|---|---|
 | Digital bin pricing and promotions | [`docs/DIGITAL_BIN_PRICING.md`](../../docs/DIGITAL_BIN_PRICING.md) | `td_price_digital_bin`, `td_set_digital_bin_price`, `td_protect_digital_bin_price`, `td_refund_promotion_on_cancel`, `increment_promotional_usage`, their triggers on `digital_bins`, the policies on `promotional_usage` |
 | Points | [`docs/POINTS.md`](../../docs/POINTS.md) | `user_stats_dashboard`, `td_redeem_reward`, `td_guard_request_write` and its trigger, `td_guard_profile_columns` and its trigger, `get_dashboard_data_optimized` |
-| Collector payouts | [`docs/COLLECTOR_PAYOUTS.md`](../../docs/COLLECTOR_PAYOUTS.md) | `td_keep_booked_payout` and its trigger on `digital_bins`, `td_guard_bin_payment` and its trigger, `td_withdrawable_items` |
+| Collector payouts | [`docs/COLLECTOR_PAYOUTS.md`](../../docs/COLLECTOR_PAYOUTS.md) | `td_keep_booked_payout` and `td_record_bin_acceptance` and their triggers on `digital_bins`, `td_bin_collector_share`, `td_guard_bin_payment` and its trigger, `td_withdrawable_items` |
 
 ## Changing a protected rule
 

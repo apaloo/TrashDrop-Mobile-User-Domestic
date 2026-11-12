@@ -6,6 +6,7 @@
 /trashdrop/supabase/migrations/20261024*                    @apaloo
 /trashdrop/supabase/diagnostics/server_side_bin_pricing_rollback.sql @apaloo
 /trashdrop/supabase/diagnostics/digital_bin_pricing_check.sql @apaloo
+/trashdrop/supabase/diagnostics/collector_payout_check.sql @apaloo
 /trashdrop/src/services/digitalBinService.js                @apaloo
 /trashdrop/src/services/promotionalService.js               @apaloo
 /trashdrop/src/services/gpsPricingService.js                @apaloo

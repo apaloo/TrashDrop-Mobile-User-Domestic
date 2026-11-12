@@ -119,12 +119,14 @@ const PROTECTED_FUNCTIONS = [
   ['pricing', 'td_refund_promotion_on_cancel'], ['pricing', 'increment_promotional_usage'],
   ['points', 'td_redeem_reward'], ['points', 'td_guard_request_write'], ['points', 'td_guard_profile_columns'], ['points', 'get_dashboard_data_optimized'],
   ['payouts', 'td_guard_bin_payment'], ['payouts', 'td_withdrawable_items'], ['payouts', 'td_keep_booked_payout'],
+  ['payouts', 'td_record_bin_acceptance'], ['payouts', 'td_bin_collector_share'],
 ];
 const PROTECTED_TRIGGERS = [
   ['pricing', 'digital_bins', 'digital_bins_set_price'], ['pricing', 'digital_bins', 'digital_bins_protect_price'],
   ['pricing', 'digital_bins', 'digital_bins_refund_promotion'],
   ['points', 'pickup_requests', 'aa_td_guard_write'], ['points', 'profiles', 'td_guard_profile_columns'],
   ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'], ['payouts', 'digital_bins', 'ab_td_keep_booked_payout'],
+  ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'],
 ];
 const values = (rows) => rows.map((r) => `(${r.map((v) => `'${v}'`).join(',')})`).join(',');
 export const PROTECTED_DEFINITIONS_SQL = `with fns(rule, name) as (values ${values(PROTECTED_FUNCTIONS)}),
