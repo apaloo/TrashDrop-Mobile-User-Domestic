@@ -58,10 +58,13 @@ difference (`platform_subsidy`). See the pricing specification.
 - Cash-outs list their items on the server (`withdrawal_items`); the app
   can't add its own.
 - What the collector is shown at disposal (owner's decisions, 2026-11-12):
-  a bin whose client MoMo payment is still pending shows the expected payout
-  marked "pending until the client's MoMo payment is confirmed"; a bin with no
-  readable payment record shows GH₵0. Only confirmed payments are
-  withdrawable.
+  a client MoMo payment still pending (or initiated) shows the expected payout
+  marked "pending until the client's MoMo payment is confirmed"; a failed one
+  shows GH₵0 and "payment failed"; a bin with no readable payment record shows
+  GH₵0. This is what is shown, not what is paid.
+- A cash-out counts every MoMo payment that has **not failed**, including ones
+  still pending (`td_withdrawable_items`, part A). Whether it should wait for
+  confirmation is open with the owner (TD53).
 
 ## Who works it out
 
