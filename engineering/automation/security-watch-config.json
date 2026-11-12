@@ -197,6 +197,15 @@
       "expect": "data"
     }
   ],
+  "migrationLedger": {
+    "_comment": "TD18 / ADR-001: every migration production has recorded must have its file in one of these folders. On 2026-11-12 all 55 did. Files applied by hand in the SQL editor before 2026-11-11 are not in production's history and are not checked here.",
+    "repos": [
+      { "repo": "apaloo/TrashDrop-Mobile-User-Domestic", "path": "trashdrop/supabase/migrations" },
+      { "repo": "apaloo/TrashDrop-Mobile-Collector-Driver", "path": "supabase/migrations" },
+      { "repo": "apaloo/TrashDrop_Management_webApp_admins", "path": "supabase/migrations" }
+    ],
+    "maxMissing": 0
+  },
   "capacity": {
     "_comment": "TD20: database performance work (indexes, policy rewrites) waits until a table or the database is this big. Reported daily, never fails. On 2026-11-12 the largest table had about 1,100 rows and digital_bins 28.",
     "revisitRows": 10000,

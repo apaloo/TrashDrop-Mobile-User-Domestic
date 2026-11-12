@@ -15,6 +15,23 @@ All three repositories contain migrations that change it:
 - No repository can rebuild the database from scratch, and there is no
   staging copy to test a change against the other two apps.
 
+### Update 2026-11-12
+
+- Production's history now records 55 migrations, every one with its file in
+  one of the three repositories. The daily security watch checks this
+  (*Migration ledger*) and fails if a recorded migration has no file.
+- 78 older files (admin 38, household 20, carter 20) were applied by hand and
+  are not in production's history; nothing proves production matches them.
+  The protected rules (pricing, points, payouts) are fingerprinted daily, so
+  drift there is caught; elsewhere it is not.
+- 8 functions are defined in more than one repository's migrations
+  (`td_is_staff`, `td_staff_users`, `td_audit_actor`, `td_alert_notify`,
+  `td_guard_request_write`, `protect_collector_admin_fields`,
+  `update_collector_location`, `update_updated_at_column`). Production is
+  the latest applied version; the files no longer show which one that is.
+- Without this decision, migrations on 2026-11-12 were recorded in all three
+  repositories (each next to the app that needed it).
+
 ## Options
 
 | Option | For | Against |

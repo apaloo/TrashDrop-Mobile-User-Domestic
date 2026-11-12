@@ -43,6 +43,8 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Lists the migration folders of the three repositories (migration ledger)
+          GITHUB_TOKEN: ${{ github.token }}
         run: node engineering/automation/security-watch.mjs
 
       # Pull requests only check that the script runs; issues come from the
