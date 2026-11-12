@@ -142,6 +142,27 @@ const check = (label, fn) => { try { fn(); console.log('  ok   ' + label); passe
   check('redelivery is skipped', () =>
     assert.ok(!rpcCalls.includes('get_active_whatsapp_session'), 'session was touched on replay'));
 
+  {
+    const lines = [];
+    const saved = { log: console.log, warn: console.warn, error: console.error };
+    console.log = console.warn = console.error = (...a) => lines.push(a.map(String).join(' '));
+    const privateBody = envelope({ id: 'wamid.private', from: '233244000000', timestamp: '1',
+      type: 'text', text: { body: 'House 12, Osu Badu Street' } });
+    try { await post(privateBody, sign(privateBody)); } finally { Object.assign(console, saved); }
+    const logged = lines.join('\n');
+    check('logs never show the full phone number or what was written', () => {
+      assert.ok(!logged.includes('233244000000'), 'full number logged:\n' + logged);
+      assert.ok(!logged.includes('Osu Badu'), 'message text logged:\n' + logged);
+      assert.ok(logged.includes('233***00'), 'masked number missing:\n' + logged);
+    });
+    check('maskPhone keeps 3 + 2 digits and hides short values', () => {
+      const { maskPhone } = require(path.join(UTILS, 'mask-phone.js'));
+      assert.strictEqual(maskPhone('0244123456'), '024***56');
+      assert.strictEqual(maskPhone('12345'), '***');
+      assert.strictEqual(maskPhone(null), '(none)');
+    });
+  }
+
   // ---- engine --------------------------------------------------------------
   console.log('booking flow');
   const LOC = { type: 'location', location: { latitude: 5.56, longitude: -0.2057, name: 'Osu Home', address: '12 Oxford St' } };
