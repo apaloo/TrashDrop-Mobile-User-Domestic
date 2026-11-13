@@ -1,0 +1,51 @@
+name: Delete merged branches
+
+# By hand only: Actions → Delete merged branches → Run workflow. Deletes the
+# branches already merged into main (squash merges included); a dry run that
+# only lists them unless "delete" is ticked. Keeps main, protected branches,
+# branches with an open pull request, branches fully in main with a commit in
+# the last 24 hours (maybe just created), and anything with work not in main.
+# Same workflow in all three repositories
+# (.github/scripts/delete-merged-branches.cjs). The monthly repository health
+# lists what is waiting.
+on:
+  workflow_dispatch:
+    inputs:
+      delete:
+        description: 'Delete them (leave unticked to only list them)'
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - '.github/scripts/delete-merged-branches.cjs'
+      - '.github/workflows/delete-merged-branches.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  self-test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node .github/scripts/delete-merged-branches.cjs --self-test
+
+  branches:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/github-script@v9
+        env:
+          DELETE: ${{ inputs.delete }}
+        with:
+          script: |
+            const run = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/delete-merged-branches.cjs`);
+            await run({ github, context, core });
