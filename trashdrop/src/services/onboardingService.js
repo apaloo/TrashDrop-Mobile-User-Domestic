@@ -473,7 +473,7 @@ export const onboardingService = {
    */
   async addUserLocation(userId, name, address, latitude, longitude) {
     try {
-      console.log('[Onboarding] addUserLocation called:', { userId, name, address, latitude, longitude });
+      console.log('[Onboarding] addUserLocation called');
       
       const { data, error } = await supabase
         .rpc('add_user_location', {

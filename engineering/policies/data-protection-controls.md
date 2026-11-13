@@ -26,6 +26,13 @@ Act, 2012 (Act 843).
    approved restore test.
 3. **Error tracking scrubs personal data.** Sentry is configured with
    `sendDefaultPii: false`, and form values are not captured.
+   **Console logs carry no personal data either.** Log that something
+   happened, or a yes/no (`hasEmail: !!email`), never an email, phone number,
+   name or address: a shared phone's console, a browser extension or a support
+   screenshot can read it. Checked by CI in all three apps
+   (`scripts/ci/check-log-privacy.cjs`), since 2026-11-13, when the household
+   app was found writing the email at every sign-in, sign-up and password
+   reset, and a saved location's address.
 4. **Retention.** Proposed defaults for DPS approval: location pings 90 days;
    application logs 30 days; closed dumping-report photos 2 years; payment
    records 7 years (tax). Implement as scheduled database jobs once approved.

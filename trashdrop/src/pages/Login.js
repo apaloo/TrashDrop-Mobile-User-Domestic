@@ -70,10 +70,7 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('[Login] Attempting to sign in with:', { 
-        email: formData.email,
-        passwordLength: formData.password ? formData.password.length : 0 
-      });
+      console.log('[Login] Attempting to sign in');
       
       const email = formData.email.trim();
       const result = await signIn(email, formData.password, rememberMe);

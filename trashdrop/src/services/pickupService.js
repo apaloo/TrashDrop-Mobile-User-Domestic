@@ -148,7 +148,7 @@ export const pickupService = {
               id: collectorData.user_id,
               ...collectorData
             };
-            console.log('[PickupService] Fetched digital bin collector:', collectorData.first_name, collectorData.last_name);
+            console.log('[PickupService] Fetched digital bin collector');
           }
         } catch (collectorError) {
           console.warn('[PickupService] Could not fetch digital bin collector details:', collectorError);
