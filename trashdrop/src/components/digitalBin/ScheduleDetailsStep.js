@@ -17,12 +17,23 @@ const TIME_OPTIONS = [
   ['evening', '🌆', 'Evening', '4pm - 8pm']
 ];
 
+// Today as YYYY-MM-DD in the phone's own time zone (toISOString would give
+// the UTC date, a day off near midnight outside UTC)
+export const localToday = (now = new Date()) =>
+  `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
 const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) => {
+  const today = localToday();
+  // A past date can still be typed in, or come from an old reminder: the
+  // picker's min only limits the calendar
+  const dateInPast = Boolean(formData.startDate) && formData.startDate < today;
+
   // What is still missing, so a disabled Continue button explains itself
   const getMissingFields = () => {
     const missing = [];
     if (!formData.frequency) missing.push('service frequency');
     if (!formData.startDate) missing.push('start date');
+    else if (dateInPast) missing.push('a pickup date from today on');
     if (!formData.preferredTime) missing.push('preferred time');
     return missing;
   };
@@ -87,8 +98,15 @@ const ScheduleDetailsStep = ({ formData, updateFormData, nextStep, prevStep }) =
             onChange={handleDateChange}
             className={inputField}
             placeholder="dd/mm/yyyy"
-            min={new Date().toISOString().split('T')[0]} // Prevent past dates
+            min={today}
+            aria-invalid={dateInPast || undefined}
+            aria-describedby={dateInPast ? 'startDate-past' : undefined}
           />
+          {dateInPast && (
+            <p id="startDate-past" className="mt-1.5 text-sm text-td-error dark:text-red-300">
+              This date has passed. Choose today or a later date.
+            </p>
+          )}
         </div>
 
         <div role="group" aria-labelledby="bin-time">
