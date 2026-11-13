@@ -71,7 +71,7 @@ export function debtRows(markdown) {
     for (const m of marks) {
       // the question is the first sentence; the rest of the marked text is context
       const [ask, ...rest] = plain(m[2]).split(/(?<=[.?!])\s/);
-      out.push({ id, kind: m[1], ask: shorten(ask), context: shorten(rest.join(' '), 500), when });
+      out.push({ id, kind: m[1], ask: shorten(ask), context: shorten(rest.join(' '), 900), when });
     }
   }
   // most urgent first; the register's order within the same urgency
