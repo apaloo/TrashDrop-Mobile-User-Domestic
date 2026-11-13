@@ -37,7 +37,7 @@ const jest = path.join(root, 'node_modules', '.bin', 'jest');
 
 console.log(`Running all suites except ${known.length} known-failing ones…`);
 // Coverage of all of src (jest.config.js collectCoverageFrom), reported by
-// scripts/ci/coverage-summary.mjs. Report only: never fails the build.
+// scripts/ci/coverage-summary.mjs, which holds it at the floors in coverage-floors.json.
 const coverage = ['--coverage', '--coverageReporters=json-summary', '--coverageReporters=text-summary'];
 const main = spawnSync(jest, ['--ci', ...coverage, '--testPathIgnorePatterns', ...known.map(escape)], {
   cwd: root, env, stdio: 'inherit',
