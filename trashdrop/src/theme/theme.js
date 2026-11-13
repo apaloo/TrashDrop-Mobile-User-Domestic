@@ -136,35 +136,4 @@ export const themeOptions = {
   },
 };
 
-// Dark theme overrides
-export const darkThemeOverrides = {
-  palette: {
-    mode: 'dark',
-    background: {
-      default: '#121212',
-      paper: '#1e1e1e',
-    },
-    text: {
-      primary: 'rgba(255, 255, 255, 0.87)',
-      secondary: 'rgba(255, 255, 255, 0.7)',
-      disabled: 'rgba(255, 255, 255, 0.5)',
-    },
-  },
-};
-
-// Function to create a theme based on the current mode
-export const createCustomTheme = (mode = 'light') => {
-  const isDark = mode === 'dark';
-  const baseTheme = {
-    ...themeOptions,
-    palette: {
-      ...themeOptions.palette,
-      mode,
-      ...(isDark ? darkThemeOverrides.palette : {}),
-    },
-  };
-
-  return baseTheme;
-};
-
 export default themeOptions;

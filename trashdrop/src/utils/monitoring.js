@@ -79,12 +79,6 @@ export function captureError(error, context) {
   });
 }
 
-/** Attach the signed-in user's id (never email or phone). Pass null on sign-out. */
-export function setMonitoringUser(userId) {
-  if (!enabled) return;
-  Sentry.setUser(userId ? { id: userId } : null);
-}
-
 export function isMonitoringEnabled() {
   return enabled;
 }

@@ -3,3 +3,4 @@
 src/service-worker.js # built by vite-plugin-pwa (injectManifest: srcDir src, filename service-worker.js)
 src/theme/brand.js # design tokens for inline styles; the counterpart of src/theme/tokens.css, kept in step with the admin design system
 src/services/locationService.js # an unused older copy of the IP location fallback (the live one is in components/profile/Locations.js); kept until the location work (TD9) settles it
+src/theme/brand.js:* # the design-token exports (TD, BTN, FF, TYPE) are the design system's inline-style API, kept in step with tokens.css
