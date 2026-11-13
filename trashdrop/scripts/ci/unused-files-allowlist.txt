@@ -4,15 +4,4 @@ src/service-worker.js # built by vite-plugin-pwa (injectManifest: srcDir src, fi
 src/theme/brand.js # design tokens for inline styles; the counterpart of src/theme/tokens.css, kept in step with the admin design system
 src/services/locationService.js # an unused older copy of the IP location fallback (the live one is in components/profile/Locations.js); kept until the location work (TD9) settles it
 src/theme/brand.js:* # the design-token exports (TD, BTN, FF, TYPE) are the design system's inline-style API, kept in step with tokens.css
-src/utils/costCalculator.js:SOP_CONSTANTS # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:calculateBinCost # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:calculateDistanceCharge # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:getCostBreakdown # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:getEstimatedCost # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:getGPSBaseCost # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:getLocationPrices # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/utils/costCalculator.js:getRecommendedBinSize # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/services/gpsPricingService.js:getHealthStatus # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
-src/services/gpsPricingService.js:resetMetrics # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
 src/services/locationService.js:* # the unused older copy of the IP location fallback above (TD9); its methods go with it
-src/services/userService.js:userService.updateUserStats # TD63: nothing calls it; protected points file, removed with the owner's approval
