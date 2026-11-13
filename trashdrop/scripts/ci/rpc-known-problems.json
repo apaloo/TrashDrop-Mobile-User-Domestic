@@ -10,24 +10,6 @@
       "file": "src/pages/CollectionQRCode.js",
       "table": "collections",
       "ref": "TD67"
-    },
-    {
-      "file": "src/pages/Rewards.js",
-      "table": "user_activity",
-      "column": "status",
-      "ref": "TD68"
-    },
-    {
-      "file": "src/pages/Rewards.js",
-      "table": "user_activity",
-      "column": "points",
-      "ref": "TD68"
-    },
-    {
-      "file": "src/pages/Rewards.js",
-      "table": "user_activity",
-      "column": "details",
-      "ref": "TD68"
     }
   ]
 }
