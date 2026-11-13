@@ -69,9 +69,9 @@ export function debtRows(markdown) {
     if (/^done/i.test(when)) continue;
     const marks = [...line.matchAll(/\*\*Owner (action|decision):\*\*\s*([^|]*?)(?=\*\*Owner (?:action|decision):\*\*|\s\||$)/g)];
     for (const m of marks) {
-      // the marked text runs to the end of its sentence
-      const ask = plain(m[2]).split(/(?<=[.?!])\s/)[0];
-      out.push({ id, kind: m[1], ask: shorten(ask), when });
+      // the question is the first sentence; the rest of the marked text is context
+      const [ask, ...rest] = plain(m[2]).split(/(?<=[.?!])\s/);
+      out.push({ id, kind: m[1], ask: shorten(ask), context: shorten(rest.join(' '), 500), when });
     }
   }
   // most urgent first; the register's order within the same urgency
@@ -85,7 +85,7 @@ export function render({ steps, debt }, today) {
     `### Decisions (${debt.filter((d) => d.kind === 'decision').length})`,
     '',
   ];
-  const row = (d) => `- **${d.id}** (${d.when}): ${d.ask}`;
+  const row = (d) => `- **${d.id}** (${d.when}): ${d.ask}${d.context ? `\n  ${d.context}` : ''}`;
   const decisions = debt.filter((d) => d.kind === 'decision');
   lines.push(...(decisions.length ? decisions.map(row) : ['None.']));
   const actions = debt.filter((d) => d.kind === 'action');
@@ -119,6 +119,8 @@ function selfTest() {
   const d = debtRows(register);
   assert(d.map((x) => `${x.id}:${x.kind}`).join() === 'TD2:action,TD3:decision,TD3:action', `marked open rows only (${JSON.stringify(d)})`);
   assert(d[0].ask === 'upgrade it.' && d[1].ask === 'keep or drop?' && d[2].ask === 'rotate the key', 'the ask is its own sentence');
+  assert(d[1].context === 'More text.' && d[0].context === 'Then check sign-in', `the rest is context (${JSON.stringify(d)})`);
+  assert(render({ steps: [], debt: [d[1]] }, 'x').includes('- **TD3** (Next): keep or drop?\n  More text.'), 'context on its own line under the question');
 
   const md = render({ steps: s, debt: d }, '2026-11-13');
   assert(debtRows(register.replace('| DB | Now |', '| DB | Later |'))[0].id === 'TD3', 'most urgent first');
