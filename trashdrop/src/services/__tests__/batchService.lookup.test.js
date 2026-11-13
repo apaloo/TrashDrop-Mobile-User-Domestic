@@ -12,7 +12,6 @@ jest.mock('../../utils/offlineStorage.js', () => ({
   isOnline: () => true,
   getSyncQueueByOperation: async () => [],
 }));
-jest.mock('../../utils/batchDiagnostics.js', () => ({ __esModule: true, default: {} }));
 
 // Every query is recorded as [table, method, ...args]; mockRows decides
 // what a finished query returns. Plain functions: CRA's resetMocks would

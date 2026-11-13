@@ -412,33 +412,6 @@ export const userServiceOptimized = {
     }
   },
 
-  /**
-   * Check if user stats need refresh based on last update
-   * @param {string} userId - User ID
-   * @returns {boolean} Whether refresh is needed
-   */
-  async needsRefresh(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('user_stats_dashboard')
-        .select('last_updated')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error || !data) {
-        return true; // No data, need refresh
-      }
-
-      const lastUpdated = new Date(data.last_updated);
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      
-      return lastUpdated < fiveMinutesAgo;
-
-    } catch (error) {
-      console.warn('[UserServiceOptimized] Error checking refresh need:', error);
-      return true; // Error, assume refresh needed
-    }
-  }
 };
 
 export default userServiceOptimized;

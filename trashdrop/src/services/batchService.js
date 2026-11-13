@@ -5,7 +5,6 @@
 
 import supabase from '../utils/supabaseClient.js';
 import offlineStorageAPI, { addToSyncQueue, removeFromSyncQueue, isOnline, getSyncQueueByOperation } from '../utils/offlineStorage.js';
-import batchDiagnostics from '../utils/batchDiagnostics.js';
 
 // Base URL for serverless functions. Use direct connection in development to bypass proxy issues
 const FUNCTIONS_BASE = process.env.NODE_ENV === 'development' 

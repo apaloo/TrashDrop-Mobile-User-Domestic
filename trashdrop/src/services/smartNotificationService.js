@@ -422,23 +422,6 @@ export const smartNotificationService = {
   },
 
   /**
-   * Update user preferences
-   * @param {Object} preferences - New preferences
-   */
-  updatePreferences(preferences) {
-    this.userPreferences = { ...this.userPreferences, ...preferences };
-    console.log('[SmartNotificationService] Updated preferences:', this.userPreferences);
-  },
-
-  /**
-   * Clear notification history
-   */
-  clearHistory() {
-    this.lastNotifications.clear();
-    console.log('[SmartNotificationService] Cleared notification history');
-  },
-
-  /**
    * Get notification statistics
    * @returns {Object} Notification statistics
    */
