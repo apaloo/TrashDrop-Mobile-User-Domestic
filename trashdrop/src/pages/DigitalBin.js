@@ -121,7 +121,6 @@ function DigitalBin() {
     photos: [],
     
     // Internal state
-    savedLocations: [],
     isNewLocation: true,
     
     // GPS accuracy tracking
@@ -172,30 +171,10 @@ function DigitalBin() {
   };
   
   // Handler for updating form data
+  // Booking is GPS-only (TD65): the position always comes from the location
+  // step, never from a saved place
   const updateFormData = (newData) => {
-    setFormData(prev => {
-      const updated = {
-        ...prev,
-        ...newData
-      };
-      
-      // If switching to a saved location, update the address and coordinates
-      if (newData.location_id && !newData.isNewLocation) {
-        const selectedLocation = prev.savedLocations.find(
-          loc => loc.id === newData.location_id
-        );
-        
-        if (selectedLocation) {
-          updated.address = selectedLocation.address;
-          updated.latitude = selectedLocation.latitude;
-          updated.longitude = selectedLocation.longitude;
-          updated.location_name = selectedLocation.location_name;
-          updated.is_default = selectedLocation.is_default;
-        }
-      }
-      
-      return updated;
-    });
+    setFormData(prev => ({ ...prev, ...newData }));
   };
   
   // Function to manually refresh data
@@ -228,18 +207,13 @@ function DigitalBin() {
     setError('');
     
     try {
-      // Fetch both scheduled pickups and locations
-      const [pickups, locations] = await Promise.all([
-        // One message at most: the background retries stay silent
-        fetchScheduledPickups(user.id, { silent: dataIncompleteRef.current }),
-        fetchUserLocations(user.id)
-      ]);
-      dataIncompleteRef.current = pickups === null || locations === null;
+      // One message at most: the background retries stay silent
+      const pickups = await fetchScheduledPickups(user.id, { silent: dataIncompleteRef.current });
+      dataIncompleteRef.current = pickups === null;
       setDataIncomplete(dataIncompleteRef.current);
       
       // Update state with fetched data (null: couldn't load, keep what's there)
       if (pickups) setScheduledPickups(pickups);
-      if (locations) setFormData(prev => ({ ...prev, savedLocations: locations }));
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -318,26 +292,6 @@ function DigitalBin() {
   };
   
   // Fetch user's saved locations
-  const fetchUserLocations = async (userId) => {
-    try {
-      const { data: locations, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching user locations:', error);
-        throw error;
-      }
-
-      return locations || [];
-    } catch (error) {
-      console.error('Error fetching user locations:', error);
-      return null;
-    }
-  };
-  
   // NO REAL-TIME: Removed subscription setup
   
   // NO SYNC: Removed all sync event handlers
@@ -556,65 +510,10 @@ function DigitalBin() {
           debug.log('[DigitalBin] Location found in bin_locations table:', binLocation);
           locationId = binLocation.id;
         } else {
-          debug.log('[DigitalBin] Location not found in bin_locations, checking locations table...');
-          
-          // Check if it exists in locations table
-          const { data: legacyLocation, error: legacyLookupError } = await supabase
-            .from('locations')
-            // locations has no name or coordinates column: asking for them
-            // made every lookup fail, so an old saved place was never copied
-            .select('id, location_name, address, latitude, longitude')
-            .eq('id', formData.location_id)
-            .single();
-
-          if (!legacyLookupError && legacyLocation) {
-            debug.log('[DigitalBin] Location found in locations table, migrating to bin_locations:', legacyLocation);
-            
-            // Extract coordinates from PostGIS POINT format if separate lat/lng not available
-            let latitude = legacyLocation.latitude;
-            let longitude = legacyLocation.longitude;
-            
-            if ((!latitude || !longitude) && legacyLocation.coordinates) {
-              // Parse PostGIS POINT format: "POINT(lng lat)"
-              const match = legacyLocation.coordinates.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-              if (match) {
-                longitude = parseFloat(match[1]);
-                latitude = parseFloat(match[2]);
-                debug.log('[DigitalBin] Parsed coordinates from PostGIS:', { latitude, longitude });
-              }
-            }
-            
-            // Migrate location from locations to bin_locations table
-            try {
-              const migratedLocationData = {
-                user_id: user.id,
-                location_name: legacyLocation.location_name || legacyLocation.name || 'Migrated Location',
-                address: legacyLocation.address || '',
-                coordinates: `POINT(${longitude || 0} ${latitude || 0})`,
-                is_default: false
-              };
-              
-              const { data: newBinLocation, error: migrationError } = await supabase
-                .from('bin_locations')
-                .insert(migratedLocationData)
-                .select()
-                .single();
-                
-              if (!migrationError && newBinLocation) {
-                debug.log('[DigitalBin] Successfully migrated location to bin_locations:', newBinLocation);
-                locationId = newBinLocation.id;
-              } else {
-                console.error('[DigitalBin] Failed to migrate location:', migrationError);
-                locationId = null; // Clear invalid location_id, will create new
-              }
-            } catch (migrationError) {
-              console.error('[DigitalBin] Error during location migration:', migrationError);
-              locationId = null; // Clear invalid location_id, will create new
-            }
-          } else {
-            debug.log('[DigitalBin] Location not found in either table, will create new one');
-            locationId = null; // Clear invalid location_id
-          }
+          // Not a bin location (booking is GPS-only, TD65): save a new one
+          // from the GPS position below
+          debug.log('[DigitalBin] Location not found in bin_locations, will create a new one');
+          locationId = null;
         }
       }
 
@@ -1041,7 +940,6 @@ function DigitalBin() {
         photos: [],
         
         // Internal state
-        savedLocations: formData.savedLocations,
         isNewLocation: true,
         
         // GPS accuracy tracking

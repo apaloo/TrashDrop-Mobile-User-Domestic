@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import supabase from '../../utils/supabaseClient.js';
-import { useAuth } from '../../context/AuthContext.js';
 import toastService from '../../services/toastService.js';
 import GeolocationService from '../../utils/geolocationService.js';
 import { reverseGeocode as lookUpAddress, coordinateDescription } from '../../utils/reverseGeocode.js';
@@ -80,7 +78,6 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
   // When the phone's location is off, offer to turn it on. Closing the
   // prompt leaves the step as it was: map pin, address and saved places
   const locationGate = useLocationRequired();
-  const { user } = useAuth();
   
   // NO DEFAULT LOCATION - require actual GPS coordinates
   // Start with null position until GPS provides real coordinates
@@ -89,10 +86,8 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       ? [formData.latitude, formData.longitude] 
       : null // No fallback - require real GPS
   );
-  const [savedLocations, setSavedLocations] = useState([]);
   const [addressInput, setAddressInput] = useState(formData.address || '');
   const [addressError, setAddressError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [gpsHint, setGpsHint] = useState(''); // Help text for poor GPS accuracy
   const [isNewLocation, setIsNewLocation] = useState(false); // Track if location came from GPS
@@ -226,94 +221,6 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
     autoFetchLocation();
   }, []);
 
-  // Load saved locations from localStorage and Supabase
-  useEffect(() => {
-    const fetchSavedLocations = async () => {
-      if (!user) return;
-      
-      setIsLoading(true);
-      
-      try {
-        // First check localStorage for immediate display (user-specific cache)
-        const cacheKey = `trashdrop_locations_${user.id}`;
-        const cachedLocations = localStorage.getItem(cacheKey);
-        if (cachedLocations) {
-          const parsedLocations = JSON.parse(cachedLocations);
-          console.log('Loaded locations from local storage in LocationStep:', parsedLocations);
-          setSavedLocations(parsedLocations);
-        }
-        
-        // Fetch from bin_locations (primary table for digital bins)
-        const { data: binLocations, error: binError } = await supabase
-          .from('bin_locations')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-        
-        // Also check legacy locations table for backward compatibility
-        const { data: legacyLocations, error: legacyError } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-        
-        if (binError && legacyError) throw binError;
-        
-        // Combine locations from both tables, preferring bin_locations
-        const allLocations = [
-          ...(binLocations || []),
-          ...(legacyLocations || []).filter(legacy => 
-            !(binLocations || []).some(bin => 
-              bin.address === legacy.address && bin.location_name === legacy.name
-            )
-          )
-        ];
-        
-        if (allLocations.length > 0) {
-          // Format locations to match component's expected structure
-          const formattedLocations = allLocations.map(location => ({
-            id: location.id,
-            name: location.location_name || location.name,
-            address: location.address || '',
-            city: location.city || '',
-            latitude: location.latitude,
-            longitude: location.longitude,
-            synced: true,
-            source: location.location_name ? 'bin_locations' : 'locations'
-          }));
-          
-          console.log('Loaded user locations from Supabase in LocationStep:', formattedLocations);
-          
-          // Merge with local storage data for any offline-saved locations (reuse cacheKey)
-          const cachedLocations = localStorage.getItem(cacheKey);
-          const localLocations = cachedLocations ? JSON.parse(cachedLocations) : [];
-          
-          // Identify any local-only locations (ones not synced to server yet)
-          const localOnlyLocations = localLocations.filter(
-            local => local.id.toString().startsWith('local_') && 
-                     !formattedLocations.some(server => 
-                        server.name === local.name && server.address === local.address)
-          );
-          
-          // Combine server locations with any local-only locations
-          const mergedLocations = [...formattedLocations, ...localOnlyLocations];
-          
-          // Update state with all locations
-          setSavedLocations(mergedLocations);
-          
-          // Update localStorage with merged data (reuse cacheKey)
-          localStorage.setItem(cacheKey, JSON.stringify(mergedLocations));
-        }
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchSavedLocations();
-  }, [user]);
-  
   // Handler for setting position from map
   const handlePositionChange = (newPosition) => {
     if (!newPosition || !Array.isArray(newPosition) || newPosition.length !== 2) return;
@@ -325,27 +232,6 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       latitude,
       longitude
     });
-  };
-  
-  // Handler for saved location selection
-  const handleLocationSelect = (e) => {
-    const locationId = e.target.value;
-    if (!locationId) return;
-
-    const selectedLocation = savedLocations.find(loc => loc.id.toString() === locationId.toString());
-    if (selectedLocation) {
-      const { latitude, longitude, address, id } = selectedLocation;
-      setPosition([latitude, longitude]);
-      setAddressInput(address || '');
-      updateFormData({
-        location_id: id,
-        address: address || '',
-        address_coords: address ? [latitude, longitude] : null, // Keep the saved address
-        latitude,
-        longitude,
-        useCurrentLocation: false
-      });
-    }
   };
   
   // Helper function to reverse geocode coordinates to address
