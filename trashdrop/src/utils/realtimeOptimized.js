@@ -351,13 +351,3 @@ const realtimeManager = new RealtimeManager();
 
 export default realtimeManager;
 
-// Convenience functions for backward compatibility
-export const subscribeToDashboardUpdates = (userId, callbacks, mountedRef) => {
-  return realtimeManager.setupOptimizedSubscription(userId, callbacks, callbacks, mountedRef);
-};
-
-export const unsubscribeFromDashboardUpdates = (userId) => {
-  realtimeManager.cleanupSubscription(userId);
-};
-
-export const getRealtimeStats = () => realtimeManager.getStats();

@@ -51,8 +51,9 @@ jobs:
         node scripts/ci/check-runtime-deps.cjs src netlify/functions
 
     # Every source file is reachable from the app (index.html, the Vite
-    # config or a test): no new copies, debug panels or helpers nothing uses.
-    # Files loaded in a way the check can't see are listed, with a reason,
+    # config or a test), and every export is used somewhere: no new copies,
+    # debug panels or helpers nothing uses.
+    # Files and exports it can't see being used are listed, with a reason,
     # in scripts/ci/unused-files-allowlist.txt.
     - name: Unused files check
       run: |

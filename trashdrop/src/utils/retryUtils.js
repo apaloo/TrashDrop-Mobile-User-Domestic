@@ -195,30 +195,9 @@ const retrySupabaseOperation = async (fn, options = {}) => {
   return retryWithBackoff(fn, mergedOptions);
 };
 
-/**
- * Retry for network/API operations with longer delays
- * @param {Function} fn - Async network operation function
- * @param {Object} options - Retry options (extends retryWithBackoff options)
- * @returns {Promise} Promise that resolves with the operation result
- */
-const retryNetworkOperation = async (fn, options = {}) => {
-  const defaultOptions = {
-    maxAttempts: 5,
-    baseDelay: 2000,
-    maxDelay: 60000, // Longer max delay for network operations
-    jitter: 0.3,
-    operationName: 'Network operation'
-  };
-  
-  const mergedOptions = { ...defaultOptions, ...options };
-  
-  return retryWithBackoff(fn, mergedOptions);
-};
-
 export {
   retryWithBackoff,
   retrySupabaseOperation,
-  retryNetworkOperation,
   isRetryableError,
   isPermanentError,
   calculateBackoffDelay,
