@@ -43,6 +43,7 @@ export function checkAdvisors(lints, advisorsConfig) {
   const problems = [];
   const allowed = new Set(advisorsConfig.allowedErrors);
   const seenAllowed = new Set();
+  const seenCeilings = new Set();
   for (const l of lints) {
     if (l.level === 'ERROR') {
       for (const f of l.findings ?? l.items ?? []) {
@@ -54,9 +55,17 @@ export function checkAdvisors(lints, advisorsConfig) {
     }
     const ceiling = advisorsConfig.ceilings?.[l.name];
     const count = l.count ?? (l.findings ?? []).length;
+    seenCeilings.add(l.name);
     if (ceiling !== undefined && count > ceiling) problems.push(`${l.name}: ${count} (ceiling ${ceiling})`);
+    // The baseline only tightens (2026-11-13: four fixed views stayed allowed
+    // for days, so any of them could have gone back unnoticed)
+    if (ceiling !== undefined && count < ceiling) problems.push(`${l.name}: ${count}, lower its ceiling from ${ceiling} to ${count}`);
+  }
+  for (const [name, ceiling] of Object.entries(advisorsConfig.ceilings ?? {})) {
+    if (!seenCeilings.has(name) && ceiling > 0) problems.push(`${name}: 0, lower its ceiling from ${ceiling} to 0`);
   }
   const fixed = [...allowed].filter((k) => !seenAllowed.has(k));
+  fixed.forEach((k) => problems.push(`Fixed, delete from allowedErrors: ${k}`));
   return { problems, fixed };
 }
 
@@ -405,7 +414,7 @@ async function main() {
       const { problems, fixed } = checkAdvisors(body.lints ?? body, config.advisors);
       lines.push('', `**Advisors:** ${problems.length ? '❌ ' + problems.length + ' problem(s)' : '✅ no new ERROR findings, ceilings held'}`);
       problems.forEach((p) => { lines.push(`- ${p}`); failures.push(p); });
-      if (fixed.length) lines.push('', `Fixed since the baseline (delete from allowedErrors): ${fixed.join(', ')}`);
+
     } else {
       lines.push('', `**Advisors:** could not be read (HTTP ${res.status}); probes still ran.`);
     }
@@ -565,7 +574,11 @@ function selfTest() {
   assert(judge('denied-or-empty', 200, []) && !judge('denied', 200, []), 'judge denied-or-empty');
   const adv = checkAdvisors([{ name: 'x', level: 'ERROR', findings: [{ metadata: { schema: 'public', name: 'a' } }] }, { name: 'w', level: 'WARN', count: 5 }],
     { allowedErrors: ['x:public.a', 'x:public.gone'], ceilings: { w: 4 } });
-  assert(adv.problems.length === 1 && adv.problems[0].startsWith('w: 5') && adv.fixed[0] === 'x:public.gone', 'checkAdvisors');
+  assert(adv.problems.length === 2 && adv.problems[0].startsWith('w: 5') && adv.problems[1] === 'Fixed, delete from allowedErrors: x:public.gone'
+    && adv.fixed[0] === 'x:public.gone', 'checkAdvisors');
+  const tight = checkAdvisors([{ name: 'w', level: 'WARN', count: 3 }], { allowedErrors: [], ceilings: { w: 4, gone: 2 } });
+  assert(JSON.stringify(tight.problems) === JSON.stringify(['w: 3, lower its ceiling from 4 to 3', 'gone: 0, lower its ceiling from 2 to 0']), 'ceilings only go down');
+  assert(checkAdvisors([{ name: 'w', level: 'WARN', count: 4 }], { allowedErrors: [], ceilings: { w: 4 } }).problems.length === 0, 'a ceiling at the count holds');
   const cfg = { maxEndpointsPerMinute: 40, maxNotFoundPerMinute: 25 };
   // Shapes measured on 2026-11-11: busy real visitors, then one scan.
   const rows = [

@@ -249,7 +249,7 @@
     "maxNotFoundPerMinute": 25
   },
   "advisors": {
-    "_comment": "Known ERROR-level advisor findings, accepted until tech-debt TD19 fixes them. A new ERROR finding fails the watch; fixing one means deleting it here.",
+    "_comment": "Known ERROR-level advisor findings, accepted until tech-debt TD19 fixes them. A new ERROR finding fails the watch, and so does an entry here the advisor no longer reports: the list only shrinks. 2026-11-13: dumping_duplicate_monitoring, unified_pickup_status, urgent_digital_bins and user_dumping_activity removed (signed-in and signed-out users can no longer read them, so the advisor stopped reporting them).",
     "allowedErrors": [
       "auth_users_exposed:public.user_stats_dashboard",
       "rls_disabled_in_public:public.spatial_ref_sys",
@@ -258,17 +258,13 @@
       "security_definer_view:public.admin_bag_items",
       "security_definer_view:public.admin_bag_scans",
       "security_definer_view:public.collector_assignments_view",
-      "security_definer_view:public.dumping_duplicate_monitoring",
       "security_definer_view:public.public_illegal_dumping_reports",
-      "security_definer_view:public.unified_pickup_status",
-      "security_definer_view:public.urgent_digital_bins",
-      "security_definer_view:public.user_dumping_activity",
       "security_definer_view:public.user_recent_activity",
       "security_definer_view:public.user_stats_dashboard"
     ],
-    "_ceilings_comment": "Warning counts that may only go down. Lower a ceiling when the count drops.",
+    "_ceilings_comment": "Warning counts that may only go down. A count below its ceiling fails the watch until the ceiling is lowered to it. 2026-11-13: anon 35 -> 34.",
     "ceilings": {
-      "anon_security_definer_function_executable": 35
+      "anon_security_definer_function_executable": 34
     }
   },
   "_writePolicies_comment": "Row-level security write policies (INSERT, UPDATE, DELETE or ALL) that apply to every row (USING/WITH CHECK true) or to signed-out visitors (anon). Policies made in the dashboard never pass the migration check, so the live database is counted daily. Only the count is published (the repository is public); list them with the query in engineering/runbooks/database-function-review.md. Policies for service_role alone are not counted (that key bypasses row-level security anyway). maxOpen was 9 on 2026-11-12 and is 0 since TD50 closed them the same day; never raise it without the CTO.",
