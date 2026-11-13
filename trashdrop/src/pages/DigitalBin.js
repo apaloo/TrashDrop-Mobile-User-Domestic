@@ -21,6 +21,7 @@ import PageHeader from '../components/ui/PageHeader.js';
 import { card, infoNote, primaryButton } from '../components/ui/styles.js';
 import { getBinSizeLabelShort } from '../utils/costCalculator.js';
 import { prepareDigitalBinData, transformBin } from '../services/digitalBinService.js';
+import { locationSaveMessage } from '../utils/locationSaveMessage.js';
 import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
 import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees } from '../services/promotionalService.js';
@@ -639,8 +640,7 @@ function DigitalBin() {
         
         console.log('Final coordinates for location creation:', { latitude, longitude, types: { lat: typeof latitude, lng: typeof longitude } });
         
-        // Create new location with required coordinates
-        // Try both 'locations' and 'bin_locations' tables to handle schema variations
+        // Create the bin location (the bin refers to it)
         let newLocation = null;
         let insertError = null;
         
@@ -649,7 +649,6 @@ function DigitalBin() {
           throw new Error('Location coordinates are required but not available');
         }
         
-        // Prepare location data for both bin_locations and locations tables
         const locationData = {
           user_id: user.id,
           location_name: formData.location_name || 'Home',
@@ -658,7 +657,6 @@ function DigitalBin() {
           is_default: false
         };
           
-        // First try 'bin_locations' table (as indicated by the foreign key error)
         try {
           console.log('Attempting to create location in bin_locations table');
           debug.log('[DigitalBin] Creating location with actual schema:', locationData);
@@ -703,8 +701,7 @@ function DigitalBin() {
               .maybeSingle();
             
             if (queryResult.error || !queryResult.data) {
-              // If we still can't query it, create a local-only location
-              console.warn('[DigitalBin] Could not query created location, using timestamp-based ID');
+              console.warn('[DigitalBin] Location saved but could not be read back');
               throw new Error('Location created but could not be retrieved');
             }
             
@@ -723,74 +720,20 @@ function DigitalBin() {
           newLocation = binLocationResult.data;
           debug.log('[DigitalBin] Successfully created location:', newLocation);
         } catch (binLocationError) {
-          console.warn('bin_locations table completely failed, trying locations table:', binLocationError?.message || binLocationError);
-          
-          // Fallback to 'locations' table with different schema
-          try {
-            console.log('Attempting to create location in locations table');
-            
-            // Create fallback data for locations table (might use different field names)
-            const fallbackLocationData = {
-              user_id: user.id,
-              name: formData.location_name || 'Home', // locations table might use 'name' instead of 'location_name'
-              address: formData.address || '',
-              latitude: latitude,
-              longitude: longitude,
-              is_default: false
-            };
-            
-            const { data: locationTableData, error: locationTableError } = await supabase
-              .from('locations')
-              .insert(fallbackLocationData)
-              .select()
-              .single();
-              
-            if (!locationTableError && locationTableData) {
-              newLocation = locationTableData;
-              console.log('Successfully created location in locations table');
-            } else {
-              insertError = locationTableError || new Error('No data returned from locations table');
-            }
-          } catch (locationError) {
-            insertError = locationError;
-            console.error('Both bin_locations and locations tables failed:', locationError.message);
-          }
+          insertError = binLocationError;
         }
 
         if (insertError || !newLocation) {
-          // If all database operations fail, create a local-only location for offline usage
-          console.warn('All database location creation failed, creating local-only location');
-          const localLocationId = `local_location_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          
-          // Store location data locally for offline use
-          const localLocationData = {
-            id: localLocationId,
-            user_id: user.id,
-            location_name: formData.location_name || 'Home',
-            address: formData.address || '',
-            latitude: latitude,
-            longitude: longitude,
-            is_default: formData.is_default || false,
-            created_at: new Date().toISOString(),
-            local_only: true,
-            sync_pending: true
-          };
-          
-          try {
-            const localLocationKey = `location_${localLocationId}`;
-            localStorage.setItem(localLocationKey, JSON.stringify(localLocationData));
-            
-            // Add to pending sync list
-            const pendingSyncList = JSON.parse(localStorage.getItem('pending_location_sync') || '[]');
-            pendingSyncList.push(localLocationId);
-            localStorage.setItem('pending_location_sync', JSON.stringify(pendingSyncList));
-            
-            console.log('Created local-only location:', localLocationId);
-            locationId = localLocationId;
-          } catch (localStorageError) {
-            console.error('Failed to create local location:', localStorageError);
-            throw new Error(`Error creating location: ${insertError?.message || 'Failed to create location in any table and localStorage also failed'}`);
-          }
+          // A bin needs a saved bin location (digital_bins.location_id is a
+          // required reference to bin_locations). Until 2026-11-13 a failure
+          // here fell back to the locations table (refused: it has no "name"
+          // column, and its ids aren't bin locations) and then to a made-up
+          // local id (refused: not a database id), so the household saw
+          // "invalid input syntax for type uuid" and the address stayed in
+          // the phone's storage with nothing to send it.
+          const reason = insertError?.message || '';
+          console.error('[DigitalBin] Location could not be saved:', reason);
+          throw new Error(locationSaveMessage(reason));
         } else {
           locationId = newLocation.id;
         }

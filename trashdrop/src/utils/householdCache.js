@@ -6,9 +6,12 @@
  * offline).
  *
  * Display caches whose key doesn't carry the user id are cleared on sign-out.
- * Unsynced offline work (digitalBinsList / digitalBin_*, illegalDumping*,
- * pending_location_sync / location_*) is kept so nobody loses work they
- * haven't sent yet; the database refuses to file it under another account.
+ * Unsynced offline work (digitalBinsList / digitalBin_*, illegalDumping*) is
+ * kept so nobody loses work they haven't sent yet; the database refuses to
+ * file it under another account. Bin locations the app used to keep "for
+ * later" when they couldn't be saved (pending_location_sync and
+ * location_local_location_*, until 2026-11-13) are cleared: nothing ever
+ * sent them, and each holds an address and coordinates.
  */
 export const HOUSEHOLD_CACHE_KEYS = [
   'digitalBins',               // the digital bin list (QR links, addresses)
@@ -18,8 +21,12 @@ export const HOUSEHOLD_CACHE_KEYS = [
   'trashdrop_qr_batch_id',
   'trashdrop_qr_bag_count',
   'trashdrop_location_saved',  // onboarding: location saved
+  'pending_location_sync',     // list of the unsendable local bin locations below
 ];
-export const HOUSEHOLD_CACHE_PREFIXES = ['qr_']; // one cached QR image per bin
+export const HOUSEHOLD_CACHE_PREFIXES = [
+  'qr_',                       // one cached QR image per bin
+  'location_local_location_',  // a bin location that couldn't be saved (address, coordinates)
+];
 
 const storageOrNull = () => {
   try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
