@@ -15,3 +15,21 @@ src/utils/costCalculator.js:getRecommendedBinSize # protected pricing file (CLAU
 src/services/gpsPricingService.js:getHealthStatus # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
 src/services/gpsPricingService.js:resetMetrics # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
 src/services/locationService.js:* # the unused older copy of the IP location fallback above (TD9); its methods go with it
+src/services/userService.js:userService.updateUserStats # TD63: nothing calls it; protected points file, removed with the owner's approval
+src/services/rewardsService.js:rewardsService.redeemReward # TD63: the old client-side redemption (nothing calls it; the database refuses its points write); points code, removed with the owner's approval
+src/services/rewardsService.js:rewardsService.getRedemptionHistory # TD63: nothing calls it; points code, removed with the owner's approval
+src/services/rewardsService.js:rewardsService.getRewardCategories # TD63: nothing calls it; points code, removed with the owner's approval
+src/services/rewardsService.js:rewardsService.getRewardsByCategory # TD63: nothing calls it; points code, removed with the owner's approval
+src/services/activityService.js:activityService.getPointsHistory # TD63: nothing calls it; points code, removed with the owner's approval
+src/services/activityService.js:activityService.createActivity # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/activityService.js:activityService.getActivityStats # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/activityService.js:activityService.logActivity # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/dumpingService.js:dumpingService.addPhotosToReport # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/dumpingService.js:dumpingService.getNearbyReports # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/dumpingService.js:dumpingService.getReportDetails # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/dumpingService.js:dumpingService.updateReportStatus # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/onboardingService.js:onboardingService.createOnboardingPickup # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/pickupService.js:pickupService.createPickupRequest # TD63: nothing calls it; removed after the owner's no-delete window
+src/services/pickupService.js:pickupService.getPickupHistory # TD63: nothing calls it; removed after the owner's no-delete window
+src/utils/requestDeduplication.js:deduplicatedRequests.getNotifications # TD63: nothing calls it; removed after the owner's no-delete window
+src/utils/requestDeduplication.js:deduplicatedRequests.getRecentActivity # TD63: nothing calls it; removed after the owner's no-delete window

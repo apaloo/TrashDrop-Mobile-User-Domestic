@@ -8,7 +8,7 @@
  *   2. unless it is a trigger function (RETURNS trigger: not callable through
  *      the API), either check its caller in its body (auth.uid(),
  *      auth.role(), td_assert_self_or_staff, td_can_manage_requests,
- *      td_is_*, td_my_role) or be revoked from anon in the same file
+ *      td_is_*, td_my_role, can_do) or be revoked from anon in the same file
  *      (REVOKE ... ON FUNCTION <name> ... FROM ... anon).
  *
  * Write policies (secure development policy, principle 10): a row-level
@@ -46,7 +46,7 @@ const POLICY_PERF_FIRST_CHECKED = '20261113120000';
 const WRAPPED_AUTH_CALL = /\(\s*select\s+(?:auth\.(?:uid|role|jwt)\(\)|current_setting\([^()]*\)(?:::\w+)?)\s*\)/gi;
 const AUTH_CALL = /auth\.(?:uid|role|jwt)\(\)|current_setting\(/i;
 const MIGRATIONS = path.join(__dirname, '..', '..', 'supabase', 'migrations');
-const CALLER_CHECK = /auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_staff|td_can_manage_requests|td_is_\w+\(|td_my_role\(/i;
+const CALLER_CHECK = /auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_staff|td_can_manage_requests|td_is_\w+\(|td_my_role\(|can_do\(/i;
 
 /** Functions created in a migration: name, header (before the body), body */
 function functionsIn(sql) {
@@ -178,6 +178,8 @@ function selfTest() {
   assert.deepStrictEqual(problemsIn(good), []);
   assert.deepStrictEqual(problemsIn(revoked), []);
   assert.deepStrictEqual(problemsIn(trigger), []);
+  // the admin capability check (can_do('rewards.manage'), admin_reward_redemptions) counts as a caller check
+  assert.deepStrictEqual(problemsIn(`CREATE FUNCTION public.admin_x() RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ BEGIN IF NOT public.can_do('rewards.manage') THEN RAISE EXCEPTION 'Not allowed'; END IF; RETURN '[]'; END $$;`), []);
   assert.deepStrictEqual(problemsIn(invoker), []);
 
   const noPath = good.replace(/SET search_path = public, pg_temp/, '');
