@@ -60,7 +60,9 @@ async function checkRepo(gh, { owner, repo }, now) {
     const recent = await gh.rest.pulls.list({ owner, repo, state: 'all', sort: 'created', direction: 'desc', per_page: 100 });
     dependabotRecent = recent.data.some((p) => p.user?.login === 'dependabot[bot]' && (now - new Date(p.created_at)) / 86400000 <= DEPENDABOT_QUIET_DAYS);
   }
-  return { repo: `${owner}/${repo}`, visibility: info.private ? 'private' : 'public', main, files, knownFailing, mainProtected, oldPrs, branches, secretScanning, dependabotAlerts, dependabotRecent };
+  // Settings → General → "Automatically delete head branches"
+  const autoDeleteBranches = typeof info.delete_branch_on_merge === 'boolean' ? info.delete_branch_on_merge : null;
+  return { repo: `${owner}/${repo}`, visibility: info.private ? 'private' : 'public', main, files, knownFailing, mainProtected, oldPrs, branches, autoDeleteBranches, secretScanning, dependabotAlerts, dependabotRecent };
 }
 
 function render(results) {
@@ -78,6 +80,7 @@ function render(results) {
     lines.push(`| Dependabot opened a pull request in ${DEPENDABOT_QUIET_DAYS} days | ${ok.map((r) => tick(r.dependabotRecent)).join(' | ')} |`);
     lines.push(`| Known-failing test suites (target 0) | ${ok.map((r) => (r.knownFailing === null ? 'no list' : r.knownFailing)).join(' | ')} |`);
     lines.push(`| Pull requests open ${OLD_PR_DAYS}+ days | ${ok.map((r) => r.oldPrs.length).join(' | ')} |`);
+    lines.push(`| Merged branches deleted automatically | ${ok.map((r) => tick(r.autoDeleteBranches)).join(' | ')} |`);
     lines.push(`| Branches to delete (merged / stale) | ${ok.map((r) => `${r.branches.merged.length} / ${r.branches.stale.length}`).join(' | ')} |`);
     lines.push('');
   }
@@ -90,12 +93,12 @@ function render(results) {
     r.files.filter((f) => !f.ok).forEach((f) => todo.push(`- [ ] Add the missing ${f.label.toLowerCase()} (runbook 08 §Rolling out)`));
     if (r.visibility !== 'private') todo.push('- [ ] Make the repository private (runbook 01)');
     if (r.mainProtected === false) todo.push('- [ ] Protect `main` (runbook 08)');
+    if (r.autoDeleteBranches === false) todo.push('- [ ] Turn on "Automatically delete head branches" (Settings → General → Pull Requests)');
     if (r.secretScanning === false) todo.push('- [ ] Turn on secret scanning and push protection (Settings → Code security)');
     if (r.dependabotAlerts === false) todo.push('- [ ] Turn on Dependabot alerts (Settings → Code security)');
     if (r.dependabotRecent === false) todo.push(`- [ ] Dependabot opened no pull request in ${DEPENDABOT_QUIET_DAYS} days although it is configured: check Insights → Dependency graph → Dependabot for failing update jobs`);
     if (todo.length) { lines.push('', `### ${r.repo}`, ...todo); }
   }
-  lines.push('', 'Tip: Settings → General → "Automatically delete head branches" stops merged branches piling up.');
   return lines.join('\n');
 }
 
@@ -110,7 +113,7 @@ module.exports = async ({ github, context, getOctokit }, repos, now = new Date()
     catch (e) { results.push({ repo: `${r.owner}/${r.repo}`, skipped: `could not read (${e.status || e.message})` }); }
   }
   const needsAction = results.some((r) => r.skipped || r.oldPrs?.length || r.branches?.merged.length || r.branches?.stale.length
-    || r.files?.some((f) => !f.ok) || r.visibility !== 'private' || r.mainProtected === false
+    || r.files?.some((f) => !f.ok) || r.visibility !== 'private' || r.mainProtected === false || r.autoDeleteBranches === false
     || r.secretScanning === false || r.dependabotAlerts === false || r.dependabotRecent === false);
   return { results, needsAction, body: render(results) };
 };
