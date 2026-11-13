@@ -44,6 +44,10 @@ changed by the server or staff (`td_guard_profile_columns`).
 - Every redemption that isn't rejected is subtracted. A rejected redemption
   gives its points back.
 - Staff send or reject redemptions (`admin_set_redemption_status`, admin site).
+- Each redemption appears in the household's activity list as "Redeemed …"
+  with the points spent, written by `td_redeem_reward` in the same transaction;
+  a rejected one adds "Points returned: …" (`admin_set_redemption_status`).
+  The activity list is display only: the balance never reads it.
 
 ## Balance
 
@@ -60,6 +64,7 @@ dumping report points − points spent.
 | 2026-11-12 | Two older pickup requests that carried 125 and 126 points, written by an earlier app version, reset to 5 (balances 1,190 → 1,070 and 326 → 205; none went below 0) |
 | 2026-11-12 | Redemptions go through `td_redeem_reward` (the server checks cost and balance) |
 | 2026-11-12 | Points can't be created by inserting rows: redemptions only through `td_redeem_reward`, always positive; a household's new dumping report always starts as pending, and verification (which earns its points) is set only by the team (`20261112162540`). Neither had been used: every redemption was positive and no report had been created already verified |
+| 2026-11-13 | Redemptions are logged in the activity list by the server (TD68, `20261113210339`): the app's own log never worked (it named columns `user_activity` doesn't have). The 7 earlier redemptions were added, dated when they were made; no balance changed (all balances together 3,450 before and after) |
 
 ## Where this lives
 
@@ -67,7 +72,7 @@ dumping report points − points spent.
   `td_guard_request_write`, `td_guard_profile_columns`,
   `td_guard_dumping_insert`, `get_dashboard_data_optimized`, and the access
   rules on `rewards_redemption` (migrations `20261112095056`,
-  `20261112110640`, `20261112110931`, `20261112162540`).
+  `20261112110640`, `20261112110931`, `20261112162540`, `20261113210339`).
 - Household app: `src/services/userService.js` (`getUserStats`),
   `src/utils/reportPoints.js`, `src/pages/Rewards.js`.
 - Tests: `userService.stats.test.js`, `Rewards.redeem.test.js`.

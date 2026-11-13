@@ -317,7 +317,7 @@
       "function get_dashboard_data_optimized": "3209b97a7271bc365099c20cbefffd84",
       "function td_guard_profile_columns": "cffd0a300068f35db2780da1f205cc4f",
       "function td_guard_request_write": "916674594870b3e67d8eddaf3c7ed0ed",
-      "function td_redeem_reward": "d94fc9dc88da56a37eb0c2eba484acc6",
+      "function td_redeem_reward": "07672d8c068fbe4b02b18079c62aa339",
       "trigger pickup_requests.aa_td_guard_write": "834d27d20f8a914a84782ba74429c73f",
       "trigger profiles.td_guard_profile_columns": "23b436452cb8f639ffed0edd3b259398",
       "view user_stats_dashboard": "379de5b10f072e53296ecbcfe4114d22",

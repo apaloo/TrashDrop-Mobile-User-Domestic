@@ -346,7 +346,7 @@ const Rewards = () => {
     setErrorMessage('');
     
     try {
-      // Generate a unique redemption code
+      // A reference shown to the household after a redemption without delivery details
       const redemptionCode = `REWARD-${reward.id}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
       // The server checks the reward's cost and the balance, then records the
@@ -366,21 +366,8 @@ const Rewards = () => {
       
       console.log('[Rewards] Successfully recorded reward redemption:', redemptionData);
       
-      // Record activity
-      await supabase.from('user_activity').insert([
-        {
-          user_id: user.id,
-          activity_type: 'reward_redemption',
-          status: 'completed',
-          points: -reward.pointsCost, // negative as points are spent
-          details: {
-            reward_id: reward.id,
-            reward_name: reward.name,
-            redemption_code: redemptionCode
-          },
-          created_at: new Date().toISOString()
-        }
-      ]);
+      // td_redeem_reward also records it in the activity list, with the
+      // server's figures (TD68); the app writes nothing about points itself
       
       // Update local state and show it under My Redemptions (the server's balance)
       const balanceAfter = Number(redemptionData?.balance_after);

@@ -66,6 +66,8 @@ describe('Redeeming a reward', () => {
 
     expect(mockRpcCalls).toEqual([['td_redeem_reward', { p_reward_id: 'r9', p_phone: null, p_network: null }]]);
     expect(mockWrites.filter(([table]) => table === 'rewards_redemption')).toEqual([]);
+    // Nor the activity row: td_redeem_reward writes it with the server's figures (TD68)
+    expect(mockWrites).toEqual([]);
     expect(await screen.findByText('205')).toBeInTheDocument();
     expect(await screen.findByText(/Successfully redeemed Shopping voucher/)).toBeInTheDocument();
   });
