@@ -22,6 +22,8 @@ export const HOUSEHOLD_CACHE_KEYS = [
   'trashdrop_qr_bag_count',
   'trashdrop_location_saved',  // onboarding: location saved
   'pending_location_sync',     // list of the unsendable local bin locations below
+  'trashdrop_error_logs',      // console errors copied by a start-up hook removed 2026-11-13
+  'trashdrop_pwa_last_login',  // time of the last sign-in in the installed app (nothing reads it)
 ];
 export const HOUSEHOLD_CACHE_PREFIXES = [
   'qr_',                       // one cached QR image per bin

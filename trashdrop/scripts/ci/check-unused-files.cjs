@@ -109,6 +109,18 @@ function exportsOf(code) {
 }
 const exportedNames = (code) => [...new Set(exportsOf(code).map((e) => e.name))];
 
+/** The source without its `export default { … }` object literal */
+function withoutDefaultExportObject(code) {
+  const m = /export\s+default\s*\{/.exec(code);
+  if (!m) return code;
+  let depth = 0; let i = m.index + m[0].length - 1;
+  for (; i < code.length; i++) {
+    if (code[i] === '{') depth++;
+    else if (code[i] === '}' && --depth === 0) break;
+  }
+  return code.slice(0, m.index) + code.slice(i + 1);
+}
+
 const stripComments = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 /** Exports no other file names and their own file doesn't use: [ 'src/a.js:name' ] */
@@ -124,7 +136,11 @@ function unusedExports(root, files, allow) {
     for (const { name, local, mentions } of exportsOf(own)) {
       if (allowed.has(`${r}:${name}`)) continue;
       const wordFor = (n) => new RegExp(`(^|[^\\w$])${n.replace(/\$/g, '\\$')}(?![\\w$])`, 'g');
-      if ((own.match(wordFor(local)) || []).length > mentions) continue; // used in its own file
+      // used in its own file; a mention in the file's own `export default { … }`
+      // doesn't count (2026-11-13: seven pricing helpers nothing called stayed
+      // "used" that way; a default export someone imports shows up as x.name
+      // in their file instead)
+      if ((withoutDefaultExportObject(own).match(wordFor(local)) || []).length > mentions) continue;
       const word = wordFor(name);
       let used = false;
       for (const [g, code] of text) {
@@ -187,7 +203,7 @@ function selfTest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'unused-files-'));
   const put = (p, s) => { fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), s); };
   put('index.html', '<script type="module" src="/src/main.jsx"></script>');
-  put('src/main.jsx', "import App from './App';\nimport './useLib';\nimport './lib2';\nconst P = () => import('./pages/Lazy.jsx');\nnew Worker(new URL('./workers/w.js', import.meta.url));\n");
+  put('src/main.jsx', "import App from './App';\nimport './useLib';\nimport './lib2';\nimport './useLib2';\nconst P = () => import('./pages/Lazy.jsx');\nnew Worker(new URL('./workers/w.js', import.meta.url));\n");
   put('src/App.jsx', "export { default as x } from './utils/x.js';\n// import Old from './Old';\n");
   put('src/utils/x.js', "const y = require('./y');\n");
   put('src/utils/y.js', 'module.exports = 1;');
@@ -201,11 +217,12 @@ function selfTest() {
   put('src/lib.js', "export const usedOutside = 1;\nexport function usedInside() {}\nexport const deadOne = usedInside();\nexport { deadToo };\nconst deadToo = 2;\nexport const allowedOne = 3;\nexport default 4;\n");
   put('src/useLib.js', "import { usedOutside } from './lib';\n// deadOne is only named in a comment here\n");
   put('netlify/functions/fn.js', "const { onlyNetlify } = require('../../src/lib2');\n");
-  put('src/lib2.js', "export const onlyNetlify = 1;\n");
+  put('src/lib2.js', "export const onlyNetlify = 1;\nexport const onlyInDefault = () => 2;\nexport const usedViaDefault = () => 3;\nexport default { onlyInDefault, usedViaDefault };\n");
+  put('src/useLib2.js', "import lib2 from './lib2';\nlib2.usedViaDefault();\n");
   put('scripts/ci/unused-files-allowlist.txt', '# comment\nsrc/kept.js # loaded by name\nsrc/gone.js # removed since\nsrc/lib.js:allowedOne # a public API\nsrc/lib.js:renamed # was removed\n');
   const r = check(dir);
   assert(JSON.stringify(r.unused) === JSON.stringify(['src/Old.jsx', 'src/OldHelper.js']), `unused was ${JSON.stringify(r.unused)}`);
-  assert(JSON.stringify(r.unusedExports) === JSON.stringify(['src/lib.js:deadOne', 'src/lib.js:deadToo']), `unused exports were ${JSON.stringify(r.unusedExports)}`);
+  assert(JSON.stringify(r.unusedExports) === JSON.stringify(['src/lib.js:deadOne', 'src/lib.js:deadToo', 'src/lib2.js:onlyInDefault']), `unused exports were ${JSON.stringify(r.unusedExports)}`);
   assert(JSON.stringify(r.staleAllowlist.map((a) => a.path)) === JSON.stringify(['src/gone.js', 'src/lib.js:renamed']), `stale was ${JSON.stringify(r.staleAllowlist)}`);
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('check-unused-files self-test passed');

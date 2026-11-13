@@ -8,15 +8,16 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import performanceTracker from "./utils/performanceTracker";
 import reportWebVitals from "./reportWebVitals";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
-import { initGlobalErrorHandlers } from "./utils/errorBoundary";
 import { notifyUpdateReady, watchForMissingChunks } from "./utils/appUpdate";
 import { initMonitoring } from "./utils/monitoring";
 
 // Error monitoring first, so start-up errors are caught (no-op without REACT_APP_SENTRY_DSN)
 initMonitoring();
 
-// Initialize global error handlers early
-initGlobalErrorHandlers();
+// Until 2026-11-13 a start-up hook copied every console error into
+// localStorage (trashdrop_error_logs) for good, through sign-outs, and nothing
+// ever read it; error reports go to monitoring above. Remove what phones kept.
+try { localStorage.removeItem('trashdrop_error_logs'); } catch { /* storage blocked */ }
 
 // A deploy can remove code files this version still asks for: reload onto the new one
 if (process.env.NODE_ENV === "production") {

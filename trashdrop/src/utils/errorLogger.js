@@ -106,34 +106,8 @@ const handleFatalError = (errorLog) => {
   console.error(errorLog);
 };
 
-/**
- * Get all stored error logs from this session
- * @returns {Array} Array of error log objects
- */
-export const getStoredErrors = () => {
-  try {
-    return JSON.parse(sessionStorage.getItem('error_logs') || '[]');
-  } catch (e) {
-    console.error('Failed to retrieve stored errors:', e);
-    return [];
-  }
-};
-
-/**
- * Clear all stored error logs
- */
-export const clearStoredErrors = () => {
-  try {
-    sessionStorage.removeItem('error_logs');
-  } catch (e) {
-    console.error('Failed to clear stored errors:', e);
-  }
-};
-
 export default {
   logError,
   logAuthError,
-  getStoredErrors,
-  clearStoredErrors,
   ERROR_CATEGORIES
 };
