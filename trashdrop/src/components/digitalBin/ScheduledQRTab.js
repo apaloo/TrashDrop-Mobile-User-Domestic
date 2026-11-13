@@ -9,6 +9,7 @@ import ConfirmModal from '../ConfirmModal.js';
 import { transformBin } from '../../services/digitalBinService.js';
 import { shareQrImage } from '../../utils/shareQrImage.js';
 import { useArrivalQR } from '../../context/useArrivalQR.js';
+import { cachedBinsFor } from '../../utils/householdCache.js';
 
 const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCreatedBinId = null, onNewBinExpanded = null }) => {
 
@@ -32,52 +33,26 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
     onRefreshRef.current = onRefresh;
   }, [onRefresh]);
 
-  // Load persisted QR codes from localStorage on component mount
+  // Show this user's cached bins (never another account's) until the server answers
   useEffect(() => {
-    const loadPersistedPickups = () => {
-      try {
-        debug.log('[ScheduledQRTab] Loading persisted pickups from localStorage');
-        const storedPickups = localStorage.getItem('digitalBins');
-        debug.log('[ScheduledQRTab] Raw localStorage data:', storedPickups);
-        
-        if (storedPickups) {
-          const parsedPickups = JSON.parse(storedPickups);
-          debug.log('[ScheduledQRTab] Parsed pickups:', parsedPickups);
-          
-          if (Array.isArray(parsedPickups)) {
-            setLocalPickups(parsedPickups);
-            debug.log('[ScheduledQRTab] Loaded', parsedPickups.length, 'digital bins from localStorage');
-            
-            // Auto-select tab with most items or active tab by default
-            const activeCount = parsedPickups.filter(p => p && (p.status === 'active' || p.status === 'in_service')).length;
-            const completedCount = parsedPickups.filter(p => p && p.status === 'completed').length;
-            const cancelledCount = parsedPickups.filter(p => p && p.status === 'cancelled').length;
-            
-            debug.log('[ScheduledQRTab] Counts - Active:', activeCount, 'Completed:', completedCount, 'Cancelled:', cancelledCount);
-            
-            // If there's a remembered tab in localStorage, use that
-            const rememberedTab = localStorage.getItem('digitalBinActiveTab');
-            if (rememberedTab) {
-              setActiveTab(rememberedTab);
-            } else if (completedCount > activeCount && completedCount > cancelledCount) {
-              setActiveTab('completed');
-            } else if (cancelledCount > activeCount && cancelledCount > completedCount) {
-              setActiveTab('cancelled');
-            }
-            // else stay on active tab
-          } else {
-            console.warn('[ScheduledQRTab] Parsed data is not an array:', parsedPickups);
-          }
-        } else {
-          debug.log('[ScheduledQRTab] No stored pickups found in localStorage');
-        }
-      } catch (error) {
-        console.error('[ScheduledQRTab] Error loading persisted digital bins:', error);
-      }
-    };
-    
-    loadPersistedPickups();
-  }, []);
+    const cached = cachedBinsFor(user?.id);
+    setLocalPickups(cached);
+    if (cached.length === 0) return;
+
+    // Auto-select tab with most items or active tab by default
+    const activeCount = cached.filter(p => p.status === 'active' || p.status === 'in_service').length;
+    const completedCount = cached.filter(p => p.status === 'completed').length;
+    const cancelledCount = cached.filter(p => p.status === 'cancelled').length;
+    let rememberedTab = null;
+    try { rememberedTab = localStorage.getItem('digitalBinActiveTab'); } catch { /* storage blocked */ }
+    if (rememberedTab) {
+      setActiveTab(rememberedTab);
+    } else if (completedCount > activeCount && completedCount > cancelledCount) {
+      setActiveTab('completed');
+    } else if (cancelledCount > activeCount && cancelledCount > completedCount) {
+      setActiveTab('cancelled');
+    }
+  }, [user?.id]);
   
   // Subscribe to real-time digital bin updates
   useEffect(() => {
