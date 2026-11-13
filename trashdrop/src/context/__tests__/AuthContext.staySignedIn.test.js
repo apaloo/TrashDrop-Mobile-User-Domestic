@@ -173,4 +173,20 @@ describe('Signing out', () => {
 
     await waitFor(() => expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: 'global' }));
   });
+
+  // Shared phones (2026-11-13): the next account must not see this household's bins
+  it('clears this household\'s cached bins and QR codes, keeping unsent offline work', async () => {
+    signedInBefore();
+    localStorage.setItem('digitalBins', JSON.stringify([{ id: 'bin-1', user_id: 'u1', qr_code_url: 'https://app.trashdrops.com/bin/bin-1' }]));
+    localStorage.setItem('qr_bin-1', 'data:image/png;base64,AAA');
+    localStorage.setItem('digitalBinsList', '["local-1"]');
+    mount();
+
+    fireEvent.click(screen.getByText('sign out'));
+
+    await screen.findByText('status: UNAUTHENTICATED');
+    expect(localStorage.getItem('digitalBins')).toBeNull();
+    expect(localStorage.getItem('qr_bin-1')).toBeNull();
+    expect(localStorage.getItem('digitalBinsList')).toBe('["local-1"]');
+  });
 });

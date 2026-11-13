@@ -6,6 +6,7 @@ import { logAuthError, ERROR_CATEGORIES } from '../utils/errorLogger.js';
 import { getSiteUrl } from '../utils/siteUrl.js';
 import performanceMonitor from '../utils/performanceMonitor.js';
 import appConfigImport from '../utils/app-config.js';
+import { clearHouseholdCaches } from '../utils/householdCache.js';
 
 // Safe app config access with fallbacks
 const appConfig = appConfigImport || {
@@ -230,6 +231,9 @@ export const AuthProvider = ({ children }) => {
     
     // Clear all auth data
     clearAuthData();
+    // and this household's display caches, so the next person to sign in on
+    // this device doesn't see them (shared phones)
+    clearHouseholdCaches();
     
     // Update state to unauthenticated or error
     updateAuthState({

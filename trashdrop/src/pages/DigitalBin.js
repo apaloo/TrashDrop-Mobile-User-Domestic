@@ -25,6 +25,7 @@ import { uploadPhotos } from '../services/photoUploadService.js';
 import useGpsRefinement from '../hooks/useGpsRefinement.js';
 import { checkPromotionalEligibility, getPromotionalFee, getAllPromotionalFees } from '../services/promotionalService.js';
 import { answerReminder, createReminderPlan, isRepeatFrequency } from '../services/binReminderService.js';
+import { cachedBinsFor } from '../utils/householdCache.js';
 
 
 // Pickup time windows offered in ScheduleDetailsStep
@@ -260,6 +261,7 @@ function DigitalBin() {
           .from('digital_bins')
           .select(`
             id,
+            user_id,
             location_id,
             qr_code_url,
             frequency,
@@ -491,16 +493,9 @@ function DigitalBin() {
       console.log('[Network] Offline - using localStorage cache');
       // Don't call loadData() - it hits Supabase which fails offline
       // Instead, rely on localStorage data already loaded in ScheduledQRTab
-      try {
-        const cached = localStorage.getItem('digitalBins');
-        if (cached) {
-          const bins = JSON.parse(cached);
-          console.log('[Network] Loaded', bins.length, 'bins from localStorage cache');
-          setScheduledPickups(bins);
-        }
-      } catch (err) {
-        console.error('[Network] Error loading cached data:', err);
-      }
+      // Only this user's cached bins, never another account's (shared phones)
+      const bins = cachedBinsFor(user?.id);
+      if (bins.length > 0) setScheduledPickups(bins);
     };
     
     window.addEventListener('online', handleOnline);
