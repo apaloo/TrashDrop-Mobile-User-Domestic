@@ -23,57 +23,6 @@ export const isMobilePwa = () => {
 };
 
 /**
- * Store authentication data with special handling for mobile PWA
- * @param {Object} user - User object
- * @param {Object} session - Session object with access_token
- * @param {string} tokenKey - Key to use for token storage
- * @param {string} userKey - Key to use for user storage
- */
-export const storeMobileAuthData = (user, session, tokenKey = "trashdrop_auth_token", userKey = "trashdrop_user") => {
-  try {
-    if (!user || !session?.access_token) {
-      console.error('[MobileAuth] Cannot store auth data - missing user or token');
-      return false;
-    }
-
-    // Store user data with mobile flag
-    const userData = {
-      ...user,
-      id: user.id,
-      email: user.email,
-      user_metadata: user.user_metadata,
-      last_authenticated: new Date().toISOString(),
-      mobile_authenticated: true, // Add mobile flag
-      device_type: isMobileDevice() ? 'mobile' : 'desktop',
-      is_pwa: isMobilePwa()
-    };
-    
-    // Store in localStorage
-    localStorage.setItem(userKey, JSON.stringify(userData));
-    localStorage.setItem(tokenKey, session.access_token);
-    
-    // Also store in sessionStorage for redundancy on mobile
-    if (isMobileDevice()) {
-      try {
-        sessionStorage.setItem(userKey, JSON.stringify(userData));
-        sessionStorage.setItem(tokenKey, session.access_token);
-      } catch (e) {
-        console.error('[MobileAuth] Failed to store in sessionStorage:', e);
-      }
-    }
-    
-    // Store additional metadata
-    localStorage.setItem('trashdrop_mobile_last_login', new Date().toISOString());
-    
-    console.log('[MobileAuth] Auth data stored successfully');
-    return true;
-  } catch (error) {
-    console.error('[MobileAuth] Error storing auth data:', error);
-    return false;
-  }
-};
-
-/**
  * Get stored authentication data with mobile-specific fallbacks
  * @param {string} tokenKey - Key used for token storage
  * @param {string} userKey - Key used for user storage
@@ -154,7 +103,6 @@ export const initMobileAuthListeners = () => {
 export default {
   isMobileDevice,
   isMobilePwa,
-  storeMobileAuthData,
   getMobileAuthData,
   initMobileAuthListeners
 };

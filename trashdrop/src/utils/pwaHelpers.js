@@ -80,36 +80,8 @@ export const getPwaAuthData = (tokenKey = "trashdrop_auth_token", userKey = "tra
   }
 };
 
-/**
- * Clear PWA authentication data
- * @param {string} tokenKey - Key used for token storage
- * @param {string} userKey - Key used for user storage
- */
-export const clearPwaAuthData = (tokenKey = "trashdrop_auth_token", userKey = "trashdrop_user") => {
-  try {
-    localStorage.removeItem(tokenKey);
-    localStorage.removeItem(userKey);
-    localStorage.removeItem("trashdrop_pwa_last_login");
-    
-    // Also clear any Supabase-related items
-    const supabaseKeys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
-      .filter(key => key && (key.includes("supabase") || key.includes("sb-")));
-    
-    supabaseKeys.forEach(key => {
-      if (key) localStorage.removeItem(key);
-    });
-    
-    console.log("[PWA] Auth data cleared successfully");
-    return true;
-  } catch (error) {
-    console.error("[PWA] Error clearing auth data:", error);
-    return false;
-  }
-};
-
 export default {
   isPwaMode,
   storePwaAuthData,
-  getPwaAuthData,
-  clearPwaAuthData
+  getPwaAuthData
 };

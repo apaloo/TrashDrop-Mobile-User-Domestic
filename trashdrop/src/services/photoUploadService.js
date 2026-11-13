@@ -201,37 +201,9 @@ export const uploadPhotos = async (blobUrls, userId) => {
   }
 };
 
-/**
- * Delete a photo from Supabase Storage
- * @param {string} filePath - Path to file in storage
- * @returns {Promise<boolean>} Success status
- */
-export const deletePhoto = async (filePath) => {
-  try {
-    console.log('[PhotoUpload] Deleting photo:', filePath);
-
-    const { error } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .remove([filePath]);
-
-    if (error) {
-      console.error('[PhotoUpload] Delete error:', error);
-      return false;
-    }
-
-    console.log('[PhotoUpload] Photo deleted successfully');
-    return true;
-
-  } catch (error) {
-    console.error('[PhotoUpload] Error deleting photo:', error);
-    return false;
-  }
-};
-
 export default {
   uploadPhoto,
-  uploadPhotos,
-  deletePhoto
+  uploadPhotos
 };
 
 /** True for photos held only on this device (camera blob: or inline data: URLs) */
