@@ -28,12 +28,6 @@
       "table": "user_activity",
       "column": "details",
       "ref": "TD68"
-    },
-    {
-      "file": "src/services/rewardsService.js",
-      "table": "rewards",
-      "column": "points_required",
-      "ref": "TD63"
     }
   ]
 }

@@ -229,17 +229,6 @@ export const deduplicatedRequests = {
   },
 
   /**
-   * Deduplicated recent activity request
-   * @param {string} userId - User ID
-   * @param {number} limit - Activity limit
-   * @param {Function} requestFn - Request function
-   * @returns {Promise} Recent activities
-   */
-  async getRecentActivity(userId, limit, requestFn) {
-    return requestDeduplicator.deduplicate('getRecentActivity', [userId, limit], requestFn, 15000); // 15s cache
-  },
-
-  /**
    * Deduplicated active pickup request
    * @param {string} userId - User ID
    * @param {Function} requestFn - Request function
@@ -249,15 +238,6 @@ export const deduplicatedRequests = {
     return requestDeduplicator.deduplicate('getActivePickup', [userId], requestFn, 10000); // 10s cache
   },
 
-  /**
-   * Deduplicated notifications request
-   * @param {string} userId - User ID
-   * @param {Function} requestFn - Request function
-   * @returns {Promise} Notifications
-   */
-  async getNotifications(userId, requestFn) {
-    return requestDeduplicator.deduplicate('getNotifications', [userId], requestFn, 20000); // 20s cache
-  }
 };
 
 export default requestDeduplicator;
