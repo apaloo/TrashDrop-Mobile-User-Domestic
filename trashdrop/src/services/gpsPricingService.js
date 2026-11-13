@@ -327,21 +327,6 @@ export const getAllPricesForLocation = async (latitude, longitude) => {
 };
 
 /**
- * Get base cost for cost calculator integration
- *
- * @param {number} binSize - Bin size in liters
- * @param {number} latitude - GPS latitude
- * @param {number} longitude - GPS longitude
- * @returns {Promise<number>} Base cost in GHS
- * @throws {PricingUnavailableError} when the location or size cannot be priced
- */
-export const getBaseCost = async (binSize, latitude, longitude) => {
-  const priceInfo = await getLocationPrice(latitude, longitude, binSize);
-  console.log('[GPSPricing] Base cost for', binSize, 'L:', priceInfo.price, 'GHS');
-  return priceInfo.price;
-};
-
-/**
  * Clear pricing cache (useful for testing or manual refresh)
  */
 export const clearPricingCache = () => {
@@ -373,77 +358,6 @@ export const getCacheStats = () => {
 };
 
 /**
- * Get metrics for monitoring and debugging
- * @returns {Object} Current metrics
- */
-export const getMetrics = () => {
-  const uptime = Date.now() - metrics.lastReset;
-  const successRate = metrics.rpcCalls > 0 
-    ? ((metrics.rpcSuccesses / metrics.rpcCalls) * 100).toFixed(1) 
-    : 100;
-  const cacheHitRate = metrics.totalRequests > 0
-    ? ((metrics.cacheHits / metrics.totalRequests) * 100).toFixed(1)
-    : 0;
-
-  return {
-    ...metrics,
-    uptime_ms: uptime,
-    success_rate: `${successRate}%`,
-    cache_hit_rate: `${cacheHitRate}%`,
-    circuit_breaker_status: circuitBreaker.isOpen ? 'OPEN' : 'CLOSED',
-    circuit_breaker_failures: circuitBreaker.failures
-  };
-};
-
-/**
- * Get health status of the GPS pricing service
- * @returns {Object} Health status
- */
-export const getHealthStatus = () => {
-  const recentFailureRate = metrics.rpcCalls > 0 
-    ? (metrics.rpcFailures / metrics.rpcCalls) 
-    : 0;
-
-  let status = 'healthy';
-  let message = 'GPS pricing service is operating normally';
-
-  if (circuitBreaker.isOpen) {
-    status = 'degraded';
-    message = `Circuit breaker is open. Pricing is unavailable. Will retry in ${Math.max(0, Math.ceil((circuitBreaker.resetTimeout - (Date.now() - circuitBreaker.lastFailure)) / 1000))}s`;
-  } else if (recentFailureRate > 0.5) {
-    status = 'warning';
-    message = `High failure rate detected: ${(recentFailureRate * 100).toFixed(0)}%`;
-  }
-
-  return {
-    status,
-    message,
-    circuitBreaker: {
-      isOpen: circuitBreaker.isOpen,
-      failures: circuitBreaker.failures,
-      threshold: circuitBreaker.threshold,
-      lastFailure: circuitBreaker.lastFailure
-    },
-    cache: getCacheStats(),
-    metrics: getMetrics()
-  };
-};
-
-/**
- * Reset metrics (useful for testing)
- */
-export const resetMetrics = () => {
-  metrics.totalRequests = 0;
-  metrics.cacheHits = 0;
-  metrics.rpcCalls = 0;
-  metrics.rpcSuccesses = 0;
-  metrics.rpcFailures = 0;
-  metrics.circuitBreakerTrips = 0;
-  metrics.lastReset = Date.now();
-  console.log('[GPSPricing] Metrics reset');
-};
-
-/**
  * Force reset circuit breaker (for manual recovery)
  */
 export const resetCircuitBreaker = () => {
@@ -458,12 +372,8 @@ export default {
   findCoveringPricingZone,
   getLocationPrice,
   getAllPricesForLocation,
-  getBaseCost,
   clearPricingCache,
   getCacheStats,
-  getMetrics,
-  getHealthStatus,
-  resetMetrics,
   resetCircuitBreaker,
   PricingUnavailableError
 };

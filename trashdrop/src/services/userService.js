@@ -168,48 +168,6 @@ export const userService = {
     }
   },
 
-  /**
-   * Create or update user stats entry
-   * @param {string} userId - User ID
-   * @param {Object} statsData - Stats data to update
-   */
-  async updateUserStats(userId, statsData) {
-    try {
-      if (!userId) {
-        throw new Error('User ID is required');
-      }
-
-      console.log('[UserService] Updating user stats for:', userId);
-
-      const { data, error } = await supabase
-        .from('user_stats')
-        .upsert({
-          user_id: userId,
-          ...statsData,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('[UserService] Error updating stats:', error);
-        throw error;
-      }
-
-      console.log('[UserService] Successfully updated user stats');
-      return { data, error: null };
-
-    } catch (error) {
-      console.error('[UserService] Error in updateUserStats:', error);
-      return { 
-        data: null, 
-        error: {
-          message: error.message || 'Failed to update user stats',
-          code: error.code || 'STATS_UPDATE_ERROR'
-        }
-      };
-    }
-  }
 };
 
 export default userService;
