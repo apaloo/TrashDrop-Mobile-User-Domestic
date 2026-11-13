@@ -2,12 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 
-// Mock any components that might cause issues in test environment
-jest.mock('./utils/syncService', () => ({
-  initialize: jest.fn(),
-  syncData: jest.fn(),
-}));
-
 // Mock service worker registration
 jest.mock('./serviceWorkerRegistration', () => ({
   register: jest.fn(),
