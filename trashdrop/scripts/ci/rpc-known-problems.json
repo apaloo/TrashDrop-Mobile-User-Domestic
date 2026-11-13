@@ -1,5 +1,5 @@
 {
-  "_comment": "Database calls (rpc() functions; from() tables in \"table\", with \"column\" for a column) that already fail and are tracked, so CI flags only new ones (scripts/ci/check-rpc-calls.mjs). Each needs its register item in engineering/registers/tech-debt.md. Delete an entry when it is fixed; CI fails while a fixed entry is still listed.",
+  "_comment": "Database calls (rpc() functions; from() tables in \"table\", with \"column\" for a column; storage buckets in \"bucket\") that already fail and are tracked, so CI flags only new ones (scripts/ci/check-rpc-calls.mjs). Each needs its register item in engineering/registers/tech-debt.md. Delete an entry when it is fixed; CI fails while a fixed entry is still listed.",
   "problems": [
     {
       "file": "src/pages/CollectionForm.js",

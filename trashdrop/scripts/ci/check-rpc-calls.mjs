@@ -6,7 +6,9 @@
  * or view that exists (since 2026-11-13: the collector saved shifts to a
  * table that never existed, TD66), with columns that exist where they can be
  * read: insert/update/upsert object keys, the column of a filter or order,
- * and plain column names in select(). Calls to functions that didn't exist, or with the
+ * and plain column names in select(). Storage calls must name a bucket that
+ * exists, and getPublicUrl() only on a public bucket: a public link to a
+ * private bucket never loads (the collector's photos, TD70). Calls to functions that didn't exist, or with the
  * wrong parameter names, failed silently in production for weeks (TD37,
  * TD38, admin exec_sql, the dead admin service layer); unit tests mock the
  * database, so only a check against the real signatures finds them.
@@ -181,6 +183,23 @@ export function chainColumns(src, end) {
   return out;
 }
 
+/**
+ * supabase.storage.from(bucket) calls: { bucket, method, line }. The bucket is
+ * a literal or a constant set to a literal in the same file; others are skipped.
+ */
+export function findStorageCalls(src) {
+  const consts = {};
+  for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(['"])([\w.-]+)\2/g)) consts[m[1]] = m[3];
+  const calls = [];
+  const re = /storage\s*\.\s*from\(\s*(?:(['"])([\w.-]+)\1|([A-Za-z_$][\w$]*))\s*\)\s*\.\s*([A-Za-z_$][\w$]*)/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const bucket = m[2] || consts[m[3]];
+    if (bucket) calls.push({ bucket, method: m[4], line: src.slice(0, m.index).split('\n').length });
+  }
+  return calls;
+}
+
 /** Tables and views a migration creates (lower case) */
 export function findMigrationRelations(sql) {
   const clean = sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -273,13 +292,14 @@ function knownFunctions() {
       }
     }
   }
-  return { fns, relations, columns, generated: snap.generated };
+  const buckets = snap.buckets ? new Map(Object.entries(snap.buckets)) : null;
+  return { fns, relations, columns, buckets, generated: snap.generated };
 }
 
 function check() {
-  const { fns, relations, columns, generated } = knownFunctions();
+  const { fns, relations, columns, buckets, generated } = knownFunctions();
   const known = fs.existsSync(KNOWN) ? JSON.parse(fs.readFileSync(KNOWN, 'utf8')).problems || [] : [];
-  const problems = []; let calls = 0; let unread = 0; let tableCalls = 0; let columnUses = 0;
+  const problems = []; let calls = 0; let unread = 0; let tableCalls = 0; let columnUses = 0; let storageCalls = 0;
   for (const d of SOURCE_DIRS) {
     for (const p of walk(path.join(appRoot, d))) {
       if (!/\.(js|jsx|ts|tsx|mjs|cjs)$/.test(p) || /\.(test|spec)\./.test(p)) continue;
@@ -291,6 +311,13 @@ function check() {
       }
       if (!relations) continue;
       const src = fs.readFileSync(p, 'utf8');
+      if (buckets) {
+        for (const c of findStorageCalls(src)) {
+          storageCalls++;
+          if (!buckets.has(c.bucket)) problems.push({ file: rel, line: c.line, bucket: c.bucket, why: 'storage bucket does not exist' });
+          else if (c.method === 'getPublicUrl' && !buckets.get(c.bucket)) problems.push({ file: rel, line: c.line, bucket: c.bucket, why: 'public link to a private bucket: it will not load (use createSignedUrl, or a public bucket)' });
+        }
+      }
       for (const t of findTableCalls(src)) {
         tableCalls++;
         if (!relations.has(t.name.toLowerCase())) { problems.push({ file: rel, line: t.line, table: t.name, why: 'table or view does not exist' }); continue; }
@@ -303,7 +330,7 @@ function check() {
       }
     }
   }
-  const nameOf = (x) => x.function || (x.column ? `${x.table}.${x.column}` : x.table);
+  const nameOf = (x) => x.function || (x.bucket ? `bucket ${x.bucket}` : x.column ? `${x.table}.${x.column}` : x.table);
   const isKnown = (pr) => known.find((k) => k.file === pr.file && nameOf(k) === nameOf(pr));
   const fresh = problems.filter((pr) => !isKnown(pr));
   const stale = known.filter((k) => !problems.some((pr) => pr.file === k.file && nameOf(pr) === nameOf(k)));
@@ -311,6 +338,7 @@ function check() {
   console.log(relations
     ? `Table check: ${tableCalls} from() calls against ${relations.size} tables and views; ${columns ? `${columnUses} column names checked` : 'column check skipped (no "columns" in the snapshot)'}.`
     : 'Table check skipped: scripts/ci/rpc-signatures.json has no "relations" yet (run --refresh).');
+  console.log(buckets ? `Storage check: ${storageCalls} storage calls against ${buckets.size} buckets.` : 'Storage check skipped: no "buckets" in the snapshot (run --refresh).');
   problems.filter(isKnown).forEach((pr) => console.log(`  known (${isKnown(pr).ref}): ${pr.file}:${pr.line} ${nameOf(pr)}: ${pr.why}`));
   fresh.forEach((pr) => console.log(`::error file=${pr.file},line=${pr.line}::${nameOf(pr)}: ${pr.why}`));
   stale.forEach((k) => console.log(`::error file=scripts/ci/rpc-known-problems.json::${k.file} ${nameOf(k)} no longer fails: delete it from the known list`));
@@ -337,6 +365,8 @@ order by c.relname`;
 export const COLUMNS_SQL = `select c.table_name as t, c.column_name as c from information_schema.columns c
 where c.table_schema = 'public' order by c.table_name, c.ordinal_position`;
 
+export const BUCKETS_SQL = 'select id, public from storage.buckets order by id';
+
 async function refresh() {
   const token = process.env.SUPABASE_ACCESS_TOKEN; const ref = process.env.SUPABASE_PROJECT_REF;
   if (!token || !ref) { console.error('Set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF (production).'); process.exit(2); }
@@ -359,10 +389,16 @@ async function refresh() {
   if (!colRes.ok) { console.error(`Could not read the columns: HTTP ${colRes.status}`); process.exit(2); }
   const columns = {};
   for (const r of await colRes.json()) (columns[r.t] ||= []).push(r.c);
+  const bucketRes = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ query: BUCKETS_SQL }),
+  });
+  if (!bucketRes.ok) { console.error(`Could not read the storage buckets: HTTP ${bucketRes.status}`); process.exit(2); }
+  const buckets = Object.fromEntries((await bucketRes.json()).map((r) => [r.id, r.public === true]));
   const functions = {};
   for (const r of rows) (functions[r.n] ||= []).push({ args: r.a || [], defaults: Number(r.d) || 0 });
   const old = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
-  const snap = { ...old, generated: new Date().toISOString().slice(0, 10), relations_generated: new Date().toISOString().slice(0, 10), relations, columns, functions: Object.fromEntries(Object.entries(functions).sort()) };
+  const snap = { ...old, generated: new Date().toISOString().slice(0, 10), relations_generated: new Date().toISOString().slice(0, 10), relations, columns, buckets, functions: Object.fromEntries(Object.entries(functions).sort()) };
   fs.writeFileSync(SNAPSHOT, JSON.stringify(snap, null, 0).replace(/\],"/g, '],\n"') + '\n');
   console.log(`Snapshot written: ${Object.keys(functions).length} functions, ${relations.length} tables and views, ${Object.keys(columns).length} with columns.`);
 }
@@ -420,6 +456,14 @@ function selfTest() {
   assert(uses[0] === 'select:id,select:name,eq:status,order:created_at,neq:kind', `columns in a chain (${uses[0]})`);
   assert(uses[1] === 'insert:a,insert:b,insert:c,select:id', `insert keys of every row (${uses[1]})`);
   assert(uses[2] === 'eq:id' && uses[3] === '', `spread or variable rows are not guessed (${uses[2]} | ${uses[3]})`);
+  const st = findStorageCalls(`const BUCKET = 'avatars';
+    supabase.storage.from(BUCKET).upload(p, f);
+    supabase.storage
+      .from('collector-photos')
+      .getPublicUrl(path);
+    supabase.storage.from(dynamicName).list();
+    supabase.from('avatars').select('*');`);
+  assert(st.map((c) => `${c.bucket}:${c.method}:${c.line}`).join() === 'avatars:upload:2,collector-photos:getPublicUrl:3', `storage calls (${JSON.stringify(st)})`);
   const touched = findMigrationTouchedTables('alter table if exists public.bags add column x int; create table new_t (id int); -- alter table gone');
   assert([...touched].sort().join() === 'bags,new_t', `tables a migration creates or alters (${[...touched]})`);
   const rels = findMigrationRelations(`-- create table public.commented (id int);

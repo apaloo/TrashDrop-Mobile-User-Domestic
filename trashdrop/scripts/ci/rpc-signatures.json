@@ -550,4 +550,4 @@
 "validate_status_transition":[{"args":["current_status","new_status"],
 "defaults":0}],
 "volunteer_claimable_reports":[{"args":[],
-"defaults":0}]}}
+"defaults":0}]},"buckets":{"avatars":true,"collector-photos":false,"dumping-photos":true,"illegal-dumping-photos":true}}
