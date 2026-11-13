@@ -50,6 +50,15 @@ jobs:
         node scripts/ci/check-runtime-deps.cjs --self-test
         node scripts/ci/check-runtime-deps.cjs src netlify/functions
 
+    # Every source file is reachable from the app (index.html, the Vite
+    # config or a test): no new copies, debug panels or helpers nothing uses.
+    # Files loaded in a way the check can't see are listed, with a reason,
+    # in scripts/ci/unused-files-allowlist.txt.
+    - name: Unused files check
+      run: |
+        node scripts/ci/check-unused-files.cjs --self-test
+        node scripts/ci/check-unused-files.cjs
+
     # Only TrashDrop domains we own (trashdrops.com) in shipped code and new
     # migrations: trashdrop.app is someone else's (TD58)
     - name: Owned domains check
