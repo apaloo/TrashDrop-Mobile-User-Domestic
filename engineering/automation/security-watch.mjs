@@ -197,13 +197,37 @@ select 'points', 'policies rewards_redemption',
      from pg_policy p where p.polrelid = to_regclass('public.rewards_redemption'))
 order by 1, 2`;
 
+// Access control (TD61, 2026-11-13): the functions and row-level policies
+// that decide what an account can see and do (roles, areas, volunteer teams,
+// staff, capabilities). A flaw here is in the logic, so the caller-check count
+// above can't see it; instead any change is noticed and must be reviewed in a
+// pull request before its new fingerprint is recorded.
+export const ACCESS_FUNCTIONS = [
+  'request_account_role', 'admin_review_account_role', 'admin_set_account_area', 'my_access', 'td_account_role_on_signup',
+  'team_accept_invite', 'team_create_invite', 'team_leave', 'team_remove_member', 'team_revoke_invite', 'team_set_role',
+  'td_team_of', 'td_effective_account', 'td_my_role', 'td_my_team', 'td_my_area', 'td_my_assign_region', 'td_in_my_area',
+  'td_is_staff', 'can_do', 'has_any_role', 'td_capability_roles',
+];
+export const ACCESS_TABLES = ['account_roles', 'staff_admins', 'team_members', 'team_invites', 'illegal_dumping_mobile'];
+export const ACCESS_DEFINITIONS_SQL = `select 'access' as rule, 'function ' || f.name as object,
+  (select md5(string_agg(pg_get_functiondef(p.oid) || coalesce(array_to_string(p.proacl, ','), ''), '|' order by p.oid::regprocedure::text))
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public' where p.proname = f.name) as hash
+from unnest(array[${ACCESS_FUNCTIONS.map((n) => `'${n}'`).join(',')}]) as f(name)
+union all
+select 'access', 'policies ' || t.name,
+  (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
+          || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.' || t.name)))
+     from pg_policy p where p.polrelid = to_regclass('public.' || t.name))
+from unnest(array[${ACCESS_TABLES.map((n) => `'${n}'`).join(',')}]) as t(name)
+order by 2`;
+
 export function judgeProtected(rows, expected) {
   const live = Object.fromEntries((rows || []).map((r) => [r.object, r]));
   const problems = [];
   for (const [object, hash] of Object.entries(expected)) {
     const row = live[object];
     if (!row || !row.hash) problems.push(`${object} is missing`);
-    else if (row.hash !== hash) problems.push(`${object} (${row.rule}) has changed`);
+    else if (row.hash !== String(hash).replace(/^md5:/, '')) problems.push(`${object} (${row.rule}) has changed`);
   }
   for (const object of Object.keys(live)) {
     if (!(object in expected)) problems.push(`${object} has no recorded fingerprint`);
@@ -446,6 +470,20 @@ async function main() {
     lines.push('', '**Protected rules:** skipped (needs the same token and project ref as the advisors).');
   }
 
+  if (token && ref && config.accessDefinitions?.objects) {
+    try {
+      const problems = judgeProtected(await query(token, ref, ACCESS_DEFINITIONS_SQL), config.accessDefinitions.objects);
+      const n = Object.keys(config.accessDefinitions.objects).length;
+      lines.push('', `**Access control:** ${problems.length ? `❌ ${problems.length} of ${n} database objects changed since they were reviewed` : `✅ all ${n} database objects as reviewed`}`);
+      problems.forEach((p) => {
+        lines.push(`- ${p}`);
+        failures.push(`Access control: ${p}. Who can see or change what may have changed. Review the change in its pull request (can an account give itself more access?), then record the new fingerprint (engineering/runbooks/database-function-review.md §Access control).`);
+      });
+    } catch (e) {
+      lines.push('', `**Access control:** could not be read (${e.message}).`);
+    }
+  }
+
   if (token && ref) {
     try {
       const r = judgeCapacity((await query(token, ref, CAPACITY_SQL))?.[0], config.capacity);
@@ -564,6 +602,12 @@ function selfTest() {
     'view user_stats_dashboard', 'policies promotional_usage', 'policies rewards_redemption'];
   assert(listed.length === recorded.length && listed.every((o) => recorded.includes(o)), 'every protected object has a recorded fingerprint');
   assert(Object.values(config.protectedDefinitions.objects).every((h) => /^[0-9a-f]{32}$/.test(h)), 'fingerprints are md5');
+  const accessListed = [...ACCESS_FUNCTIONS.map((n) => `function ${n}`), ...ACCESS_TABLES.map((t) => `policies ${t}`)];
+  const accessRecorded = Object.keys(config.accessDefinitions?.objects || {});
+  assert(accessListed.length === accessRecorded.length && accessListed.every((o) => accessRecorded.includes(o)), 'every access-control object has a recorded fingerprint');
+  assert(Object.values(config.accessDefinitions.objects).every((h) => /^md5:[0-9a-f]{32}$/.test(h)), 'access fingerprints are md5:<hash> (plain hashes next to names like my_access trip the secret scan)');
+  assert(judgeProtected([{ rule: 'access', object: 'function a', hash: 'h1' }], { 'function a': 'md5:h1' }).length === 0, 'judgeProtected: md5: prefix');
+  assert(/^select 'access'/.test(ACCESS_DEFINITIONS_SQL) && !ACCESS_DEFINITIONS_SQL.includes('${'), 'access SQL is built');
   const cap = { revisitRows: 100000, revisitMb: 2048 };
   assert(!judgeCapacity({ largest_table: 'logs', largest_rows: 1081, db_bytes: 50 * 1048576 }, cap).due, 'judgeCapacity: small');
   assert(judgeCapacity({ largest_table: 'logs', largest_rows: 100000, db_bytes: 1 }, cap).due && judgeCapacity({ largest_table: 'x', largest_rows: 1, db_bytes: 2048 * 1048576 }, cap).due, 'judgeCapacity: thresholds');
