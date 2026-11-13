@@ -309,6 +309,38 @@
       "trigger digital_bins.ac_td_record_bin_acceptance": "91eebb2ec4b7eebc6447233b3078602e"
     }
   },
+  "_accessDefinitions_comment": "Fingerprints of the functions and row-level policies that decide what an account can see and do (roles, areas, volunteer teams, staff, capabilities). Recorded 2026-11-13 after the TD61 fix (20261113104611) and a review of every function that writes the access tables. A change fails the watch until it has been reviewed in a pull request (can an account give itself more access?) and its new fingerprint recorded: engineering/runbooks/database-function-review.md, Access control. Stored as \"md5:<hash>\" so the secret scan does not mistake them for API keys (names like my_access).",
+  "accessDefinitions": {
+    "objects": {
+      "function admin_review_account_role": "md5:531187321133f51fa293084deaf92cb0",
+      "function admin_set_account_area": "md5:97666d1aaa2b5978ef45a636484ee0fc",
+      "function can_do": "md5:4abc8e0ba41d86499935628c82dd454f",
+      "function has_any_role": "md5:db86bfc51c63526482a92303ddc2966f",
+      "function my_access": "md5:5aab03fd9d3ee76a0613886fa580c5b4",
+      "function request_account_role": "md5:a6480a51d69671ed71c3a8ba7983956f",
+      "function td_account_role_on_signup": "md5:d91e27e99074bb613b59e3128833fd1b",
+      "function td_capability_roles": "md5:ee750b1fbb8a5f673941fdc705f5dcc9",
+      "function td_effective_account": "md5:c428219d32647848259b421ed9aa4aa2",
+      "function td_in_my_area": "md5:9a52786bedb325dbb9b82c440c87ddd7",
+      "function td_is_staff": "md5:25a622133c33f939e32d14991804862d",
+      "function td_my_area": "md5:d4ce82a676d4e38c31da8886832748ab",
+      "function td_my_assign_region": "md5:1220852cbdbf93b0f35e8deb356c1d6e",
+      "function td_my_role": "md5:afee388d1d124a4b815cc001d915f25c",
+      "function td_my_team": "md5:fc8a99f3eb9ba301e3cfb6515945e240",
+      "function td_team_of": "md5:c5d2a903804846c64e1c123c3820fd2d",
+      "function team_accept_invite": "md5:16289335758ba47a19dc750fd6288f04",
+      "function team_create_invite": "md5:7be1067c27853dba77dd977531985b63",
+      "function team_leave": "md5:1d848b1fdfc0c94bb73c2a27abe17e2d",
+      "function team_remove_member": "md5:84c7504154d6d16ff159a1c5d8392828",
+      "function team_revoke_invite": "md5:a02d6b8f23c0bc344fc0a88820bd3ee4",
+      "function team_set_role": "md5:2bb36c8b84986e178d8714638d4e326f",
+      "policies account_roles": "md5:5efea1041b54016402aea773c730e8c4",
+      "policies illegal_dumping_mobile": "md5:9d08ab46ab381e3b3b53a8d98a8abab6",
+      "policies staff_admins": "md5:8a814367e04216674daab57c8187e960",
+      "policies team_invites": "md5:0311f3753581849f4b818cf8bbcdf72d",
+      "policies team_members": "md5:0311f3753581849f4b818cf8bbcdf72d"
+    }
+  },
   "_uncheckedFunctions_comment": "Database functions that run with their owner's rights, can be run by any signed-in user and show no check of who is calling: those that write and take an id, and those that read personal data (auth.users, phone numbers). Baseline 2026-11-12 after TD19 round 3 (20261112122021): 0 writers; 2 readers, both deliberate yes/no answers (the sign-up phone check, is_active_collector). Only counts are published; never raise a baseline without the CTO.",
   "uncheckedFunctions": {
     "maxWriters": 0,

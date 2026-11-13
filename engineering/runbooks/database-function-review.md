@@ -236,3 +236,38 @@ Then revoke `SELECT` from `anon` (and `authenticated` if the app doesn't need
 it), switch on row-level security for a table, or make a view run as the
 caller (`security_invoker`), after checking its readers in all three apps and
 the API logs.
+
+## Access control
+
+The functions and row-level policies that decide what an account can see and
+do are fingerprinted by the daily security watch (`accessDefinitions` in
+`engineering/automation/security-watch-config.json`): account roles and areas
+(`request_account_role`, `admin_review_account_role`, `admin_set_account_area`,
+`my_access`), volunteer teams (`team_*`, `td_team_of`, `td_my_team`,
+`td_effective_account`), who someone is (`td_my_role`, `td_is_staff`,
+`td_my_area`, `td_in_my_area`, `td_my_assign_region`), capabilities (`can_do`,
+`has_any_role`, `td_capability_roles`, which the admin site owns) and the
+policies on `account_roles`, `staff_admins`, `team_members`, `team_invites` and
+`illegal_dumping_mobile`.
+
+Why: a flaw here is in the logic, not a missing check. On 2026-11-13 (TD61)
+`request_account_role` checked who was calling but still let an approved
+account move itself to another district. The "caller check" count can't see
+that; a fingerprint notices any change.
+
+When the watch reports a change:
+
+1. Find the pull request and migration that made it. None: treat it as an
+   incident (someone changed access in the dashboard) and restore the migration's
+   definition.
+2. Review the new definition with one question per input: **can a signed-in
+   account use this to give itself, or another account, more access, or a
+   different area, without an admin?** Test the answer as that account in a
+   rolled-back transaction (section 4 above shows how to act as a user).
+3. Record the new fingerprint: run `ACCESS_DEFINITIONS_SQL` from
+   `security-watch.mjs` on production and copy the changed hash into
+   `accessDefinitions.objects`, in the same pull request or a follow-up that
+   links the review. Never record a fingerprint only to make the watch pass.
+
+Adding an object: add it to `ACCESS_FUNCTIONS` or `ACCESS_TABLES` and record its
+fingerprint; the self-test fails until both are there.
