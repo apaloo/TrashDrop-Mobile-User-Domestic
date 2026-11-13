@@ -1,5 +1,5 @@
 {
-  "_comment": "CI scripts that are one script in three repositories (engineering/automation/shared-scripts.mjs). The household copy is the source: change it here first, then copy it to the other two in the same day. Add a script here when it starts being shared.",
+  "_comment": "CI scripts that are one script in three repositories (engineering/automation/shared-scripts.mjs). The household copy is the source: change it here first, then copy it to the other two in the same day. Add a script here when it starts being shared. rpc-signatures.json is data, not a script: production's functions, tables and columns, the same for all three (refreshed weekly by the Schema snapshot workflow here; copy it to the others when it changes).",
   "sourceDir": "trashdrop/scripts/ci",
   "scripts": [
     "check-runtime-deps.cjs",
@@ -7,10 +7,19 @@
     "check-rpc-calls.mjs",
     "coverage-summary.mjs",
     "check-unused-files.cjs",
-    "check-log-privacy.cjs"
+    "check-log-privacy.cjs",
+    "rpc-signatures.json"
   ],
   "repos": [
-    { "name": "collector", "slug": "apaloo/TrashDrop-Mobile-Collector-Driver", "dir": "scripts/ci" },
-    { "name": "admin", "slug": "apaloo/TrashDrop_Management_webApp_admins", "dir": "scripts/ci" }
+    {
+      "name": "collector",
+      "slug": "apaloo/TrashDrop-Mobile-Collector-Driver",
+      "dir": "scripts/ci"
+    },
+    {
+      "name": "admin",
+      "slug": "apaloo/TrashDrop_Management_webApp_admins",
+      "dir": "scripts/ci"
+    }
   ]
 }
