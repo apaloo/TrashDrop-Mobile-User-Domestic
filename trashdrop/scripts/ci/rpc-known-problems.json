@@ -1,5 +1,5 @@
 {
-  "_comment": "Database calls (rpc() functions, or from() tables in \"table\") that already fail and are tracked, so CI flags only new ones (scripts/ci/check-rpc-calls.mjs). Each needs its register item in engineering/registers/tech-debt.md. Delete an entry when it is fixed; CI fails while a fixed entry is still listed.",
+  "_comment": "Database calls (rpc() functions; from() tables in \"table\", with \"column\" for a column) that already fail and are tracked, so CI flags only new ones (scripts/ci/check-rpc-calls.mjs). Each needs its register item in engineering/registers/tech-debt.md. Delete an entry when it is fixed; CI fails while a fixed entry is still listed.",
   "problems": [
     {
       "file": "src/pages/CollectionForm.js",
@@ -10,6 +10,30 @@
       "file": "src/pages/CollectionQRCode.js",
       "table": "collections",
       "ref": "TD67"
+    },
+    {
+      "file": "src/pages/Rewards.js",
+      "table": "user_activity",
+      "column": "status",
+      "ref": "TD68"
+    },
+    {
+      "file": "src/pages/Rewards.js",
+      "table": "user_activity",
+      "column": "points",
+      "ref": "TD68"
+    },
+    {
+      "file": "src/pages/Rewards.js",
+      "table": "user_activity",
+      "column": "details",
+      "ref": "TD68"
+    },
+    {
+      "file": "src/services/rewardsService.js",
+      "table": "rewards",
+      "column": "points_required",
+      "ref": "TD63"
     }
   ]
 }

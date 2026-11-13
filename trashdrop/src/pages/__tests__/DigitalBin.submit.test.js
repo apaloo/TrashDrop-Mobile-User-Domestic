@@ -153,12 +153,13 @@ describe('Saving a digital bin booking: the bin location', () => {
     expect(binInsert().location_id).toBe('binloc-1');
   });
 
-  it('a place only in the old locations table is copied into bin_locations, reading its PostGIS point', async () => {
+  it('a place only in the old locations table is copied into bin_locations, with its position', async () => {
     mockLocation = { ...mockLocation, location_id: 'legacy-1' };
     mockRespond = (c) => {
       if (c.table === 'bin_locations' && c.op === 'select' && c.single) return { data: null, error: { message: 'not found' } };
       if (c.table === 'locations' && c.single) {
-        return { data: { id: 'legacy-1', name: 'Shop', address: 'Labone', coordinates: 'POINT(-0.18 5.56)' }, error: null };
+        // the real columns (check-rpc-calls.mjs checks the select against production)
+        return { data: { id: 'legacy-1', location_name: 'Shop', address: 'Labone', latitude: 5.56, longitude: -0.18 }, error: null };
       }
       if (c.table === 'bin_locations' && c.op === 'insert') return { data: { id: 'binloc-migrated' }, error: null };
       return undefined;
@@ -169,6 +170,36 @@ describe('Saving a digital bin booking: the bin location', () => {
       user_id: 'u1', location_name: 'Shop', address: 'Labone', coordinates: 'POINT(-0.18 5.56)', is_default: false,
     });
     expect(binInsert().location_id).toBe('binloc-migrated');
+  });
+
+  it('an old place that cannot be copied gives way to a new bin location at the GPS position', async () => {
+    mockLocation = { ...mockLocation, location_id: 'legacy-1' };
+    let binLocationInserts = 0;
+    mockRespond = (c) => {
+      if (c.table === 'bin_locations' && c.op === 'select' && c.single) return { data: null, error: { message: 'not found' } };
+      if (c.table === 'locations' && c.single) return { data: { id: 'legacy-1', location_name: 'Shop', address: 'Labone', latitude: 5.56, longitude: -0.18 }, error: null };
+      if (c.table === 'bin_locations' && c.op === 'insert') {
+        binLocationInserts += 1;
+        return binLocationInserts === 1 ? { data: null, error: { message: 'refused' } } : { data: { id: 'binloc-gps' }, error: null };
+      }
+      return undefined;
+    };
+    await book();
+    await screen.findByText('Request submitted');
+    expect(callsTo('bin_locations', 'insert')[1].payload.coordinates).toBe('POINT(-0.187 5.6037)');
+    expect(binInsert().location_id).toBe('binloc-gps');
+  });
+
+  it('a place in neither table is saved again from the GPS position', async () => {
+    mockLocation = { ...mockLocation, location_id: 'gone-1' };
+    mockRespond = (c) => {
+      if (c.single && c.op === 'select' && ['bin_locations', 'locations'].includes(c.table)) return { data: null, error: { message: 'not found' } };
+      if (c.table === 'bin_locations' && c.op === 'insert') return { data: { id: 'binloc-new' }, error: null };
+      return undefined;
+    };
+    await book();
+    await screen.findByText('Request submitted');
+    expect(binInsert().location_id).toBe('binloc-new');
   });
 
   it('without a GPS position nothing is saved and the household is told why', async () => {
