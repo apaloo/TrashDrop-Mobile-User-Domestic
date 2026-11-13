@@ -262,9 +262,18 @@
       "security_definer_view:public.user_recent_activity",
       "security_definer_view:public.user_stats_dashboard"
     ],
-    "_ceilings_comment": "Warning counts that may only go down. A count below its ceiling fails the watch until the ceiling is lowered to it. 2026-11-13: anon 35 -> 34.",
+    "_ceilings_comment": "Warning counts that may only go down. A count below its ceiling fails the watch until the ceiling is lowered to it, and a WARN-level type without a ceiling fails it too (reasons in _ceilingReasons). 2026-11-13: anon 35 -> 34; ceilings added for the other three warning types.",
     "ceilings": {
-      "anon_security_definer_function_executable": 34
+      "anon_security_definer_function_executable": 34,
+      "authenticated_security_definer_function_executable": 142,
+      "extension_in_public": 2,
+      "vulnerable_postgres_version": 1
+    },
+    "_ceilingReasons": {
+      "anon_security_definer_function_executable": "TD19: mostly triggers (not callable through the API) and deliberate public lookups (sign-up phone check, invite links, pricing)",
+      "authenticated_security_definer_function_executable": "TD19: signed-in functions; each checks its caller (td_assert_self_or_staff and the access fingerprints below)",
+      "extension_in_public": "postgis and pg_net, installed there before 2026; moving postgis would touch the tables whose columns use its types, and pg_net must be dropped and recreated. Accepted, 2026-11-13",
+      "vulnerable_postgres_version": "TD62: Postgres 15.8 has security patches waiting; the owner runs the upgrade from the Supabase dashboard"
     }
   },
   "_writePolicies_comment": "Row-level security write policies (INSERT, UPDATE, DELETE or ALL) that apply to every row (USING/WITH CHECK true) or to signed-out visitors (anon). Policies made in the dashboard never pass the migration check, so the live database is counted daily. Only the count is published (the repository is public); list them with the query in engineering/runbooks/database-function-review.md. Policies for service_role alone are not counted (that key bypasses row-level security anyway). maxOpen was 9 on 2026-11-12 and is 0 since TD50 closed them the same day; never raise it without the CTO.",
