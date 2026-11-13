@@ -100,4 +100,62 @@ describe('userService.getUserStats', () => {
     expect(data.points).toBe(123);
     expect(data.batches).toBe(0);
   });
+
+  it('no user: an error, with no lookups', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await userService.getUserStats(undefined);
+    expect(r).toEqual({ data: null, error: { message: 'User ID is required', code: 'USER_STATS_ERROR' } });
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("a profile that can't be read is an error, never a points figure from what was left", async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    supabase.from.mockImplementation(withTable('profiles', { data: null, error: { message: 'permission denied', code: '42501' } }));
+    const r = await userService.getUserStats('u1');
+    expect(r).toEqual({ data: null, error: { message: 'permission denied', code: '42501' } });
+  });
+
+  it('a profile that simply does not exist yet (PGRST116) still shows the server balance', async () => {
+    supabase.from.mockImplementation(withTable('profiles', { data: null, error: { code: 'PGRST116', message: 'no rows' } }));
+    const { data, error } = await userService.getUserStats('u1');
+    expect(error).toBeNull();
+    expect(data.points).toBe(123);
+  });
+});
+
+describe('userService.updateUserProfile (the profile page)', () => {
+  const upserts = [];
+  const profileTable = (result) => () => new Proxy({}, {
+    get: (_, prop) => {
+      if (prop === 'then') return (resolve) => resolve(result);
+      if (prop === 'upsert') return (row) => { upserts.push(row); return profileTable(result)(); };
+      return () => profileTable(result)();
+    },
+  });
+  beforeEach(() => {
+    upserts.length = 0;
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('saves the changes on this account\'s own profile row, stamped with the time', async () => {
+    supabase.from.mockImplementation(profileTable({ data: { id: 'u1', first_name: 'Ama' }, error: null }));
+    const r = await userService.updateUserProfile('u1', { first_name: 'Ama' });
+    expect(r).toEqual({ data: { id: 'u1', first_name: 'Ama' }, error: null });
+    expect(supabase.from).toHaveBeenCalledWith('profiles');
+    expect(upserts[0]).toMatchObject({ id: 'u1', first_name: 'Ama' });
+    expect(Date.parse(upserts[0].updated_at)).not.toBeNaN();
+  });
+
+  it('a refusal (the database guards points and role columns) is an error, not a saved profile', async () => {
+    supabase.from.mockImplementation(profileTable({ data: null, error: { message: 'Not allowed to change points', code: '42501' } }));
+    const r = await userService.updateUserProfile('u1', { points: 9999 });
+    expect(r).toEqual({ data: null, error: { message: 'Not allowed to change points', code: '42501' } });
+  });
+
+  it('no user: an error, nothing sent', async () => {
+    const r = await userService.updateUserProfile(null, { first_name: 'x' });
+    expect(r).toEqual({ data: null, error: { message: 'User ID is required', code: 'PROFILE_UPDATE_ERROR' } });
+    expect(upserts).toEqual([]);
+  });
 });
