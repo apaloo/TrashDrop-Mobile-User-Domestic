@@ -98,9 +98,25 @@ The database, at every step (since 2026-11-12, TD3):
 | Collector's share | Set when the payment is recorded (`td_bin_collector_share`, applied by `td_guard_bin_payment`), from what the client paid, never above the bin's fee or the booked payout. The app's own figures are ignored |
 | Cash-out | `td_withdrawable_items` |
 
-The collector app still works the share out to show it before the payment is
-recorded (`computeBinPaymentShares`); it reads the distance from the bin, so it
-shows the same figure.
+### What the collector app shows (owner-approved 2026-11-13)
+The app shows the database's figure everywhere, never more:
+- **Job card** (standard bins): "What you earn", by the rule above from the
+  bin's fee, at the distance recorded when the bin was accepted; before that,
+  the collector's current straight-line distance to the bin (what the database
+  records if they accept now); unknown, 87%. Never the client's whole fee and
+  never the booked payout (that is the ceiling, not the earning).
+- **Disposal**: the same figure from what the client paid (counted up to the
+  fee), never above the booked payout, plus confirmed tips. The pending and
+  failed MoMo display below still applies.
+- **Earnings**: each bin's recorded share (`bin_payments.collector_share`),
+  split into base and urgent parts; not the payout columns stored on the bin.
+
+There is **no loyalty cashback, distance bonus or surge share** on digital
+bins. Until 2026-11-13 the app showed a 1% cashback (and could show distance
+and surge bonuses) that nothing paid; cash-outs were never affected. The app
+works the figure out with `computeBinPaymentShares` and
+`src/utils/binEarnings.js`, pinned to the production function by
+`disposalPayout.matchesDatabase.test.js`.
 
 **Watch the 87% default.** A bin within 2 km earns 85%, an unknown distance
 87%, so turning location off pays slightly more on nearby bins. The monthly
@@ -121,6 +137,7 @@ bring the default back to the owner.
 | 2026-11-12 | Cash-outs count only MoMo payments confirmed by the gateway or an admin; a collector's own confirmation doesn't (TD53, `20261112154512`) |
 | 2026-11-12 | At disposal: pending MoMo shows the expected payout marked pending; failed shows GH₵0 "payment failed"; no payment record shows GH₵0 |
 | 2026-11-12 | Cleanup fees are set only by an admin or the MMDA; cleanups an MMDA assigns are paid by the MMDA and only recorded on TrashDrop, until MMDA-funded accounts exist (admin `20261118_mmda_paid_cleanups.sql`, applied as `20261112170602`) |
+| 2026-11-13 | The collector app shows the database's figure on the job card, at disposal and in Earnings; no loyalty cashback, distance bonus or surge share on digital bins (collector #94) |
 
 ## Where it lives
 
@@ -135,7 +152,7 @@ bring the default back to the owner.
   (`getDeadheadShare`, `computeBinPaymentShares`, `promotionalPayout`,
   `computePromotionalShares`), `src/services/paymentService.js`,
   `src/services/disposalService.js`, `src/services/earningsService.js`.
-- Tests (collector app): `src/utils/__tests__/promotionalPayout.test.js`,
+- Tests (collector app): `src/services/__tests__/disposalPayout.matchesDatabase.test.js`, `src/utils/__tests__/binEarnings.test.js`, `src/utils/__tests__/promotionalPayout.test.js`,
   `src/services/__tests__/earningsPromotional.test.js`,
   `src/services/__tests__/earningsLoyaltyTier.test.js` (the Earnings page's
   loyalty tier: Silver when there is no row for the month; read with
