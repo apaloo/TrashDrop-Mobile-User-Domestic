@@ -68,7 +68,9 @@ describe('Digital bin location step with the phone location off', () => {
 
   it('closing the prompt keeps the user on the step, and GPS does not take over afterwards', async () => {
     render(<Harness />);
-    await userEvent.click(await screen.findByRole('button', { name: /Pick the spot on the map/i }));
+    // it doesn't offer the map or a saved place instead: a booking needs the phone's position
+    expect(await screen.findByRole('alertdialog')).not.toHaveTextContent(/saved place|Pick the spot on the map/i);
+    await userEvent.click(await screen.findByRole('button', { name: /^Not now$/i }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     // Still on the Bin Location step with its normal controls

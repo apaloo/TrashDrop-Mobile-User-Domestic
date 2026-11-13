@@ -547,7 +547,10 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
           action="set your bin location"
           reason="Collectors use your phone's GPS to find the exact spot of your bin."
           onLeave={locationGate.clear}
-          leaveLabel={savedLocations.length > 0 ? 'Use the map or a saved place' : 'Pick the spot on the map'}
+          // Booking needs the phone's own position (collectors need a precise
+          // spot; handleContinue refuses a map pin alone), so leaving the prompt
+          // doesn't promise the map or a saved place instead (TD65)
+          leaveLabel="Not now"
         />
       )}
       <section className={`${card} px-4 py-4 space-y-4`}>
