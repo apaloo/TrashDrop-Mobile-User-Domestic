@@ -54,7 +54,7 @@ the CTO and CEO.
 
 **Templates:** [Architecture decision record](templates/adr.md) · [Post-incident review](templates/postmortem.md) · [Release checklist](templates/release-checklist.md)
 
-**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19) · [A signed-out caller scanned the API](runbooks/api-scan-detected.md) · [Production database errors](runbooks/production-errors.md) · [Protected rules](runbooks/protected-rules.md) · [A secret in git history](runbooks/secret-in-git-history.md)
+**Runbooks:** [account and tool setup, steps 01–09](setup-tracker.md) · [Database function review](runbooks/database-function-review.md) (TD19) · [A signed-out caller scanned the API](runbooks/api-scan-detected.md) · [Production database errors](runbooks/production-errors.md) · [Protected rules](runbooks/protected-rules.md) · [A secret in git history](runbooks/secret-in-git-history.md) · [The database call check failed](runbooks/database-call-check.md)
 
 ## What is automated
 
