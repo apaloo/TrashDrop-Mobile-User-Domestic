@@ -43,10 +43,14 @@
     for INSERT, UPDATE, DELETE or ALL never uses `USING (true)` or
     `WITH CHECK (true)`, and never applies to `anon`: that lets every
     signed-in user (or everyone) change every row. Name the owner
-    (`user_id = auth.uid()`), the assigned collector, or staff
+    (`user_id = (select auth.uid())`), the assigned collector, or staff
     (`td_is_staff()`), or write through a SECURITY DEFINER function. Checked
     in new migrations by CI, and on the live database daily by the security
     watch (policies made in the dashboard skip migrations).
+    In every policy, wrap `auth.uid()`, `auth.role()`, `auth.jwt()` and
+    `current_setting()` as `(select auth.uid())`, so Postgres works them out
+    once per query instead of once per row. Checked by CI in migrations from
+    2026-11-13 (TD20); the security watch holds the live count.
 
 ## Automated checks (all pull requests)
 
@@ -55,7 +59,7 @@
 | Lint (application code) | ESLint | Yes |
 | Unit tests | Jest (`npm run test:ci`) | Yes |
 | Pricing guard tests | Jest + `pricing-promo.js` | Yes |
-| Database functions and write policies in new migrations (principles 8 and 10) | `scripts/ci/check-migrations.js` | Yes |
+| Database functions, write policies and per-row auth calls in new migrations (principles 8 and 10) | `scripts/ci/check-migrations.js` | Yes |
 | Database calls match real functions (principle 9), all three apps | `scripts/ci/check-rpc-calls.mjs` | Yes; tracked failures in `rpc-known-problems.json` |
 | Build | Vite (all three apps) | Yes |
 | Secrets in new commits | gitleaks | Yes |
