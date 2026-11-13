@@ -12,7 +12,7 @@ Act, 2012 (Act 843).
 | Class | Examples in TrashDrop | Controls |
 |---|---|---|
 | **Restricted** | MoMo / payment numbers, ID documents, exact home GPS, auth tokens | RLS to owner and named staff roles only; never in logs, analytics, error reports or AI prompts; encrypted at rest (Supabase default) |
-| **Confidential** | Names, phone numbers, emails, addresses, pickup history, carter earnings | RLS to owner and staff; masked in admin lists where possible |
+| **Confidential** | Names, phone numbers, emails, addresses, pickup history, carter earnings, households' ratings of collectors and their comments | RLS to owner and staff; masked in admin lists where possible. Ratings: the household reads its own, staff read all, a collector sees only their average (`job_ratings`, `td_rate_job`; issue #186) |
 | **Internal** | Aggregated statistics, operational dashboards | Staff only |
 | **Public** | Published environmental reports, website content | No restriction |
 
@@ -33,6 +33,10 @@ Act, 2012 (Act 843).
    quarterly access review.
 6. **Privacy by design.** The feature request form asks whether new personal data is
    collected; if so, the DPS reviews before build.
+   Collector ratings (2026-11-13, issue #186): collectors see only their
+   average; comments are staff only; the privacy notices (trashdrops.com/privacy,
+   collector app Privacy page) say so. Retention to be set with the defaults
+   below.
 7. **Breach handling** follows [Incident management](incident-management.md);
    the DPS decides on notification to the Data Protection Commission and
    affected people.
