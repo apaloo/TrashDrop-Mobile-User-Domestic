@@ -12,7 +12,6 @@ jest.mock('../../utils/offlineStorage.js', () => ({
   isOnline: () => true,
   getSyncQueueByOperation: async () => [],
 }));
-jest.mock('../../utils/batchDiagnostics.js', () => ({ __esModule: true, default: {} }));
 
 // Queries are recorded as [table, method, ...args]; rpc calls as ['rpc', fn, args].
 // Plain functions: CRA's resetMocks would wipe jest.fn implementations.

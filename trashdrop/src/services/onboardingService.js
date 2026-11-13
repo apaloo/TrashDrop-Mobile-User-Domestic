@@ -221,35 +221,6 @@ export const onboardingService = {
     return 'Test data cleared successfully';
   },
 
-  // Debug function to check current localStorage state
-  debugLocalStorage(userId) {
-    console.log('[Onboarding] Debug localStorage for user:', userId);
-    
-    const qrScanKey = `trashdrop_qr_scan_${userId}`;
-    const qrScanData = JSON.parse(localStorage.getItem(qrScanKey) || 'null');
-    
-    const dismissedKey = `trashdrop_onboarding_dismissed_${userId}`;
-    const hasDismissed = localStorage.getItem(dismissedKey);
-    
-    const locationKey = `trashdrop_locations_${userId}`;
-    const locations = JSON.parse(localStorage.getItem(locationKey) || '[]');
-    
-    console.log('[Onboarding] LocalStorage state:', {
-      qrScanKey,
-      qrScanData,
-      dismissedKey,
-      hasDismissed,
-      locationKey,
-      locations
-    });
-    
-    return {
-      qrScanData,
-      hasDismissed,
-      locations
-    };
-  },
-
   // Main service methods for the actual calculation
   async performStateCalculation(userId) {
     console.log('[Onboarding] Starting state calculation for userId:', userId);
@@ -374,30 +345,6 @@ export const onboardingService = {
         total_bags_scanned: 0,
         location_count: 0
       };
-    }
-  },
-
-  /**
-   * Start onboarding process
-   * Uses RPC function to track onboarding start
-   */
-  async startOnboarding(userId) {
-    try {
-      console.log('[Onboarding] Start onboarding called for user:', userId);
-      
-      const { data, error } = await supabase
-        .rpc('start_onboarding', { user_uuid: userId });
-      
-      if (error) {
-        console.error('[Onboarding] Error starting onboarding:', error);
-        throw error;
-      }
-      
-      console.log('[Onboarding] Onboarding started successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('[Onboarding] Error starting onboarding:', error);
-      throw error;
     }
   },
 
@@ -683,37 +630,6 @@ export const onboardingService = {
   async shouldShowOnboarding(userId) {
     const result = await this.checkOnboardingStatus(userId);
     return result.show;
-  },
-
-  /**
-   * Fallback method for shouldShowOnboarding (original logic)
-   */
-  async fallbackShouldShowOnboarding(userId) {
-    console.log('[Onboarding] Using fallback shouldShowOnboarding logic');
-    
-    try {
-      const state = await this.getUserState(userId);
-      console.log('[Onboarding] User state for fallback shouldShowOnboarding:', state);
-      
-      // Only show onboarding if user is truly new (NEW_USER state) and has no bags/scans
-      // Users who have reached LOCATION_SET or beyond should not see onboarding again
-      const shouldShow = state.state === 'NEW_USER' && 
-                         (state.available_bags === 0 || state.available_bags === null) && 
-                         (state.total_bags_scanned === 0 || state.total_bags_scanned === null);
-      
-      console.log('[Onboarding] Fallback shouldShowOnboarding check:', {
-        userId,
-        state: state.state,
-        available_bags: state.available_bags,
-        total_bags_scanned: state.total_bags_scanned,
-        shouldShow
-      });
-      
-      return shouldShow;
-    } catch (error) {
-      console.error('[Onboarding] Error in fallback shouldShowOnboarding:', error);
-      return false;
-    }
   },
 
   /**

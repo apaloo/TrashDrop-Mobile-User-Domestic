@@ -199,32 +199,6 @@ export const notificationService = {
   },
 
   /**
-   * Create a pickup status notification
-   * @param {string} userId - User ID to notify
-   * @param {string} pickupId - Pickup request ID
-   * @param {string} status - New pickup status
-   * @param {Object} details - Additional details
-   * @returns {Object} Created notification
-   */
-  async createBinStatusNotification(userId, locationId, status, details = {}) {
-    const statusMessages = {
-      accepted: 'Your digital bin request has been accepted',
-      in_transit: 'Collector is on the way',
-      completed: 'Your bin has been serviced',
-      cancelled: 'Your bin has been cancelled'
-    };
-
-    const title = 'Digital Bin Status Update';
-    const message = statusMessages[status] || `Bin status changed to ${status}`;
-
-    return await this.createNotification(userId, 'bin_status', title, message, {
-      location_id: locationId,
-      status,
-      ...details
-    });
-  },
-
-  /**
    * Delete notifications older than a certain date
    * @param {string} userId - User ID
    * @param {number} daysOld - Delete notifications older than this many days

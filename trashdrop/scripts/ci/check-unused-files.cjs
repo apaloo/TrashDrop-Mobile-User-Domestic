@@ -21,6 +21,9 @@
  * Cypress) or be used inside its own file. By name, so it never calls a used
  * export unused; it can miss an unused one whose name is common.
  *
+ * Methods of exported objects (2026-11-13): a function-valued key of an
+ * exported object literal is checked the same way (src/a.js:svc.method).
+ *
  * Allowlist: scripts/ci/unused-files-allowlist.txt, one entry per line
  * relative to the folder with package.json, then " # " and the reason. An
  * entry is a file (src/a.js) or an export (src/a.js:name, or src/a.js:* for
@@ -149,8 +152,51 @@ function unusedExports(root, files, allow) {
       }
       if (!used) out.push(`${r}:${name}`);
     }
+    // Methods of exported service objects (2026-11-13): `export const x = {
+    // a() {…}, b: async () => {…} }` hid methods nothing called. Only keys whose
+    // value is a function count; data keys (constants, design tokens) don't.
+    for (const { object, method, start, end } of objectMethods(own)) {
+      const key = `${object}.${method}`;
+      if (allowed.has(`${r}:${key}`) || allowed.has(`${r}:${object}.*`)) continue;
+      const word = new RegExp(`(^|[^\\w$])${method.replace(/\$/g, '\\$')}(?![\\w$])`, 'g');
+      const outside = own.slice(0, start) + own.slice(end);
+      if (((own.slice(start, end)).match(word) || []).length > 1 || word.test(outside)) continue; // used in its own file
+      let used = false;
+      for (const [g, code] of text) {
+        word.lastIndex = 0;
+        if (g !== f && word.test(code)) { used = true; break; }
+      }
+      if (!used) out.push(`${r}:${key}`);
+    }
   }
   return out.sort();
+}
+
+/** Function-valued top-level keys of exported object literals: [{ object, method, start, end }] (start/end: the object body) */
+function objectMethods(code) {
+  const objects = [...code.matchAll(/export\s+const\s+([\w$]+)\s*=\s*\{/g)].map((m) => [m[1], m.index + m[0].length - 1]);
+  for (const m of code.matchAll(/(?:^|\n)const\s+([\w$]+)\s*=\s*\{/g)) {
+    const exported = new RegExp(`export\\s*(?:default\\s+${m[1]}\\b|\\{[^}]*\\b${m[1]}\\b)`).test(code);
+    if (exported) objects.push([m[1], m.index + m[0].length - 1]);
+  }
+  const out = [];
+  for (const [object, open] of objects) {
+    let depth = 0; let i = open;
+    for (; i < code.length; i++) { if (code[i] === '{') depth++; else if (code[i] === '}' && --depth === 0) break; }
+    const start = open + 1; const end = i; const body = code.slice(start, end);
+    let d = 0; let cur = ''; const parts = [];
+    for (const ch of body) {
+      if ('{(['.includes(ch)) d++;
+      if ('})]'.includes(ch)) d--;
+      if (d === 0 && ch === ',') { parts.push(cur); cur = ''; } else cur += ch;
+    }
+    parts.push(cur);
+    for (const p of parts) {
+      const m = /^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*(?:\(|:\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>))/.exec(p);
+      if (m) out.push({ object, method: m[1], start, end });
+    }
+  }
+  return out;
 }
 
 /** Returns { unused: [relative paths], unusedExports: ['path:name'], staleAllowlist: [entries] } */
@@ -218,11 +264,12 @@ function selfTest() {
   put('src/useLib.js', "import { usedOutside } from './lib';\n// deadOne is only named in a comment here\n");
   put('netlify/functions/fn.js', "const { onlyNetlify } = require('../../src/lib2');\n");
   put('src/lib2.js', "export const onlyNetlify = 1;\nexport const onlyInDefault = () => 2;\nexport const usedViaDefault = () => 3;\nexport default { onlyInDefault, usedViaDefault };\n");
-  put('src/useLib2.js', "import lib2 from './lib2';\nlib2.usedViaDefault();\n");
+  put('src/useLib2.js', "import lib2 from './lib2';\nlib2.usedViaDefault();\nimport { svc } from './svc';\nsvc.read();\n");
+  put('src/svc.js', "export const svc = {\n  async read(id) { return this.helper(id); },\n  helper(id) { return id; },\n  write: async (x) => x,\n  legacy: function () {},\n  LIMIT: 5,\n  nested: { inner() {} },\n};\n");
   put('scripts/ci/unused-files-allowlist.txt', '# comment\nsrc/kept.js # loaded by name\nsrc/gone.js # removed since\nsrc/lib.js:allowedOne # a public API\nsrc/lib.js:renamed # was removed\n');
   const r = check(dir);
   assert(JSON.stringify(r.unused) === JSON.stringify(['src/Old.jsx', 'src/OldHelper.js']), `unused was ${JSON.stringify(r.unused)}`);
-  assert(JSON.stringify(r.unusedExports) === JSON.stringify(['src/lib.js:deadOne', 'src/lib.js:deadToo', 'src/lib2.js:onlyInDefault']), `unused exports were ${JSON.stringify(r.unusedExports)}`);
+  assert(JSON.stringify(r.unusedExports) === JSON.stringify(['src/lib.js:deadOne', 'src/lib.js:deadToo', 'src/lib2.js:onlyInDefault', 'src/svc.js:svc.legacy', 'src/svc.js:svc.write']), `unused exports were ${JSON.stringify(r.unusedExports)}`);
   assert(JSON.stringify(r.staleAllowlist.map((a) => a.path)) === JSON.stringify(['src/gone.js', 'src/lib.js:renamed']), `stale was ${JSON.stringify(r.staleAllowlist)}`);
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('check-unused-files self-test passed');

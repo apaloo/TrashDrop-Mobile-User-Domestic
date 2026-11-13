@@ -14,3 +14,4 @@ src/utils/costCalculator.js:getLocationPrices # protected pricing file (CLAUDE.m
 src/utils/costCalculator.js:getRecommendedBinSize # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
 src/services/gpsPricingService.js:getHealthStatus # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
 src/services/gpsPricingService.js:resetMetrics # protected pricing file (CLAUDE.md): removed with the next owner-approved pricing change
+src/services/locationService.js:* # the unused older copy of the IP location fallback above (TD9); its methods go with it
