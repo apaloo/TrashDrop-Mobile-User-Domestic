@@ -120,7 +120,6 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         isLoading,
         hasUser: !!authState.user,
-        userEmail: authState.user?.email,
         lastAction: authState.lastAction
       });
     }
@@ -320,7 +319,7 @@ export const AuthProvider = ({ children }) => {
         storePwaAuthData(user, session, appConfig?.storage?.tokenKey, appConfig?.storage?.userKey);
       });
     }
-    console.log('[Auth] Authentication successful:', { user: user?.email, session: !!session });
+    console.log('[Auth] Authentication successful:', { hasUser: !!user, session: !!session });
     
     // Store user data in localStorage
     if (user) {
@@ -558,7 +557,7 @@ export const AuthProvider = ({ children }) => {
       const session = data?.session;
 
       if (session?.user) {
-        console.log('[Auth] Session check successful, user:', session.user.email);
+        console.log('[Auth] Session check successful');
         return handleAuthSuccess(session.user, session);
       }
 
@@ -589,10 +588,8 @@ export const AuthProvider = ({ children }) => {
 
   // Authentication methods
   const signIn = useCallback(async (email, password, rememberMe = false) => {
-    console.log('[Auth] Signing in attempt', { email: email || 'no email provided', rememberMe });
+    console.log('[Auth] Signing in attempt', { hasEmail: !!email, rememberMe });
     
-    // For debugging - log the credentials being used
-    console.log(`[Auth DEBUG] Using credentials: ${email} / ${password ? '******' : 'no password'}`); 
     
     // Regular authentication flow for non-test accounts
     // Set loading state directly
@@ -612,7 +609,7 @@ export const AuthProvider = ({ children }) => {
       
       // Before Supabase stores the session: keep it after the app closes, or not
       applyRememberMe(rememberMe, email);
-      console.log('[Auth DEBUG] Calling signInWithPassword with:', { email, rememberMe });
+      console.log('[Auth DEBUG] Calling signInWithPassword', { rememberMe });
       // A connection failure comes back as an error, a hang as a timeout, so
       // both reach the connection check below instead of the generic catch
       const attempt = () => withTimeout(supabase.auth.signInWithPassword({ email, password }))
@@ -697,7 +694,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       if (data?.user && data?.session) {
-        console.log('[Auth] Sign-in successful:', data.user.email);
+        console.log('[Auth] Sign-in successful');
         
         // Store user data in localStorage with remember me preference
         try {
@@ -789,7 +786,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
   
   const signUp = useCallback(async (email, password, userData) => {
-    console.log('[Auth] Signing up:', email);
+    console.log('[Auth] Signing up');
     updateAuthState({ status: AUTH_STATES.LOADING, lastAction: 'signing_up' });
     
     try {
@@ -814,7 +811,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: { message: 'User already registered', code: 'USER_EXISTS' } };
       }
 
-      console.log('[Auth] Sign up successful:', data.user?.email);
+      console.log('[Auth] Sign up successful');
       // Leave the loading state: signed in straight away, or waiting for the
       // user to open the link in the confirmation email
       if (data.session) {
@@ -858,7 +855,7 @@ export const AuthProvider = ({ children }) => {
   }, [resetAuthState, updateAuthState]);
 
   const resetPassword = useCallback(async (email) => {
-    console.log('[Auth] Requesting password reset for:', email);
+    console.log('[Auth] Requesting password reset');
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -886,7 +883,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const resendConfirmationEmail = useCallback(async (email) => {
-    console.log('[Auth] Resending confirmation email to:', email);
+    console.log('[Auth] Resending confirmation email');
     
     try {
       const { error } = await supabase.auth.resend({

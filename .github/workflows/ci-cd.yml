@@ -60,6 +60,15 @@ jobs:
         node scripts/ci/check-unused-files.cjs --self-test
         node scripts/ci/check-unused-files.cjs
 
+    # No personal data (email, phone, name, address) in console or logger
+    # calls: a shared phone's console or a support screenshot can read it
+    # (data protection controls). Exceptions with a reason in
+    # scripts/ci/log-privacy-allowlist.txt.
+    - name: Log privacy check
+      run: |
+        node scripts/ci/check-log-privacy.cjs --self-test
+        node scripts/ci/check-log-privacy.cjs
+
     # Only TrashDrop domains we own (trashdrops.com) in shipped code and new
     # migrations: trashdrop.app is someone else's (TD58)
     - name: Owned domains check

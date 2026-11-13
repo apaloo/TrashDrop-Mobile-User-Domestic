@@ -38,7 +38,6 @@ const PrivateRoute = ({ children }) => {
       refreshAttempted,
       initialRenderComplete,
       hasUser: !!user,
-      userEmail: user?.email,
       hasStoredUser,
       hasStoredToken,
       pwaMode
