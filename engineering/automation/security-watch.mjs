@@ -582,6 +582,16 @@ async function main() {
     lines.push('', '**Log scan:** skipped (needs the same token and project ref as the advisors).');
   }
 
+  // Without the token only the outsider's probes run. Say so at the top and
+  // as a warning on the run, so a green run isn't read as "all checked"
+  // (found 2026-11-13: advisors, write policies, protected-rule fingerprints
+  // and the log scan had been skipped on every scheduled run).
+  if (!(token && ref)) {
+    const note = 'Only the outsider probes ran: the advisor, performance, write-policy, protected-rule and log-scan checks were skipped because SUPABASE_ACCESS_TOKEN is not set (setup step 07b, engineering/setup-tracker.md).';
+    lines.splice(1, 0, '', `> ⚠️ **${note}**`);
+    console.log(`::warning title=Security watch: database checks skipped::${note}`);
+  }
+
   const summary = lines.join('\n');
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
