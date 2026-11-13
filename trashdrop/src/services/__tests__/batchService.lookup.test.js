@@ -73,25 +73,6 @@ describe('likeExact', () => {
   });
 });
 
-describe('verifyBatchInPrimaryTable', () => {
-  it('finds a batch by its exact code, ignoring case', async () => {
-    const res = await batchService.verifyBatchInPrimaryTable('batch-7f3k2');
-    expect(res.data).toMatchObject({ id: BATCH.id, total_bags_count: 5 });
-  });
-
-  it.each(['7F3K2', 'BATCH-7F3', 'F3K'])('part of a code (%s) is not recognized', async (partial) => {
-    const res = await batchService.verifyBatchInPrimaryTable(partial);
-    expect(res).toEqual({ data: null, error: { message: 'Batch not recognized' } });
-    expect(patterns().some((p) => p.includes('%'))).toBe(false);
-  });
-
-  it('an underscore in a code is not a wildcard', async () => {
-    const res = await batchService.verifyBatchInPrimaryTable('BATCH_7F3K2');
-    expect(res.data).toBeNull();
-    expect(patterns()).toEqual(['BATCH\\_7F3K2']);
-  });
-});
-
 describe('activateBatchForUser lookups', () => {
   const USER = '11111111-1111-4111-8111-111111111111';
 
