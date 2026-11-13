@@ -7,6 +7,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import { getQRCode, storeQRCode } from '../../utils/qrStorage.js';
 import { getBinSizeLabelShort } from '../../utils/costCalculator.js';
 import { downloadQrImage } from '../../utils/shareQrImage.js';
+import RateCollector from './RateCollector.js';
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -469,6 +470,13 @@ const QRCodeCard = ({ pickup, onCancel, onShare, onRefresh, isNewlyCreated = fal
               </div>
             )}
             
+            {/* Rate the collector once the bin is done (issue #186) */}
+            {pickup.status === 'completed' && pickup.collector_id && (
+              <div className="mt-4 pt-4 border-t border-td-border dark:border-gray-600">
+                <RateCollector source="digital_bins" jobId={pickup.id} />
+              </div>
+            )}
+
             {/* Actions */}
             <div className="mt-6 pt-4 border-t border-td-border dark:border-gray-600 flex justify-between">
               <button 
