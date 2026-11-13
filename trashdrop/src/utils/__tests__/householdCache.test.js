@@ -17,12 +17,22 @@ describe('clearHouseholdCaches (sign-out)', () => {
   test('keeps unsynced offline work and settings', () => {
     const keep = {
       digitalBinsList: '["local-1"]', 'digitalBin_local-1': '{}', illegalDumpingList: '["r1"]', illegalDumping_r1: '{}',
-      pending_location_sync: '["l1"]', location_l1: '{}', trashdrop_theme: 'dark', 'trashdrop_locations_u-1': '[]',
+      location_l1: '{}', trashdrop_theme: 'dark', 'trashdrop_locations_u-1': '[]',
     };
     Object.entries(keep).forEach(([k, v]) => localStorage.setItem(k, v));
     localStorage.setItem('digitalBins', '[]');
     clearHouseholdCaches();
     Object.entries(keep).forEach(([k, v]) => expect(localStorage.getItem(k)).toBe(v));
+  });
+
+  test('clears bin locations kept "for later" that nothing could ever send (address and coordinates)', () => {
+    localStorage.setItem('pending_location_sync', '["local_location_1_abc"]');
+    localStorage.setItem('location_local_location_1_abc', JSON.stringify({ address: '12 Ring Rd', latitude: 5.6, longitude: -0.2 }));
+    localStorage.setItem('location_l1', '{}'); // not one of those
+    expect(clearHouseholdCaches()).toBe(2);
+    expect(localStorage.getItem('pending_location_sync')).toBeNull();
+    expect(localStorage.getItem('location_local_location_1_abc')).toBeNull();
+    expect(localStorage.getItem('location_l1')).toBe('{}');
   });
 
   test('blocked storage is not an error', () => {
