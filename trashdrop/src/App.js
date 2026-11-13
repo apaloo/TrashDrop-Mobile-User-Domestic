@@ -18,8 +18,6 @@ import DumpingReport from './pages/DumpingReport.js';
 import Rewards from './pages/Rewards.js';
 import Activity from './pages/Activity.js';
 import SchemaTest from './pages/SchemaTest.js';
-import CollectionForm from './pages/CollectionForm.js';
-import CollectionQRCode from './pages/CollectionQRCode.js';
 import Profile from './pages/Profile.js';
 import Notifications from './pages/Notifications.js';
 import CollectorTracking from './pages/CollectorTracking.js';
@@ -212,16 +210,6 @@ const AppContent = () => {
               </PrivateRoute>
             } />
           )}
-          <Route path="/collection/:collectionId" element={
-            <PrivateRoute>
-              <CollectionForm />
-            </PrivateRoute>
-          } />
-          <Route path="/collection-qr" element={
-            <PrivateRoute>
-              <CollectionQRCode />
-            </PrivateRoute>
-          } />
           <Route path="/profile" element={
             <PrivateRoute>
               <Profile />
