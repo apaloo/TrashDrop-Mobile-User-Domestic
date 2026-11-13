@@ -425,6 +425,24 @@ async function main() {
     lines.push('', '**Advisors:** skipped (set SUPABASE_ACCESS_TOKEN and the SUPABASE_PROJECT_REF variable to enable).');
   }
 
+  // Performance advisor (2026-11-13, after 11 duplicate indexes were dropped):
+  // the same rules, ceilings that only go down, so a duplicate index, a table
+  // without a primary key or a row-level rule that re-runs auth.uid() per row
+  // can't come back unnoticed. Types left out are in config.performance.ignored.
+  if (token && ref && config.performance) {
+    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/advisors/performance`, { headers: { authorization: `Bearer ${token}` } });
+    if (res.ok) {
+      const body = await res.json();
+      const ignored = new Set(config.performance.ignored ?? []);
+      const lints = (body.lints ?? body).filter((l) => !ignored.has(l.name));
+      const { problems } = checkAdvisors(lints, { allowedErrors: [], ceilings: config.performance.ceilings });
+      lines.push('', `**Performance advisor:** ${problems.length ? '❌ ' + problems.length + ' problem(s)' : '✅ ceilings held'}`);
+      problems.forEach((p) => { lines.push(`- ${p}`); failures.push(`performance: ${p}`); });
+    } else {
+      lines.push('', `**Performance advisor:** could not be read (HTTP ${res.status}).`);
+    }
+  }
+
   if (token && ref) {
     try {
       const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
