@@ -4,7 +4,7 @@
   "files": {
     "src/services/digitalBinService.js": 100,
     "src/services/promotionalService.js": 79.4,
-    "src/services/gpsPricingService.js": 68.8,
+    "src/services/gpsPricingService.js": 78.5,
     "src/utils/costCalculator.js": 45,
     "src/components/digitalBin/ReviewStep.js": 83.1,
     "src/services/pickupService.js": 64.6,
