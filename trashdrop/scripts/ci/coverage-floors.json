@@ -9,7 +9,7 @@
     "src/components/digitalBin/ReviewStep.js": 83.1,
     "src/services/pickupService.js": 54.8,
     "src/services/batchService.js": 79.7,
-    "src/context/AuthContext.js": 40.2,
+    "src/context/AuthContext.js": 74,
     "src/services/userService.js": 50.8,
     "src/utils/reportPoints.js": 100,
     "src/pages/Rewards.js": 71.8
