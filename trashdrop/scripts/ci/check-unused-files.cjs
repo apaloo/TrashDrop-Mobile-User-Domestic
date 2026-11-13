@@ -159,8 +159,10 @@ function unusedExports(root, files, allow) {
       const key = `${object}.${method}`;
       if (allowed.has(`${r}:${key}`) || allowed.has(`${r}:${object}.*`)) continue;
       const word = new RegExp(`(^|[^\\w$])${method.replace(/\$/g, '\\$')}(?![\\w$])`, 'g');
-      const outside = own.slice(0, start) + own.slice(end);
-      if (((own.slice(start, end)).match(word) || []).length > 1 || word.test(outside)) continue; // used in its own file
+      // a mention inside quotes (a log message naming the method) is not a use
+      const code = withoutQuotedText(own);
+      const outside = code.slice(0, start) + code.slice(end);
+      if (((code.slice(start, end)).match(word) || []).length > 1 || word.test(outside)) continue; // used in its own file
       let used = false;
       for (const [g, code] of text) {
         word.lastIndex = 0;
@@ -170,6 +172,11 @@ function unusedExports(root, files, allow) {
     }
   }
   return out.sort();
+}
+
+/** The source with the text inside '…' and "…" on each line blanked (same length, so offsets hold) */
+function withoutQuotedText(code) {
+  return code.split('\n').map((line) => line.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g, (q) => q[0] + ' '.repeat(q.length - 2) + q[q.length - 1])).join('\n');
 }
 
 /** Function-valued top-level keys of exported object literals: [{ object, method, start, end }] (start/end: the object body) */
@@ -238,7 +245,13 @@ function check(root, srcDir = 'src') {
     const [p, name] = a.path.split(':');
     const file = path.normalize(path.join(root, p));
     if (!known.has(file)) return true;
-    return name && name !== '*' && !exportedNames(stripComments(fs.readFileSync(file, 'utf8'))).includes(name);
+    if (!name || name === '*') return false;
+    const code = stripComments(fs.readFileSync(file, 'utf8'));
+    if (name.includes('.')) {
+      const [object, method] = name.split('.');
+      return method !== '*' && !objectMethods(code).some((m) => m.object === object && m.method === method);
+    }
+    return !exportedNames(code).includes(name);
   });
   return { unused, unusedExports: unusedExports(root, reachable, allow), staleAllowlist };
 }
@@ -265,12 +278,12 @@ function selfTest() {
   put('netlify/functions/fn.js', "const { onlyNetlify } = require('../../src/lib2');\n");
   put('src/lib2.js', "export const onlyNetlify = 1;\nexport const onlyInDefault = () => 2;\nexport const usedViaDefault = () => 3;\nexport default { onlyInDefault, usedViaDefault };\n");
   put('src/useLib2.js', "import lib2 from './lib2';\nlib2.usedViaDefault();\nimport { svc } from './svc';\nsvc.read();\n");
-  put('src/svc.js', "export const svc = {\n  async read(id) { return this.helper(id); },\n  helper(id) { return id; },\n  write: async (x) => x,\n  legacy: function () {},\n  LIMIT: 5,\n  nested: { inner() {} },\n};\n");
-  put('scripts/ci/unused-files-allowlist.txt', '# comment\nsrc/kept.js # loaded by name\nsrc/gone.js # removed since\nsrc/lib.js:allowedOne # a public API\nsrc/lib.js:renamed # was removed\n');
+  put('src/svc.js', "export const svc = {\n  async read(id) { return this.helper(id); },\n  helper(id) { return id; },\n  write: async (x) => x,\n  legacy: function () {},\n  logged() { console.error('[svc] Error in logged:', 1); },\n  LIMIT: 5,\n  nested: { inner() {} },\n};\n");
+  put('scripts/ci/unused-files-allowlist.txt', '# comment\nsrc/kept.js # loaded by name\nsrc/gone.js # removed since\nsrc/lib.js:allowedOne # a public API\nsrc/lib.js:renamed # was removed\nsrc/svc.js:svc.write # kept for now\nsrc/svc.js:svc.gone # was removed\n');
   const r = check(dir);
   assert(JSON.stringify(r.unused) === JSON.stringify(['src/Old.jsx', 'src/OldHelper.js']), `unused was ${JSON.stringify(r.unused)}`);
-  assert(JSON.stringify(r.unusedExports) === JSON.stringify(['src/lib.js:deadOne', 'src/lib.js:deadToo', 'src/lib2.js:onlyInDefault', 'src/svc.js:svc.legacy', 'src/svc.js:svc.write']), `unused exports were ${JSON.stringify(r.unusedExports)}`);
-  assert(JSON.stringify(r.staleAllowlist.map((a) => a.path)) === JSON.stringify(['src/gone.js', 'src/lib.js:renamed']), `stale was ${JSON.stringify(r.staleAllowlist)}`);
+  assert(JSON.stringify(r.unusedExports) === JSON.stringify(['src/lib.js:deadOne', 'src/lib.js:deadToo', 'src/lib2.js:onlyInDefault', 'src/svc.js:svc.legacy', 'src/svc.js:svc.logged']), `unused exports were ${JSON.stringify(r.unusedExports)}`);
+  assert(JSON.stringify(r.staleAllowlist.map((a) => a.path)) === JSON.stringify(['src/gone.js', 'src/lib.js:renamed', 'src/svc.js:svc.gone']), `stale was ${JSON.stringify(r.staleAllowlist)}`);
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('check-unused-files self-test passed');
 }
