@@ -262,6 +262,7 @@ function DigitalBin() {
           .select(`
             id,
             user_id,
+            collector_id,
             location_id,
             qr_code_url,
             frequency,
