@@ -70,13 +70,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      # Fails on a critical finding in a runtime dependency (TD11). High and
-      # lower are reported in the summary; most sit in the Create React App
-      # build toolchain (TD32). When a new critical advisory turns this red,
-      # fix it in its own PR first: engineering/policies/vulnerability-management.md.
+      # Fails on a high or critical finding in a runtime dependency (TD11;
+      # raised from critical-only on 2026-11-13, when all three apps reached 0
+      # runtime findings). Moderate and lower are reported in the summary. When
+      # a new advisory turns this red, fix it in its own PR first:
+      # engineering/policies/vulnerability-management.md.
       - name: npm audit
         run: |
-          npm audit --omit=dev --audit-level=critical > audit.txt 2>&1; status=$?
+          npm audit --omit=dev --audit-level=high > audit.txt 2>&1; status=$?
           {
             echo '### npm audit (runtime dependencies)'
             echo '```'
