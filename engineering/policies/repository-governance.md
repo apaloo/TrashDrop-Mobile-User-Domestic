@@ -15,8 +15,13 @@
   checks (CI, secret scan); no force pushes; no deletion; administrators are
   included.
 - Branch names: `feat/`, `fix/`, `chore/`, `db/`, `docs/`. Merged branches are
-  deleted automatically (repository setting).
+  deleted automatically (Settings → General → "Automatically delete head
+  branches"; off in all three repositories on 2026-11-13, so the monthly
+  repository health flags it).
 - Branches inactive for 60 days are deleted after asking their author.
+- The monthly repository health lists the branches to delete. A branch counts
+  as merged when it is fully in `main` or its tip is the head of a merged pull
+  request (a squash merge).
 
 ## What does not belong in git
 
