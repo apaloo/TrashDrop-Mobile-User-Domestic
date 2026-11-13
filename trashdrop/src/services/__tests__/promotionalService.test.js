@@ -103,3 +103,25 @@ describe('incrementPromotionalUsage', () => {
     expect(await incrementPromotionalUsage('u1')).toBe(false);
   });
 });
+
+describe('a database call that throws instead of answering (offline, client error)', () => {
+  // mockResult throwing makes the mocked call itself throw, as a dropped
+  // connection would; every lookup must still fall back to "no promotion"
+  beforeEach(() => { mockResult = () => { throw new Error('Failed to fetch'); }; });
+
+  it('eligibility: not eligible, nothing used', async () => {
+    expect(await checkPromotionalEligibility('u1')).toEqual({ isEligible: false, usedCount: 0, maxRequests: 0 });
+  });
+
+  it('a size\'s promotional fee: unknown, never a free or guessed price', async () => {
+    expect(await getPromotionalFee(120)).toEqual({ clientFee: null, collectorPayout: null, platformSubsidy: null });
+  });
+
+  it('the fee table: empty', async () => {
+    expect(await getAllPromotionalFees()).toEqual([]);
+  });
+
+  it('using up a promotion: reported as not done', async () => {
+    expect(await incrementPromotionalUsage('u1')).toBe(false);
+  });
+});
