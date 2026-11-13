@@ -4,7 +4,9 @@
  *   1. Probes: requests with only the public app key must be refused or see
  *      no rows (see security-watch-config.json). A control probe must see data.
  *   2. Advisors (when SUPABASE_ACCESS_TOKEN is set): no new ERROR-level
- *      findings, and warning counts no higher than their ceilings.
+ *      findings, and warning counts no higher than their ceilings. Every
+ *      WARN-level type needs a ceiling, so a new kind of warning fails the
+ *      watch the day it appears.
  *   3. Write policies (same token): no more row-level security write rules
  *      open to every row or to signed-out visitors than the baseline.
  *   4. Log scan (same token): no signed-out caller scanned the API in the
@@ -56,6 +58,7 @@ export function checkAdvisors(lints, advisorsConfig) {
     const ceiling = advisorsConfig.ceilings?.[l.name];
     const count = l.count ?? (l.findings ?? []).length;
     seenCeilings.add(l.name);
+    if (l.level === 'WARN' && ceiling === undefined) problems.push(`New warning type: ${l.name} (${count}); fix it, or give it a ceiling with a reason`);
     if (ceiling !== undefined && count > ceiling) problems.push(`${l.name}: ${count} (ceiling ${ceiling})`);
     // The baseline only tightens (2026-11-13: four fixed views stayed allowed
     // for days, so any of them could have gone back unnoticed)
@@ -579,6 +582,8 @@ function selfTest() {
   const tight = checkAdvisors([{ name: 'w', level: 'WARN', count: 3 }], { allowedErrors: [], ceilings: { w: 4, gone: 2 } });
   assert(JSON.stringify(tight.problems) === JSON.stringify(['w: 3, lower its ceiling from 4 to 3', 'gone: 0, lower its ceiling from 2 to 0']), 'ceilings only go down');
   assert(checkAdvisors([{ name: 'w', level: 'WARN', count: 4 }], { allowedErrors: [], ceilings: { w: 4 } }).problems.length === 0, 'a ceiling at the count holds');
+  const fresh = checkAdvisors([{ name: 'new_kind', level: 'WARN', count: 1 }, { name: 'note', level: 'INFO', count: 3 }], { allowedErrors: [], ceilings: {} });
+  assert(fresh.problems.length === 1 && fresh.problems[0].startsWith('New warning type: new_kind'), 'a warning type without a ceiling fails; INFO does not');
   const cfg = { maxEndpointsPerMinute: 40, maxNotFoundPerMinute: 25 };
   // Shapes measured on 2026-11-11: busy real visitors, then one scan.
   const rows = [
