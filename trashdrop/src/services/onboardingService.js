@@ -445,34 +445,6 @@ export const onboardingService = {
   },
 
   /**
-   * Create onboarding pickup request
-   * Uses RPC function to create pickup request in pickup_requests table
-   */
-  async createOnboardingPickup(userId, locationId, bagCount = 1) {
-    try {
-      console.log('[Onboarding] createOnboardingPickup called:', { userId, locationId, bagCount });
-      
-      const { data, error } = await supabase
-        .rpc('create_onboarding_pickup', {
-          user_uuid: userId,
-          location_id: locationId,
-          bag_count: bagCount
-        });
-      
-      if (error) {
-        console.error('[Onboarding] Error creating pickup:', error);
-        throw error;
-      }
-      
-      console.log('[Onboarding] Pickup created successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('[Onboarding] Error creating pickup:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Get user's "has bags" selection from user_activity
    * Returns the most recent has_bags selection made by the user
    */
