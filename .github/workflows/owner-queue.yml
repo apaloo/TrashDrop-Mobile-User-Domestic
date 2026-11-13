@@ -1,0 +1,54 @@
+name: Owner queue
+
+# Mondays: everything waiting on the owner (setup steps marked "Owner
+# action" and not ticked, technical debt rows marked **Owner action:** or
+# **Owner decision:** and not Done) in one issue, kept up to date
+# (engineering/automation/owner-queue.mjs). On a pull request that changes
+# the tracker, the register or the script it only runs the self-test and
+# shows the queue in the job summary.
+on:
+  schedule:
+    - cron: '41 6 * * 1' # Mondays 06:41 UTC (Africa/Accra)
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'engineering/setup-tracker.md'
+      - 'engineering/registers/tech-debt.md'
+      - 'engineering/automation/owner-queue.mjs'
+      - '.github/workflows/owner-queue.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TITLE: '[Owner queue] Decisions and actions waiting on the owner'
+
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Self-test
+        run: node engineering/automation/owner-queue.mjs --self-test
+
+      - name: Build the queue
+        run: node engineering/automation/owner-queue.mjs
+
+      - name: Keep the issue up to date
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = fs.readFileSync('owner-queue.md', 'utf8') + `\n_Built by ${runUrl}_\n`;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 }))
+              .find((i) => i.title === process.env.TITLE && !i.pull_request);
+            if (open) await github.rest.issues.update({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title: process.env.TITLE, body });
