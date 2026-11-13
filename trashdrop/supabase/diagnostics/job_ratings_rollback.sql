@@ -1,4 +1,4 @@
--- Undo the job ratings migration (households rate their collector, issue #186).
+-- Undo 20261113095112_job_ratings.sql (households rate their collector, issue #186).
 --
 -- Drops td_rate_job and job_ratings (every rating is lost; export them first
 -- if they matter), puts protect_collector_admin_fields back as it was before

@@ -1,4 +1,4 @@
--- Rolled-back test of the job ratings migration (households rate their collector,
+-- Rolled-back test of the job ratings migration (20261113095112_job_ratings.sql; applied 2026-11-13, so the CREATE statements below now replace the live objects inside the rolled-back transaction) (households rate their collector,
 -- issue #186). Run the whole file in one go (Supabase SQL editor or
 -- execute_sql): it creates the objects, tries each case as real roles, then
 -- raises "ROLLED BACK: ..." with the results, so nothing is kept.
