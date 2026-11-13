@@ -7,7 +7,7 @@
     "src/services/gpsPricingService.js": 68.8,
     "src/utils/costCalculator.js": 45,
     "src/components/digitalBin/ReviewStep.js": 83.1,
-    "src/services/pickupService.js": 54.8,
+    "src/services/pickupService.js": 64.6,
     "src/services/batchService.js": 79.7,
     "src/context/AuthContext.js": 74,
     "src/services/userService.js": 50.8,
