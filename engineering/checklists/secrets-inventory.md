@@ -44,7 +44,7 @@ Re-check this list at each quarterly access review.
 
 | Secret | Used by | Configured in | Collection | In Bitwarden | Old copies deleted | Last rotated |
 |---|---|---|---|---|---|---|
-| Google Maps API key (browser, referrer-restricted) | Carter and household apps | Netlify env `VITE_GOOGLE_MAPS_API_KEY` | S | ☐ | ☐ | **rotate (TD27)** |
+| Google Maps API key (browser, referrer-restricted) | Carter app (navigation). The household app stopped using Google on 2026-11-13 (TD9); delete `REACT_APP_GOOGLE_MAPS_API_KEY` from its Netlify settings if set | Netlify env `VITE_GOOGLE_MAPS_API_KEY` | S | ☐ | ☐ | **rotate (TD27)** |
 | Google Cloud console login | People | n/a | P | ☐ | n/a | |
 | Facebook app secret / page token | Admin `facebook-feed` function | Supabase Edge Function secrets | P | ☐ | ☐ | |
 | Sentry DSNs (public by design) | Three apps | Netlify env | S | ☐ | n/a | |

@@ -5,6 +5,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { useAuth } from '../../context/AuthContext.js';
 import toastService from '../../services/toastService.js';
 import GeolocationService from '../../utils/geolocationService.js';
+import { reverseGeocode as lookUpAddress, coordinateDescription } from '../../utils/reverseGeocode.js';
 import { checkServiceCoverage, joinCoverageWaitlist } from '../../services/serviceCoverageService.js';
 import StepNav from './StepNav.js';
 import { LocationRequiredModal, needsLocationTurnedOn, useLocationRequired } from '../ui/LocationRequired.js';
@@ -358,81 +359,14 @@ const LocationStep = ({ formData, updateFormData, nextStep }) => {
       updateFormData({ address, address_coords: [latitude, longitude] });
     };
 
-
-    try {
-      console.log('[LocationStep] Reverse geocoding:', latitude, longitude);
-      
-      // Try multiple geocoding services for reliability
-      let addressFound = null;
-      
-      // Try 1: Nominatim (OpenStreetMap)
-      try {
-        const nominatimResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@trashdrops.com`,
-          { headers: { 'Accept': 'application/json' } }
-        );
-        
-        if (nominatimResponse.ok) {
-          const data = await nominatimResponse.json();
-          console.log('[LocationStep] Nominatim result:', data);
-          
-          if (data.display_name) {
-            addressFound = data.display_name;
-          } else if (data.address) {
-            // Build address from parts
-            const parts = [];
-            if (data.address.road) parts.push(data.address.road);
-            if (data.address.suburb) parts.push(data.address.suburb);
-            if (data.address.city || data.address.town || data.address.village) {
-              parts.push(data.address.city || data.address.town || data.address.village);
-            }
-            if (data.address.country) parts.push(data.address.country);
-            if (parts.length > 0) {
-              addressFound = parts.join(', ');
-            }
-          }
-        }
-      } catch (nominatimError) {
-        console.warn('[LocationStep] Nominatim failed:', nominatimError.message);
-      }
-      
-      // Try 2: BigDataCloud (free, no API key needed)
-      if (!addressFound) {
-        try {
-          const bigDataResponse = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-          );
-          
-          if (bigDataResponse.ok) {
-            const data = await bigDataResponse.json();
-            console.log('[LocationStep] BigDataCloud result:', data);
-            
-            if (data.locality || data.city || data.principalSubdivision) {
-              const parts = [];
-              if (data.locality) parts.push(data.locality);
-              if (data.city && data.city !== data.locality) parts.push(data.city);
-              if (data.principalSubdivision) parts.push(data.principalSubdivision);
-              if (data.countryName) parts.push(data.countryName);
-              addressFound = parts.join(', ');
-            }
-          }
-        } catch (bigDataError) {
-          console.warn('[LocationStep] BigDataCloud failed:', bigDataError.message);
-        }
-      }
-      
-      if (addressFound) {
-        console.log('[LocationStep] Address found:', addressFound);
-        applyAddress(addressFound);
-        return true;
-      }
-      
-    } catch (error) {
-      console.warn('[LocationStep] Reverse geocoding error:', error);
+    const found = await lookUpAddress(latitude, longitude);
+    if (found) {
+      applyAddress(found.displayName);
+      return true;
     }
-    
-    // Fallback: Generate a meaningful location description
-    const fallbackAddress = `Near ${latitude.toFixed(4)}°N, ${Math.abs(longitude).toFixed(4)}°W`;
+
+    // No service knows the place: describe it by its coordinates
+    const fallbackAddress = coordinateDescription(latitude, longitude);
     applyAddress(fallbackAddress);
     console.log('[LocationStep] Using coordinate fallback:', fallbackAddress);
     return false;
