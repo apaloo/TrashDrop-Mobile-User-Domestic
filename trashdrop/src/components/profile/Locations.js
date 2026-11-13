@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import { useLocation, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import supabase from '../../utils/supabaseClient.js';
-import appConfig from '../../utils/app-config.js';
+import { reverseGeocode } from '../../utils/reverseGeocode.js';
 import { saveOfflineLocation, getOfflineLocations, isOnline } from '../../utils/offlineStorage.js';
 import { useAuth } from '../../context/AuthContext.js';
 import '../../utils/leafletDefaultIcon.js';
@@ -247,14 +247,6 @@ const Locations = () => {
 
           // Reverse-geocode to auto-fill address from coordinates (non-blocking)
           (async () => {
-            const fetchReverse = async (url, headers = {}) => fetch(url, {
-              method: 'GET',
-              mode: 'cors',
-              cache: 'no-store',
-              referrerPolicy: 'no-referrer-when-downgrade',
-              headers
-            });
-
             const shouldReplaceAddress = (currentAddress) => {
               if (!currentAddress) return true;
               const coordString = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
@@ -264,114 +256,12 @@ const Locations = () => {
               return looksLikeCoords;
             };
 
-            const tryGoogle = async () => {
-              if (!appConfig.maps.googleApiKey) return null;
-              try {
-                const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&location_type=ROOFTOP&result_type=street_address&language=en&key=${appConfig.maps.googleApiKey}`;
-                const res = await fetchReverse(googleUrl);
-                if (!res.ok) return null;
-                const data = await res.json();
-                return data?.results?.[0]?.formatted_address || null;
-              } catch (err) {
-                console.warn('Google reverse geocode failed:', err);
-                return null;
-              }
-            };
-
-            const tryNominatim = async () => {
-              try {
-                const headers = {
-                  'User-Agent': 'TrashDrop/1.0 (app.trashdrops.com)',
-                  'Accept-Language': 'en'
-                };
-                const primaryUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-                let response = await fetchReverse(primaryUrl, headers);
-                if (!response.ok) {
-                  console.warn('Reverse geocode primary failed with status:', response.status);
-                  const retryUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
-                  response = await fetchReverse(retryUrl, headers);
-                }
-                if (!response.ok) return null;
-                const data = await response.json();
-                return data.display_name || null;
-              } catch (err) {
-                console.warn('Nominatim reverse geocode failed:', err);
-                return null;
-              }
-            };
-
-            const tryMapsCo = async () => {
-              try {
-                // Additional fallback service (no key required) to improve chance of a human-readable address
-                const mapsCoUrl = `https://geocode.maps.co/reverse?lat=${lat}&lon=${lng}`;
-                const res = await fetchReverse(mapsCoUrl);
-                if (!res.ok) return null;
-                const data = await res.json();
-                return data?.display_name || data?.address?.road || null;
-              } catch (err) {
-                console.warn('maps.co reverse geocode failed:', err);
-                return null;
-              }
-            };
-
-            const tryBigDataCloud = async () => {
-              try {
-                const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
-                const res = await fetchReverse(url);
-                if (!res.ok) return null;
-                const data = await res.json();
-                const parts = [];
-                if (data.locality) parts.push(data.locality);
-                if (data.city && data.city !== data.locality) parts.push(data.city);
-                if (data.principalSubdivision) parts.push(data.principalSubdivision);
-                if (data.countryName) parts.push(data.countryName);
-                if (parts.length === 0) return null;
-                return parts.join(', ');
-              } catch (err) {
-                console.warn('BigDataCloud reverse geocode failed:', err);
-                return null;
-              }
-            };
-
             try {
-              const addressFromGoogle = await tryGoogle();
-              if (addressFromGoogle) {
+              const found = await reverseGeocode(lat, lng);
+              if (found) {
                 setNewLocation(prev => ({
                   ...prev,
-                  address: shouldReplaceAddress(prev.address) ? addressFromGoogle : prev.address
-                }));
-                setSyncStatus('Address auto-filled from your location');
-                setTimeout(() => setSyncStatus(null), 2000);
-                return;
-              }
-
-              const addressFromNominatim = await tryNominatim();
-              if (addressFromNominatim) {
-                setNewLocation(prev => ({
-                  ...prev,
-                  address: shouldReplaceAddress(prev.address) ? addressFromNominatim : prev.address
-                }));
-                setSyncStatus('Address auto-filled from your location');
-                setTimeout(() => setSyncStatus(null), 2000);
-                return;
-              }
-
-              const addressFromMapsCo = await tryMapsCo();
-              if (addressFromMapsCo) {
-                setNewLocation(prev => ({
-                  ...prev,
-                  address: shouldReplaceAddress(prev.address) ? addressFromMapsCo : prev.address
-                }));
-                setSyncStatus('Address auto-filled from your location');
-                setTimeout(() => setSyncStatus(null), 2000);
-                return;
-              }
-
-              const addressFromBigDataCloud = await tryBigDataCloud();
-              if (addressFromBigDataCloud) {
-                setNewLocation(prev => ({
-                  ...prev,
-                  address: shouldReplaceAddress(prev.address) ? addressFromBigDataCloud : prev.address
+                  address: shouldReplaceAddress(prev.address) ? found.displayName : prev.address
                 }));
                 setSyncStatus('Address auto-filled from your location');
                 setTimeout(() => setSyncStatus(null), 2000);

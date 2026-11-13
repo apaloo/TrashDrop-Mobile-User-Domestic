@@ -7,6 +7,7 @@ import { toastService } from '../services/toastService.js';
 import { retrySupabaseOperation } from '../utils/retryUtils.js';
 import syncService from './syncService.js';
 import { prepareReportPhotos, isLocalPhotoUrl } from './photoUploadService.js';
+import { reverseGeocode as lookUpAddress } from '../utils/reverseGeocode.js';
 
 /**
  * General area for the public map, "Town, Region" (e.g. "Pokuase, Greater Accra Region").
@@ -26,41 +27,22 @@ export const areaFromAddress = (address = {}) => {
  * @returns {Promise<{formattedAddress: string, area: string|null}|null>} null if the lookup fails
  */
 const reverseGeocode = async (latitude, longitude) => {
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-      {
-        headers: {
-          'User-Agent': 'TrashDropMobileApp/1.0'
-        }
-      }
-    );
-    
-    if (!response.ok) {
-      console.warn('[DumpingService] Reverse geocoding failed:', response.statusText);
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    // Build address from components
-    const address = data.address || {};
-    const parts = [
-      address.road || address.street,
-      address.suburb || address.neighbourhood,
-      address.city || address.town || address.village,
-      address.state || address.region,
-      address.country
-    ].filter(Boolean);
-    
-    const formattedAddress = parts.length > 0 ? parts.join(', ') : data.display_name;
-    console.log('[DumpingService] Reverse geocoded address:', formattedAddress);
-
-    return { formattedAddress, area: areaFromAddress(address) };
-  } catch (error) {
-    console.warn('[DumpingService] Error in reverse geocoding:', error);
+  const found = await lookUpAddress(latitude, longitude);
+  if (!found) {
+    console.warn('[DumpingService] Reverse geocoding found no address');
     return null;
   }
+  // Build the address from its parts (shorter than the full display name)
+  const address = found.address;
+  const parts = [
+    address.road || address.street,
+    address.suburb || address.neighbourhood,
+    address.city || address.town || address.village,
+    address.state || address.region,
+    address.country
+  ].filter(Boolean);
+  const formattedAddress = parts.length > 0 ? parts.join(', ') : found.displayName;
+  return { formattedAddress, area: areaFromAddress(address) };
 };
 
 /**

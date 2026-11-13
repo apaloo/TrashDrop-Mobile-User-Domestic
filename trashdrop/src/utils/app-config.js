@@ -82,7 +82,6 @@ const appConfig = {
       lng: parseFloat(process.env.REACT_APP_MAP_CENTER_LNG) || -0.17320421503543074,
     },
     defaultZoom: parseInt(process.env.REACT_APP_MAP_DEFAULT_ZOOM) || 13,
-    googleApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
   },
   features: {
     enableMocks: false, // Always use real data - no mocks

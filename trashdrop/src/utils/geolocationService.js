@@ -1,10 +1,8 @@
 /**
  * Geolocation service that provides robust location handling
  * Handles browser geolocation API errors and provides fallbacks
- * Uses Google Maps Geolocation API as backup when browser geolocation fails
  */
 
-import appConfig from './app-config.js';
 
 class GeolocationService {
   /**
@@ -140,14 +138,8 @@ class GeolocationService {
     }
     
     // If we reach here, all browser geolocation attempts failed
-    console.warn('All browser geolocation attempts failed. Trying Google Maps API as backup.');
-    
-    // Google Maps Geolocation API is NOT suitable for ≤5m accuracy
-    // It uses cell towers/WiFi/IP which gives 100-1000m+ accuracy
-    // Skip it entirely for precision requirements
-    console.warn('[GPSService] All browser GPS attempts failed. Google Maps API skipped (insufficient accuracy for ≤5m requirement).');
-    
-    // If we reach here, all attempts including Google Maps API failed
+    // No network-based fallback: cell-tower, Wi-Fi or IP location is
+    // 100 m–1 km+ off, far from the accuracy pickups need
     console.error('All geolocation attempts failed. No default location available.');
     
     // If options.silentFallback is false, we'll log specific error info
@@ -254,66 +246,6 @@ class GeolocationService {
     return true;
   }
   
-  /**
-   * Get location using Google Maps Geolocation API as a backup method
-   * Uses the device's WiFi signals, IP address, and cell tower data
-   * @returns {Promise<Object>} Location data with success/error information
-   */
-  static async _getGoogleMapsLocation() {
-    // Ensure we have an API key
-    if (!appConfig.maps.googleApiKey) {
-      throw new Error('Google Maps API key is not configured');
-    }
-    
-    try {
-      // Get IP-based location using Google Maps Geolocation API
-      const endpoint = `https://www.googleapis.com/geolocation/v1/geolocate?key=${appConfig.maps.googleApiKey}`;
-      
-      // Request WiFi-based location (this works even without WiFi as it will fall back to IP)
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Google Geolocation API error: ${errorData.error?.message || response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Google's API returns: { location: { lat, lng }, accuracy }
-      if (data && data.location) {
-        return {
-          coords: {
-            latitude: data.location.lat,
-            longitude: data.location.lng,
-            accuracy: data.accuracy || 1000 // Default accuracy of 1000m if not provided
-          },
-          timestamp: Date.now(),
-          source: 'google_maps_api',
-          success: true
-        };
-      } else {
-        throw new Error('Invalid response from Google Maps Geolocation API');
-      }
-    } catch (error) {
-      console.error('Google Maps Geolocation API error:', error);
-      return {
-        coords: { latitude: null, longitude: null },
-        timestamp: Date.now(),
-        source: 'error',
-        success: false,
-        error: {
-          code: 'GOOGLE_API_ERROR',
-          message: this._getErrorMessage(error)
-        }
-      };
-    }
-  }
 }
 
 export default GeolocationService;
