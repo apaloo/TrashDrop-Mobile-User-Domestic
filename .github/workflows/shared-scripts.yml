@@ -1,0 +1,78 @@
+name: Shared scripts in step
+
+# Daily: the CI scripts that are one script in three repositories
+# (engineering/automation/shared-scripts-config.json) must be the same in the
+# collector and admin repositories as here (the source). Keeps one issue up to
+# date while a copy differs and closes it when all are in step. On a pull
+# request that changes a shared script it only warns: the other repositories
+# catch up with their own pull requests.
+on:
+  schedule:
+    - cron: '23 7 * * *' # daily 07:23 UTC (Africa/Accra)
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'trashdrop/scripts/ci/**'
+      - 'engineering/automation/shared-scripts*'
+      - '.github/workflows/shared-scripts.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TITLE: '[Shared scripts] A copy is out of step'
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Self-test
+        run: node engineering/automation/shared-scripts.mjs --self-test
+
+      - name: Compare the copies
+        id: compare
+        run: |
+          set +e
+          node engineering/automation/shared-scripts.mjs; status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          if [ $status -ne 0 ] && [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::warning::A shared CI script differs from the collector or admin copy on main. Copy it there in a pull request once this merges."
+            exit 0
+          fi
+          exit $status
+
+      - name: Keep the issue up to date
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            let result = { outOfStep: [] };
+            try { result = JSON.parse(fs.readFileSync('shared-scripts-result.json', 'utf8')); } catch { return; }
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 }))
+              .find((i) => i.title === process.env.TITLE && !i.pull_request);
+            if (!result.outOfStep.length) {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `All shared scripts are in step again (${runUrl}).` });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            const body = [
+              `These copies differ from this repository's \`trashdrop/scripts/ci/\` (the source), as of ${new Date().toISOString().slice(0, 10)} (${runUrl}):`,
+              '',
+              '| Script | Repository | Problem |', '|---|---|---|',
+              ...result.outOfStep.map((x) => `| \`${x.script}\` | ${x.repo} | ${x.problem} |`),
+              '',
+              'Copy the household version into that repository\'s `scripts/ci/` in a pull request there. This issue closes on the first daily run with every copy the same.',
+            ].join('\n');
+            if (open) await github.rest.issues.update({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title: process.env.TITLE, body });

@@ -1,0 +1,16 @@
+{
+  "_comment": "CI scripts that are one script in three repositories (engineering/automation/shared-scripts.mjs). The household copy is the source: change it here first, then copy it to the other two in the same day. Add a script here when it starts being shared.",
+  "sourceDir": "trashdrop/scripts/ci",
+  "scripts": [
+    "check-runtime-deps.cjs",
+    "check-domains.cjs",
+    "check-rpc-calls.mjs",
+    "coverage-summary.mjs",
+    "check-unused-files.cjs",
+    "check-log-privacy.cjs"
+  ],
+  "repos": [
+    { "name": "collector", "slug": "apaloo/TrashDrop-Mobile-Collector-Driver", "dir": "scripts/ci" },
+    { "name": "admin", "slug": "apaloo/TrashDrop_Management_webApp_admins", "dir": "scripts/ci" }
+  ]
+}
