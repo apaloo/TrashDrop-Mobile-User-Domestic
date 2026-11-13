@@ -13,3 +13,9 @@ src/context/AuthContext.js
 src/services/userService.js
 src/utils/reportPoints.js
 src/pages/Rewards.js
+src/pages/DigitalBin.js
+src/services/dumpingService.js
+src/utils/householdCache.js
+src/services/ratingService.js
+src/components/digitalBin/LocationStep.js
+src/utils/locationSaveMessage.js

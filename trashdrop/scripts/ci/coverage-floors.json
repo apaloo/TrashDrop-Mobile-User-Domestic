@@ -12,6 +12,12 @@
     "src/context/AuthContext.js": 74,
     "src/services/userService.js": 79.6,
     "src/utils/reportPoints.js": 100,
-    "src/pages/Rewards.js": 71.8
+    "src/pages/Rewards.js": 71.8,
+    "src/pages/DigitalBin.js": 51.1,
+    "src/services/dumpingService.js": 45.5,
+    "src/utils/householdCache.js": 100,
+    "src/services/ratingService.js": 100,
+    "src/components/digitalBin/LocationStep.js": 48.6,
+    "src/utils/locationSaveMessage.js": 100
   }
 }
