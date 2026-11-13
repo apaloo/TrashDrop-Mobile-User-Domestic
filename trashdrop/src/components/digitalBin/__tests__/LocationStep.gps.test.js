@@ -7,8 +7,8 @@ import toastService from '../../../services/toastService.js';
 
 // The booking's location step and the phone's GPS: the fix taken when the
 // step opens, the "Get my current location" button, what Continue refuses,
-// the service-area retry, and the saved places it loads (TD65: none of them
-// can be booked without GPS yet). LocationStep.address.test.js covers the
+// and the service-area retry. (Booking is GPS-only, the owner's decision on
+// TD65, so the step no longer loads saved places.) LocationStep.address.test.js covers the
 // address, LocationStep.locationRequired.test.js the location-off prompt.
 jest.mock('react-leaflet', () => {
   const React = require('react');
@@ -199,35 +199,5 @@ describe('Continue', () => {
     await userEvent.click(retry);
     await waitFor(() => expect(mockCoverageChecks).toBe(checksBefore + 1));
     await waitFor(() => expect(continueButton()).toBeEnabled());
-  });
-});
-
-describe('saved places (loaded, though booking needs GPS: TD65)', () => {
-  it('reads bin_locations and the old locations table, drops duplicates, and keeps places not yet sent', async () => {
-    mockUser = { id: 'u1' };
-    localStorage.setItem('trashdrop_locations_u1', JSON.stringify([
-      { id: 'local_1', name: 'Gate', address: 'Unsent street' },
-      { id: 'local_2', name: 'Home', address: 'Osu' },
-    ]));
-    mockTables = {
-      bin_locations: { data: [{ id: 'b1', location_name: 'Home', address: 'Osu' }], error: null },
-      locations: { data: [{ id: 'l1', name: 'Home', address: 'Osu' }, { id: 'l2', name: 'Shop', address: 'Labone' }], error: null },
-    };
-    render(<Harness initial={{ latitude: OSU.latitude, longitude: OSU.longitude, useCurrentLocation: true }} />);
-
-    await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem('trashdrop_locations_u1'));
-      expect(saved.map((l) => `${l.id}:${l.source || 'local'}`)).toEqual(['b1:bin_locations', 'l2:locations', 'local_1:local']);
-    });
-  });
-
-  it('a failed read of both tables leaves what the phone had', async () => {
-    mockUser = { id: 'u1' };
-    const cached = [{ id: 'b1', name: 'Home', address: 'Osu' }];
-    localStorage.setItem('trashdrop_locations_u1', JSON.stringify(cached));
-    mockTables = { bin_locations: { data: null, error: { message: 'down' } }, locations: { data: null, error: { message: 'down' } } };
-    render(<Harness initial={{ latitude: OSU.latitude, longitude: OSU.longitude, useCurrentLocation: true }} />);
-    await waitFor(() => expect(console.error).toHaveBeenCalledWith('Error fetching locations:', expect.anything()));
-    expect(JSON.parse(localStorage.getItem('trashdrop_locations_u1'))).toEqual(cached);
   });
 });

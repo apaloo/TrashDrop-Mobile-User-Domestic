@@ -153,40 +153,17 @@ describe('Saving a digital bin booking: the bin location', () => {
     expect(binInsert().location_id).toBe('binloc-1');
   });
 
-  it('a place only in the old locations table is copied into bin_locations, with its position', async () => {
+  it('booking is GPS-only (TD65): a place that is not a bin location is never looked up in the old locations table', async () => {
     mockLocation = { ...mockLocation, location_id: 'legacy-1' };
     mockRespond = (c) => {
       if (c.table === 'bin_locations' && c.op === 'select' && c.single) return { data: null, error: { message: 'not found' } };
-      if (c.table === 'locations' && c.single) {
-        // the real columns (check-rpc-calls.mjs checks the select against production)
-        return { data: { id: 'legacy-1', location_name: 'Shop', address: 'Labone', latitude: 5.56, longitude: -0.18 }, error: null };
-      }
-      if (c.table === 'bin_locations' && c.op === 'insert') return { data: { id: 'binloc-migrated' }, error: null };
+      if (c.table === 'bin_locations' && c.op === 'insert') return { data: { id: 'binloc-gps' }, error: null };
       return undefined;
     };
     await book();
     await screen.findByText('Request submitted');
-    expect(callsTo('bin_locations', 'insert')[0].payload).toEqual({
-      user_id: 'u1', location_name: 'Shop', address: 'Labone', coordinates: 'POINT(-0.18 5.56)', is_default: false,
-    });
-    expect(binInsert().location_id).toBe('binloc-migrated');
-  });
-
-  it('an old place that cannot be copied gives way to a new bin location at the GPS position', async () => {
-    mockLocation = { ...mockLocation, location_id: 'legacy-1' };
-    let binLocationInserts = 0;
-    mockRespond = (c) => {
-      if (c.table === 'bin_locations' && c.op === 'select' && c.single) return { data: null, error: { message: 'not found' } };
-      if (c.table === 'locations' && c.single) return { data: { id: 'legacy-1', location_name: 'Shop', address: 'Labone', latitude: 5.56, longitude: -0.18 }, error: null };
-      if (c.table === 'bin_locations' && c.op === 'insert') {
-        binLocationInserts += 1;
-        return binLocationInserts === 1 ? { data: null, error: { message: 'refused' } } : { data: { id: 'binloc-gps' }, error: null };
-      }
-      return undefined;
-    };
-    await book();
-    await screen.findByText('Request submitted');
-    expect(callsTo('bin_locations', 'insert')[1].payload.coordinates).toBe('POINT(-0.187 5.6037)');
+    expect(mockCalls.some((c) => c.table === 'locations')).toBe(false); // not even to list them
+    expect(callsTo('bin_locations', 'insert')[0].payload.coordinates).toBe('POINT(-0.187 5.6037)');
     expect(binInsert().location_id).toBe('binloc-gps');
   });
 
