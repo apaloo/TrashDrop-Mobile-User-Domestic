@@ -17,6 +17,13 @@
  * write every row; that is how bags, batches and scans were open until
  * 2026-11-12. Write policies for anon (signed-out visitors) are refused too.
  *
+ * Per-row auth calls (TD20, from POLICY_PERF_FIRST_CHECKED): in a policy,
+ * auth.uid(), auth.role(), auth.jwt() and current_setting() must be wrapped as
+ * (select auth.uid()), so Postgres works them out once per query instead of
+ * once per row. The performance advisor counts the policies that don't
+ * (auth_rls_initplan: 64 on 2026-11-13), and the daily security watch holds
+ * that count; this stops new ones in review.
+ *
  * Migrations before FIRST_CHECKED were written before this rule and are
  * tracked in the tech-debt register (TD19), not here.
  *
@@ -28,6 +35,9 @@ const path = require('path');
 const assert = require('assert');
 
 const FIRST_CHECKED = '20261111222005';
+const POLICY_PERF_FIRST_CHECKED = '20261113120000';
+const WRAPPED_AUTH_CALL = /\(\s*select\s+(?:auth\.(?:uid|role|jwt)\(\)|current_setting\([^()]*\)(?:::\w+)?)\s*\)/gi;
+const AUTH_CALL = /auth\.(?:uid|role|jwt)\(\)|current_setting\(/i;
 const MIGRATIONS = path.join(__dirname, '..', '..', 'supabase', 'migrations');
 const CALLER_CHECK = /auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_staff|td_can_manage_requests|td_is_\w+\(|td_my_role\(/i;
 
@@ -73,15 +83,19 @@ function policiesIn(sql) {
       roles,
       openUsing: /\busing\s*\(\s*true\s*\)/i.test(rest),
       openCheck: /\bwith\s+check\s*\(\s*true\s*\)/i.test(rest),
+      perRowAuth: AUTH_CALL.test(rest.replace(WRAPPED_AUTH_CALL, '')),
     });
   }
   return out;
 }
 
 /** Problems with one migration's SQL, as readable strings */
-function problemsIn(sql) {
+function problemsIn(sql, { policyPerf = true } = {}) {
   const problems = [];
   for (const p of policiesIn(sql)) {
+    if (policyPerf && p.perRowAuth) {
+      problems.push(`policy "${p.name}" on ${p.table}: wrap auth.uid(), auth.role(), auth.jwt() and current_setting() as (select auth.uid()) so they run once per query, not per row (TD20)`);
+    }
     if (p.cmd === 'select') continue;
     if (p.openUsing || p.openCheck) {
       problems.push(`policy "${p.name}" on ${p.table}: ${p.cmd.toUpperCase()} for every row (true); say whose rows it is for (principle 10)`);
@@ -126,13 +140,21 @@ function selfTest() {
   // A revoke for another function doesn't count
   assert.strictEqual(problemsIn(open + ' REVOKE ALL ON FUNCTION public.kk(uuid) FROM anon;').length, 1);
   // Write policies (principle 10)
-  const own = `create policy own_rows on public.bags for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());`;
+  const own = `create policy own_rows on public.bags for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));`;
   assert.deepStrictEqual(problemsIn(own), []);
+  // Per-row auth calls (TD20)
+  const perRow = `create policy own_rows on public.bags for select to authenticated using (user_id = auth.uid());`;
+  assert.match(problemsIn(perRow)[0], /once per query/);
+  assert.deepStrictEqual(problemsIn(perRow, { policyPerf: false }), []);
+  assert.deepStrictEqual(problemsIn(`create policy r on t for select using ((select auth.role()) = 'authenticated' and owner = ( SELECT auth.uid() ));`), []);
+  assert.deepStrictEqual(problemsIn(`create policy r on t for select using (tenant = (select current_setting('app.tenant', true)::uuid));`), []);
+  assert.strictEqual(problemsIn(`create policy r on t for select using (tenant = current_setting('app.tenant')::uuid);`).length, 1);
+  assert.strictEqual(problemsIn(`create policy r on t for select using ((select auth.uid()) = a or b = auth.uid());`).length, 1);
   assert.deepStrictEqual(problemsIn(`create policy "read all" on public.bags for select to authenticated using (true);`), []);
   assert.match(problemsIn(`create policy "Enable update for authenticated users" on public.bags for update to authenticated using (true) with check (true);`)[0], /UPDATE for every row/);
   assert.match(problemsIn(`CREATE POLICY ins ON bags FOR INSERT TO authenticated WITH CHECK ( true );`)[0], /INSERT for every row/);
   assert.match(problemsIn(`create policy everything on bags using (true);`)[0], /ALL for every row/);
-  assert.match(problemsIn(`create policy guest_write on bags for insert to anon with check (auth.uid() is null);`)[0], /signed-out visitors/);
+  assert.match(problemsIn(`create policy guest_write on bags for insert to anon with check ((select auth.uid()) is null);`)[0], /signed-out visitors/);
   assert.deepStrictEqual(problemsIn(`-- create policy old on bags for all using (true);\nselect 1;`), []);
   console.log('self-test passed');
 }
@@ -144,7 +166,7 @@ function main() {
     .sort();
   let failed = 0;
   for (const f of files) {
-    const problems = problemsIn(fs.readFileSync(path.join(MIGRATIONS, f), 'utf8'));
+    const problems = problemsIn(fs.readFileSync(path.join(MIGRATIONS, f), 'utf8'), { policyPerf: f.slice(0, 14) >= POLICY_PERF_FIRST_CHECKED });
     for (const p of problems) {
       failed += 1;
       console.log(`::error file=trashdrop/supabase/migrations/${f}::${p}`);
@@ -157,4 +179,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { problemsIn, functionsIn, policiesIn, FIRST_CHECKED };
+module.exports = { problemsIn, functionsIn, policiesIn, FIRST_CHECKED, POLICY_PERF_FIRST_CHECKED };
