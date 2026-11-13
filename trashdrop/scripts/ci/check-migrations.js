@@ -24,6 +24,13 @@
  * (auth_rls_initplan: 64 on 2026-11-13), and the daily security watch holds
  * that count; this stops new ones in review.
  *
+ * Foreign keys (TD20, from POLICY_PERF_FIRST_CHECKED): a foreign key a
+ * migration adds must be covered in the same file by an index, primary key or
+ * unique constraint whose first column is the key's first column. Without one,
+ * deleting or updating the referenced row scans the whole table (the
+ * performance advisor's unindexed_foreign_keys: 46 on 2026-11-13). The parser
+ * agreed with the advisor on every migration in this repository.
+ *
  * Migrations before FIRST_CHECKED were written before this rule and are
  * tracked in the tech-debt register (TD19), not here.
  *
@@ -89,6 +96,44 @@ function policiesIn(sql) {
   return out;
 }
 
+// Foreign keys a migration adds, and whether the same file covers them
+// Foreign keys a migration adds, and whether the same file covers them with an index / PK / unique
+function stripSqlComments(sql) { return sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, ''); }
+function splitTopLevel(s) { const out = []; let d = 0, cur = ''; for (const ch of s) { if (ch === '(') d++; if (ch === ')') d--; if (ch === ',' && d === 0) { out.push(cur); cur = ''; } else cur += ch; } if (cur.trim()) out.push(cur); return out; }
+const norm = (t) => t.replace(/"/g, '').replace(/^public\./i, '').toLowerCase();
+function foreignKeysIn(sql) {
+  const clean = stripSqlComments(sql); const fks = []; const covered = new Set();
+  // CREATE TABLE t ( ... )
+  const ct = /create\s+table\s+(?:if\s+not\s+exists\s+)?([\w."]+)\s*\(/gi; let m;
+  while ((m = ct.exec(clean))) {
+    const table = norm(m[1]); let i = ct.lastIndex, d = 1; const start = i;
+    while (i < clean.length && d > 0) { if (clean[i] === '(') d++; if (clean[i] === ')') d--; i++; }
+    const body = clean.slice(start, i - 1);
+    for (const part of splitTopLevel(body)) {
+      const p = part.trim();
+      const tfk = /^(?:constraint\s+[\w"]+\s+)?foreign\s+key\s*\(([^)]+)\)\s*references/i.exec(p);
+      if (tfk) { fks.push({ table, cols: tfk[1].split(',').map((c) => c.trim().replace(/"/g, '').toLowerCase()) }); continue; }
+      const tpk = /^(?:constraint\s+[\w"]+\s+)?(?:primary\s+key|unique)\s*\(([^)]+)\)/i.exec(p);
+      if (tpk) { covered.add(`${table}:${tpk[1].split(',')[0].trim().replace(/"/g, '').toLowerCase()}`); continue; }
+      const col = /^("?[\w]+"?)\s+[\w\s(),.\[\]]*?\breferences\b/i.exec(p);
+      const colName = /^("?[\w]+"?)/.exec(p)?.[1]?.replace(/"/g, '').toLowerCase();
+      if (col) fks.push({ table, cols: [colName] });
+      if (colName && /\b(primary\s+key|unique)\b/i.test(p)) covered.add(`${table}:${colName}`);
+    }
+  }
+  // ALTER TABLE t ADD [CONSTRAINT x] FOREIGN KEY (c) / ADD COLUMN c ... REFERENCES
+  const at = /alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?([\w."]+)([^;]*);/gi;
+  while ((m = at.exec(clean))) {
+    const table = norm(m[1]);
+    for (const f of m[2].matchAll(/add\s+(?:constraint\s+[\w"]+\s+)?foreign\s+key\s*\(([^)]+)\)/gi)) fks.push({ table, cols: f[1].split(',').map((c) => c.trim().replace(/"/g, '').toLowerCase()) });
+    for (const f of m[2].matchAll(/add\s+(?:column\s+)?(?:if\s+not\s+exists\s+)?(?!(?:constraint|foreign|primary|unique|check|exclude)\b)("?\w+"?)\s+[^,]*?\breferences\b/gi)) fks.push({ table, cols: [f[1].replace(/"/g, '').toLowerCase()] });
+    for (const f of m[2].matchAll(/add\s+(?:constraint\s+[\w"]+\s+)?(?:primary\s+key|unique)\s*\(([^)]+)\)/gi)) covered.add(`${table}:${f[1].split(',')[0].trim().replace(/"/g, '').toLowerCase()}`);
+  }
+  // CREATE [UNIQUE] INDEX ... ON t [USING x] (c, ...)
+  for (const f of clean.matchAll(/create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?[\w"]*\s*on\s+(?:only\s+)?([\w."]+)\s*(?:using\s+\w+\s*)?\(\s*("?\w+"?)/gi)) covered.add(`${norm(f[1])}:${f[2].replace(/"/g, '').toLowerCase()}`);
+  return fks.map((fk) => ({ ...fk, covered: covered.has(`${fk.table}:${fk.cols[0]}`) }));
+}
+
 /** Problems with one migration's SQL, as readable strings */
 function problemsIn(sql, { policyPerf = true } = {}) {
   const problems = [];
@@ -102,6 +147,11 @@ function problemsIn(sql, { policyPerf = true } = {}) {
     }
     if (p.roles.includes('anon')) {
       problems.push(`policy "${p.name}" on ${p.table}: ${p.cmd.toUpperCase()} for signed-out visitors (anon) (principle 10)`);
+    }
+  }
+  if (policyPerf) {
+    for (const k of foreignKeysIn(sql).filter((x) => !x.covered)) {
+      problems.push(`foreign key ${k.table}(${k.cols.join(', ')}) has no index: add CREATE INDEX ON ${k.table} (${k.cols.join(', ')}) in the same migration (TD20)`);
     }
   }
   for (const fn of functionsIn(sql)) {
@@ -156,6 +206,20 @@ function selfTest() {
   assert.match(problemsIn(`create policy everything on bags using (true);`)[0], /ALL for every row/);
   assert.match(problemsIn(`create policy guest_write on bags for insert to anon with check ((select auth.uid()) is null);`)[0], /signed-out visitors/);
   assert.deepStrictEqual(problemsIn(`-- create policy old on bags for all using (true);\nselect 1;`), []);
+  // Foreign keys need an index (TD20)
+  const t = 'create table public.notes (id uuid primary key, owner uuid references auth.users(id), bin_id uuid not null references public.digital_bins(id) on delete cascade);';
+  assert.strictEqual(problemsIn(t).length, 2);
+  assert.match(problemsIn(t)[0], /foreign key notes\(owner\) has no index/);
+  assert.deepStrictEqual(problemsIn(t + ' create index notes_owner_idx on public.notes (owner); CREATE INDEX IF NOT EXISTS "notes_bin" ON notes USING btree ("bin_id", id);'), []);
+  assert.deepStrictEqual(problemsIn(t, { policyPerf: false }), []);
+  // covered by the primary key or a unique constraint, or a composite whose first column it is
+  assert.deepStrictEqual(problemsIn('create table r (user_id uuid primary key references auth.users(id));'), []);
+  assert.deepStrictEqual(problemsIn('create table r (a uuid references x(id), b int, unique (a, b));'), []);
+  assert.strictEqual(problemsIn('create table r (a uuid, b uuid references x(id), unique (a, b));').length, 1);
+  // ALTER TABLE forms
+  assert.strictEqual(problemsIn('alter table r add constraint r_x_fkey foreign key (x_id) references x(id);').length, 1);
+  assert.strictEqual(problemsIn('alter table r add column if not exists x_id uuid references x(id);').length, 1);
+  assert.deepStrictEqual(problemsIn('alter table r add column x_id uuid references x(id); create index on r (x_id);'), []);
   console.log('self-test passed');
 }
 
@@ -179,4 +243,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { problemsIn, functionsIn, policiesIn, FIRST_CHECKED, POLICY_PERF_FIRST_CHECKED };
+module.exports = { problemsIn, functionsIn, policiesIn, foreignKeysIn, FIRST_CHECKED, POLICY_PERF_FIRST_CHECKED };
