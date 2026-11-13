@@ -124,6 +124,16 @@ report shows how often the distance is unknown
 (`trashdrop/supabase/diagnostics/collector_payout_check.sql`); if it is often,
 bring the default back to the owner.
 
+### Pickup requests with prepaid bags (owner-approved 2026-11-13)
+When a household has bought bags in advance, the collector earns **100% of the
+scanned bags' unit prices, plus tips**, and TrashDrop takes nothing from the
+job: the database records the collector's payout and TrashDrop's share (0) when
+the bags are scanned (`td_apply_prepaid_bag_payout`, `platform_share`). The
+collector app's Earnings page shows both as recorded, so they never add up to
+more than the job (`calculatePlatformEarnings`, pinned by
+`earningsPickupRequests.test.js`). Until 2026-11-13 the page would have counted
+the fee less GH₵1 as TrashDrop's as well; no prepaid pickup had happened.
+
 ## Decisions
 
 | Date | Decision |
@@ -138,6 +148,7 @@ bring the default back to the owner.
 | 2026-11-12 | At disposal: pending MoMo shows the expected payout marked pending; failed shows GH₵0 "payment failed"; no payment record shows GH₵0 |
 | 2026-11-12 | Cleanup fees are set only by an admin or the MMDA; cleanups an MMDA assigns are paid by the MMDA and only recorded on TrashDrop, until MMDA-funded accounts exist (admin `20261118_mmda_paid_cleanups.sql`, applied as `20261112170602`) |
 | 2026-11-13 | The collector app shows the database's figure on the job card, at disposal and in Earnings; no loyalty cashback, distance bonus or surge share on digital bins (collector #94) |
+| 2026-11-13 | Prepaid-bag pickup requests: the Earnings page counts as TrashDrop's only what the database recorded (0), so the collector's 100% and TrashDrop's share add up to the job (TD64) |
 
 ## Where it lives
 
