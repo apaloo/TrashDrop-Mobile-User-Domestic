@@ -65,6 +65,7 @@ dumping report points − points spent.
 | 2026-11-12 | Redemptions go through `td_redeem_reward` (the server checks cost and balance) |
 | 2026-11-12 | Points can't be created by inserting rows: redemptions only through `td_redeem_reward`, always positive; a household's new dumping report always starts as pending, and verification (which earns its points) is set only by the team (`20261112162540`). Neither had been used: every redemption was positive and no report had been created already verified |
 | 2026-11-13 | Redemptions are logged in the activity list by the server (TD68, `20261113210339`): the app's own log never worked (it named columns `user_activity` doesn't have). The 7 earlier redemptions were added, dated when they were made; no balance changed (all balances together 3,450 before and after) |
+| 2026-11-13 | The dashboard's activity list shows a dumping report's points by the balance's own rule (20/15/10 once verified; 0 while waiting), not the old 50/30/15/25; `get_critical_stats` and the `user_stats_aggregated` view, which kept an old copy of the rules and were used by nothing, were removed (TD51, `20261113221533`). No balance changed (3,450 in all before and after) |
 
 ## Where this lives
 
@@ -72,7 +73,7 @@ dumping report points − points spent.
   `td_guard_request_write`, `td_guard_profile_columns`,
   `td_guard_dumping_insert`, `get_dashboard_data_optimized`, and the access
   rules on `rewards_redemption` (migrations `20261112095056`,
-  `20261112110640`, `20261112110931`, `20261112162540`, `20261113210339`).
+  `20261112110640`, `20261112110931`, `20261112162540`, `20261113210339`, `20261113221533`).
 - Household app: `src/services/userService.js` (`getUserStats`),
   `src/utils/reportPoints.js`, `src/pages/Rewards.js`.
 - Tests: `userService.stats.test.js`, `Rewards.redeem.test.js`.
