@@ -17,7 +17,7 @@ module.exports = [
     ['Organisation with 2FA and data scrubbing', 'Household app sends events from production', 'Carter and admin apps wired', 'Alert rules email alerts@']),
   step('07', 'Uptime monitoring and alerting', `${R}/07-uptime-monitoring.md`, [],
     ['Monitors for the three sites, Supabase and the WhatsApp webhook', 'Alerts reach alerts@ and the on-call phone']),
-  step('07b', 'Switch on the daily security watch', '.github/workflows/security-watch.yml', [],
+  step('07b', 'Switch on the daily security watch', '.github/workflows/security-watch.yml', ['owner-action'],
     ['Repository variables SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY and SUPABASE_PROJECT_REF set', 'Actions → Security watch → Run workflow: all probes pass, and the advisors and the log scan are read (not "skipped" or "could not be read")', 'Actions → Error watch → Run workflow: it reads the logs and lists any error types']),
   step('07c', 'Monthly report for all three apps', '.github/workflows/governance-cadence.yml', ['owner-action'],
     ['ENGINEERING_REPORT_TOKEN secret added (fine-grained, read-only on the carter and admin repositories)', 'Governance cadence → monthly-report run shows a row per repository']),
