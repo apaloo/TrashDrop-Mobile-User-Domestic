@@ -11,6 +11,7 @@ Run by GitHub Actions through `actions/github-script`; plain CommonJS, no depend
 | `monthly-report.js` | cadence | Drafts the monthly CTO report from pull requests, reviews, CI runs and issues (all three repositories with `ENGINEERING_REPORT_TOKEN`) |
 | `repo-health.js` | cadence | Monthly, per repository: standard files present, `main` protected, private, known-failing tests, pull requests open 14+ days, branches to delete |
 | `branch-cleanup.js` | repo-health | Finds merged (squash merges included) and 60-day-idle branches |
+| `.github/scripts/delete-merged-branches.cjs` | Delete merged branches (by hand; dry run unless "delete" is ticked; same in all three repos) | Deletes the merged branches repo-health lists |
 | `release-notes.js` | `release-notes.yml` | GitHub Release per production deploy, listing the pull requests shipped |
 | `error-watch.mjs` + `error-watch-config.json` | `error-watch.yml` (daily) | Database errors in the last 24 hours by type; flags new or growing ones (`--self-test` runs without network) |
 | `supabase-public.mjs` + `supabase-public.json` | every watch | The production project's public settings (URL, project ref, publishable key), used when the repository variables are unset; never on pull requests, never for secrets |

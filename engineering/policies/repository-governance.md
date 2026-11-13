@@ -21,7 +21,9 @@
 - Branches inactive for 60 days are deleted after asking their author.
 - The monthly repository health lists the branches to delete. A branch counts
   as merged when it is fully in `main` or its tip is the head of a merged pull
-  request (a squash merge).
+  request (a squash merge). To delete them: Actions → **Delete merged
+  branches** → Run workflow (a dry run first; tick "delete" to delete). Same
+  workflow in all three repositories.
 
 ## What does not belong in git
 
