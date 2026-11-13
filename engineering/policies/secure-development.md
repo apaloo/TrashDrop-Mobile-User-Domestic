@@ -51,6 +51,10 @@
     `current_setting()` as `(select auth.uid())`, so Postgres works them out
     once per query instead of once per row. Checked by CI in migrations from
     2026-11-13 (TD20); the security watch holds the live count.
+    A foreign key a migration adds gets an index in the same migration (or is
+    covered by a primary key or unique constraint that starts with it), so
+    deleting the row it points to doesn't scan the whole table. Checked by CI
+    in migrations from 2026-11-13 (TD20).
 
 ## Automated checks (all pull requests)
 
@@ -59,7 +63,7 @@
 | Lint (application code) | ESLint | Yes |
 | Unit tests | Jest (`npm run test:ci`) | Yes |
 | Pricing guard tests | Jest + `pricing-promo.js` | Yes |
-| Database functions, write policies and per-row auth calls in new migrations (principles 8 and 10) | `scripts/ci/check-migrations.js` | Yes |
+| Database functions, write policies, per-row auth calls and unindexed foreign keys in new migrations (principles 8 and 10) | `scripts/ci/check-migrations.js` | Yes |
 | Database calls match real functions (principle 9), all three apps | `scripts/ci/check-rpc-calls.mjs` | Yes; tracked failures in `rpc-known-problems.json` |
 | Build | Vite (all three apps) | Yes |
 | Secrets in new commits | gitleaks | Yes |
