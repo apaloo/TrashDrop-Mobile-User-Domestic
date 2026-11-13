@@ -8,7 +8,7 @@
 |---|---|---|
 | Unit tests (Jest) | CI on every pull request | All code changes. New logic needs new tests. |
 | Lint | CI (all of `src`; collector: changed files until its last 3 errors, in protected payout files, are approved) | All JavaScript changes |
-| Test coverage | CI job summary, report only: the whole app and each file in `scripts/ci/critical-files.txt` | Information. New logic in a critical file comes with tests that raise its figure |
+| Test coverage | CI job summary: the whole app and each file in `scripts/ci/critical-files.txt`, against `scripts/ci/coverage-floors.json` | Blocks merge when one drops more than 0.5 points below its floor (since 2026-11-13). A floor only goes up: when coverage rises 2 points above one, raise it in the same pull request. New logic in a critical file comes with tests that raise its figure |
 | Guard tests for protected rules | CI | Never skipped: household pricing (`digitalBinService.promotion.test.js`, `pricing-promo.js`), carter payouts (`promotionalPayout.test.js`), admin fee checks (`pickupRequestUtils.test.js`) |
 | Edge Function handler tests | CI (admin) | Changes to those functions |
 | Manual regression on staging | QA, using the [release checklist](../templates/release-checklist.md) | Critical-workflow changes |
@@ -46,4 +46,4 @@
 |---|---|
 | 2 | Fix known-failing suites; tests for every bug fixed |
 | 3 | End-to-end tests for QR Bag, Digital Bin, payments and dumping reports against staging; tests for database rules (RLS) in `supabase/tests` |
-| 4 | Coverage thresholds on the critical files (reporting started 2026-11-11); device testing on low-end Android |
+| 4 | ~~Coverage thresholds on the critical files~~ (floors since 2026-11-13; reporting started 2026-11-11); device testing on low-end Android |

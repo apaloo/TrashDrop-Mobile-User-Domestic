@@ -104,8 +104,9 @@ jobs:
     - name: Unit tests
       run: npm run test:ci
 
-    # Report only: the whole app and each file in scripts/ci/critical-files.txt
-    - name: Test coverage (report)
+    # The whole app and each file in scripts/ci/critical-files.txt, against the
+    # floors in scripts/ci/coverage-floors.json (a floor may only go up)
+    - name: Test coverage (floors)
       if: always()
       run: node scripts/ci/coverage-summary.mjs
     
