@@ -4,14 +4,18 @@
  * name a function that exists, with parameter names it takes and every
  * parameter it requires, and every supabase.from('name') must name a table
  * or view that exists (since 2026-11-13: the collector saved shifts to a
- * table that never existed, TD66). Calls to functions that didn't exist, or with the
+ * table that never existed, TD66), with columns that exist where they can be
+ * read: insert/update/upsert object keys, the column of a filter or order,
+ * and plain column names in select(). Calls to functions that didn't exist, or with the
  * wrong parameter names, failed silently in production for weeks (TD37,
  * TD38, admin exec_sql, the dead admin service layer); unit tests mock the
  * database, so only a check against the real signatures finds them.
  *
  * Known functions and tables: scripts/ci/rpc-signatures.json (a snapshot of
- * production; "relations" lists the public tables and views, and the table
- * check is skipped while a repository's snapshot has none) plus every
+ * production; "relations" lists the public tables and views and "columns"
+ * their columns, and each check is skipped while a repository's snapshot
+ * lacks its list; a table a newer migration creates or alters is not
+ * column-checked) plus every
  * function this repository's migrations create and every table and view its
  * migrations dated on or after the snapshot create, so a pull request that
  * adds one and its caller passes. Calls that already
@@ -114,9 +118,67 @@ export function findTableCalls(src) {
   while ((m = re.exec(src))) {
     const owner = src.slice(0, m.index).match(/([A-Za-z_$][\w$]*)\s*$/)?.[1] || '';
     if (owner === 'storage' || /^[A-Z]/.test(owner)) continue;
-    calls.push({ name: m[2], line: src.slice(0, m.index).split('\n').length });
+    calls.push({ name: m[2], line: src.slice(0, m.index).split('\n').length, end: re.lastIndex });
   }
   return calls;
+}
+
+const FILTERS = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'containedBy', 'order', 'not']);
+const quoted = (a) => a.trim().match(/^(['"])([A-Za-z_][A-Za-z0-9_]*)\1$/)?.[2] || null;
+
+/** Top-level keys of an object literal, or of each object in an array literal; null when not literal */
+export function literalKeys(arg) {
+  const a = arg.trim();
+  const objects = [];
+  if (a.startsWith('[')) {
+    if (matchBracket(a, 0) !== a.length) return null;
+    objects.push(...splitTopLevel(a.slice(1, -1)));
+  } else objects.push(a);
+  const keys = [];
+  for (const o of objects) {
+    if (!o.startsWith('{') || matchBracket(o, 0) !== o.length) return null;
+    const body = o.slice(1, -1).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const part of splitTopLevel(body)) {
+      if (part.startsWith('...')) return null;
+      const k = part.match(/^(?:(['"])([^'"]+)\1|([A-Za-z_$][\w$]*))\s*(?::|$)/);
+      if (!k) return null;
+      keys.push(k[2] || k[3]);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Columns named in the chain of calls that follows a from() call ending at
+ * `end`: [{ column, method, line }]. Only what can be read for certain:
+ * literal insert/update/upsert keys, a literal first argument of a filter
+ * or order (not on another table), and plain names in a literal select()
+ * ("count" is PostgREST's own).
+ */
+export function chainColumns(src, end) {
+  const out = [];
+  let i = end;
+  for (;;) {
+    let j = i; while (/\s/.test(src[j] || '')) j++;
+    if (src[j] !== '.') break;
+    const m = src.slice(j + 1).match(/^([A-Za-z_$][\w$]*)\s*\(/);
+    if (!m) break;
+    const open = j + m[0].length;
+    const close = matchBracket(src, open);
+    if (close < 0) break;
+    const args = splitTopLevel(src.slice(open + 1, close - 1));
+    const line = src.slice(0, j).split('\n').length;
+    let names = [];
+    if (['insert', 'update', 'upsert'].includes(m[1]) && args[0]) names = literalKeys(args[0]) || [];
+    else if (FILTERS.has(m[1]) && args[0] && !/foreignTable|referencedTable/.test(args.slice(1).join())) names = [quoted(args[0])].filter(Boolean);
+    else if (m[1] === 'select' && args[0]) {
+      const lit = args[0].trim().match(/^(['"])([^'"]*)\1$/);
+      if (lit) names = splitTopLevel(lit[2]).map((t) => t.trim()).filter((t) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(t) && t !== 'count');
+    }
+    for (const column of names) out.push({ column, method: m[1], line });
+    i = close;
+  }
+  return out;
 }
 
 /** Tables and views a migration creates (lower case) */
@@ -126,6 +188,16 @@ export function findMigrationRelations(sql) {
   const re = /create\s+(?:or\s+replace\s+)?(?:(?:temp|temporary|unlogged)\s+)?(?:materialized\s+)?(table|view)\s+(?:if\s+not\s+exists\s+)?(?:"?public"?\.)?"?([A-Za-z0-9_]+)"?/gi;
   let m;
   while ((m = re.exec(clean))) out.add(m[2].toLowerCase());
+  return out;
+}
+
+/** Tables a migration creates or alters (lower case): their columns may differ from the snapshot */
+export function findMigrationTouchedTables(sql) {
+  const clean = sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const out = findMigrationRelations(clean);
+  const re = /alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?(?:"?public"?\.)?"?([A-Za-z0-9_]+)"?/gi;
+  let m;
+  while ((m = re.exec(clean))) out.add(m[1].toLowerCase());
   return out;
 }
 
@@ -187,6 +259,7 @@ function knownFunctions() {
   // Older migrations are already in the production snapshot, including the
   // tables they created that were dropped since; only newer ones add tables
   const since = (snap.relations_generated || snap.generated || '').replace(/-/g, '');
+  const columns = snap.columns && relations ? new Map(Object.entries(snap.columns).map(([t, c]) => [t, new Set(c)])) : null;
   for (const d of MIGRATION_DIRS) {
     for (const p of walk(path.join(appRoot, d))) {
       if (!p.endsWith('.sql')) continue;
@@ -194,16 +267,19 @@ function knownFunctions() {
       for (const [name, list] of Object.entries(findMigrationFunctions(sql))) {
         (fns[name] ||= []).push(...list);
       }
-      if (relations && path.basename(p).slice(0, 8) >= since) for (const r of findMigrationRelations(sql)) relations.add(r);
+      if (relations && path.basename(p).slice(0, 8) >= since) {
+        for (const r of findMigrationRelations(sql)) relations.add(r);
+        if (columns) for (const t of findMigrationTouchedTables(sql)) columns.delete(t);
+      }
     }
   }
-  return { fns, relations, generated: snap.generated };
+  return { fns, relations, columns, generated: snap.generated };
 }
 
 function check() {
-  const { fns, relations, generated } = knownFunctions();
+  const { fns, relations, columns, generated } = knownFunctions();
   const known = fs.existsSync(KNOWN) ? JSON.parse(fs.readFileSync(KNOWN, 'utf8')).problems || [] : [];
-  const problems = []; let calls = 0; let unread = 0; let tableCalls = 0;
+  const problems = []; let calls = 0; let unread = 0; let tableCalls = 0; let columnUses = 0;
   for (const d of SOURCE_DIRS) {
     for (const p of walk(path.join(appRoot, d))) {
       if (!/\.(js|jsx|ts|tsx|mjs|cjs)$/.test(p) || /\.(test|spec)\./.test(p)) continue;
@@ -214,19 +290,26 @@ function check() {
         if (why) problems.push({ file: rel, line: c.line, function: c.name, why });
       }
       if (!relations) continue;
-      for (const t of findTableCalls(fs.readFileSync(p, 'utf8'))) {
+      const src = fs.readFileSync(p, 'utf8');
+      for (const t of findTableCalls(src)) {
         tableCalls++;
-        if (!relations.has(t.name.toLowerCase())) problems.push({ file: rel, line: t.line, table: t.name, why: 'table or view does not exist' });
+        if (!relations.has(t.name.toLowerCase())) { problems.push({ file: rel, line: t.line, table: t.name, why: 'table or view does not exist' }); continue; }
+        const known = columns?.get(t.name.toLowerCase());
+        if (!known) continue;
+        for (const c of chainColumns(src, t.end)) {
+          columnUses++;
+          if (!known.has(c.column)) problems.push({ file: rel, line: c.line, table: t.name, column: c.column, why: `column does not exist (${c.method})` });
+        }
       }
     }
   }
-  const nameOf = (x) => x.function || x.table;
+  const nameOf = (x) => x.function || (x.column ? `${x.table}.${x.column}` : x.table);
   const isKnown = (pr) => known.find((k) => k.file === pr.file && nameOf(k) === nameOf(pr));
   const fresh = problems.filter((pr) => !isKnown(pr));
   const stale = known.filter((k) => !problems.some((pr) => pr.file === k.file && nameOf(pr) === nameOf(k)));
   console.log(`Database call check: ${calls} rpc() calls (${unread} with parameters that can't be read statically), signatures from production ${generated} plus this repository's migrations.`);
   console.log(relations
-    ? `Table check: ${tableCalls} from() calls against ${relations.size} tables and views.`
+    ? `Table check: ${tableCalls} from() calls against ${relations.size} tables and views; ${columns ? `${columnUses} column names checked` : 'column check skipped (no "columns" in the snapshot)'}.`
     : 'Table check skipped: scripts/ci/rpc-signatures.json has no "relations" yet (run --refresh).');
   problems.filter(isKnown).forEach((pr) => console.log(`  known (${isKnown(pr).ref}): ${pr.file}:${pr.line} ${nameOf(pr)}: ${pr.why}`));
   fresh.forEach((pr) => console.log(`::error file=${pr.file},line=${pr.line}::${nameOf(pr)}: ${pr.why}`));
@@ -251,6 +334,9 @@ where ns.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'p', 'f')
   and not exists (select 1 from pg_depend dep where dep.classid = 'pg_class'::regclass and dep.objid = c.oid and dep.deptype = 'e')
 order by c.relname`;
 
+export const COLUMNS_SQL = `select c.table_name as t, c.column_name as c from information_schema.columns c
+where c.table_schema = 'public' order by c.table_name, c.ordinal_position`;
+
 async function refresh() {
   const token = process.env.SUPABASE_ACCESS_TOKEN; const ref = process.env.SUPABASE_PROJECT_REF;
   if (!token || !ref) { console.error('Set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF (production).'); process.exit(2); }
@@ -266,12 +352,19 @@ async function refresh() {
   });
   if (!relRes.ok) { console.error(`Could not read the tables: HTTP ${relRes.status}`); process.exit(2); }
   const relations = (await relRes.json()).map((r) => r.n);
+  const colRes = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ query: COLUMNS_SQL }),
+  });
+  if (!colRes.ok) { console.error(`Could not read the columns: HTTP ${colRes.status}`); process.exit(2); }
+  const columns = {};
+  for (const r of await colRes.json()) (columns[r.t] ||= []).push(r.c);
   const functions = {};
   for (const r of rows) (functions[r.n] ||= []).push({ args: r.a || [], defaults: Number(r.d) || 0 });
   const old = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
-  const snap = { ...old, generated: new Date().toISOString().slice(0, 10), relations, functions: Object.fromEntries(Object.entries(functions).sort()) };
+  const snap = { ...old, generated: new Date().toISOString().slice(0, 10), relations_generated: new Date().toISOString().slice(0, 10), relations, columns, functions: Object.fromEntries(Object.entries(functions).sort()) };
   fs.writeFileSync(SNAPSHOT, JSON.stringify(snap, null, 0).replace(/\],"/g, '],\n"') + '\n');
-  console.log(`Snapshot written: ${Object.keys(functions).length} functions, ${relations.length} tables and views.`);
+  console.log(`Snapshot written: ${Object.keys(functions).length} functions, ${relations.length} tables and views, ${Object.keys(columns).length} with columns.`);
 }
 
 // ---------- self-test ----------
@@ -316,6 +409,19 @@ function selfTest() {
     supabase.from(tableName);`);
   assert(tables.map((t) => t.name).join() === 'pickup_requests,digital_bins', `tables only, not storage buckets, Buffer or Array (${JSON.stringify(tables)})`);
   assert(tables[1].line === 4, 'line of a chained from()');
+  const chainSrc = `supabase.from('t')
+      .select('id, name, alias:other(*), count, *')
+      .eq('status', 'x').order('created_at', { ascending: false })
+      .order('rank', { referencedTable: 'other' }).eq(col, 1).neq("kind", 2);
+    supabase.from('t').insert([{ a: 1, 'b': 2 }, { c: 3 }]).select('id');
+    supabase.from('t').update({ ...rest, d: 1 }).eq('id', 1);
+    supabase.from('t').upsert(rows);`;
+  const uses = findTableCalls(chainSrc).map((t) => chainColumns(chainSrc, t.end).map((c) => `${c.method}:${c.column}`).join());
+  assert(uses[0] === 'select:id,select:name,eq:status,order:created_at,neq:kind', `columns in a chain (${uses[0]})`);
+  assert(uses[1] === 'insert:a,insert:b,insert:c,select:id', `insert keys of every row (${uses[1]})`);
+  assert(uses[2] === 'eq:id' && uses[3] === '', `spread or variable rows are not guessed (${uses[2]} | ${uses[3]})`);
+  const touched = findMigrationTouchedTables('alter table if exists public.bags add column x int; create table new_t (id int); -- alter table gone');
+  assert([...touched].sort().join() === 'bags,new_t', `tables a migration creates or alters (${[...touched]})`);
   const rels = findMigrationRelations(`-- create table public.commented (id int);
     create table if not exists public.bin_reminders (id uuid);
     CREATE OR REPLACE VIEW "public"."Admin_View" AS select 1;

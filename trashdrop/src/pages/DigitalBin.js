@@ -561,7 +561,9 @@ function DigitalBin() {
           // Check if it exists in locations table
           const { data: legacyLocation, error: legacyLookupError } = await supabase
             .from('locations')
-            .select('id, name, location_name, address, latitude, longitude, coordinates')
+            // locations has no name or coordinates column: asking for them
+            // made every lookup fail, so an old saved place was never copied
+            .select('id, location_name, address, latitude, longitude')
             .eq('id', formData.location_id)
             .single();
 
