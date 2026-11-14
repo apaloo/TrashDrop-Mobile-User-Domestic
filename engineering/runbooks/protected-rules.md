@@ -55,3 +55,21 @@ fingerprint. A difference means one of two things:
   5. Write it up in the incident log.
 
 Never update a fingerprint just to make the watch pass.
+
+### After a Postgres upgrade
+
+A major Postgres upgrade can change how the database prints an object without
+anyone changing it. Prove that before touching anything: compare the live
+fingerprints with the recorded ones, and for each difference find what
+printed differently. Change the fingerprint query (not the recorded
+fingerprints) only when the difference is shown to carry no meaning, and keep
+it catching every real change.
+
+2026-11-14, Postgres 15.8 → 17.11 (TD62): every function and trigger matched.
+The view `user_stats_dashboard` and seven tables' policies did not, only
+because Postgres 17 gives a table's owner (`postgres`) the new MAINTAIN
+privilege, an `m` in the grants (`arwdDxt` → `arwdDxtm`: VACUUM, ANALYZE,
+REINDEX; no access to rows). With that `m` left out, all eight matched the
+recorded fingerprints exactly. The watch now leaves out only the owner's
+automatic `m` (`aclText` in `security-watch.mjs`); MAINTAIN granted to any
+other role still changes the fingerprint.

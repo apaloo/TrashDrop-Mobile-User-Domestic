@@ -5,16 +5,16 @@
 -- options: security_invoker=on
 
 create view public.illegal_dumping_reports with (security_invoker=on) as
-SELECT illegal_dumping.id,
-    illegal_dumping.reported_by,
-    illegal_dumping.assigned_to,
-    illegal_dumping.location,
-    illegal_dumping.address,
-    illegal_dumping.description,
-    illegal_dumping.waste_type,
-    illegal_dumping.severity,
-    illegal_dumping.status,
-    illegal_dumping.images,
-    illegal_dumping.created_at,
-    illegal_dumping.updated_at
+SELECT id,
+    reported_by,
+    assigned_to,
+    location,
+    address,
+    description,
+    waste_type,
+    severity,
+    status,
+    images,
+    created_at,
+    updated_at
    FROM illegal_dumping;

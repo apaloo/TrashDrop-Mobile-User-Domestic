@@ -183,6 +183,13 @@ const PROTECTED_TRIGGERS = [
   ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'], ['payouts', 'digital_bins', 'ab_td_keep_booked_payout'],
   ['payouts', 'digital_bins', 'ac_td_record_bin_acceptance'], ['payouts', 'illegal_dumping_mobile', 'ab_td_guard_cleanup_fee'],
 ];
+// A table's grants as text for its fingerprint. Postgres 17 (production from
+// 2026-11-14, TD62) gives a table's owner the new MAINTAIN privilege ("m":
+// VACUUM, ANALYZE, REINDEX; no reading or writing rows) automatically, so the
+// owner's entry gained an "m" without anyone changing a grant. Only that
+// automatic owner "m" is left out, which keeps the fingerprints recorded on
+// Postgres 15; MAINTAIN granted to any other role still changes them.
+export const aclText = (col) => `regexp_replace(array_to_string(${col}, ','), '(^|,)(postgres=[a-zA-Z*]*?)m(\\*?)/', '\\1\\2\\3/')`;
 const values = (rows) => rows.map((r) => `(${r.map((v) => `'${v}'`).join(',')})`).join(',');
 export const PROTECTED_DEFINITIONS_SQL = `with fns(rule, name) as (values ${values(PROTECTED_FUNCTIONS)}),
 trg(rule, tbl, name) as (values ${values(PROTECTED_TRIGGERS)})
@@ -196,16 +203,16 @@ select t.rule, 'trigger ' || t.tbl || '.' || t.name,
 from trg t
 union all
 select 'points', 'view user_stats_dashboard',
-  (select md5(pg_get_viewdef(c.oid) || coalesce(array_to_string(c.relacl, ','), '')) from pg_class c where c.oid = to_regclass('public.user_stats_dashboard'))
+  (select md5(pg_get_viewdef(c.oid) || coalesce(${aclText('c.relacl')}, '')) from pg_class c where c.oid = to_regclass('public.user_stats_dashboard'))
 union all
 select 'pricing', 'policies promotional_usage',
   (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
-          || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.promotional_usage')))
+          || (select coalesce(${aclText('relacl')}, '') || relrowsecurity::text from pg_class where oid = to_regclass('public.promotional_usage')))
      from pg_policy p where p.polrelid = to_regclass('public.promotional_usage'))
 union all
 select 'points', 'policies rewards_redemption',
   (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
-          || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.rewards_redemption')))
+          || (select coalesce(${aclText('relacl')}, '') || relrowsecurity::text from pg_class where oid = to_regclass('public.rewards_redemption')))
      from pg_policy p where p.polrelid = to_regclass('public.rewards_redemption'))
 order by 1, 2`;
 
@@ -228,7 +235,7 @@ from unnest(array[${ACCESS_FUNCTIONS.map((n) => `'${n}'`).join(',')}]) as f(name
 union all
 select 'access', 'policies ' || t.name,
   (select md5(coalesce(string_agg(p.polname || p.polcmd::text || p.polroles::text || coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''), '|' order by p.polname), '')
-          || (select coalesce(array_to_string(relacl, ','), '') || relrowsecurity::text from pg_class where oid = to_regclass('public.' || t.name)))
+          || (select coalesce(${aclText('relacl')}, '') || relrowsecurity::text from pg_class where oid = to_regclass('public.' || t.name)))
      from pg_policy p where p.polrelid = to_regclass('public.' || t.name))
 from unnest(array[${ACCESS_TABLES.map((n) => `'${n}'`).join(',')}]) as t(name)
 order by 2`;
@@ -647,6 +654,9 @@ function selfTest() {
   const listed = [...PROTECTED_FUNCTIONS.map(([, n]) => `function ${n}`), ...PROTECTED_TRIGGERS.map(([, t, n]) => `trigger ${t}.${n}`),
     'view user_stats_dashboard', 'policies promotional_usage', 'policies rewards_redemption'];
   assert(listed.length === recorded.length && listed.every((o) => recorded.includes(o)), 'every protected object has a recorded fingerprint');
+  // Postgres 17's automatic owner MAINTAIN ("m") is left out of table grants, and only that (TD62)
+  assert(aclText('relacl').startsWith("regexp_replace(array_to_string(relacl, ','), '(^|,)(postgres="), 'only the owner entry is rewritten');
+  assert(!/array_to_string\((c\.)?relacl/.test(PROTECTED_DEFINITIONS_SQL.replace(/regexp_replace\(array_to_string\((c\.)?relacl/g, '')) && !/array_to_string\(relacl/.test(ACCESS_DEFINITIONS_SQL.replace(/regexp_replace\(array_to_string\(relacl/g, '')), 'every table-grant fingerprint goes through aclText');
   assert(Object.values(config.protectedDefinitions.objects).every((h) => /^[0-9a-f]{32}$/.test(h)), 'fingerprints are md5');
   const accessListed = [...ACCESS_FUNCTIONS.map((n) => `function ${n}`), ...ACCESS_TABLES.map((t) => `policies ${t}`)];
   const accessRecorded = Object.keys(config.accessDefinitions?.objects || {});

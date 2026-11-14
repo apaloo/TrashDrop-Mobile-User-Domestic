@@ -31,7 +31,7 @@ create table public.logs (
   metadata jsonb not null default '{}'::jsonb,
   is_sample boolean not null default false
 );
-alter table public.logs add constraint logs_level_check CHECK (((level)::text = ANY ((ARRAY['debug'::character varying, 'info'::character varying, 'warn'::character varying, 'error'::character varying, 'critical'::character varying])::text[])));
+alter table public.logs add constraint logs_level_check CHECK (((level)::text = ANY (ARRAY[('debug'::character varying)::text, ('info'::character varying)::text, ('warn'::character varying)::text, ('error'::character varying)::text, ('critical'::character varying)::text])));
 alter table public.logs add constraint logs_pkey PRIMARY KEY (id);
 alter table public.logs add constraint logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
 CREATE INDEX idx_logs_level ON public.logs USING btree (level);

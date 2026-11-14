@@ -44,23 +44,23 @@ WITH base AS (
             COALESCE(b.stored_area, NULLIF(btrim(regexp_replace(array_to_string((string_to_array(b.address, ','::text))[GREATEST(1, (COALESCE(array_length(string_to_array(b.address, ','::text), 1), 1) - 1)):COALESCE(array_length(string_to_array(b.address, ','::text), 1), 1)], ','::text), '\s*,\s*'::text, ', '::text, 'g'::text)), ''::text)) AS candidate_area
            FROM base b
         )
- SELECT n.id,
-    n.latitude,
-    n.longitude,
-    n.severity,
-    n.waste_type,
-    n.status,
-    n.created_at,
+ SELECT id,
+    latitude,
+    longitude,
+    severity,
+    waste_type,
+    status,
+    created_at,
         CASE
-            WHEN (n.status = ANY (ARRAY['completed'::text, 'disposed'::text])) THEN COALESCE(n.stored_completed_at, n.updated_at)
+            WHEN (status = ANY (ARRAY['completed'::text, 'disposed'::text])) THEN COALESCE(stored_completed_at, updated_at)
             ELSE NULL::timestamp with time zone
         END AS completed_at,
         CASE
-            WHEN (n.candidate_area ~ '-?[0-9]+\.[0-9]{3,}'::text) THEN NULL::text
-            ELSE n.candidate_area
+            WHEN (candidate_area ~ '-?[0-9]+\.[0-9]{3,}'::text) THEN NULL::text
+            ELSE candidate_area
         END AS area_name,
     COALESCE(ARRAY( SELECT p.p
            FROM unnest(n.photos) p(p)
           WHERE (p.p ~~* 'https://%'::text)), ARRAY[]::text[]) AS photo_urls
    FROM named n
-  WHERE ((n.status <> 'cancelled'::text) AND ((((n.latitude >= (4.5)::double precision) AND (n.latitude <= (11.2)::double precision)) AND ((n.longitude >= ('-3.3'::numeric)::double precision) AND (n.longitude <= (1.3)::double precision))) OR (td_supported_country(n.latitude, n.longitude) = 'LR'::text)));
+  WHERE ((status <> 'cancelled'::text) AND (((latitude >= (4.5)::double precision) AND (latitude <= (11.2)::double precision) AND ((longitude >= ('-3.3'::numeric)::double precision) AND (longitude <= (1.3)::double precision))) OR (td_supported_country(latitude, longitude) = 'LR'::text)));

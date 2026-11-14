@@ -22,10 +22,10 @@ create table public.withdrawals (
 );
 alter table public.withdrawals add constraint withdrawals_amount_check CHECK ((amount > (0)::numeric));
 alter table public.withdrawals add constraint withdrawals_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES auth.users(id);
-alter table public.withdrawals add constraint withdrawals_network_check CHECK (((network)::text = ANY ((ARRAY['MTN'::character varying, 'VODAFONE'::character varying, 'AIRTELTIGO'::character varying, NULL::character varying])::text[])));
-alter table public.withdrawals add constraint withdrawals_payment_method_check CHECK (((payment_method)::text = ANY ((ARRAY['mobile_money'::character varying, 'bank_transfer'::character varying])::text[])));
+alter table public.withdrawals add constraint withdrawals_network_check CHECK (((network)::text = ANY (ARRAY[('MTN'::character varying)::text, ('VODAFONE'::character varying)::text, ('AIRTELTIGO'::character varying)::text, (NULL::character varying)::text])));
+alter table public.withdrawals add constraint withdrawals_payment_method_check CHECK (((payment_method)::text = ANY (ARRAY[('mobile_money'::character varying)::text, ('bank_transfer'::character varying)::text])));
 alter table public.withdrawals add constraint withdrawals_pkey PRIMARY KEY (id);
-alter table public.withdrawals add constraint withdrawals_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])));
+alter table public.withdrawals add constraint withdrawals_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('processing'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text, ('cancelled'::character varying)::text])));
 CREATE INDEX idx_withdrawals_collector_id ON public.withdrawals USING btree (collector_id);
 CREATE INDEX idx_withdrawals_collector_status ON public.withdrawals USING btree (collector_id, status);
 CREATE INDEX idx_withdrawals_created_at ON public.withdrawals USING btree (created_at DESC);
