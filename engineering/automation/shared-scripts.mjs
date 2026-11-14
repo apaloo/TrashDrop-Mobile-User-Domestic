@@ -7,7 +7,8 @@
  * script in three repositories: a fix made in one must reach the others.
  * Nothing checked that (2026-11-13). This compares the collector's and the
  * admin site's copies on their main branch with this repository's copy (the
- * source: change it here first, then copy it), byte for byte.
+ * source: change it here first, then copy it), byte for byte. Shared files
+ * outside scripts/ci/ (the browser tests' fake Supabase) are compared the same way.
  *
  * Reads public raw files, so it needs no token. Writes shared-scripts-result.json
  * ({ outOfStep: [{ script, repo, problem }] }) for the workflow, and a
@@ -27,21 +28,32 @@ const config = JSON.parse(fs.readFileSync(path.join(here, 'shared-scripts-config
 const sha = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 12);
 
 /**
- * @param {{ scripts: string[], sourceDir: string, repos: {name: string, slug: string, dir: string}[] }} cfg
+ * Everything compared: each script in scripts/ci/ (sourceDir here, each
+ * repository's dir there), and each shared file with its own paths ("files":
+ * [{ name, source, copy }], e.g. the browser tests' fake Supabase).
+ * @returns {{ name: string, source: string, copy: (repo: {dir: string}) => string }[]}
+ */
+export const entries = (cfg) => [
+  ...cfg.scripts.map((script) => ({ name: script, source: path.posix.join(cfg.sourceDir, script), copy: (repo) => path.posix.join(repo.dir, script) })),
+  ...(cfg.files || []).map((f) => ({ name: f.name, source: f.source, copy: () => f.copy })),
+];
+
+/**
+ * @param {{ scripts: string[], sourceDir: string, files?: {name: string, source: string, copy: string}[], repos: {name: string, slug: string, dir: string}[] }} cfg
  * @param {(file: string) => string|null} readSource  this repository's copy
  * @param {(slug: string, file: string) => Promise<string|null>} readRemote  null when it can't be read
  */
 export async function compare(cfg, readSource, readRemote) {
   const rows = [];
   const outOfStep = [];
-  for (const script of cfg.scripts) {
-    const source = readSource(path.posix.join(cfg.sourceDir, script));
+  for (const { name: script, source: sourcePath, copy: copyPath } of entries(cfg)) {
+    const source = readSource(sourcePath);
     if (source === null) {
       outOfStep.push({ script, repo: 'household', problem: 'missing here (the source copy)' });
       continue;
     }
     for (const repo of cfg.repos) {
-      const copy = await readRemote(repo.slug, path.posix.join(repo.dir, script));
+      const copy = await readRemote(repo.slug, copyPath(repo));
       let problem = null;
       if (copy === null) problem = 'missing or unreadable on main';
       else if (copy !== source) problem = `differs (here ${sha(source)}, there ${sha(copy)})`;
@@ -74,7 +86,11 @@ async function selfTest() {
   assert(r2.outOfStep.some((x) => x.repo === 'collector' && /missing/.test(x.problem)), 'a missing copy');
   const r3 = await compare({ ...cfg, scripts: ['gone.cjs'] }, () => null, async () => 'x');
   assert(r3.outOfStep[0].repo === 'household', 'a missing source');
+  const withFile = { ...cfg, scripts: [], files: [{ name: 'fake.mjs', source: 'app/e2e/fake.mjs', copy: 'tests/fake.mjs' }] };
+  const r4 = await compare(withFile, (f) => (f === 'app/e2e/fake.mjs' ? 'F' : null), async (s, f) => (f === 'tests/fake.mjs' ? (s === 'o/c' ? 'F' : 'F-old') : null));
+  assert(r4.rows.length === 2 && r4.outOfStep.length === 1 && r4.outOfStep[0].repo === 'admin' && r4.outOfStep[0].script === 'fake.mjs', 'a shared file at its own paths');
   assert(config.scripts.length >= 6 && config.repos.length === 2, 'config lists the shared scripts and both repositories');
+  assert((config.files || []).every((f) => f.name && f.source && f.copy && fs.existsSync(path.join(here, '..', '..', f.source))), 'every shared file has a name, a source that exists here, and a copy path');
   console.log('shared-scripts self-test passed');
 }
 
@@ -86,14 +102,14 @@ async function main() {
     fetchRaw,
   );
   const lines = ['### Shared CI scripts', '', '| Script | ' + config.repos.map((r) => r.name).join(' | ') + ' |', '|---|' + config.repos.map(() => '---|').join('')];
-  for (const script of config.scripts) {
+  for (const { name: script } of entries(config)) {
     lines.push(`| \`${script}\` | ` + config.repos.map((repo) => {
       const row = rows.find((x) => x.script === script && x.repo === repo.name);
       return row ? (row.ok ? '✅ same' : `❌ ${row.problem}`) : '❌';
     }).join(' | ') + ' |');
   }
   lines.push('', outOfStep.length
-    ? `**${outOfStep.length} copy(ies) out of step.** Copy the household version (\`${config.sourceDir}/\`) into the other repository's \`scripts/ci/\` in a pull request there.`
+    ? `**${outOfStep.length} copy(ies) out of step.** Copy the household version (\`${config.sourceDir}/\`, or the file's own path above) into the other repository in a pull request there.`
     : '**All copies are the same as the household version.**');
   const md = lines.join('\n') + '\n';
   console.log(md);

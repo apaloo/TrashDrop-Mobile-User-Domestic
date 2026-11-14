@@ -13,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'trashdrop/scripts/ci/**'
+      - 'trashdrop/e2e/fakeSupabase.mjs'
       - 'engineering/automation/shared-scripts*'
       - '.github/workflows/shared-scripts.yml'
 
@@ -72,7 +73,7 @@ jobs:
               '| Script | Repository | Problem |', '|---|---|---|',
               ...result.outOfStep.map((x) => `| \`${x.script}\` | ${x.repo} | ${x.problem} |`),
               '',
-              'Copy the household version into that repository\'s `scripts/ci/` in a pull request there. This issue closes on the first daily run with every copy the same.',
+              'Copy the household version into that repository (`scripts/ci/`, or `browser-tests/` for the fake Supabase) in a pull request there. This issue closes on the first daily run with every copy the same.',
             ].join('\n');
             if (open) await github.rest.issues.update({ owner, repo, issue_number: open.number, body });
             else await github.rest.issues.create({ owner, repo, title: process.env.TITLE, body });
