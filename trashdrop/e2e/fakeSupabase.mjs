@@ -8,6 +8,8 @@
 // arrays, or one object with "Accept: application/vnd.pgrst.object+json"),
 // with the CORS headers a browser needs for a cross-origin call.
 
+import { randomUUID } from 'node:crypto';
+
 export const SUPABASE = 'https://ci-placeholder.supabase.co';
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -41,10 +43,14 @@ const CORS = {
  *   account:  household() for a valid password, or null (every sign-in refused)
  *   tables:   { table: rows[] } answers for reads; unlisted tables are empty
  *   rpc:      { name: result | (body) => result } answers for database functions
- * Returns the calls made, [{ method, path, body }], for assertions.
+ * Returns the calls made, [{ method, path, body }], for assertions, with
+ * .db (the tables now) and .uploads (files stored) attached.
  */
 export async function fakeSupabase(page, { account = null, tables = {}, rpc = {} } = {}) {
   const calls = [];
+  const uploads = [];
+  // The tables as the test set them up, then as the app changed them
+  const db = Object.fromEntries(Object.entries(tables).map(([t, rows]) => [t, rows.map((r) => ({ ...r }))]));
   await page.route(/^(?!http:\/\/(localhost|127\.0\.0\.1)[:/]).*/, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -72,23 +78,52 @@ export async function fakeSupabase(page, { account = null, tables = {}, rpc = {}
       return json(200, typeof answer === 'function' ? answer(body) : (answer ?? null));
     }
 
-    // Tables (PostgREST)
+    // Tables (PostgREST). The fake keeps what the app writes: an insert is
+    // read back, an update changes the matching rows.
     const table = url.pathname.match(/^\/rest\/v1\/([^/]+)$/)?.[1];
     if (table) {
-      const rows = tables[table] || [];
+      db[table] = db[table] || [];
+      // "column=eq.value" filters, as the app's .eq() sends them; others are ignored
+      const matches = (row) => [...url.searchParams].every(([col, cond]) => {
+        const eq = cond.match(/^eq\.(.*)$/);
+        return !eq || !(col in row) || String(row[col]) === eq[1];
+      });
+      const rows = db[table].filter(matches);
       const wantsOne = (req.headers().accept || '').includes('application/vnd.pgrst.object');
-      if (req.method() === 'GET' || req.method() === 'HEAD') {
-        if (wantsOne) return rows.length ? json(200, rows[0]) : json(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned', details: 'The result contains 0 rows' });
-        return json(200, rows, { 'content-range': `0-${Math.max(rows.length - 1, 0)}/${rows.length}` });
+      const many = (list) => json(200, list, { 'content-range': `0-${Math.max(list.length - 1, 0)}/${list.length}` });
+      const one = (list) => (list.length ? json(200, list[0]) : json(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned', details: 'The result contains 0 rows' }));
+      switch (req.method()) {
+        case 'GET':
+        case 'HEAD':
+          return wantsOne ? one(rows) : many(rows);
+        case 'POST': {
+          const added = (Array.isArray(body) ? body : [body || {}]).map((r) => ({ id: randomUUID(), created_at: new Date().toISOString(), ...r })); // ids and dates the database would default
+          db[table].push(...added);
+          return json(201, wantsOne ? added[0] : added);
+        }
+        case 'PATCH':
+          rows.forEach((r) => Object.assign(r, body || {}));
+          return wantsOne ? one(rows) : many(rows);
+        default:
+          return json(204, null);
       }
-      return json(201, wantsOne ? (body || {}) : [body || {}]);
     }
 
-    // Storage, functions and anything else Supabase serves: nothing there
+    // Storage: uploads are accepted and kept by path
+    const upload = url.pathname.match(/^\/storage\/v1\/object\/([^/]+)\/(.+)$/);
+    if (upload && (req.method() === 'POST' || req.method() === 'PUT')) {
+      const [, bucket, key] = upload;
+      uploads.push({ bucket, key });
+      return json(200, { Key: `${bucket}/${key}`, Id: key });
+    }
+
+    // Functions and anything else Supabase serves: nothing there
     return json(404, { message: 'not in the test fake' });
   });
   // Realtime is a websocket: refuse it, as an offline network would
   await page.routeWebSocket(/supabase\.co/, (ws) => ws.close());
+  calls.db = db;
+  calls.uploads = uploads;
   return calls;
 }
 
