@@ -219,10 +219,14 @@ const ScheduledQRTab = ({ scheduledPickups = [], onRefresh, isLoading, newlyCrea
       setLocalPickups(updatedBins);
       localStorage.setItem('digitalBins', JSON.stringify(updatedBins));
       
-      // Then update server - digital bins table
+      // Then the server. The status is what collectors list bins by: a bin
+      // cancelled with only is_active = false stayed 'pending' and still showed
+      // as available to collectors (found 2026-11-14). The database allows
+      // cancelling until collection starts; it refunds a promotion either way.
       const { error } = await supabase
         .from('digital_bins')
-        .update({ 
+        .update({
+          status: 'cancelled',
           is_active: false,
           updated_at: new Date().toISOString()
         })

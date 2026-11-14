@@ -1,6 +1,6 @@
 {
   "_comment": "Line coverage floors (scripts/ci/coverage-summary.mjs): a pull request may not drop the whole app or a critical file more than 0.5 points below its floor, and raises a floor when coverage rises 2 or more points above it, so floors only go up. Set 2026-11-13 from that day's coverage, rounded down.",
-  "total": 45.1,
+  "total": 47.5,
   "files": {
     "src/services/digitalBinService.js": 100,
     "src/services/promotionalService.js": 100,
@@ -18,6 +18,7 @@
     "src/utils/householdCache.js": 100,
     "src/services/ratingService.js": 100,
     "src/components/digitalBin/LocationStep.js": 84.3,
-    "src/utils/locationSaveMessage.js": 100
+    "src/utils/locationSaveMessage.js": 100,
+    "src/components/digitalBin/ScheduledQRTab.js": 63.2
   }
 }
