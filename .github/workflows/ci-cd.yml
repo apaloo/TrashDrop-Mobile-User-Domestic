@@ -33,8 +33,6 @@ jobs:
         cache-dependency-path: trashdrop/package-lock.json
     
     - name: Install dependencies
-      env:
-        CYPRESS_INSTALL_BINARY: 0 # end-to-end tests don't run here
       run: npm ci
 
     # Errors fail the build. Test files are not linted yet (see
@@ -150,8 +148,6 @@ jobs:
         cache-dependency-path: trashdrop/package-lock.json
 
     - name: Install dependencies
-      env:
-        CYPRESS_INSTALL_BINARY: 0
       run: npm ci
 
     - name: Install Chromium
