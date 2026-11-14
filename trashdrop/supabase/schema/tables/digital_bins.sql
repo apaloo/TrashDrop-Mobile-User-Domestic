@@ -85,6 +85,7 @@ create policy "Users can view their own digital bins" on public.digital_bins as 
   using ((auth.uid() = user_id));
 
 -- Triggers (run in name order)
+CREATE TRIGGER aa_td_sync_bin_cancellation BEFORE INSERT OR UPDATE ON public.digital_bins FOR EACH ROW EXECUTE FUNCTION td_sync_bin_cancellation();
 CREATE TRIGGER ab_td_keep_booked_payout BEFORE UPDATE ON public.digital_bins FOR EACH ROW EXECUTE FUNCTION td_keep_booked_payout();
 CREATE TRIGGER ab_td_manager_assign BEFORE INSERT OR UPDATE ON public.digital_bins FOR EACH ROW EXECUTE FUNCTION td_guard_manager_assign();
 CREATE TRIGGER ac_td_record_bin_acceptance BEFORE UPDATE ON public.digital_bins FOR EACH ROW EXECUTE FUNCTION td_record_bin_acceptance();

@@ -302,7 +302,7 @@
   "writePolicies": {
     "maxOpen": 0
   },
-  "_protectedDefinitions_comment": "Fingerprints (md5 of definition and grants) of the database objects that hold the owner's protected rules: digital bin pricing (docs/DIGITAL_BIN_PRICING.md), points (docs/POINTS.md) and collector payouts (docs/COLLECTOR_PAYOUTS.md). Recorded 2026-11-12 ; 24 objects after td_keep_booked_payout (20261112113921) and the server-side collector share (20261112120016), both owner approved the same day. A difference fails the watch: either someone changed a protected rule outside an approved pull request, or an approved change forgot to record its new fingerprint. Update a value only in the pull request that carries the owner's written approval (engineering/runbooks/protected-rules.md).",
+  "_protectedDefinitions_comment": "Fingerprints (md5 of definition and grants) of the database objects that hold the owner's protected rules: digital bin pricing (docs/DIGITAL_BIN_PRICING.md), points (docs/POINTS.md) and collector payouts (docs/COLLECTOR_PAYOUTS.md). Recorded 2026-11-12 ; 24 objects after td_keep_booked_payout (20261112113921) and the server-side collector share (20261112120016), both owner approved the same day. 2026-11-14: td_sync_bin_cancellation and its trigger aa_td_sync_bin_cancellation added (TD74, owner approved in chat, 'Approve the TD74 database rule'; migration 20261114110821); no existing fingerprint changed. A difference fails the watch: either someone changed a protected rule outside an approved pull request, or an approved change forgot to record its new fingerprint. Update a value only in the pull request that carries the owner's written approval (engineering/runbooks/protected-rules.md).",
   "protectedDefinitions": {
     "objects": {
       "function increment_promotional_usage": "e8e2845fccdc47de8ca62b5fb29d0cb9",
@@ -313,6 +313,8 @@
       "policies promotional_usage": "3f1ed6089cb36140ab02bcf2b9f8649f",
       "trigger digital_bins.digital_bins_protect_price": "fee44dc61bab0b96a7233f4ec26aed2d",
       "trigger digital_bins.digital_bins_refund_promotion": "d4c85764b4edb1e6fc5be8a7b4550b85",
+      "function td_sync_bin_cancellation": "4ff0741d19692a0dde959ef4e633f9a4",
+      "trigger digital_bins.aa_td_sync_bin_cancellation": "69e8573532fa1240f91880f73e088f0c",
       "trigger digital_bins.digital_bins_set_price": "1866818a7fd5ba6fa8caaf9321154827",
       "function get_dashboard_data_optimized": "e920457b0e2775b17c0a569e438641a9",
       "function td_guard_profile_columns": "cffd0a300068f35db2780da1f205cc4f",
@@ -368,10 +370,11 @@
       "policies team_members": "md5:0311f3753581849f4b818cf8bbcdf72d"
     }
   },
-  "_uncheckedFunctions_comment": "Database functions that run with their owner's rights, can be run by any signed-in user and show no check of who is calling: those that write and take an id, and those that read personal data (auth.users, phone numbers). Baseline 2026-11-12 after TD19 round 3 (20261112122021): 0 writers; 2 readers, both deliberate yes/no answers (the sign-up phone check, is_active_collector). Only counts are published; never raise a baseline without the CTO.",
+  "_uncheckedFunctions_comment": "Database functions that run with their owner's rights, can be run by any signed-in user and show no check of who is calling: those that write and take an id, and those that read personal data (auth.users, phone numbers). Baseline 2026-11-12 after TD19 round 3 (20261112122021): 0 writers; 2 readers, both deliberate yes/no answers (the sign-up phone check, is_active_collector). Deleters (2026-11-14, TD75): any such function that deletes rows, with or without arguments; 0 since 20261114093918 closed cleanup_expired_digital_bins(). Only counts are published; never raise a baseline without the CTO.",
   "uncheckedFunctions": {
     "maxWriters": 0,
-    "maxPersonalReads": 2
+    "maxPersonalReads": 2,
+    "maxDeleters": 0
   },
   "_personalExposure_comment": "Tables without row-level security, materialized views and views that run as their owner, readable by signed-out callers, that hold personal columns (email, phone, names, MoMo numbers, addresses). 0 since 2026-11-12 (20261112124531 closed user_stats_aggregated). Count only; never raise without the CTO.",
   "personalExposure": {

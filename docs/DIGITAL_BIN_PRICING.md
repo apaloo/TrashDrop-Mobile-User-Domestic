@@ -76,6 +76,14 @@ Cancelling a promotional bin gives the promotion back. A bin counts as
 cancelled when its status is cancelled, or it is inactive and not completed
 (the app's Cancel button). Reactivating it takes the promotion again.
 
+The database keeps a bin's two cancellation columns in step on every write,
+from any app (`td_sync_bin_cancellation`, approved by the owner 2026-11-14,
+TD74, migration `20261114110821`): a cancelled status makes the bin inactive;
+making a bin inactive before collection starts (pending, accepted, en route,
+arrived) makes its status cancelled, so collectors stop being offered it; an
+admin reopening a cancelled bin makes it active again. A bin being collected
+or done keeps its status. The refund above is unchanged.
+
 ### Protection
 - Customers can only **read** their own `promotional_usage` row.
 - The customer who booked a bin can't change its fee, size, bags, urgency,
@@ -91,7 +99,7 @@ cancelled when its status is cancelled, or it is inactive and not completed
 
 | Part | Repository | File / object |
 |---|---|---|
-| Price, promotion count, protection, refund | household app | `trashdrop/supabase/migrations/20261024000000_server_side_bin_pricing.sql`, `20261024010000_revoke_promotional_usage_truncate.sql`, `20261024020000_refund_promotion_on_app_cancel.sql` |
+| Price, promotion count, protection, refund | household app | `trashdrop/supabase/migrations/20261024000000_server_side_bin_pricing.sql`, `20261024010000_revoke_promotional_usage_truncate.sql`, `20261024020000_refund_promotion_on_app_cancel.sql`, `20261114110821_td74_keep_bin_cancellation_in_step.sql` |
 | Undo | household app | `trashdrop/supabase/diagnostics/server_side_bin_pricing_rollback.sql` |
 | Health check (read-only) | household app | `trashdrop/supabase/diagnostics/digital_bin_pricing_check.sql` |
 | Price shown before booking | household app | `trashdrop/src/services/digitalBinService.js`, `trashdrop/src/components/digitalBin/ReviewStep.js`, `trashdrop/src/utils/costCalculator.js`, `trashdrop/src/services/gpsPricingService.js` |

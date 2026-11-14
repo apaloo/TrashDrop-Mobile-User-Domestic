@@ -2,7 +2,7 @@
 -- Generated from production by engineering/automation/schema-snapshot.mjs.
 -- Do not edit: change the database with a migration (ADR-001), then refresh.
 
--- cleanup_expired_digital_bins(): execute: authenticated, service_role
+-- cleanup_expired_digital_bins(): execute: service_role
 CREATE OR REPLACE FUNCTION public.cleanup_expired_digital_bins()
  RETURNS integer
  LANGUAGE plpgsql

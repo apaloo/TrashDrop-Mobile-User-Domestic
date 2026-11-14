@@ -42,6 +42,13 @@ WITH checks(check_name, ok, detail) AS (
                          ORDER BY b.created_at DESC LIMIT 1) x,
                    LATERAL public.td_price_digital_bin(NULL, ST_Y(x.coordinates::geometry), ST_X(x.coordinates::geometry), 240, 2, false, false) p), false),
          'fee = zone price × 2 + GHS 1, payout = fee − 1 (fails if that zone has no 240 L price)'
+  UNION ALL
+  SELECT 'cancellation kept in step (TD74)',
+         EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.digital_bins'::regclass AND tgname = 'aa_td_sync_bin_cancellation' AND tgenabled <> 'D')
+         AND NOT EXISTS (SELECT 1 FROM public.digital_bins
+                         WHERE (lower(status) IN ('cancelled', 'canceled') AND is_active)
+                            OR (NOT is_active AND lower(coalesce(status, 'pending')) IN ('pending', 'available', 'accepted', 'en_route', 'arrived'))),
+         'no bin is cancelled in one column but not the other, and the rule that keeps them in step is on'
 )
 SELECT CASE WHEN ok THEN 'ok' ELSE 'FAIL' END AS result, check_name, detail FROM checks;
 
