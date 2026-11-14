@@ -12,6 +12,12 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+      # Security fixes (when "Dependabot security updates" is on in Settings):
+      # one pull request per app with every fix in it, like the weekly updates.
+      # Each one runs the full CI and is merged only when it passes.
+      security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]
     ignore:
       # Major upgrades change APIs and need planned work (a tech-debt item and
       # its own PR), so Dependabot proposes only minor and patch updates.
