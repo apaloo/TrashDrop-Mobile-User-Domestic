@@ -128,6 +128,57 @@ jobs:
       run: npm run build
     
 
+  # The built app in a real browser (Chromium, phone screen) against a fake
+  # Supabase (trashdrop/e2e/fakeSupabase.mjs): sign-in, the dashboard, and
+  # what a signed-out visitor is shown. Unit tests check parts; these check
+  # that the parts work together once built. Placeholder Supabase settings:
+  # nothing reaches a real project. The report is kept for 14 days.
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: trashdrop
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        cache: 'npm'
+        cache-dependency-path: trashdrop/package-lock.json
+
+    - name: Install dependencies
+      env:
+        CYPRESS_INSTALL_BINARY: 0
+      run: npm ci
+
+    - name: Install Chromium
+      run: npx playwright install --with-deps chromium
+
+    - name: Build with placeholder Supabase settings
+      env:
+        REACT_APP_SUPABASE_URL: https://ci-placeholder.supabase.co
+        REACT_APP_SUPABASE_ANON_KEY: sb_publishable_ci_placeholder
+        CI: false
+      run: npm run build
+
+    - name: Browser tests
+      env:
+        CI: true
+      run: npm run test:browser
+
+    - name: Keep the report
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: browser-test-report
+        path: |
+          trashdrop/playwright-report
+          trashdrop/test-results
+        retention-days: 14
+
   # No deploy jobs here: Netlify builds and publishes the site itself from
   # every push to main (production) and every pull request (preview), within
   # about a minute and without waiting for this workflow. CI is a gate only

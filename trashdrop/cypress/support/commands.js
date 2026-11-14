@@ -1,3 +1,6 @@
+// Test sign-in comes from Cypress.env (TEST_EMAIL, TEST_PASSWORD; e.g. cypress.env.json,
+// not committed). The account these files used to name was blocked on
+// 2026-11-14: its password had been committed here.
 // ***********************************************
 // This file can be used to add custom commands to Cypress
 // ***********************************************
@@ -5,8 +8,8 @@
 // Login command using special test credentials
 Cypress.Commands.add('login', () => {
   cy.visit('/login');
-  cy.get('#email').type('prince02@mailinator.com');
-  cy.get('#password').type('sChool@123');
+  cy.get('#email').type(Cypress.env('TEST_EMAIL'));
+  cy.get('#password').type(Cypress.env('TEST_PASSWORD'));
   cy.get('button[type="submit"]').click();
   // Wait for successful login
   cy.url().should('not.include', '/login');

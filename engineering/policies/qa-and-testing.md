@@ -12,7 +12,8 @@
 | Guard tests for protected rules | CI | Never skipped: household pricing (`digitalBinService.promotion.test.js`, `pricing-promo.js`), carter payouts (`promotionalPayout.test.js`), admin fee checks (`pickupRequestUtils.test.js`) |
 | Edge Function handler tests | CI (admin) | Changes to those functions |
 | Manual regression on staging | QA, using the [release checklist](../templates/release-checklist.md) | Critical-workflow changes |
-| End-to-end (Cypress/Playwright) | To be added in Phase 3 | The four critical workflows, once staging exists |
+| Browser tests (Playwright, household) | CI job *browser-tests* on every pull request (since 2026-11-14): the built app in Chromium on a phone screen, against a fake Supabase (`trashdrop/e2e/fakeSupabase.mjs`), so no real project or account is touched | Changes to sign-in, routing and the screens they cover; a new critical screen gets one. Run locally with `npm run build` (placeholder settings) then `npm run test:browser` |
+| End-to-end against staging | To be added in Phase 3 | The four critical workflows, once staging exists |
 
 ## Rules
 

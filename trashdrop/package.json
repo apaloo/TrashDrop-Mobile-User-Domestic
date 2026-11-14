@@ -51,6 +51,7 @@
     "build:clean": "vite build",
     "test": "jest --watch",
     "test:e2e": "cypress run",
+    "test:browser": "playwright test",
     "cypress:open": "cypress open",
     "dev:noop": "node -e \"setInterval(()=>{}, 1<<30)\"",
     "whatsapp:upload-flow": "node scripts/upload-whatsapp-flow.js",
@@ -78,6 +79,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.6.2",
     "babel-jest": "^27.5.1",
