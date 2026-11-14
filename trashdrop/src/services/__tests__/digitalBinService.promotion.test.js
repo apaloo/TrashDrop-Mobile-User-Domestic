@@ -1,4 +1,4 @@
-import { prepareDigitalBinData } from '../digitalBinService.js';
+import { prepareDigitalBinData, transformBin } from '../digitalBinService.js';
 
 // The promotional path never reaches GPS pricing; the standard path does
 jest.mock('../gpsPricingService.js', () => ({ __esModule: true, default: {} }));
@@ -32,5 +32,20 @@ describe('digital bin promotional price', () => {
   it('prices a booking without a promotional fee normally', async () => {
     const d = await prepareDigitalBinData(booking({ promotional_client_fee: null }));
     expect(d).toMatchObject({ fee: '81.00', is_promotional: false });
+  });
+});
+
+// TD74 (approved 2026-11-14): the database keeps status and is_active in step
+// (td_sync_bin_cancellation), so a cancelled bin always arrives with both set.
+// The list must show it as cancelled, and a bin still on offer as active.
+describe('a bin as the database stores it after a cancel', () => {
+  it('a cancelled bin is listed as cancelled', () => {
+    expect(transformBin({ id: 'b', status: 'cancelled', is_active: false }).status).toBe('cancelled');
+  });
+  it('a pending bin still on offer is listed as active', () => {
+    expect(transformBin({ id: 'b', status: 'pending', is_active: true }).status).toBe('active');
+  });
+  it('a disposed bin is listed as completed whatever is_active says', () => {
+    expect(transformBin({ id: 'b', status: 'disposed', is_active: false }).status).toBe('completed');
   });
 });

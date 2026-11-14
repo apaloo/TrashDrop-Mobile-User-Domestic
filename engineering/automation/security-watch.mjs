@@ -131,17 +131,22 @@ const CALLER_CHECKS = String.raw`auth\.uid\(\)|auth\.role\(\)|td_assert_self_or_
 export const UNCHECKED_FUNCTIONS_SQL = `select
   count(*) filter (where pg_get_function_identity_arguments(p.oid) ~* 'uuid|_id'
                      and p.prosrc ~* '\\m(insert\\s+into|update\\s+\\w|delete\\s+from)')::int as writers,
-  count(*) filter (where p.prosrc ~* 'auth\\.users|\\mphone\\M')::int as personal_reads
+  count(*) filter (where p.prosrc ~* 'auth\\.users|\\mphone\\M')::int as personal_reads,
+  count(*) filter (where p.prosrc ~* '\\mdelete\\s+from')::int as deleters
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public'
 where p.prosecdef and p.prorettype <> 'trigger'::regtype
   and has_function_privilege('authenticated', p.oid, 'execute')
   and not (p.prosrc ~* '${CALLER_CHECKS}')`;
 
+// Deleters count any unchecked function that deletes rows, with or without
+// arguments: cleanup_expired_digital_bins() took none, so the writer count
+// missed it, and any signed-in user could have deleted every expired or
+// inactive bin and its payments (TD75, closed 20261114093918).
 export function judgeUnchecked(row, cfg) {
-  const w = Number(row?.writers); const r = Number(row?.personal_reads);
-  if (!Number.isFinite(w) || !Number.isFinite(r)) return { ok: false, line: 'could not be counted' };
-  const ok = w <= cfg.maxWriters && r <= cfg.maxPersonalReads;
-  return { ok, line: `${ok ? '✅' : '❌'} ${w} that write (baseline ${cfg.maxWriters}), ${r} that read personal data (baseline ${cfg.maxPersonalReads})` };
+  const w = Number(row?.writers); const r = Number(row?.personal_reads); const d = Number(row?.deleters);
+  if (!Number.isFinite(w) || !Number.isFinite(r) || !Number.isFinite(d)) return { ok: false, line: 'could not be counted' };
+  const ok = w <= cfg.maxWriters && r <= cfg.maxPersonalReads && d <= cfg.maxDeleters;
+  return { ok, line: `${ok ? '✅' : '❌'} ${w} that write (baseline ${cfg.maxWriters}), ${r} that read personal data (baseline ${cfg.maxPersonalReads}), ${d} that delete rows (baseline ${cfg.maxDeleters})` };
 }
 
 // Tables, views and materialized views a signed-out caller can read past
@@ -169,7 +174,7 @@ export function judgePersonalExposure(count, cfg) {
 // compared with the fingerprints recorded when the owner approved it.
 const PROTECTED_FUNCTIONS = [
   ['pricing', 'td_price_digital_bin'], ['pricing', 'td_set_digital_bin_price'], ['pricing', 'td_protect_digital_bin_price'],
-  ['pricing', 'td_refund_promotion_on_cancel'], ['pricing', 'increment_promotional_usage'],
+  ['pricing', 'td_refund_promotion_on_cancel'], ['pricing', 'increment_promotional_usage'], ['pricing', 'td_sync_bin_cancellation'],
   ['points', 'td_redeem_reward'], ['points', 'td_guard_request_write'], ['points', 'td_guard_profile_columns'], ['points', 'get_dashboard_data_optimized'],
   ['points', 'td_guard_dumping_insert'],
   ['payouts', 'td_guard_bin_payment'], ['payouts', 'td_withdrawable_items'], ['payouts', 'td_keep_booked_payout'],
@@ -177,7 +182,7 @@ const PROTECTED_FUNCTIONS = [
 ];
 const PROTECTED_TRIGGERS = [
   ['pricing', 'digital_bins', 'digital_bins_set_price'], ['pricing', 'digital_bins', 'digital_bins_protect_price'],
-  ['pricing', 'digital_bins', 'digital_bins_refund_promotion'],
+  ['pricing', 'digital_bins', 'digital_bins_refund_promotion'], ['pricing', 'digital_bins', 'aa_td_sync_bin_cancellation'],
   ['points', 'pickup_requests', 'aa_td_guard_write'], ['points', 'profiles', 'td_guard_profile_columns'],
   ['points', 'illegal_dumping_mobile', 'aa_td_guard_insert'],
   ['payouts', 'bin_payments', 'aa_td_guard_bin_payment'], ['payouts', 'digital_bins', 'ab_td_keep_booked_payout'],
@@ -640,11 +645,12 @@ function selfTest() {
   assert(judgePersonalExposure(0, { maxExposed: 0 }).ok && !judgePersonalExposure(1, { maxExposed: 0 }).ok && !judgePersonalExposure(undefined, { maxExposed: 0 }).ok, 'judgePersonalExposure');
   assert(/^select count\(\*\)::int as exposed\s*$/.test(PERSONAL_EXPOSURE_SQL.split('from')[0]), 'personal exposure check selects a count, not names');
   assert(Number.isInteger(config.personalExposure?.maxExposed), 'personalExposure config');
-  const ucfg = { maxWriters: 0, maxPersonalReads: 2 };
-  assert(judgeUnchecked({ writers: 0, personal_reads: 2 }, ucfg).ok && !judgeUnchecked({ writers: 1, personal_reads: 0 }, ucfg).ok
-    && !judgeUnchecked({ writers: 0, personal_reads: 3 }, ucfg).ok && !judgeUnchecked(undefined, ucfg).ok, 'judgeUnchecked');
+  const ucfg = { maxWriters: 0, maxPersonalReads: 2, maxDeleters: 0 };
+  assert(judgeUnchecked({ writers: 0, personal_reads: 2, deleters: 0 }, ucfg).ok && !judgeUnchecked({ writers: 1, personal_reads: 0, deleters: 0 }, ucfg).ok
+    && !judgeUnchecked({ writers: 0, personal_reads: 3, deleters: 0 }, ucfg).ok && !judgeUnchecked({ writers: 0, personal_reads: 0, deleters: 1 }, ucfg).ok
+    && !judgeUnchecked({ writers: 0, personal_reads: 0 }, ucfg).ok && !judgeUnchecked(undefined, ucfg).ok, 'judgeUnchecked');
   assert(/^select\s+count\(\*\)/.test(UNCHECKED_FUNCTIONS_SQL) && !/proname\s*(,|as)/.test(UNCHECKED_FUNCTIONS_SQL.split('from pg_proc')[0]), 'unchecked-function check selects counts, not names');
-  assert(Number.isInteger(config.uncheckedFunctions?.maxWriters) && Number.isInteger(config.uncheckedFunctions?.maxPersonalReads), 'uncheckedFunctions config');
+  assert(Number.isInteger(config.uncheckedFunctions?.maxWriters) && Number.isInteger(config.uncheckedFunctions?.maxPersonalReads) && Number.isInteger(config.uncheckedFunctions?.maxDeleters), 'uncheckedFunctions config');
   const exp = { 'function a': 'h1', 'view b': 'h2' };
   assert(judgeProtected([{ rule: 'x', object: 'function a', hash: 'h1' }, { rule: 'x', object: 'view b', hash: 'h2' }], exp).length === 0, 'judgeProtected: unchanged');
   const pr = judgeProtected([{ rule: 'x', object: 'function a', hash: 'zz' }, { rule: 'x', object: 'view b', hash: null }, { rule: 'x', object: 'trigger c', hash: 'h3' }], exp);
