@@ -15,14 +15,14 @@ describe('Digital Bin Flow', () => {
     // Pre-seed auth/session before the app loads to avoid redirects to /login
     const mockUser = {
       id: '123e4567-e89b-12d3-a456-426614174000',
-      email: 'prince02@mailinator.com',
+      email: Cypress.env('TEST_EMAIL'),
       user_metadata: { name: 'Test User' },
       last_authenticated: new Date().toISOString()
     };
     // A fake, unsigned token (only its expiry is read): built here so the source
     // holds no JWT-shaped string for the secret scan to flag.
     const b64url = (o) => btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-    const mockJwt = [b64url({ alg: 'HS256', typ: 'JWT' }), b64url({ sub: '123e4567-e89b-12d3-a456-426614174000', email: 'prince02@mailinator.com', exp: 9999999999 }), 'mockSignature'].join('.');
+    const mockJwt = [b64url({ alg: 'HS256', typ: 'JWT' }), b64url({ sub: '123e4567-e89b-12d3-a456-426614174000', email: Cypress.env('TEST_EMAIL'), exp: 9999999999 }), 'mockSignature'].join('.');
 
     // Load root and seed auth before app boots
     cy.visit('/', {
@@ -46,8 +46,8 @@ describe('Digital Bin Flow', () => {
     // If on login, perform login via UI to stabilize auth context, then navigate
     cy.location('pathname', { timeout: 30000 }).then((pathname) => {
       if (pathname.includes('/login')) {
-        return cy.get('#email', { timeout: 20000 }).should('be.visible').clear().type('prince02@mailinator.com')
-          .get('#password', { timeout: 20000 }).should('be.visible').clear().type('sChool@123')
+        return cy.get('#email', { timeout: 20000 }).should('be.visible').clear().type(Cypress.env('TEST_EMAIL'))
+          .get('#password', { timeout: 20000 }).should('be.visible').clear().type(Cypress.env('TEST_PASSWORD'))
           .get('button[type="submit"]').click()
           .location('pathname', { timeout: 30000 }).should('not.include', '/login');
       }
@@ -67,8 +67,8 @@ describe('Digital Bin Flow', () => {
     // If app still redirected to /login due to early auth check, perform login and try again
     cy.location('pathname', { timeout: 30000 }).then((pathname) => {
       if (pathname.includes('/login')) {
-        return cy.get('#email', { timeout: 20000 }).should('be.visible').clear().type('prince02@mailinator.com')
-          .get('#password', { timeout: 20000 }).should('be.visible').clear().type('sChool@123')
+        return cy.get('#email', { timeout: 20000 }).should('be.visible').clear().type(Cypress.env('TEST_EMAIL'))
+          .get('#password', { timeout: 20000 }).should('be.visible').clear().type(Cypress.env('TEST_PASSWORD'))
           .get('button[type="submit"]').click()
           .location('pathname', { timeout: 30000 }).should('not.include', '/login')
           .visit('/digital-bin')
@@ -80,8 +80,8 @@ describe('Digital Bin Flow', () => {
     cy.get('body', { timeout: 30000 }).then(($body) => {
       const onLogin = $body.find('#email').length && $body.find('button:contains("Sign in")').length;
       if (onLogin) {
-        cy.get('#email').clear().type('prince02@mailinator.com');
-        cy.get('#password').clear().type('sChool@123');
+        cy.get('#email').clear().type(Cypress.env('TEST_EMAIL'));
+        cy.get('#password').clear().type(Cypress.env('TEST_PASSWORD'));
         cy.get('button[type="submit"]').click();
         cy.location('pathname', { timeout: 30000 }).should('not.include', '/login');
         cy.visit('/digital-bin');

@@ -29,3 +29,10 @@ yarn-error.log*
 # Local Netlify folder
 .netlify
 .known-failing-results.json
+
+# Browser tests (Playwright)
+/test-results
+/playwright-report
+
+# Cypress test sign-in (never committed)
+cypress.env.json
