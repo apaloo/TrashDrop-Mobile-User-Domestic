@@ -195,28 +195,8 @@ export const invalidateQRCode = async (qrCodeId) => {
   }
 };
 
-/**
- * Cleans up expired QR codes
- * @returns {Promise<number>} Number of QR codes cleaned up
- */
-export const cleanupExpiredQRCodes = async () => {
-  try {
-    const { data, error } = await supabase.rpc('cleanup_expired_digital_bins');
-    
-    if (error) throw error;
-    return data || 0;
-  } catch (error) {
-    console.error('Error cleaning up expired QR codes:', error);
-    return 0;
-  }
-};
-
-// Run cleanup on import (optional, could be run on app start)
-// cleanupExpiredQRCodes().catch(console.error);
-
 export default {
   storeQRCode,
   getQRCode,
-  invalidateQRCode,
-  cleanupExpiredQRCodes
+  invalidateQRCode
 };

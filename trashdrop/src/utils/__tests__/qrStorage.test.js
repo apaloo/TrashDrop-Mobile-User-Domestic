@@ -131,20 +131,4 @@ describe('QR Code Storage Tests', () => {
       expect(eqMock).toHaveBeenCalledWith('id', '1');
     });
   });
-
-  describe('cleanupExpiredQRCodes', () => {
-    it('should clean up expired QR codes', async () => {
-      const mockResponse = {
-        data: 5,
-        error: null
-      };
-
-      supabase.rpc.mockResolvedValue(mockResponse);
-
-      const result = await qrStorage.cleanupExpiredQRCodes();
-
-      expect(result).toBe(5);
-      expect(supabase.rpc).toHaveBeenCalledWith('cleanup_expired_digital_bins');
-    });
-  });
 });
