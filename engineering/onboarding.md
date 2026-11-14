@@ -27,7 +27,7 @@ You need Node 22 (`nvm install`, which reads `.nvmrc`) and Git.
 
 ```bash
 cd trashdrop
-CYPRESS_INSTALL_BINARY=0 npm ci
+npm ci
 ```
 
 Create `trashdrop/.env.development.local` (git-ignored) with the values from
@@ -45,11 +45,12 @@ REACT_APP_SUPABASE_ANON_KEY=sb_publishable_...
 | Unit tests, as CI runs them | `npm run test:ci` |
 | Lint | `npm run lint` |
 | Pricing guard tests | `npx jest --ci src/services/__tests__/digitalBinService.promotion.test.js` |
+| Browser tests, as CI runs them | `REACT_APP_SUPABASE_URL=https://ci-placeholder.supabase.co REACT_APP_SUPABASE_ANON_KEY=sb_publishable_ci_placeholder npm run build`, then `npx playwright install chromium` (once) and `npm run test:browser`. They use a fake Supabase, never the real one |
 
 ### Carter app: `TrashDrop-Mobile-Collector-Driver`
 
 ```bash
-CYPRESS_INSTALL_BINARY=0 npm ci
+npm ci
 cp .env.example .env    # then fill VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY only
 ```
 
@@ -62,16 +63,18 @@ live only in the Edge Functions' secrets.
 | Run | `npm run dev` |
 | Unit tests, as CI runs them | `node scripts/ci/run-tests.mjs` |
 | Lint the files you changed | `scripts/ci/lint-changed.sh origin/main` |
+| Browser tests | `VITE_SUPABASE_URL=https://ci-placeholder.supabase.co VITE_SUPABASE_ANON_KEY=sb_publishable_ci_placeholder npm run build`, then `npm run test:browser` |
 
 ### Admin portal: `TrashDrop_Management_webApp_admins`
 
 ```bash
-CYPRESS_INSTALL_BINARY=0 PUPPETEER_SKIP_DOWNLOAD=1 npm ci --legacy-peer-deps
+PUPPETEER_SKIP_DOWNLOAD=1 npm ci --legacy-peer-deps
 npm start
 ```
 
 `.env.development` is committed and holds only public values. Tests: `npm run
-test:ci`. Edge Function tests: `node --experimental-strip-types --test
+test:ci`. Browser tests: `npx vite build` with the placeholder `REACT_APP_SUPABASE_*`
+settings, then `npm run test:browser`. Edge Function tests: `node --experimental-strip-types --test
 supabase/functions/*/*.test.mjs` (Node 22).
 
 ## Day 3: first change

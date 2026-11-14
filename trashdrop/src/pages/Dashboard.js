@@ -15,7 +15,7 @@ import { useReloadWhenBack } from '../hooks/useReloadWhenBack.js';
 import { statusService } from '../services/statusService.js';
 import smartNotificationService from '../services/smartNotificationService.js';
 import { isOnline, getCachedUserStats, cacheUserStats, cacheUserActivity, getCachedUserActivity } from '../utils/offlineStorage';
-import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate, handleStatsUpdate } from '../utils/realtime';
+import { subscribeToStatsUpdates, subscribeToDumpingReports, handleDumpingReportUpdate } from '../utils/realtime';
 import realtimeManager from '../utils/realtimeOptimized.js';
 import seamlessDashboardService from '../services/seamlessDashboardService.js';
 import { ActivityItemSkeleton } from '../components/SkeletonLoader.js';
@@ -1092,28 +1092,6 @@ const Dashboard = () => {
       window.removeEventListener('trashdrop:activity-updated', handleActivityUpdate);
     };
   }, [user?.id]);
-
-  // Cypress test hook to simulate realtime stats updates (test-only)
-  useEffect(() => {
-    // Only attach in test environment
-    if (typeof window === 'undefined') return;
-    if (!window.Cypress) return;
-
-    // Expose a helper to emit a stats update payload
-    const emitFn = (tableType, payload) => {
-      setStats(prev => handleStatsUpdate(tableType || 'user_stats', payload, prev));
-    };
-
-    // Namespace under Cypress to avoid globals
-    window.Cypress.emitStatsUpdate = emitFn;
-
-    return () => {
-      // Cleanup on unmount
-      if (window.Cypress && window.Cypress.emitStatsUpdate === emitFn) {
-        try { delete window.Cypress.emitStatsUpdate; } catch (_) {}
-      }
-    };
-  }, []);
 
   // Listen to storage changes from other tabs/windows and refresh
   useEffect(() => {
