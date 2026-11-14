@@ -77,11 +77,20 @@ jobs:
       # engineering/policies/vulnerability-management.md.
       - name: npm audit
         run: |
-          npm audit --omit=dev --audit-level=high > audit.txt 2>&1; status=$?
+          runtime=0; npm audit --omit=dev --audit-level=high > audit.txt 2>&1 || runtime=$?
+          # Development tools too (tests, build, pre-render) since 2026-11-14, when
+          # all three apps reached 0 high and critical in every dependency (TD72):
+          # they run in CI and on the build servers, so a hijacked one is a supply
+          # chain risk even though it never reaches a phone.
+          all=0; npm audit --audit-level=high > audit-all.txt 2>&1 || all=$?
           {
             echo '### npm audit (runtime dependencies)'
             echo '```'
             tail -n 25 audit.txt
             echo '```'
+            echo '### npm audit (all dependencies, development tools included)'
+            echo '```'
+            tail -n 25 audit-all.txt
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          exit $status
+          [ $runtime -eq 0 ] && [ $all -eq 0 ]
