@@ -18,7 +18,7 @@ alter table public.team_invites add constraint team_invites_group_id_fkey FOREIG
 alter table public.team_invites add constraint team_invites_pkey PRIMARY KEY (id);
 alter table public.team_invites add constraint team_invites_role_chk CHECK ((team_role = ANY (ARRAY['member'::text, 'admin'::text])));
 alter table public.team_invites add constraint team_invites_token_key UNIQUE (token);
-alter table public.team_invites add constraint team_invites_uses_chk CHECK ((((max_uses >= 1) AND (max_uses <= 200)) AND ((uses >= 0) AND (uses <= max_uses))));
+alter table public.team_invites add constraint team_invites_uses_chk CHECK (((max_uses >= 1) AND (max_uses <= 200) AND ((uses >= 0) AND (uses <= max_uses))));
 CREATE INDEX team_invites_group_idx ON public.team_invites USING btree (group_id, created_at DESC);
 
 -- Row level security: on

@@ -5,13 +5,13 @@
 -- options: security_barrier=true
 
 create view public.user_recent_activity with (security_barrier=true) as
-SELECT a.user_id,
-    a.activity_type,
-    a.description,
-    a.points_earned,
-    a.created_at,
-    a.source_type,
-    a.activity_id,
-    a.sort_timestamp
+SELECT user_id,
+    activity_type,
+    description,
+    points_earned,
+    created_at,
+    source_type,
+    activity_id,
+    sort_timestamp
    FROM user_recent_activity_all a
-  WHERE (((a.user_id)::text = (auth.uid())::text) OR (CURRENT_USER <> ALL (ARRAY['anon'::name, 'authenticated'::name])));
+  WHERE (((user_id)::text = (auth.uid())::text) OR (CURRENT_USER <> ALL (ARRAY['anon'::name, 'authenticated'::name])));

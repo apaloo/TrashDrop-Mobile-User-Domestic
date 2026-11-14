@@ -267,13 +267,13 @@
       "anon_security_definer_function_executable": 17,
       "authenticated_security_definer_function_executable": 141,
       "extension_in_public": 2,
-      "vulnerable_postgres_version": 1
+      "vulnerable_postgres_version": 0
     },
     "_ceilingReasons": {
       "anon_security_definer_function_executable": "TD19: 34 -> 17 on 2026-11-13 (20261113222708: signed-out callers lost EXECUTE on 17 trigger functions, which PostgreSQL does not check when a trigger fires). Left: deliberate public lookups (sign-up phone check, invite links, pricing), helpers that check their caller, and three trigger functions under protected or fingerprinted rules",
       "authenticated_security_definer_function_executable": "TD19: signed-in functions; each checks its caller (td_assert_self_or_staff and the access fingerprints below). 142 -> 141 on 2026-11-13 (get_critical_stats removed, TD51)",
       "extension_in_public": "postgis and pg_net, installed there before 2026; moving postgis would touch the tables whose columns use its types, and pg_net must be dropped and recreated. Accepted, 2026-11-13",
-      "vulnerable_postgres_version": "TD62: Postgres 15.8 has security patches waiting; the owner runs the upgrade from the Supabase dashboard"
+      "vulnerable_postgres_version": "TD62: 1 -> 0 on 2026-11-14, when the owner upgraded production from Postgres 15.8.1.105 to 17.11.0.019 (Project Settings -> General -> Service versions). A new finding fails the watch"
     }
   },
   "performance": {

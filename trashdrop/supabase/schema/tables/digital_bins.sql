@@ -44,8 +44,8 @@ create table public.digital_bins (
 );
 alter table public.digital_bins add constraint check_bag_count CHECK (((bag_count >= 1) AND (bag_count <= 10)));
 alter table public.digital_bins add constraint check_bin_size CHECK ((bin_size_liters = ANY (ARRAY[60, 80, 90, 100, 120, 240, 340, 360, 660, 1100])));
-alter table public.digital_bins add constraint check_frequency CHECK (((frequency)::text = ANY ((ARRAY['one-time'::character varying, 'weekly'::character varying, 'biweekly'::character varying, 'monthly'::character varying])::text[])));
-alter table public.digital_bins add constraint check_waste_type CHECK (((waste_type)::text = ANY ((ARRAY['general'::character varying, 'recycling'::character varying, 'organic'::character varying])::text[])));
+alter table public.digital_bins add constraint check_frequency CHECK (((frequency)::text = ANY (ARRAY[('one-time'::character varying)::text, ('weekly'::character varying)::text, ('biweekly'::character varying)::text, ('monthly'::character varying)::text])));
+alter table public.digital_bins add constraint check_waste_type CHECK (((waste_type)::text = ANY (ARRAY[('general'::character varying)::text, ('recycling'::character varying)::text, ('organic'::character varying)::text])));
 alter table public.digital_bins add constraint digital_bins_collector_id_fkey FOREIGN KEY (collector_id) REFERENCES auth.users(id);
 alter table public.digital_bins add constraint digital_bins_disposal_site_id_fkey FOREIGN KEY (disposal_site_id) REFERENCES disposal_centers(id);
 alter table public.digital_bins add constraint digital_bins_location_id_fkey FOREIGN KEY (location_id) REFERENCES bin_locations(id) ON DELETE CASCADE;
