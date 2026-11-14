@@ -1,3 +1,5 @@
+// The same file in all three repositories (household trashdrop/e2e/, collector and
+// admin browser-tests/); change it in all three.
 // A stand-in for Supabase in the browser tests: the built app talks to
 // https://ci-placeholder.supabase.co (the placeholder CI builds with), and
 // every request to it is answered here, so the tests never reach a real
@@ -15,10 +17,10 @@ export const SUPABASE = 'https://ci-placeholder.supabase.co';
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 
 /** A signed-in household account: user, and a session for it */
-export function household({ id = '11111111-2222-4333-8444-555555555555', email = 'household@example.test', firstName = 'Ama' } = {}) {
+export function household({ id = '11111111-2222-4333-8444-555555555555', email = 'household@example.test', phone = '', firstName = 'Ama' } = {}) {
   const now = Math.floor(Date.now() / 1000);
   const user = {
-    id, aud: 'authenticated', role: 'authenticated', email,
+    id, aud: 'authenticated', role: 'authenticated', email, phone,
     email_confirmed_at: new Date().toISOString(), created_at: new Date().toISOString(),
     user_metadata: { first_name: firstName }, app_metadata: { provider: 'email' },
   };
@@ -30,6 +32,10 @@ export function household({ id = '11111111-2222-4333-8444-555555555555', email =
     session: { access_token: accessToken, token_type: 'bearer', expires_in: 3600, expires_at: now + 3600, refresh_token: 'test-refresh', user },
   };
 }
+
+/** A signed-in collector account (phone sign-in), same shape as household() */
+export const collector = ({ id = '22222222-3333-4444-8555-666666666666', phone = '233501234567', firstName = 'Kofi' } = {}) =>
+  household({ id, email: '', phone, firstName });
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -67,6 +73,12 @@ export async function fakeSupabase(page, { account = null, tables = {}, rpc = {}
       if (account && body?.password === 'correct-horse') return json(200, account.session);
       return json(400, { error: 'invalid_grant', error_description: 'Invalid login credentials', code: 'invalid_credentials', msg: 'Invalid login credentials' });
     }
+    // Phone sign-in: a code is "sent", and 123456 is the only code that works
+    if (url.pathname === '/auth/v1/otp') return json(200, {});
+    if (url.pathname === '/auth/v1/verify') {
+      if (account && body?.token === '123456') return json(200, account.session);
+      return json(403, { code: 'otp_expired', error_code: 'otp_expired', msg: 'Token has expired or is invalid' });
+    }
     if (url.pathname === '/auth/v1/user') return account ? json(200, account.user) : json(401, { msg: 'not signed in' });
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
     if (url.pathname.startsWith('/auth/v1/')) return json(200, {});
@@ -83,10 +95,15 @@ export async function fakeSupabase(page, { account = null, tables = {}, rpc = {}
     const table = url.pathname.match(/^\/rest\/v1\/([^/]+)$/)?.[1];
     if (table) {
       db[table] = db[table] || [];
-      // "column=eq.value" filters, as the app's .eq() sends them; others are ignored
+      // "column=eq.value" and "column=in.(a,b)" filters, as the app's .eq() and
+      // .in() send them; others are ignored
       const matches = (row) => [...url.searchParams].every(([col, cond]) => {
+        if (!(col in row)) return true;
         const eq = cond.match(/^eq\.(.*)$/);
-        return !eq || !(col in row) || String(row[col]) === eq[1];
+        if (eq) return String(row[col]) === eq[1];
+        const inList = cond.match(/^in\.\((.*)\)$/);
+        if (inList) return inList[1].split(',').map((v) => v.replace(/^"|"$/g, '')).includes(String(row[col]));
+        return true;
       });
       const rows = db[table].filter(matches);
       const wantsOne = (req.headers().accept || '').includes('application/vnd.pgrst.object');

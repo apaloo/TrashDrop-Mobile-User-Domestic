@@ -1,5 +1,5 @@
 {
-  "_comment": "CI scripts that are one script in three repositories (engineering/automation/shared-scripts.mjs). The household copy is the source: change it here first, then copy it to the other two in the same day. Add a script here when it starts being shared. rpc-signatures.json is data, not a script: production's functions, tables and columns, the same for all three (refreshed weekly by the Schema snapshot workflow here; copy it to the others when it changes).",
+  "_comment": "CI scripts that are one script in three repositories (engineering/automation/shared-scripts.mjs). The household copy is the source: change it here first, then copy it to the other two in the same day. Add a script here when it starts being shared. rpc-signatures.json is data, not a script: production's functions, tables and columns, the same for all three (refreshed weekly by the Schema snapshot workflow here; copy it to the others when it changes). \"files\" are shared files outside scripts/ci/, each with its path here (source) and in the other two (copy).",
   "sourceDir": "trashdrop/scripts/ci",
   "scripts": [
     "check-runtime-deps.cjs",
@@ -20,6 +20,13 @@
       "name": "admin",
       "slug": "apaloo/TrashDrop_Management_webApp_admins",
       "dir": "scripts/ci"
+    }
+  ],
+  "files": [
+    {
+      "name": "fakeSupabase.mjs (browser tests)",
+      "source": "trashdrop/e2e/fakeSupabase.mjs",
+      "copy": "browser-tests/fakeSupabase.mjs"
     }
   ]
 }
