@@ -346,9 +346,6 @@ const Rewards = () => {
     setErrorMessage('');
     
     try {
-      // A reference shown to the household after a redemption without delivery details
-      const redemptionCode = `REWARD-${reward.id}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      
       // The server checks the reward's cost and the balance, then records the
       // request (td_redeem_reward); the points spent are the database's, not ours
       const { data: redemptionData, error: redemptionError } = await supabase.rpc('td_redeem_reward', {
@@ -381,8 +378,10 @@ const Rewards = () => {
         message: `Request received. We'll send ${reward.name} to ${formatGhanaPhone(delivery.phone)} (${delivery.network}).`,
       } : {
         id: reward.id,
-        message: `Successfully redeemed ${reward.name}!`,
-        code: redemptionCode,
+        // No reference code: the one shown here used to be made up in the
+        // browser and stored nowhere, so staff could never look it up
+        // (2026-11-14). The redemption is listed under My Redemptions.
+        message: `Successfully redeemed ${reward.name}! You'll find it under My Redemptions.`,
       });
     } catch (error) {
       console.error('Error redeeming reward:', error);
@@ -512,7 +511,6 @@ const Rewards = () => {
                     {redeemSuccess && redeemSuccess.id === reward.id ? (
                       <div className={`${infoNote} mt-2.5 px-3 py-2.5 text-sm`} role="status">
                         <p>{redeemSuccess.message}</p>
-                        {redeemSuccess.code && <p className="font-mono font-bold mt-1">{redeemSuccess.code}</p>}
                       </div>
                     ) : (
                       <button

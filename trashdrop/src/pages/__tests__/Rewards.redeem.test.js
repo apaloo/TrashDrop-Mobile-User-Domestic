@@ -70,6 +70,8 @@ describe('Redeeming a reward', () => {
     expect(mockWrites).toEqual([]);
     expect(await screen.findByText('205')).toBeInTheDocument();
     expect(await screen.findByText(/Successfully redeemed Shopping voucher/)).toBeInTheDocument();
+    // and no made-up reference code (it was random and stored nowhere)
+    expect(screen.queryByText(/^REWARD-/)).not.toBeInTheDocument();
   });
 
   it("shows the server's reason when it refuses", async () => {
