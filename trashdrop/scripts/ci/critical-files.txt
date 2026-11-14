@@ -19,3 +19,4 @@ src/utils/householdCache.js
 src/services/ratingService.js
 src/components/digitalBin/LocationStep.js
 src/utils/locationSaveMessage.js
+src/components/digitalBin/ScheduledQRTab.js
